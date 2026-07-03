@@ -5,8 +5,13 @@
 #           either as a prebuilt image (ATLAS_API_IMAGE) or by pointing the
 #           commented `build:` at a local checkout.
 #
-#  Bring up:   docker compose up --build
-#  Frontend:   http://localhost:${WEB_PORT:-8080}
+#  Frontend only:   docker compose up --build           (default)
+#  With backend:    docker compose --profile api up --build   (needs an image)
+#  Frontend:        http://localhost:${WEB_PORT:-8080}
+#
+#  The `api` service is behind the `api` profile, so a plain `up` runs only the
+#  frontend — it needs no backend image. nginx resolves the API lazily, so /api
+#  just returns 502 until the backend is present and the SPA shows empty states.
 # ============================================================================
 services:
   web:
@@ -22,11 +27,11 @@ services:
         VITE_API_BASE: /api/v1
     ports:
       - "${WEB_PORT:-8080}:80"
-    depends_on:
-      - api
     restart: unless-stopped
 
   api:
+    # Only started with `--profile api` (the .NET backend lives in another repo).
+    profiles: ["api"]
     # Option A (default): pull a prebuilt backend image.
     image: ${ATLAS_API_IMAGE:-atlas-ppm-api:latest}
     # Option B: build from a sibling checkout of the backend repo instead —
