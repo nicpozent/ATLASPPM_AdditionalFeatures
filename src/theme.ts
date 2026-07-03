@@ -58,6 +58,30 @@ export const color = {
   dangerTint: "#FBE7E8",
 } as const;
 
+// Chart / status palette — exact values lifted from the prototype's chart
+// builders (makeDonut, makeBudgetChart, pipeline, sparklines). Kept here so no
+// screen invents its own hex; extend from the prototype only.
+export const chart = {
+  onTrack: "#15A34A",
+  atRisk: "#E0A100",
+  critical: "#D13438",
+  onHold: "#8A93A6",
+  planned: "#B6BECE",
+  grid: "#EEF1F6",
+  track: "#EEF1F6", // empty progress/bar track
+  // demand pipeline stages
+  pipeDraft: "#8A93A6",
+  pipeBacklog: "#0F6CBD",
+  pipeApproved: "#15A34A",
+  pipeInProgress: "#7A3FB0",
+  pipeOnHold: "#E0A100",
+  // methodology chips
+  method: {
+    SAFe: "#0F6CBD", Waterfall: "#7A3FB0", Scrum: "#15A34A", "V-Model": "#E0A100",
+    Kanban: "#0E7C7B", "Stage-Gate": "#C24A1F", Scrumban: "#5B8FCB",
+  } as Record<string, string>,
+} as const;
+
 export const radius = { sm: 8, md: 9, lg: 11, xl: 14, xxl: 16 } as const;
 
 export const layout = {
