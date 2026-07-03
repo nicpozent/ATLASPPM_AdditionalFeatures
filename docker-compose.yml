@@ -1,19 +1,47 @@
 # ============================================================================
-#  Atlas PPM — full-stack compose.
-#  `web`  : this repo's frontend, built and served by nginx (same-origin /api).
-#  `api`  : the separate .NET backend. It lives in another repo, so supply it
-#           either as a prebuilt image (ATLAS_API_IMAGE) or by pointing the
-#           commented `build:` at a local checkout.
+#  Atlas PPM — full-stack compose (frontend + .NET API + PostgreSQL).
+#  `db`   : PostgreSQL with a persistent named volume.
+#  `api`  : the .NET backend (server/), builds here; runs EF migrations + seed
+#           on startup, then serves /api/v1 from the database.
+#  `web`  : the frontend, built and served by nginx, same-origin /api -> api.
 #
-#  Frontend only:   docker compose up --build           (default)
-#  With backend:    docker compose --profile api up --build   (needs an image)
-#  Frontend:        http://localhost:${WEB_PORT:-8080}
-#
-#  The `api` service is behind the `api` profile, so a plain `up` runs only the
-#  frontend — it needs no backend image. nginx resolves the API lazily, so /api
-#  just returns 502 until the backend is present and the SPA shows empty states.
+#  Bring up the whole stack:  docker compose up --build
+#  Frontend:                  http://localhost:${WEB_PORT:-8080}
+#  Frontend only (no data):   docker compose up --build web
 # ============================================================================
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}
+      POSTGRES_DB: ${POSTGRES_DB:-atlas}
+    volumes:
+      - atlas_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas} -d ${POSTGRES_DB:-atlas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      ConnectionStrings__Postgres: "Host=db;Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};Password=${POSTGRES_PASSWORD:-atlas}"
+      # Entra API token validation — mirror the frontend's auth settings.
+      Auth__Enabled: ${VITE_AUTH_ENABLED:-false}
+      Auth__TenantId: ${VITE_AUTH_TENANT_ID:-}
+      Auth__Audience: ${VITE_API_AUDIENCE:-api://atlas-ppm}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+    restart: unless-stopped
+
   web:
     build:
       context: .
@@ -27,20 +55,9 @@ services:
         VITE_API_BASE: /api/v1
     ports:
       - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
-  api:
-    # Only started with `--profile api` (the .NET backend lives in another repo).
-    profiles: ["api"]
-    # Option A (default): pull a prebuilt backend image.
-    image: ${ATLAS_API_IMAGE:-atlas-ppm-api:latest}
-    # Option B: build from a sibling checkout of the backend repo instead —
-    # comment out `image:` above and uncomment:
-    # build: ../atlas-ppm-api
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      # Add the backend's own config here (connection strings, Entra API
-      # audience/authority for token validation, etc.).
-    expose:
-      - "8080"
-    restart: unless-stopped
+volumes:
+  atlas_db:

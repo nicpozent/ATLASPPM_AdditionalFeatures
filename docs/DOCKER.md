@@ -1,32 +1,25 @@
 # Running Atlas PPM with Docker Compose
 
-This composes the **frontend** (this repo, built and served by nginx) with the
-**API** (the separate .NET backend). nginx serves the SPA and reverse-proxies
-`/api/*` to the backend, so the app is same-origin — no CORS.
+This composes the whole solution: the **frontend** (nginx-served SPA), the
+**.NET API** (`server/`), and **PostgreSQL**. nginx serves the SPA and
+reverse-proxies `/api/*` to the API (same-origin, no CORS); the API talks to
+Postgres. The API applies EF Core migrations and seeds demo data on startup.
 
 ```
-┌─────────────── docker network ───────────────┐
-│  web (nginx :80)                              │
-│    /            → static SPA (dist/)          │
-│    /api/v1/...  → proxy → api:8080            │
-│  api (.NET Kestrel :8080)                     │
-└───────────────────────────────────────────────┘
-        ▲ published on host :${WEB_PORT:-8080}
+┌──────────────────── docker network ────────────────────┐
+│  web (nginx :80)                                        │
+│    /            → static SPA (dist/)                    │
+│    /api/v1/...  → proxy → api:8080                       │
+│  api (.NET :8080)  ── EF Core ──►  db (PostgreSQL :5432) │
+└─────────────────────────────────────────────────────────┘
+        ▲ published on host :${WEB_PORT:-8080}          ▲ volume: atlas_db
 ```
 
 ## Prerequisites
 
-- Docker + Docker Compose v2.
-- **Frontend only:** nothing else — `docker compose up --build` runs standalone.
-- **Full stack:** a backend image, because the .NET API is in a **different
-  repo**. Either:
-  - **A —** a prebuilt image, referenced by `ATLAS_API_IMAGE`, or
-  - **B —** a local checkout: in `docker-compose.yml`, comment out the `api`
-    service's `image:` and uncomment `build: ../atlas-ppm-api`.
+- Docker + Docker Compose v2. Nothing else — the API and DB build/run in-stack.
 
 ## Configure
-
-Copy the env template and fill it in (all optional for a no-auth demo):
 
 ```bash
 cp .env.example .env
@@ -34,43 +27,51 @@ cp .env.example .env
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_AUTH_ENABLED` | `true` to require Entra sign-in (baked at build time) |
+| `VITE_AUTH_ENABLED` | `true` to require Entra sign-in (frontend gate **and** API validation) |
 | `VITE_AUTH_TENANT_ID` / `VITE_AUTH_CLIENT_ID` | from the **Atlas PPM Web** app registration (+ tenant) |
 | `VITE_API_AUDIENCE` | Application ID URI of the **Atlas PPM API** app registration |
-| `ATLAS_API_IMAGE` | backend image for the `api` service |
 | `WEB_PORT` | host port for the frontend (default `8080`) |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | database credentials (used by both `db` and the API connection string) |
 
 > `VITE_*` are **build-time** values (Vite bakes them into the bundle), so after
-> changing them you must rebuild: `docker compose build web`.
+> changing them rebuild the web image: `docker compose build web`.
+> `Auth__*` are passed to the API at runtime for token validation.
 
 ## Run
 
-**Frontend only (default — no backend image needed):**
+**Whole stack (default):**
 
 ```bash
-docker compose up --build -d       # builds & starts just the `web` service
-# open http://localhost:8080
+docker compose up --build -d
+# open http://localhost:8080  — screens populate from the seeded database
 ```
 
-The `api` service is behind the `api` profile, so a plain `up` never tries to
-pull a backend image. nginx resolves the API lazily, so `/api` calls return 502
-and the SPA shows its **empty states** — the UI is fully reviewable standalone.
+On first start the API waits for Postgres to be healthy, runs migrations, and
+seeds the demo portfolio, so the app comes up populated.
 
-**Full stack (when you have a backend image):**
+**Frontend only (no data, for a quick UI look):**
 
 ```bash
-# set ATLAS_API_IMAGE in .env to a real image first
-docker compose --profile api up --build -d
+docker compose up --build web
+# /api returns 502; the SPA shows its empty states
 ```
 
 - With **auth enabled**, you'll hit the branded sign-in gate first. Register the
   site origin (e.g. `http://localhost:8080`) as a **SPA** redirect URI on the
-  Atlas PPM Web app registration.
+  Atlas PPM Web app registration, and make sure the API audience matches.
 
-## Notes
+## Production notes
 
-- The frontend image is a static nginx build — no Node.js at runtime.
-- Fingerprinted assets under `/assets/` are long-cached; `index.html` is
-  `no-cache` so new deploys are picked up immediately.
-- To serve behind TLS/a real hostname, terminate TLS at an ingress/load
-  balancer in front of the `web` service, or extend `deploy/nginx.conf`.
+- Change `POSTGRES_PASSWORD` (and ideally the user/db) from the defaults; use a
+  secrets mechanism rather than committing real values.
+- The `atlas_db` named volume holds the database — back it up; don't delete it.
+- Terminate TLS at an ingress/load balancer in front of `web`, or extend
+  `deploy/nginx.conf`.
+- Seeding only runs when the DB is empty (idempotent), so restarts are safe.
+
+## The API (`server/`)
+
+.NET 8 minimal API + EF Core (Npgsql). Implements the `/api/v1` surface the
+frontend calls; entities are projected to the exact DTOs the client expects.
+Auth is off unless `Auth__Enabled=true`, matching the frontend. See
+`server/` for the domain model, endpoints and seed data.

@@ -10,3 +10,7 @@ dist/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# .NET build outputs (server/)
+[Bb]in/
+[Oo]bj/
