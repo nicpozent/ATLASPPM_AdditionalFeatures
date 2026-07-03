@@ -50,9 +50,20 @@ docker compose up --build -d
 # open https://localhost  — screens populate from the seeded database
 ```
 
-On first start the API waits for Postgres to be healthy, runs migrations, and
-seeds the demo portfolio, so the app comes up populated. (A self-signed cert
-triggers a browser warning locally — expected.)
+On first start the API waits for Postgres to be healthy and runs migrations.
+It starts **empty** by default — screens show empty states and fill as you
+create real data. (A self-signed cert triggers a browser warning locally.)
+
+### Demo data (optional)
+
+To preload the demo portfolio (e.g. for a walkthrough), set `SEED_DEMO_DATA=true`
+and start against a **fresh** database. If the DB was already seeded and you want
+it clean, reset the volume (this deletes all data):
+
+```bash
+docker compose down -v      # removes the atlas_db volume
+docker compose up --build -d
+```
 
 **Frontend only (no data, for a quick UI look):**
 
