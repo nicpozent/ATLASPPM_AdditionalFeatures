@@ -18,8 +18,9 @@ same tenant.
 ### B. Atlas PPM Web (the frontend SPA)
 1. **New registration** → name `Atlas PPM Web`.
 2. **Authentication → Add a platform → Single-page application**, and add the
-   redirect URIs (the site origin), e.g. `https://atlas.yourco.com` and
-   `http://localhost:8080` for local Docker.
+   redirect URIs (the site origin — **HTTPS**), e.g. `https://atlas.yourco.com`
+   and `https://localhost` for local Docker. (Entra only accepts HTTPS redirect
+   URIs off `localhost`, which is why the stack terminates TLS — see step 3.)
 3. **API permissions → Add a permission → My APIs → Atlas PPM API →** the
    `access_as_user` scope. **Grant admin consent.**
 4. Note the **Application (client) ID** — this is `VITE_AUTH_CLIENT_ID`.
@@ -43,9 +44,22 @@ cp .env.example .env
 | `VITE_AUTH_TENANT_ID` | Directory (tenant) ID | no |
 | `VITE_AUTH_CLIENT_ID` | **Atlas PPM Web** client ID | no |
 | `VITE_API_AUDIENCE` | **Atlas PPM API** Application ID URI (`api://atlas-ppm`) | no |
-| `WEB_PORT` | published host port (e.g. `8080` or `80`) | no |
+| `HTTPS_PORT` / `HTTP_PORT` | published host ports (default `443` / `80`) | no |
 | `POSTGRES_USER` / `POSTGRES_DB` | database name/user | no |
 | `POSTGRES_PASSWORD` | **change from the default** | **yes** |
+
+### TLS certificate (required)
+
+nginx terminates HTTPS with a bring-your-own cert at `deploy/certs/atlas.crt` +
+`atlas.key` (git-ignored). For now, generate a self-signed `localhost` cert:
+
+```bash
+sh deploy/gen-dev-cert.sh
+```
+
+When your domain's A record is ready, replace those two files with your real
+certificate (same filenames), reissue for the hostname, and add
+`https://<your-domain>` as a SPA redirect URI in Entra.
 
 `VITE_*` are baked into the frontend bundle at build time (public values only —
 never put a secret in a `VITE_*` var). `Auth__*` and `ConnectionStrings__Postgres`
@@ -55,7 +69,7 @@ are read by the API at runtime; compose derives them from the same `.env`.
 
 ```bash
 docker compose up --build -d
-# → http://localhost:${WEB_PORT}
+# → https://localhost   (self-signed cert warns locally; expected)
 ```
 
 On first start the API waits for Postgres, applies migrations, and seeds the
