@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { color, font, layout } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
+import { useAuth } from "./AuthContext";
 import {
   SCREENS, NAV_MAIN, NAV_CONFIG, NAV_STAKEHOLDER_MAIN, NAV_STAKEHOLDER_CONFIG,
   type ScreenId,
@@ -51,6 +52,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 
 export function Sidebar() {
   const { identity, role } = useRole();
+  const { enabled: authEnabled, user, logout } = useAuth();
   const isStakeholder = role === "stakeholder";
   const main = isStakeholder ? NAV_STAKEHOLDER_MAIN : NAV_MAIN;
   const config = isStakeholder ? NAV_STAKEHOLDER_CONFIG : NAV_CONFIG;
@@ -98,6 +100,21 @@ export function Sidebar() {
           <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.name}</div>
           <div style={{ fontSize: 11.5, color: color.sidebarMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{identity.roleLabel}</div>
         </div>
+        {authEnabled && user && (
+          <button
+            onClick={logout}
+            title={`Sign out (${user.name})`}
+            aria-label={`Sign out ${user.name}`}
+            style={{
+              flex: "none", display: "flex", alignItems: "center", justifyContent: "center",
+              width: 32, height: 32, borderRadius: 8, cursor: "pointer",
+              color: color.sidebarMuted, background: "transparent",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+          >
+            <Icon name="logOut" size={16} />
+          </button>
+        )}
       </div>
     </aside>
   );
