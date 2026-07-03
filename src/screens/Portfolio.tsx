@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
-import { Card, HealthPill, ProgressBar, statusDot } from "@/components/ui";
+import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea } from "@/components/ui";
 import { SCREENS } from "@/nav";
 import {
   STATUS_FILTERS, useProjects, useBlockers, type Blocker, type BlockerStatus,
@@ -31,7 +31,7 @@ export default function Portfolio() {
     inProgress: blockers.filter((b) => b.status === "In progress").length,
     resolved: blockers.filter((b) => b.status === "Resolved").length,
   };
-  const filtered = projects.filter((p) => STATUS_FILTERS.find((f) => f.key === filter)?.match(p as never) ?? true);
+  const filtered = projects.filter((p) => STATUS_FILTERS.find((f) => f.key === filter)?.match(p) ?? true);
   const openProject = (id: string) => navigate(`${SCREENS.project.path}?id=${id}`);
 
   return (
@@ -47,15 +47,15 @@ export default function Portfolio() {
           </TabBtn>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={secBtn}><Icon name="search" size={16} /> Filter</button>
-        <button style={primaryBtn}><Icon name="plus" size={16} /> New project</button>
+        <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
+        <Button><Icon name="plus" size={16} /> New project</Button>
       </div>
 
       {tab === "projects" ? (
         <>
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
             {STATUS_FILTERS.map((f) => {
-              const count = f.key === "all" ? projects.length : projects.filter((p) => f.match(p as never)).length;
+              const count = f.key === "all" ? projects.length : projects.filter((p) => f.match(p)).length;
               const active = filter === f.key;
               return (
                 <button key={f.key} onClick={() => setFilter(f.key)} style={{
@@ -170,21 +170,21 @@ function BlockersTab({ blockers, counts, projects, onRaise }: {
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}><span style={{ color: "#D13438", display: "flex" }}><Icon name="alert" size={18} /></span><div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Raise a blocker</div></div>
         <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Manually log an impediment against a project.</div>
         <Field label="Project">
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={inputStyle}>
+          <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">{projects.length ? "Select a project" : "No projects available"}</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </Select>
         </Field>
         <Field label="Description">
-          <textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is blocking progress?" style={{ ...inputStyle, minHeight: 64, resize: "vertical" }} />
+          <Textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is blocking progress?" style={{ minHeight: 64 }} />
         </Field>
         <Field label="Owner">
-          <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Assignee name" style={inputStyle} />
+          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Assignee name" />
         </Field>
         <Field label="Status">
-          <select value={status} onChange={(e) => setStatus(e.target.value as BlockerStatus)} style={inputStyle}>
+          <Select value={status} onChange={(e) => setStatus(e.target.value as BlockerStatus)}>
             {(["Active", "In progress", "Resolved"] as BlockerStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          </Select>
         </Field>
         <button onClick={submit} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>Add blocker</button>
       </Card>
@@ -208,9 +208,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-const inputStyle: React.CSSProperties = {
-  width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px",
-  fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none",
-};
-const secBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

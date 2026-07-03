@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { color, font, radius } from "@/theme";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select } from "@/components/ui";
 import { Overlay } from "./Demands";
 
 // ---- Methodology library (structural catalogue — these definitions ARE the content) ----
@@ -237,20 +238,20 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
       {step === 1 && (
         <div>
           <label style={lbl}>Project name</label>
-          <input value={tpl.name} onChange={(e) => setTpl({ ...tpl, name: e.target.value })} placeholder="e.g. Customer Portal Rebuild" style={{ ...inp, fontSize: 13.5, marginBottom: 14 }} />
+          <Input value={tpl.name} onChange={(e) => setTpl({ ...tpl, name: e.target.value })} placeholder="e.g. Customer Portal Rebuild" style={{ fontSize: 13.5, marginBottom: 14 }} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={lbl}>Division</label>
-              <input value={tpl.dept} onChange={(e) => setTpl({ ...tpl, dept: e.target.value })} placeholder="Department" style={inp} />
+              <Input value={tpl.dept} onChange={(e) => setTpl({ ...tpl, dept: e.target.value })} placeholder="Department" />
             </div>
             <div>
               <label style={lbl}>Owner</label>
-              <input value={tpl.owner} onChange={(e) => setTpl({ ...tpl, owner: e.target.value })} placeholder="Project lead" style={inp} />
+              <Input value={tpl.owner} onChange={(e) => setTpl({ ...tpl, owner: e.target.value })} placeholder="Project lead" />
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
-            <button onClick={onClose} style={ghostBtn}>Cancel</button>
-            <button onClick={() => { if (tpl.name.trim()) setStep(2); }} style={primaryBtn}>Next: scaffold</button>
+            <Button variant="secondary" onClick={onClose} style={{ padding: "10px 16px" }}>Cancel</Button>
+            <Button onClick={() => { if (tpl.name.trim()) setStep(2); }} style={{ padding: "10px 18px" }}>Next: scaffold</Button>
           </div>
         </div>
       )}
@@ -268,13 +269,13 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
             ))}
           </div>
           <label style={lbl}>Create issues in</label>
-          <select value={tpl.integration} onChange={(e) => setTpl({ ...tpl, integration: e.target.value })} style={{ ...inp, cursor: "pointer" }}>
+          <Select value={tpl.integration} onChange={(e) => setTpl({ ...tpl, integration: e.target.value })}>
             {INTEGRATION_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </Select>
           <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 7 }}>The first work item is pushed to the connector now; the rest sync on the next cycle.</div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 9, marginTop: 20 }}>
-            <button onClick={() => setStep(1)} style={ghostBtn}>Back</button>
-            <button onClick={create} style={{ ...primaryBtn, background: color.success }}>Create project</button>
+            <Button variant="secondary" onClick={() => setStep(1)} style={{ padding: "10px 16px" }}>Back</Button>
+            <Button onClick={create} style={{ padding: "10px 18px", background: color.success }}>Create project</Button>
           </div>
         </div>
       )}
@@ -300,7 +301,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
             ))}
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-            <button onClick={onClose} style={primaryBtn}>Done</button>
+            <Button onClick={onClose} style={{ padding: "10px 18px" }}>Done</Button>
           </div>
         </div>
       )}
@@ -309,7 +310,4 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
 }
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
-const inp: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
 const useBtn: React.CSSProperties = { width: "100%", fontSize: 13, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: 9, borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const ghostBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 18px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

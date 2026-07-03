@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select } from "@/components/ui";
 import { Overlay } from "./Demands";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -113,14 +114,14 @@ function AddMilestoneModal({ onClose, onAdd }: { onClose: () => void; onAdd: (m:
       <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Add milestone</div>
       <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Place a key date on the timeline.</div>
       <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Milestone</label>
-      <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. MVP go-live" style={inputStyle} />
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. MVP go-live" />
       <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>Month</label>
-      <select value={month} onChange={(e) => setMonth(+e.target.value)} style={inputStyle}>
+      <Select value={month} onChange={(e) => setMonth(+e.target.value)}>
         {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-      </select>
+      </Select>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-        <button onClick={onClose} style={secBtn}>Cancel</button>
-        <button onClick={submit} style={primaryBtn}>Add milestone</button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} style={{ padding: "10px 18px" }}>Add milestone</Button>
       </div>
     </Overlay>
   );
@@ -130,6 +131,3 @@ function Legend({ swatch, children }: { swatch: React.ReactNode; children: React
   return <span style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch}{children}</span>;
 }
 const selectStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.primary, background: "#fff", cursor: "pointer" };
-const inputStyle: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
-const secBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

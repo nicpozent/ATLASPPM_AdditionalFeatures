@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select } from "@/components/ui";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
@@ -69,7 +70,7 @@ export default function Programs() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Group related projects under a program for aggregated health, budget &amp; progress.</div>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setModal(true)} style={primaryBtn}><Icon name="plus" size={16} /> New program</button>
+        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New program</Button>
       </div>
 
       {programs.length === 0 ? (
@@ -242,12 +243,12 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
             );
           })}
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 8, marginTop: 12 }}>
-            <input value={skName} onChange={(e) => setSkName(e.target.value)} placeholder="Stakeholder name" style={smInput} />
-            <input value={skRole} onChange={(e) => setSkRole(e.target.value)} placeholder="Role" style={smInput} />
+            <Input value={skName} onChange={(e) => setSkName(e.target.value)} placeholder="Stakeholder name" />
+            <Input value={skRole} onChange={(e) => setSkRole(e.target.value)} placeholder="Role" />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginTop: 8 }}>
-            <select value={skPower} onChange={(e) => setSkPower(e.target.value as PowInt)} style={smInput}><option value="High">Power: High</option><option value="Low">Power: Low</option></select>
-            <select value={skInterest} onChange={(e) => setSkInterest(e.target.value as PowInt)} style={smInput}><option value="High">Interest: High</option><option value="Low">Interest: Low</option></select>
+            <Select value={skPower} onChange={(e) => setSkPower(e.target.value as PowInt)}><option value="High">Power: High</option><option value="Low">Power: Low</option></Select>
+            <Select value={skInterest} onChange={(e) => setSkInterest(e.target.value as PowInt)}><option value="High">Interest: High</option><option value="Low">Interest: Low</option></Select>
             <button onClick={addStk} style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Add</button>
           </div>
         </div>
@@ -330,15 +331,15 @@ function NewProgramModal({ projectOpts, onClose, onCreate }: { projectOpts: Proj
         </div>
       </div>
       <label style={lbl}>Program name</label>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Customer Experience 2027" style={{ ...smInput, marginBottom: 14, fontSize: 13.5 }} />
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Customer Experience 2027" style={{ marginBottom: 14, fontSize: 13.5 }} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-        <div><label style={lbl}>Owner</label><input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Program manager" style={smInput} /></div>
-        <div><label style={lbl}>Goal</label><input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Strategic objective" style={smInput} /></div>
+        <div><label style={lbl}>Owner</label><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Program manager" /></div>
+        <div><label style={lbl}>Goal</label><Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Strategic objective" /></div>
       </div>
       <label style={lbl}>Status</label>
-      <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...smInput, marginBottom: 14 }}>
+      <Select value={status} onChange={(e) => setStatus(e.target.value)} style={{ marginBottom: 14 }}>
         {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
+      </Select>
       <label style={{ ...lbl, marginBottom: 7 }}>Projects to include</label>
       <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, maxHeight: 220, overflowY: "auto" }}>
         {projectOpts.length === 0 ? (
@@ -364,5 +365,3 @@ function NewProgramModal({ projectOpts, onClose, onCreate }: { projectOpts: Proj
 function folderBadge(size: number, br = 12): React.CSSProperties {
   return { width: size, height: size, borderRadius: br, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 }
-const smInput: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none", boxSizing: "border-box" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

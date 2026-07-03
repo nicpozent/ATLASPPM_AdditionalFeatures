@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { color, font, radius } from "@/theme";
-import { Card, EmptyBlock } from "@/components/ui";
+import { color, font } from "@/theme";
+import { Card, EmptyBlock, Button, Input, Select } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // My Team — built 1:1 from the prototype (design/Atlas PPM.dc.html, lines
@@ -8,8 +8,6 @@ import { Card, EmptyBlock } from "@/components/ui";
 // (data), so the skills matrix and vacation calendar render their real
 // structure with empty states until members load.
 // ---------------------------------------------------------------------------
-
-const inputStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 7, padding: "7px 10px", fontSize: 12.5, fontFamily: "inherit", color: color.text, background: "#fff" };
 
 export default function Teams() {
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
@@ -46,14 +44,14 @@ export default function Teams() {
       <div style={{ background: color.surfaceAlt, border: `1px solid ${color.bg}`, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add an absence</div>
         <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
-          <select style={{ ...inputStyle, cursor: "pointer" }}><option value="">Select resource…</option></select>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inputStyle, color: color.textMuted }} />
+          <Select style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", cursor: "pointer" }}><option value="">Select resource…</option></Select>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", color: color.textMuted }} />
           <span style={{ fontSize: 12, color: color.faint3 }}>to</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inputStyle, color: color.textMuted }} />
-          <select style={{ ...inputStyle, cursor: "pointer" }}>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", color: color.textMuted }} />
+          <Select style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", cursor: "pointer" }}>
             <option value="vacation">Vacation</option><option value="sick">Sick</option><option value="training">Training</option>
-          </select>
-          <button style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "8px 14px", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" }}>Add</button>
+          </Select>
+          <Button style={{ fontSize: 12.5, padding: "8px 14px", borderRadius: 7 }}>Add</Button>
         </div>
         <div style={{ fontSize: 12, color: color.faint3, marginTop: 12 }}>No absences added yet.</div>
       </div>

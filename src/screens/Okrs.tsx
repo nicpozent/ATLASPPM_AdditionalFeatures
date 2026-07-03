@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { useRole } from "@/components/RoleContext";
 import { api } from "@/api";
+import { Button, Input } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Data model + hook (empty by default until the API exists).
@@ -56,9 +57,9 @@ export default function Okrs() {
           Objectives &amp; key results, each linked to the projects/programs/products that deliver them.
         </div>
         {canEdit && (
-          <button onClick={() => setModal({ kind: "obj" })} style={primaryBtn}>
+          <Button onClick={() => setModal({ kind: "obj" })} style={{ padding: "9px 14px" }}>
             <Icon name="plus" size={16} /> New objective
-          </button>
+          </Button>
         )}
       </div>
 
@@ -161,15 +162,15 @@ function ObjectiveModal({ onClose, onSave }: { onClose: () => void; onSave: (o: 
     <ModalShell title="New objective" onClose={onClose} width={480}>
       <div style={{ padding: 20 }}>
         <Label>Objective</Label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lead Nordic e-commerce conversion" style={{ ...inputStyle, marginBottom: 13 }} />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lead Nordic e-commerce conversion" style={{ fontSize: 13.5, marginBottom: 13 }} />
         <div style={{ display: "flex", gap: 11 }}>
           <div style={{ flex: 1 }}>
             <Label>Owner</Label>
-            <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" style={inputStyle} />
+            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" style={{ fontSize: 13.5 }} />
           </div>
           <div style={{ width: 140 }}>
             <Label>Horizon</Label>
-            <input value={horizon} onChange={(e) => setHorizon(e.target.value)} placeholder="FY2026" style={inputStyle} />
+            <Input value={horizon} onChange={(e) => setHorizon(e.target.value)} placeholder="FY2026" style={{ fontSize: 13.5 }} />
           </div>
         </div>
       </div>
@@ -191,11 +192,11 @@ function KrModal({ onClose, onSave }: { onClose: () => void; onSave: (k: Kr) => 
     <ModalShell title="Add key result" onClose={onClose} width={480}>
       <div style={{ padding: 20 }}>
         <Label>Key result</Label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Conversion rate 3.2% → 4.0%" style={{ ...inputStyle, marginBottom: 13 }} />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Conversion rate 3.2% → 4.0%" style={{ fontSize: 13.5, marginBottom: 13 }} />
         <Label>Linked deliverable</Label>
-        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Project, program or product" style={{ ...inputStyle, marginBottom: 13 }} />
+        <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Project, program or product" style={{ fontSize: 13.5, marginBottom: 13 }} />
         <Label>Starting progress %</Label>
-        <input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(clampPct(e.target.value))} style={{ ...inputStyle, width: 90, fontFamily: font.mono }} />
+        <Input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(clampPct(e.target.value))} style={{ fontSize: 13.5, width: 90, fontFamily: font.mono }} />
       </div>
       <ModalActions onClose={onClose} onSave={save} saveLabel="Add key result" />
     </ModalShell>
@@ -225,11 +226,3 @@ function ModalActions({ onClose, onSave, saveLabel }: { onClose: () => void; onS
 function Label({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
 }
-const inputStyle: React.CSSProperties = {
-  width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px",
-  fontSize: 13.5, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none", boxSizing: "border-box",
-};
-const primaryBtn: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff",
-  background: color.primary, border: "none", padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
-};
