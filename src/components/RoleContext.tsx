@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { ROLES, type RoleIdentity } from "@/nav";
+import { useAuth } from "./AuthContext";
 
 interface RoleCtx { role: string; setRole: (r: string) => void; identity: RoleIdentity; }
 const Ctx = createContext<RoleCtx | null>(null);
@@ -7,9 +8,18 @@ const Ctx = createContext<RoleCtx | null>(null);
 const KEY = "atlas.role";
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [role, setRoleState] = useState<string>(() => localStorage.getItem(KEY) || "pmo");
   const setRole = (r: string) => { setRoleState(r); localStorage.setItem(KEY, r); };
-  const identity = useMemo(() => ROLES.find((x) => x.value === role) ?? ROLES[1], [role]);
+  const identity = useMemo<RoleIdentity>(() => {
+    const base = ROLES.find((x) => x.value === role) ?? ROLES[1];
+    // When signed in via Entra the identity IS the real user — the switcher only
+    // changes which role's view/nav is shown. With auth off (demo) fall back to
+    // the prototype's cosmetic identity.
+    return user
+      ? { ...base, name: user.name, initials: user.initials, roleLabel: user.username }
+      : base;
+  }, [role, user]);
   return <Ctx.Provider value={{ role, setRole, identity }}>{children}</Ctx.Provider>;
 }
 
