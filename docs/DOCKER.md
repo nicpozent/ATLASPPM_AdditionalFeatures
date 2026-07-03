@@ -17,7 +17,9 @@ This composes the **frontend** (this repo, built and served by nginx) with the
 ## Prerequisites
 
 - Docker + Docker Compose v2.
-- A backend image, because the .NET API is in a **different repo**. Either:
+- **Frontend only:** nothing else — `docker compose up --build` runs standalone.
+- **Full stack:** a backend image, because the .NET API is in a **different
+  repo**. Either:
   - **A —** a prebuilt image, referenced by `ATLAS_API_IMAGE`, or
   - **B —** a local checkout: in `docker-compose.yml`, comment out the `api`
     service's `image:` and uncomment `build: ../atlas-ppm-api`.
@@ -43,14 +45,24 @@ cp .env.example .env
 
 ## Run
 
+**Frontend only (default — no backend image needed):**
+
 ```bash
-docker compose up --build          # build the frontend image + start both services
+docker compose up --build -d       # builds & starts just the `web` service
 # open http://localhost:8080
 ```
 
-- With **no API image available**, the `api` service won't start and `/api`
-  calls return 502 — but the frontend still loads and shows its empty states
-  (by design), so you can review the UI standalone.
+The `api` service is behind the `api` profile, so a plain `up` never tries to
+pull a backend image. nginx resolves the API lazily, so `/api` calls return 502
+and the SPA shows its **empty states** — the UI is fully reviewable standalone.
+
+**Full stack (when you have a backend image):**
+
+```bash
+# set ATLAS_API_IMAGE in .env to a real image first
+docker compose --profile api up --build -d
+```
+
 - With **auth enabled**, you'll hit the branded sign-in gate first. Register the
   site origin (e.g. `http://localhost:8080`) as a **SPA** redirect URI on the
   Atlas PPM Web app registration.
