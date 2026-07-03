@@ -10,6 +10,8 @@ public record UpdateBlockerStatusReq(string Status);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
+public record CreateKrReq(string Title, string? Link, int? Progress);
+public record UpdateKrProgressReq(int Progress);
 
 public static class WriteEndpoints
 {
@@ -145,6 +147,34 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/okrs/{o.Id}",
                 new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon, new List<KrDto>()));
+        });
+
+        api.MapPost("/okrs/{id}/krs", async (string id, CreateKrReq req, AtlasDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var obj = await db.Objectives.FindAsync(id);
+            if (obj is null) return Results.NotFound();
+            var kr = new KeyResult
+            {
+                Id = await NextId(db.KeyResults.Select(x => x.Id), "KR-", db),
+                Title = req.Title.Trim(),
+                Link = req.Link?.Trim() ?? "",
+                Progress = Math.Clamp(req.Progress ?? 0, 0, 100),
+                ObjectiveId = id,
+            };
+            db.KeyResults.Add(kr);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/okrs/{id}/krs/{kr.Id}",
+                new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
+        });
+
+        api.MapPatch("/krs/{id}", async (string id, UpdateKrProgressReq req, AtlasDbContext db) =>
+        {
+            var kr = await db.KeyResults.FindAsync(id);
+            if (kr is null) return Results.NotFound();
+            kr.Progress = Math.Clamp(req.Progress, 0, 100);
+            await db.SaveChangesAsync();
+            return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
         });
     }
 

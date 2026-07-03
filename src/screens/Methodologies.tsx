@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select } from "@/components/ui";
 import { Overlay } from "./Demands";
@@ -207,19 +209,33 @@ export default function Methodologies() {
 
 interface Created { name: string; methodology: string; dept: string; owner: string; integration: string | null; items: { title: string; ext: string | null; pushed: boolean }[] }
 
+interface CreatedProject { id: string; name: string }
+interface NewProject { name: string; dept: string; owner: string; methodology: string }
+
 function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: TplState) => void; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [created, setCreated] = useState<Created | null>(null);
   const scaffold = scaffoldFor(tpl.methodology);
+  const qc = useQueryClient();
+
+  const createProject = useMutation({
+    mutationFn: (body: NewProject) => api<CreatedProject>("/projects", { method: "POST", body: JSON.stringify(body) }),
+  });
 
   const create = () => {
-    const sys = tpl.integration === "jira" ? "Jira" : tpl.integration === "ado" ? "Azure DevOps" : null;
-    const prefix = tpl.integration === "jira" ? "BILT" : "ADO";
-    setCreated({
-      name: tpl.name.trim(), methodology: tpl.methodology, dept: tpl.dept || "—", owner: tpl.owner || "Unassigned", integration: sys,
-      items: scaffold.map((it, i) => ({ title: it.title, ext: sys ? `${prefix}-${1024 + i}` : null, pushed: !!sys && i === 0 })),
+    const body: NewProject = { name: tpl.name.trim(), dept: tpl.dept.trim(), owner: tpl.owner.trim(), methodology: tpl.methodology };
+    createProject.mutate(body, {
+      onSuccess: (project) => {
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        const sys = tpl.integration === "jira" ? "Jira" : tpl.integration === "ado" ? "Azure DevOps" : null;
+        const prefix = tpl.integration === "jira" ? "BILT" : "ADO";
+        setCreated({
+          name: project?.name || tpl.name.trim(), methodology: tpl.methodology, dept: tpl.dept || "—", owner: tpl.owner || "Unassigned", integration: sys,
+          items: scaffold.map((it, i) => ({ title: it.title, ext: sys ? (i === 0 && project?.id ? project.id : `${prefix}-${1024 + i}`) : null, pushed: !!sys && i === 0 })),
+        });
+        setStep(3);
+      },
     });
-    setStep(3);
   };
 
   return (
@@ -275,7 +291,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
           <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 7 }}>The first work item is pushed to the connector now; the rest sync on the next cycle.</div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 9, marginTop: 20 }}>
             <Button variant="secondary" onClick={() => setStep(1)} style={{ padding: "10px 16px" }}>Back</Button>
-            <Button onClick={create} style={{ padding: "10px 18px", background: color.success }}>Create project</Button>
+            <Button onClick={create} disabled={createProject.isPending} style={{ padding: "10px 18px", background: color.success }}>{createProject.isPending ? "Creating…" : "Create project"}</Button>
           </div>
         </div>
       )}
