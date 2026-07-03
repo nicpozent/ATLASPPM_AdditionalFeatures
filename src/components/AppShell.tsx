@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { color } from "@/theme";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { ErrorBoundary } from "./ui";
 
 export function AppShell() {
   return (
@@ -10,7 +11,9 @@ export function AppShell() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Topbar />
         <main style={{ flex: 1, overflowY: "auto", padding: "26px 28px 60px" }}>
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
