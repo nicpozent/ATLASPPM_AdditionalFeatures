@@ -7,22 +7,26 @@ Postgres. The API applies EF Core migrations and seeds demo data on startup.
 
 ```
 ┌──────────────────── docker network ────────────────────┐
-│  web (nginx :80)                                        │
+│  web (nginx :443 TLS, :80→443)                          │
 │    /            → static SPA (dist/)                    │
 │    /api/v1/...  → proxy → api:8080                       │
 │  api (.NET :8080)  ── EF Core ──►  db (PostgreSQL :5432) │
 └─────────────────────────────────────────────────────────┘
-        ▲ published on host :${WEB_PORT:-8080}          ▲ volume: atlas_db
+        ▲ published on host :${HTTPS_PORT:-443}         ▲ volume: atlas_db
 ```
 
 ## Prerequisites
 
-- Docker + Docker Compose v2. Nothing else — the API and DB build/run in-stack.
+- Docker + Docker Compose v2.
+- A **TLS certificate** at `deploy/certs/atlas.crt` + `atlas.key` (nginx
+  terminates HTTPS; Entra only accepts HTTPS redirect URIs off localhost).
+  For local use, generate a self-signed one: `sh deploy/gen-dev-cert.sh`.
 
 ## Configure
 
 ```bash
 cp .env.example .env
+sh deploy/gen-dev-cert.sh          # self-signed localhost cert (or drop in your real cert)
 ```
 
 | Variable | Purpose |
@@ -30,7 +34,7 @@ cp .env.example .env
 | `VITE_AUTH_ENABLED` | `true` to require Entra sign-in (frontend gate **and** API validation) |
 | `VITE_AUTH_TENANT_ID` / `VITE_AUTH_CLIENT_ID` | from the **Atlas PPM Web** app registration (+ tenant) |
 | `VITE_API_AUDIENCE` | Application ID URI of the **Atlas PPM API** app registration |
-| `WEB_PORT` | host port for the frontend (default `8080`) |
+| `HTTPS_PORT` / `HTTP_PORT` | host ports (default `443` / `80`; HTTP redirects to HTTPS) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | database credentials (used by both `db` and the API connection string) |
 
 > `VITE_*` are **build-time** values (Vite bakes them into the bundle), so after
@@ -43,11 +47,12 @@ cp .env.example .env
 
 ```bash
 docker compose up --build -d
-# open http://localhost:8080  — screens populate from the seeded database
+# open https://localhost  — screens populate from the seeded database
 ```
 
 On first start the API waits for Postgres to be healthy, runs migrations, and
-seeds the demo portfolio, so the app comes up populated.
+seeds the demo portfolio, so the app comes up populated. (A self-signed cert
+triggers a browser warning locally — expected.)
 
 **Frontend only (no data, for a quick UI look):**
 
@@ -57,7 +62,7 @@ docker compose up --build web
 ```
 
 - With **auth enabled**, you'll hit the branded sign-in gate first. Register the
-  site origin (e.g. `http://localhost:8080`) as a **SPA** redirect URI on the
+  site origin (e.g. `https://localhost`) as a **SPA** redirect URI on the
   Atlas PPM Web app registration, and make sure the API audience matches.
 
 ## Production notes
