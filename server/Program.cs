@@ -22,11 +22,17 @@ if (authEnabled)
             "Auth:Enabled=true but Auth:TenantId and/or Auth:Audience are not set. " +
             "Configure them (env: Auth__TenantId, Auth__Audience) or set Auth:Enabled=false.");
 
+    // Accept the audience in both forms — the GUID and the api://GUID URI —
+    // since the token's `aud` differs depending on how the scope was requested
+    // (and single-app setups must request the GUID form; see AADSTS90009).
+    var bare = audience.StartsWith("api://") ? audience["api://".Length..] : audience;
+    var validAudiences = new[] { audience, bare, $"api://{bare}" }.Distinct().ToArray();
+
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(o =>
         {
             o.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
-            o.Audience = audience;
+            o.TokenValidationParameters.ValidAudiences = validAudiences;
         });
     builder.Services.AddAuthorization();
 }

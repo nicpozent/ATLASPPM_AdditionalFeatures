@@ -26,8 +26,11 @@ export const msal = AUTH_ENABLED
     })
   : null;
 
-// Scope requested for the Atlas API access token.
-const API_SCOPE = `${import.meta.env.VITE_API_AUDIENCE}/.default`;
+// Scope requested for the Atlas API access token. Defaults to `/.default`;
+// for a single app registration that exposes its own API, set VITE_API_SCOPE to
+// a named scope (e.g. "access_as_user") and VITE_API_AUDIENCE to the app's GUID
+// — requesting `api://<self>/.default` is rejected by Entra (AADSTS90009).
+const API_SCOPE = `${import.meta.env.VITE_API_AUDIENCE}/${(import.meta.env.VITE_API_SCOPE as string) || ".default"}`;
 // Scopes for the initial interactive sign-in (identity + the API).
 const LOGIN_SCOPES = ["openid", "profile", "email", API_SCOPE];
 
