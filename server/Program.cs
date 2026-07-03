@@ -14,11 +14,19 @@ builder.Services.AddDbContext<AtlasDbContext>(o =>
 var authEnabled = cfg.GetValue("Auth:Enabled", false);
 if (authEnabled)
 {
+    var tenantId = cfg["Auth:TenantId"];
+    var audience = cfg["Auth:Audience"];
+    // Fail fast on misconfiguration rather than starting an unprotected API.
+    if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(audience))
+        throw new InvalidOperationException(
+            "Auth:Enabled=true but Auth:TenantId and/or Auth:Audience are not set. " +
+            "Configure them (env: Auth__TenantId, Auth__Audience) or set Auth:Enabled=false.");
+
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(o =>
         {
-            o.Authority = $"https://login.microsoftonline.com/{cfg["Auth:TenantId"]}/v2.0";
-            o.Audience = cfg["Auth:Audience"];
+            o.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+            o.Audience = audience;
         });
     builder.Services.AddAuthorization();
 }

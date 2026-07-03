@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
@@ -45,11 +45,16 @@ function Meter({ n, color: c }: { n: number; color: string }) {
   );
 }
 
+interface NewDemand { title: string; dept: string; priority: keyof typeof PRIORITY; value: number; effort: number; }
+
 export default function Demands() {
-  const { data: fetched = [] } = useDemands();
-  const [local, setLocal] = useState<Demand[]>([]);
+  const { data: demands = [] } = useDemands();
+  const qc = useQueryClient();
   const [modal, setModal] = useState(false);
-  const demands = [...local, ...fetched];
+  const createDemand = useMutation({
+    mutationFn: (body: NewDemand) => api<Demand>("/demands", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["demands"] }),
+  });
 
   return (
     <div>
@@ -101,12 +106,12 @@ export default function Demands() {
         })}
       </div>
 
-      {modal && <NewDemandModal onClose={() => setModal(false)} onCreate={(d) => { setLocal((l) => [d, ...l]); setModal(false); }} />}
+      {modal && <NewDemandModal submitting={createDemand.isPending} onClose={() => setModal(false)} onCreate={(body) => createDemand.mutate(body, { onSuccess: () => setModal(false) })} />}
     </div>
   );
 }
 
-function NewDemandModal({ onClose, onCreate }: { onClose: () => void; onCreate: (d: Demand) => void }) {
+function NewDemandModal({ onClose, onCreate, submitting }: { onClose: () => void; onCreate: (d: NewDemand) => void; submitting?: boolean }) {
   const [title, setTitle] = useState("");
   const [dept, setDept] = useState("");
   const [priority, setPriority] = useState<keyof typeof PRIORITY>("Medium");
@@ -114,11 +119,7 @@ function NewDemandModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   const [effort, setEffort] = useState(3);
   const submit = () => {
     if (!title.trim()) return;
-    onCreate({
-      id: "DM-" + Math.floor(300 + Math.random() * 699), title: title.trim(), stage: "draft",
-      priority, value, effort, requester: "You", dept: dept.trim() || "Unassigned",
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
-    });
+    onCreate({ title: title.trim(), dept: dept.trim(), priority, value, effort });
   };
   return (
     <Overlay onClose={onClose}>
@@ -138,7 +139,7 @@ function NewDemandModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
       </Select>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={submit}>Create demand</Button>
+        <Button onClick={submit} disabled={submitting}>{submitting ? "Creating…" : "Create demand"}</Button>
       </div>
     </Overlay>
   );
