@@ -1,8 +1,9 @@
 // ============================================================================
 //  Auth — Microsoft Entra ID via MSAL (browser, PKCE).
 //  Disabled by default (VITE_AUTH_ENABLED=false) so the UI runs with no backend.
-//  Turn it on + fill the env vars to wire real SSO. Access tokens are kept in
-//  memory (not localStorage) to reduce XSS token-theft risk.
+//  Turn it on + fill the env vars to wire real SSO. Tokens live in
+//  sessionStorage: cleared when the tab closes, and — unlike memoryStorage —
+//  they survive the full-page navigation that the redirect sign-in flow needs.
 // ============================================================================
 import {
   PublicClientApplication,
@@ -19,7 +20,9 @@ export const msal = AUTH_ENABLED
         authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AUTH_TENANT_ID}`,
         redirectUri: window.location.origin,
       },
-      cache: { cacheLocation: "memoryStorage" },
+      // sessionStorage (not memoryStorage): the redirect flow navigates away to
+      // Entra and back, and the in-flight request state must survive that.
+      cache: { cacheLocation: "sessionStorage" },
     })
   : null;
 
@@ -41,7 +44,7 @@ function toUser(a: AccountInfo): AuthUser {
   return { name, username: a.username, initials };
 }
 
-// The signed-in account, if any. MSAL keeps this in memory only (see cache above).
+// The signed-in account, if any.
 export function currentUser(): AuthUser | null {
   if (!msal) return null;
   const account = msal.getActiveAccount() ?? msal.getAllAccounts()[0] ?? null;
@@ -51,21 +54,29 @@ export function currentUser(): AuthUser | null {
 // Completes a redirect sign-in (call once on boot) and sets the active account.
 export async function handleRedirect(): Promise<void> {
   if (!msal) return;
-  const result = await msal.handleRedirectPromise();
-  if (result?.account) msal.setActiveAccount(result.account);
-  else if (!msal.getActiveAccount()) {
-    const existing = msal.getAllAccounts()[0];
-    if (existing) msal.setActiveAccount(existing);
+  try {
+    const result = await msal.handleRedirectPromise();
+    if (result?.account) msal.setActiveAccount(result.account);
+    else if (!msal.getActiveAccount()) {
+      const existing = msal.getAllAccounts()[0];
+      if (existing) msal.setActiveAccount(existing);
+    }
+  } catch (e) {
+    console.error("[auth] completing sign-in failed:", e);
   }
 }
 
 export function login(): void {
-  void msal?.loginRedirect({ scopes: LOGIN_SCOPES });
+  // Surface failures — a silent catch here is why a dead "Sign in" button is
+  // so hard to debug. loginRedirect navigates away on success.
+  msal?.loginRedirect({ scopes: LOGIN_SCOPES }).catch((e) =>
+    console.error("[auth] sign-in failed:", e));
 }
 
 export function logout(): void {
   const account = msal?.getActiveAccount() ?? undefined;
-  void msal?.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin });
+  msal?.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin }).catch((e) =>
+    console.error("[auth] sign-out failed:", e));
 }
 
 // Acquires an API access token silently, falling back to an interactive
