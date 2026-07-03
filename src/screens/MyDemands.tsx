@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
@@ -29,11 +29,16 @@ function useMyDemands() {
   });
 }
 
+interface NewDemand { title: string; dept: string; priority: Priority; }
+
 export default function MyDemands() {
-  const { data: fetched = [] } = useMyDemands();
-  const [local, setLocal] = useState<MyDemand[]>([]);
+  const { data: demands = [] } = useMyDemands();
+  const qc = useQueryClient();
   const [modal, setModal] = useState(false);
-  const demands = [...local, ...fetched];
+  const submitDemand = useMutation({
+    mutationFn: (body: NewDemand) => api("/demands", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["demands", "my"] }),
+  });
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -72,14 +77,15 @@ export default function MyDemands() {
       {modal && (
         <SubmitDemandModal
           onClose={() => setModal(false)}
-          onSubmit={(d) => { setLocal((l) => [d, ...l]); setModal(false); }}
+          submitting={submitDemand.isPending}
+          onSubmit={(body) => submitDemand.mutate(body, { onSuccess: () => setModal(false) })}
         />
       )}
     </div>
   );
 }
 
-function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: MyDemand) => void }) {
+function SubmitDemandModal({ onClose, onSubmit, submitting }: { onClose: () => void; onSubmit: (d: NewDemand) => void; submitting?: boolean }) {
   const [title, setTitle] = useState("");
   const [dept, setDept] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
@@ -87,11 +93,7 @@ function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
 
   const submit = () => {
     if (!title.trim()) return;
-    onSubmit({
-      id: "DM-" + Math.floor(300 + Math.random() * 699),
-      title: title.trim(), dept: dept.trim() || "Unassigned", priority, stage: "draft",
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
-    });
+    onSubmit({ title: title.trim(), dept: dept.trim(), priority });
   };
 
   return (
@@ -111,7 +113,7 @@ function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is needed and why?" style={{ minHeight: 72, resize: "vertical" }} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit}>Submit demand</Button>
+          <Button onClick={submit} disabled={submitting}>{submitting ? "Submitting…" : "Submit demand"}</Button>
         </div>
       </div>
     </div>

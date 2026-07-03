@@ -12,6 +12,8 @@ public static class Endpoints
         if (app.Configuration.GetValue("Auth:Enabled", false))
             api.RequireAuthorization();
 
+        api.MapAtlasWriteEndpoints();
+
         api.MapGet("/projects", async (AtlasDbContext db) =>
             await db.Projects.OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,

@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea } from "@/components/ui";
 import { SCREENS } from "@/nav";
@@ -15,16 +17,23 @@ const BLK_COLORS: Record<BlockerStatus, { dot: string; ink: string; tint: string
   Resolved:      { dot: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
 };
 
+interface RaiseBlocker { title: string; projectId: string; owner: string; status: BlockerStatus; }
+
 export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: projects = [] } = useProjects();
-  const { data: fetchedBlockers = [] } = useBlockers();
+  const { data: blockers = [] } = useBlockers();
 
-  // Locally-raised blockers (user input, not seed data) merged with fetched.
-  const [localBlockers, setLocalBlockers] = useState<Blocker[]>([]);
-  const blockers = useMemo(() => [...localBlockers, ...fetchedBlockers], [localBlockers, fetchedBlockers]);
+  const raiseBlocker = useMutation({
+    mutationFn: (body: RaiseBlocker) => api("/blockers", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blockers"] });
+      qc.invalidateQueries({ queryKey: ["projects"] }); // blockerCount changes
+    },
+  });
 
   const blkCounts = {
     active: blockers.filter((b) => b.status === "Active").length,
@@ -108,16 +117,17 @@ export default function Portfolio() {
       ) : (
         <BlockersTab
           blockers={blockers} counts={blkCounts} projects={projects}
-          onRaise={(b) => setLocalBlockers((l) => [b, ...l])}
+          submitting={raiseBlocker.isPending}
+          onRaise={(payload) => raiseBlocker.mutate(payload)}
         />
       )}
     </div>
   );
 }
 
-function BlockersTab({ blockers, counts, projects, onRaise }: {
+function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
   blockers: Blocker[]; counts: { active: number; inProgress: number; resolved: number };
-  projects: { id: string; name: string }[]; onRaise: (b: Blocker) => void;
+  projects: { id: string; name: string }[]; onRaise: (b: RaiseBlocker) => void; submitting?: boolean;
 }) {
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState("");
@@ -125,12 +135,8 @@ function BlockersTab({ blockers, counts, projects, onRaise }: {
   const [status, setStatus] = useState<BlockerStatus>("Active");
 
   const submit = () => {
-    if (!title.trim()) return;
-    const proj = projects.find((p) => p.id === projectId);
-    onRaise({
-      id: "BLK-" + Math.floor(1000 + Math.random() * 9000),
-      title: title.trim(), projectId, projectName: proj?.name ?? "Unassigned", owner: owner.trim() || "Unassigned", status,
-    });
+    if (!title.trim() || !projectId) return;
+    onRaise({ title: title.trim(), projectId, owner: owner.trim(), status });
     setTitle(""); setOwner("");
   };
 
@@ -186,7 +192,7 @@ function BlockersTab({ blockers, counts, projects, onRaise }: {
             {(["Active", "In progress", "Resolved"] as BlockerStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
         </Field>
-        <button onClick={submit} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>Add blocker</button>
+        <button onClick={submit} disabled={submitting} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
       </Card>
     </div>
   );
