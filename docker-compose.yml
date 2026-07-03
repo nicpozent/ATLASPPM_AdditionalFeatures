@@ -1,0 +1,41 @@
+# ============================================================================
+#  Atlas PPM — full-stack compose.
+#  `web`  : this repo's frontend, built and served by nginx (same-origin /api).
+#  `api`  : the separate .NET backend. It lives in another repo, so supply it
+#           either as a prebuilt image (ATLAS_API_IMAGE) or by pointing the
+#           commented `build:` at a local checkout.
+#
+#  Bring up:   docker compose up --build
+#  Frontend:   http://localhost:${WEB_PORT:-8080}
+# ============================================================================
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Public build-time config (baked into the bundle). Fill for real SSO.
+        VITE_AUTH_ENABLED: ${VITE_AUTH_ENABLED:-false}
+        VITE_AUTH_TENANT_ID: ${VITE_AUTH_TENANT_ID:-}
+        VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:-}
+        VITE_API_AUDIENCE: ${VITE_API_AUDIENCE:-api://atlas-ppm}
+        VITE_API_BASE: /api/v1
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    # Option A (default): pull a prebuilt backend image.
+    image: ${ATLAS_API_IMAGE:-atlas-ppm-api:latest}
+    # Option B: build from a sibling checkout of the backend repo instead —
+    # comment out `image:` above and uncomment:
+    # build: ../atlas-ppm-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      # Add the backend's own config here (connection strings, Entra API
+      # audience/authority for token validation, etc.).
+    expose:
+      - "8080"
+    restart: unless-stopped
