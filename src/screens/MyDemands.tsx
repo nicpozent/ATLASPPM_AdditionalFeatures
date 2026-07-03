@@ -1,9 +1,125 @@
-import { EmptyState } from "@/components/EmptyState";
-import { SCREENS } from "@/nav";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { color, font } from "@/theme";
+import { api } from "@/api";
+import { Icon } from "@/components/Icon";
 
-// TODO(Claude Code): replace <EmptyState/> with the full "mydemands" screen, built
-// 1:1 from design/Atlas PPM.dc.html. Empty state (no seed data) until then.
-export default function MyDemands() {
-  const s = SCREENS.mydemands;
-  return <EmptyState title={s.title} subtitle={s.subtitle} icon={s.icon} />;
+type StageKey = "draft" | "backlog" | "approved" | "progress" | "hold";
+const STAGE_META: Record<StageKey, { label: string; tint: string; ink: string }> = {
+  draft:    { label: "Draft",       tint: "#EEF0F4", ink: "#566077" },
+  backlog:  { label: "Backlog",     tint: "#E6EFFB", ink: "#0C5798" },
+  approved: { label: "Approved",    tint: "#E7F4EC", ink: "#0B6B37" },
+  progress: { label: "In Progress", tint: "#F0E8F7", ink: "#5E2E89" },
+  hold:     { label: "On Hold",     tint: "#FBF2D7", ink: "#8A6300" },
+};
+const PRIORITIES = ["Critical", "High", "Medium", "Low"] as const;
+type Priority = (typeof PRIORITIES)[number];
+
+interface MyDemand {
+  id: string; title: string; dept: string; priority: Priority; date: string; stage: StageKey;
 }
+
+function useMyDemands() {
+  return useQuery({
+    queryKey: ["demands", "my"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<MyDemand[]> => {
+      try { return (await api<MyDemand[]>("/demands/my")) ?? []; } catch { return []; }
+    },
+  });
+}
+
+export default function MyDemands() {
+  const { data: fetched = [] } = useMyDemands();
+  const [local, setLocal] = useState<MyDemand[]>([]);
+  const [modal, setModal] = useState(false);
+  const demands = [...local, ...fetched];
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <div style={{ fontSize: 13.5, color: color.subtle }}>Submit a new demand and track where it is in the intake funnel.</div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setModal(true)} style={primaryBtn}><Icon name="plus" size={16} /> Submit a demand</button>
+      </div>
+
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: "1px solid #EEF1F6" }}>
+          <div>ID</div><div>Demand</div><div>Submitted</div><div>Status</div>
+        </div>
+        {demands.length === 0 ? (
+          <div style={{ padding: "48px 20px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
+            You have not submitted any demands yet. Submit one to track it through the funnel.
+          </div>
+        ) : demands.map((d) => {
+          const sm = STAGE_META[d.stage] ?? STAGE_META.draft;
+          return (
+            <div key={d.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.id}</div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{d.title}</div>
+                <div style={{ fontSize: 11.5, color: color.faint3 }}>{d.dept} · {d.priority} priority</div>
+              </div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{d.date}</div>
+              <div>
+                <span style={{ display: "inline-flex", alignItems: "center", fontSize: 11.5, fontWeight: 600, color: sm.ink, background: sm.tint, padding: "3px 11px", borderRadius: 20 }}>{sm.label}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {modal && (
+        <SubmitDemandModal
+          onClose={() => setModal(false)}
+          onSubmit={(d) => { setLocal((l) => [d, ...l]); setModal(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d: MyDemand) => void }) {
+  const [title, setTitle] = useState("");
+  const [dept, setDept] = useState("");
+  const [priority, setPriority] = useState<Priority>("Medium");
+  const [description, setDescription] = useState("");
+
+  const submit = () => {
+    if (!title.trim()) return;
+    onSubmit({
+      id: "DM-" + Math.floor(300 + Math.random() * 699),
+      title: title.trim(), dept: dept.trim() || "Unassigned", priority, stage: "draft",
+      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+    });
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(17,22,58,0.42)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", background: color.surface, borderRadius: 16, padding: 24, boxShadow: "0 24px 60px rgba(17,22,58,0.3)" }}>
+        <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Submit a demand</div>
+        <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Describe what you need; it enters the intake funnel as a draft for review.</div>
+        <Lbl>Title</Lbl>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short description of the demand" style={inputStyle} />
+        <Lbl>Department</Lbl>
+        <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Requesting department" style={inputStyle} />
+        <Lbl>Priority</Lbl>
+        <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={inputStyle}>
+          {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <Lbl>Description</Lbl>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is needed and why?" style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={secBtn}>Cancel</button>
+          <button onClick={submit} style={primaryBtn}>Submit demand</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Lbl({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+}
+const inputStyle: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
+const secBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
+const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

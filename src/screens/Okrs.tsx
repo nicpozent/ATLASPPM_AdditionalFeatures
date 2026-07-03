@@ -1,9 +1,235 @@
-import { EmptyState } from "@/components/EmptyState";
-import { SCREENS } from "@/nav";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { color, font } from "@/theme";
+import { Icon } from "@/components/Icon";
+import { useRole } from "@/components/RoleContext";
+import { api } from "@/api";
 
-// TODO(Claude Code): replace <EmptyState/> with the full "okrs" screen, built
-// 1:1 from design/Atlas PPM.dc.html. Empty state (no seed data) until then.
-export default function Okrs() {
-  const s = SCREENS.okrs;
-  return <EmptyState title={s.title} subtitle={s.subtitle} icon={s.icon} />;
+// ---------------------------------------------------------------------------
+// Data model + hook (empty by default until the API exists).
+// ---------------------------------------------------------------------------
+interface Kr { id: string; title: string; link: string; progress: number }
+interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[] }
+
+function useObjectives() {
+  return useQuery({
+    queryKey: ["objectives"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<Objective[]> => {
+      try { return (await api<Objective[]>("/okrs")) ?? []; } catch { return []; }
+    },
+  });
 }
+
+// Objective % = mean of its key-result progress (prototype rolls KRs up).
+const objProgress = (o: Objective) =>
+  o.krs.length ? Math.round(o.krs.reduce((s, k) => s + k.progress, 0) / o.krs.length) : 0;
+// Progress → ink colour, lifted verbatim from the prototype's OKR builder.
+const objInk = (p: number) => (p >= 66 ? "#0B6B37" : p >= 33 ? "#8A6300" : "#A1282B");
+const krFill = (p: number) => (p >= 66 ? "#15A34A" : p >= 33 ? "#E0A100" : "#D13438");
+const uid = (pfx: string) => pfx + "-" + Math.floor(1000 + Math.random() * 9000);
+
+export default function Okrs() {
+  const { role } = useRole();
+  const canEdit = role === "admin" || role === "pmo"; // cosmetic gate (API is authoritative)
+  const { data: fetched = [] } = useObjectives();
+
+  // Locally-created objectives (user input, never seed data) merged with fetched.
+  const [local, setLocal] = useState<Objective[]>([]);
+  const objectives = useMemo(() => [...local, ...fetched], [local, fetched]);
+
+  // Modal state: obj = new objective, { objId } = add key result to objId.
+  const [modal, setModal] = useState<null | { kind: "obj" } | { kind: "kr"; objId: string }>(null);
+
+  const addObjective = (o: Objective) => setLocal((l) => [o, ...l]);
+  const addKr = (objId: string, kr: Kr) =>
+    setLocal((l) => l.map((o) => (o.id === objId ? { ...o, krs: [...o.krs, kr] } : o)));
+  // KR progress edits only apply to locally-created objectives.
+  const setKrProgress = (objId: string, krId: string, pct: number) =>
+    setLocal((l) => l.map((o) => (o.id === objId
+      ? { ...o, krs: o.krs.map((k) => (k.id === krId ? { ...k, progress: pct } : k)) } : o)));
+  const isLocal = (objId: string) => local.some((o) => o.id === objId);
+
+  return (
+    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, fontSize: 13.5, color: color.subtle }}>
+          Objectives &amp; key results, each linked to the projects/programs/products that deliver them.
+        </div>
+        {canEdit && (
+          <button onClick={() => setModal({ kind: "obj" })} style={primaryBtn}>
+            <Icon name="plus" size={16} /> New objective
+          </button>
+        )}
+      </div>
+
+      {objectives.length === 0 ? (
+        <div style={{
+          background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16,
+          padding: "56px 24px", textAlign: "center",
+        }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 12, background: "#EEF3FB", color: color.primary,
+            display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px",
+          }}><Icon name="target" size={22} /></div>
+          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>No objectives yet</div>
+          <div style={{ fontSize: 13, color: color.faint2, marginTop: 4 }}>
+            {canEdit ? "Create an objective and link key results to the work that delivers them."
+              : "Objectives will appear here once the PMO defines them."}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {objectives.map((o) => {
+            const p = objProgress(o);
+            return (
+              <div key={o.id} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13, padding: "18px 22px", borderBottom: `1px solid ${color.bg}` }}>
+                  <span style={{ width: 40, height: 40, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                    <Icon name="target" size={20} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{o.title}</div>
+                    <div style={{ fontSize: 11.5, color: color.faint3 }}>{o.id} · {o.owner} · {o.horizon}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: objInk(p) }}>{p}%</div>
+                    <div style={{ fontSize: 10.5, color: color.faint3 }}>objective</div>
+                  </div>
+                </div>
+                <div style={{ padding: "8px 22px 16px" }}>
+                  {o.krs.length === 0 && (
+                    <div style={{ padding: "18px 0", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
+                      No key results yet.
+                    </div>
+                  )}
+                  {o.krs.map((k) => (
+                    <div key={k.id} style={{ padding: "11px 0", borderBottom: "1px solid #F4F6FA" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                        <span style={{ flex: 1, fontSize: 13.5, color: color.text, fontWeight: 500 }}>{k.title}</span>
+                        {k.link && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: color.primaryDark, background: color.primaryTint2, padding: "2px 9px", borderRadius: 6 }}>
+                            <Icon name="link" size={14} /> {k.link}
+                          </span>
+                        )}
+                        {canEdit && isLocal(o.id) ? (
+                          <input type="number" min={0} max={100} value={k.progress}
+                            onChange={(e) => setKrProgress(o.id, k.id, clampPct(e.target.value))}
+                            style={{ width: 52, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 0", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
+                        ) : (
+                          <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: color.textMuted, width: 38, textAlign: "right" }}>{k.progress}%</span>
+                        )}
+                      </div>
+                      <div style={{ height: 7, background: color.bg, borderRadius: 5, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${clampPct(k.progress)}%`, background: krFill(k.progress), borderRadius: 5 }} />
+                      </div>
+                    </div>
+                  ))}
+                  {canEdit && isLocal(o.id) && (
+                    <button onClick={() => setModal({ kind: "kr", objId: o.id })} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
+                      <Icon name="plus" size={14} /> Add key result
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {modal?.kind === "obj" && (
+        <ObjectiveModal onClose={() => setModal(null)} onSave={(o) => { addObjective(o); setModal(null); }} />
+      )}
+      {modal?.kind === "kr" && (
+        <KrModal onClose={() => setModal(null)} onSave={(k) => { addKr(modal.objId, k); setModal(null); }} />
+      )}
+    </div>
+  );
+}
+
+const clampPct = (v: string | number) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+
+// --- New objective modal --------------------------------------------------
+function ObjectiveModal({ onClose, onSave }: { onClose: () => void; onSave: (o: Objective) => void }) {
+  const [title, setTitle] = useState("");
+  const [owner, setOwner] = useState("");
+  const [horizon, setHorizon] = useState("");
+  const save = () => {
+    if (!title.trim()) return;
+    onSave({ id: uid("OBJ"), title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026", krs: [] });
+  };
+  return (
+    <ModalShell title="New objective" onClose={onClose} width={480}>
+      <div style={{ padding: 20 }}>
+        <Label>Objective</Label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lead Nordic e-commerce conversion" style={{ ...inputStyle, marginBottom: 13 }} />
+        <div style={{ display: "flex", gap: 11 }}>
+          <div style={{ flex: 1 }}>
+            <Label>Owner</Label>
+            <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" style={inputStyle} />
+          </div>
+          <div style={{ width: 140 }}>
+            <Label>Horizon</Label>
+            <input value={horizon} onChange={(e) => setHorizon(e.target.value)} placeholder="FY2026" style={inputStyle} />
+          </div>
+        </div>
+      </div>
+      <ModalActions onClose={onClose} onSave={save} saveLabel="Create objective" />
+    </ModalShell>
+  );
+}
+
+// --- Add key result modal -------------------------------------------------
+function KrModal({ onClose, onSave }: { onClose: () => void; onSave: (k: Kr) => void }) {
+  const [title, setTitle] = useState("");
+  const [link, setLink] = useState("");
+  const [progress, setProgress] = useState(0);
+  const save = () => {
+    if (!title.trim()) return;
+    onSave({ id: uid("KR"), title: title.trim(), link: link.trim(), progress: clampPct(progress) });
+  };
+  return (
+    <ModalShell title="Add key result" onClose={onClose} width={480}>
+      <div style={{ padding: 20 }}>
+        <Label>Key result</Label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Conversion rate 3.2% → 4.0%" style={{ ...inputStyle, marginBottom: 13 }} />
+        <Label>Linked deliverable</Label>
+        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Project, program or product" style={{ ...inputStyle, marginBottom: 13 }} />
+        <Label>Starting progress %</Label>
+        <input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(clampPct(e.target.value))} style={{ ...inputStyle, width: 90, fontFamily: font.mono }} />
+      </div>
+      <ModalActions onClose={onClose} onSave={save} saveLabel="Add key result" />
+    </ModalShell>
+  );
+}
+
+// --- Modal primitives -----------------------------------------------------
+function ModalShell({ title, width, onClose, children }: { title: string; width: number; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(17,22,58,0.42)", zIndex: 190 }} />
+      <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: `min(${width}px,94vw)`, background: "#fff", borderRadius: 14, boxShadow: "0 30px 80px rgba(20,26,60,0.35)", zIndex: 200, overflow: "hidden" }}>
+        <div style={{ padding: "18px 20px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function ModalActions({ onClose, onSave, saveLabel }: { onClose: () => void; onSave: () => void; saveLabel: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
+      <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+      <button onClick={onSave} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>{saveLabel}</button>
+    </div>
+  );
+}
+function Label({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
+}
+const inputStyle: React.CSSProperties = {
+  width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px",
+  fontSize: 13.5, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none", boxSizing: "border-box",
+};
+const primaryBtn: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff",
+  background: color.primary, border: "none", padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
+};
