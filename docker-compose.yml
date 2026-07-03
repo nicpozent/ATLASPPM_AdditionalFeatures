@@ -35,6 +35,8 @@ services:
       Auth__Enabled: ${VITE_AUTH_ENABLED:-false}
       Auth__TenantId: ${VITE_AUTH_TENANT_ID:-}
       Auth__Audience: ${VITE_API_AUDIENCE:-api://atlas-ppm}
+      # Demo portfolio seed — off by default; set SEED_DEMO_DATA=true to preload it.
+      Seed__Enabled: ${SEED_DEMO_DATA:-false}
     depends_on:
       db:
         condition: service_healthy

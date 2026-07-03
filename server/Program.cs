@@ -39,12 +39,15 @@ if (authEnabled)
 
 var app = builder.Build();
 
-// Apply migrations and seed on startup (idempotent).
+// Apply migrations on startup. Demo seed is OFF by default — production starts
+// empty and fills with real data; set Seed:Enabled=true (env Seed__Enabled) to
+// preload the demo portfolio for a walkthrough. Seeding is idempotent.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
     db.Database.Migrate();
-    await Seed.RunAsync(db);
+    if (cfg.GetValue("Seed:Enabled", false))
+        await Seed.RunAsync(db);
 }
 
 if (authEnabled)
