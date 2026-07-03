@@ -1,0 +1,237 @@
+# CLAUDE.md — Atlas PPM Frontend
+
+Instructions for Claude Code. Read this fully before writing any code.
+
+---
+
+## 1. What you are building
+
+**Atlas** — a Portfolio & Project Management (PPM) web app for **Birgma / Biltema
+Group** (Nordic retail). This repository is the **frontend only** (React + TypeScript
++ Vite). A separate .NET backend exists elsewhere; here you build the UI and wire it
+to a REST API at `/api/v1/*`.
+
+Your job: **implement every screen and all functionality, pixel-faithful to the
+approved prototype**, then wire each screen to the API. The scaffold (app shell,
+routing, theme, one stub per screen) is already done and runs.
+
+---
+
+## 2. THE most important rule — match the prototype exactly
+
+`design/Atlas PPM.dc.html` is the **single source of visual truth**. Open it in a
+browser (it renders standalone) and study each screen.
+
+- **Reproduce every screen 1:1**: same layout, spacing, typography, colors,
+  components, tabs, cards, tables, charts, modals, hover/active states, and copy.
+  **Do not redesign, "improve", simplify, or reorder anything.** If it's in the
+  prototype, build it; if it's not, don't add it.
+- The prototype is a single-file component: markup lives between `<x-dc>…</x-dc>`
+  (a JSX-like template with inline `style="…"`), and behavior lives in the
+  `class Component extends DCLogic { … }` block (state, handlers, chart/SVG
+  builders). **Lift the exact inline styles and structure** from there into React
+  components. The `renderVals()` method shows how each screen's data is shaped.
+- When a value in the prototype is computed (charts, donuts, sparklines, gantt
+  bars, meters), port the computation faithfully — those helpers (`makeDonut`,
+  `makeGanttArrows`, sparkline builders, etc.) are in the logic class.
+
+### "No data" — what it means here
+The prototype is full of **demo data** (names, numbers, rows). Build the full
+visual structure of every screen, but **do not hardcode that demo data**. Instead:
+- Render the real layout/components, driven by data from the API (§6).
+- With an empty/unconfigured API, show **tasteful empty states inside the real
+  layout** (empty tables with headers, zeroed KPIs, "No demands yet" panels) — not
+  a blank page, and not fabricated seed data.
+- Keep structural, non-data chrome exactly as shown (column headers, tab bars,
+  filters, legends, section titles, buttons).
+
+Think: "the screen looks exactly like the prototype, but with the sample rows/
+numbers removed until real data loads."
+
+---
+
+## 3. Stack & conventions
+
+- **React 18 + TypeScript + Vite**, **react-router-dom v6**, **@tanstack/react-query**
+  for server state, **@azure/msal-browser** for Entra SSO.
+- **Styling: inline styles only**, using the tokens in `src/theme.ts`. This mirrors
+  the prototype (which is 100% inline-styled). **Do NOT** add Tailwind, CSS
+  modules, styled-components, or global stylesheets. **Do NOT invent colors or
+  fonts** — every color is in `theme.ts` (`color.*`), fonts are `font.head`
+  (Space Grotesk), `font.body` (Public Sans), `font.mono` (Space Mono).
+- One screen component per file in `src/screens/` (already stubbed). Split large
+  screens into local sub-components (e.g. `src/screens/dashboard/HealthDonut.tsx`)
+  when it helps, but keep the screen's folder self-contained.
+- TypeScript strict is on. Type API models in `src/api.ts` (or per-feature files).
+- Accessibility: keep hit targets ≥ 44px, real `<button>`/`<a>` elements, focus
+  styles, `aria-*` where the prototype implies it.
+- Every data view needs **loading / empty / error** states (React Query makes
+  this natural).
+
+---
+
+## 4. Project map
+
+```
+atlas-frontend/
+├─ design/Atlas PPM.dc.html   ← SOURCE OF TRUTH (open in a browser)
+├─ src/
+│  ├─ theme.ts                ← design tokens (colors, fonts, radius, layout)
+│  ├─ nav.ts                  ← SCREENS catalogue, nav groups, ROLES
+│  ├─ api.ts                  ← typed fetch client (add endpoints here)
+│  ├─ auth.ts                 ← MSAL / Entra (disabled unless VITE_AUTH_ENABLED)
+│  ├─ App.tsx                 ← router (all routes wired)
+│  ├─ main.tsx                ← entry (providers, resets)
+│  ├─ components/
+│  │  ├─ AppShell.tsx         ← sidebar + topbar + <Outlet/>  (DONE, faithful)
+│  │  ├─ Sidebar.tsx          ← role-aware nav                 (DONE)
+│  │  ├─ Topbar.tsx           ← title, role switcher, export   (DONE)
+│  │  ├─ Icon.tsx             ← stroke icon set (extend as needed)
+│  │  ├─ RoleContext.tsx      ← selected role (drives nav + identity)
+│  │  └─ EmptyState.tsx       ← placeholder (remove per screen as you build)
+│  └─ screens/*.tsx           ← ONE stub per screen — replace each body
+```
+
+The **shell is already pixel-faithful** — reuse it; don't rebuild the sidebar/
+topbar. Build inside each screen's `<main>` area.
+
+---
+
+## 5. Screen catalogue (build each 1:1 from the prototype)
+
+Routes and header text live in `src/nav.ts`. Key contents of each (verify against
+the prototype — this is a map, the prototype is authoritative):
+
+**Workspace**
+- `dashboard` — 4 layouts via a segmented control: **Executive** (portfolio-health
+  donut, budget-burn chart, KPI cards w/ sparklines, active-projects table,
+  needs-attention, demand pipeline, recent activity), **Operational** (KPIs, my
+  tasks/sprint, approvals), **Compact** (dense lists), and a drag-and-drop
+  **Custom** dashboard builder (widget palette, add/remove/reset).
+- `portfolio` — sub-tabs **Projects** (filter chips + project cards/table) and
+  **Blockers** (list + side panel). Clicking a project opens `project`.
+- `programs` — program list + **program detail** (stakeholder power/interest
+  matrix, linked projects, status). Create-program modal.
+- `products` — product portfolio; Jira/ADO tasks mapped to releases.
+- `okrs` — objectives with key results linked to projects/programs/products.
+- `demands` — **value vs effort** scored intake **funnel**; drag cards across
+  stages; create/approve demand modals.
+- `gantt` (Timeline / Gantt) — scope toggle **Project / Program**; phases, bars,
+  milestones (add-milestone modal), dependency arrows, month grid, export.
+- `project` (Project Detail) — tabs: **Overview**, **Tasks** (board + list views,
+  drag), **Epics**, **RAID**, **Artifacts** (with artifact window/versions),
+  **Costs** (labor/license/PaaS/IaaS/SaaS breakdown), **Gates** (G0–G5 stage
+  gates, gate reviews), plus people, linked products, change requests.
+- `resources` — people (synced from Entra ID) with allocation vs availability;
+  per-person input rows by reporting period.
+- `financials` — budget vs actual, CapEx/OpEx split, forecast at completion,
+  savings/benefit, portfolio ROI, source toggle.
+- `delivery` (Delivery Status) — stakeholder report by period (weekly → yearly):
+  completed/in-progress/planned, velocity, on-time %, blockers, budget burn.
+- `releases` — release calendar & deployment tracking.
+- `news` (Weekly Updates) — editable **news wall** (headline, highlight metric,
+  shout-out, image slot, milestone, doc blocks); themes + masonry layout; edit mode.
+
+**Configuration**
+- `teams` (My Team) — team members & skills.
+- `methodologies` — methodology library (Waterfall, V-Model, Stage-Gate, Scrum,
+  Kanban, SAFe, Scrumban, Spiral, Iterative, RAD, DevOps) + **create-project
+  wizard** (methodology → name/dept/owner → integration).
+- `integrations` — connectors (Jira, ServiceNow, ManageEngine SDP, GitHub,
+  Confluence, Azure DevOps, Teams, Slack, Power BI), SSO, email, directory sync.
+- `reports` — branded portfolio/demand/blocker/audit reports; export formats.
+- `admin` (Administration) — **roles & permissions matrix**, backups/restore,
+  audit log, AD sync, install & integration guides, deletion requests.
+- `help` — role-based guides, articles, contact.
+
+**Stakeholder role only** (see §7): `myprojects`, `mydemands` (plus delivery,
+releases, news, help).
+
+**Governance (appears within project/portfolio/admin in the prototype):** stage
+gates G0–G5, gate reviews (architecture/security), decision log (ADR), TOGAF ADM
+phases, architecture domains/waivers/ARB, and a security/compliance module (GDPR,
+PCI-DSS, ISO 27001, EU AI Act, SOC 2, NIS2) with control mappings. Reproduce these
+where the prototype places them.
+
+---
+
+## 6. Data & API
+
+- All server calls go through `src/api.ts` (`api<T>(path, init)`), base `/api/v1`.
+  In dev, `vite.config.ts` proxies `/api` → `VITE_API_PROXY`. In prod the site is
+  served same-origin behind nginx.
+- Use **TanStack Query** for every fetch (`useQuery` / `useMutation`), with
+  loading/empty/error states. Define typed models next to their usage or in
+  `api.ts`.
+- Endpoints follow REST under `/api/v1` (e.g. `GET /projects`, `GET /projects/my`,
+  `GET /demands`, `POST /demands`, `GET /blockers`, `GET /reports/...`). Confirm
+  exact shapes with the backend team; until an endpoint exists, the query returns
+  empty → render the empty state.
+- **Never fabricate persistent seed data.** Empty is the correct default.
+
+---
+
+## 7. Roles
+
+- The header role switcher (`src/nav.ts` `ROLES`) lists **9 identities** (Platform
+  Admin, PMO, PM, Engineering/Service/Dev/Infra Managers, Chief Architect,
+  Stakeholder) — this is **cosmetic**, exactly as in the prototype. Switching a
+  role changes the visible nav + identity, and should show/hide UI affordances.
+- The **backend enforces 6 canonical roles**: `PlatformAdmin`, `PMO`,
+  `ProjectManager`, `TeamMember`, `Executive`, `Stakeholder`. **UI role checks are
+  cosmetic only — the API is authoritative for authorization.** Never rely on the
+  client for a security decision.
+- `Stakeholder` gets the reduced nav (see `NAV_STAKEHOLDER_*` in `nav.ts`): only
+  their own projects/demands + delivery/releases/news/help.
+
+---
+
+## 8. Run
+
+```bash
+npm install
+cp .env.example .env      # leave VITE_AUTH_ENABLED=false to run with no backend
+npm run dev               # http://localhost:5173
+npm run build             # type-check + production build
+```
+
+With auth disabled the whole UI is browsable (empty states). To wire real SSO, set
+`VITE_AUTH_ENABLED=true` and the `VITE_AUTH_*` values, and add MSAL login/redirect
+handling in `main.tsx` (guarded `msal.handleRedirectPromise()`, login button, and
+route guards). To hit a real API in dev, run the backend and set `VITE_API_PROXY`.
+
+---
+
+## 9. Guardrails (do / don't)
+
+**Do**
+- Match the prototype exactly; lift inline styles/structure from it.
+- Use `theme.ts` tokens and the three fonts only.
+- Keep the shell components; build inside each screen.
+- Add icons to `Icon.tsx` as needed (Lucide-style, match the prototype's choices).
+- Data-drive everything through `api.ts` + React Query; empty states by default.
+- Keep components typed, accessible, and split sensibly.
+
+**Don't**
+- Don't redesign, restyle, or add screens/sections not in the prototype.
+- Don't introduce a CSS framework or global styles.
+- Don't invent colors/fonts or hardcode demo/seed data.
+- Don't put authorization logic on the client as a security control.
+- Don't edit `design/` (it's the reference).
+
+---
+
+## 10. Suggested order
+
+1. `dashboard` (Executive layout first) — exercises tokens, cards, charts, tables.
+2. `portfolio` (+ Blockers) and `project` detail — the core object + drill-in.
+3. `demands` funnel, `gantt` timeline.
+4. `programs`, `products`, `okrs`, `resources`, `financials`.
+5. `delivery`, `releases`, `news`.
+6. `methodologies` (+ create-project wizard), `integrations`, `reports`, `admin`, `help`.
+7. Stakeholder screens (`myprojects`, `mydemands`) + role-based nav/affordances.
+8. Governance modules (gates, decisions, TOGAF ADM, security/compliance).
+9. Wire Entra SSO + real API endpoints; finalize loading/empty/error states.
+
+Build one screen fully (visually faithful + data-wired + empty state) before moving
+to the next. After each, compare side-by-side with the prototype.
