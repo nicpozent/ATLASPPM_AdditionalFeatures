@@ -5,3 +5,8 @@ dist/
 .env
 *.log
 .DS_Store
+
+# TypeScript / Vite build outputs
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
