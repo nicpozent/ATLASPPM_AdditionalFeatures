@@ -28,6 +28,18 @@ same tenant.
 Both share the **Directory (tenant) ID** — this is `VITE_AUTH_TENANT_ID` /
 `Auth__TenantId`.
 
+### Single app registration (alternative)
+
+If instead you use **one** registration that both signs users in *and* exposes
+the API (its App ID URI is `api://<client-id>`), don't request
+`api://<client-id>/.default` — Entra rejects an app asking for a token to call
+itself (**AADSTS90009**). Instead:
+
+- **Expose an API → Add a scope**, e.g. `access_as_user`.
+- Set `VITE_API_AUDIENCE` to the app's **GUID** (not the `api://` URI) and
+  `VITE_API_SCOPE=access_as_user`.
+- The API validates the GUID or `api://<guid>` audience automatically.
+
 > SPAs use PKCE and have **no client secret**. The API validates tokens using
 > Entra's public keys, so it needs no secret either. The only real secret in
 > this stack is the database password.
