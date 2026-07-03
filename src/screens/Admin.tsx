@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { color, font, radius } from "@/theme";
 import { Icon } from "@/components/Icon";
-import { Card, EmptyBlock } from "@/components/ui";
+import { Card, EmptyBlock, Input, Select } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -218,7 +218,6 @@ function UsersSection() {
 }
 
 // ---- STAKEHOLDERS ---------------------------------------------------------
-const inputStyle: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
 const labelStyle: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
 
 function StakeholdersSection() {
@@ -234,14 +233,14 @@ function StakeholdersSection() {
           </div>
           <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Grant a person stakeholder access to a project.</div>
           <label style={labelStyle}>Project</label>
-          <select style={{ ...inputStyle, cursor: "pointer", marginBottom: 13 }}><option value="">Select a project…</option></select>
+          <Select style={{ marginBottom: 13 }}><option value="">Select a project…</option></Select>
           <label style={labelStyle}>Person</label>
-          <select style={{ ...inputStyle, cursor: "pointer", marginBottom: 13 }}><option value="">Select a person…</option></select>
+          <Select style={{ marginBottom: 13 }}><option value="">Select a person…</option></Select>
           <label style={labelStyle}>Stakeholder role</label>
-          <select style={{ ...inputStyle, cursor: "pointer", marginBottom: 13 }}><option value="">Select a role…</option></select>
+          <Select style={{ marginBottom: 13 }}><option value="">Select a role…</option></Select>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
-            <div><label style={labelStyle}>Power</label><select style={{ ...inputStyle, cursor: "pointer" }}><option>High</option><option>Low</option></select></div>
-            <div><label style={labelStyle}>Interest</label><select style={{ ...inputStyle, cursor: "pointer" }}><option>High</option><option>Low</option></select></div>
+            <div><label style={labelStyle}>Power</label><Select><option>High</option><option>Low</option></Select></div>
+            <div><label style={labelStyle}>Interest</label><Select><option>High</option><option>Low</option></Select></div>
           </div>
           <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Assign stakeholder</button>
         </Card>
@@ -251,10 +250,10 @@ function StakeholdersSection() {
             <div style={sectionTitle}>Create stakeholder contact</div>
           </div>
           <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Add a person to the contact directory, then assign them above.</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" style={{ ...inputStyle, marginBottom: 11 }} />
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title / role" style={{ ...inputStyle, marginBottom: 11 }} />
-          <input value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Organisation / unit" style={{ ...inputStyle, marginBottom: 11 }} />
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ ...inputStyle, marginBottom: 16 }} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" style={{ marginBottom: 11 }} />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title / role" style={{ marginBottom: 11 }} />
+          <Input value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Organisation / unit" style={{ marginBottom: 11 }} />
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ marginBottom: 16 }} />
           <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Create contact</button>
         </Card>
       </div>

@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
+
+export { Overlay };
 
 const STAGES = [
   { key: "draft",    label: "Draft",       color: "#8A93A6" },
@@ -53,8 +56,8 @@ export default function Demands() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Intake scored on <b style={{ color: color.primary }}>value</b> vs <b style={{ color: "#C98A00" }}>effort</b> · drag to advance through the funnel</div>
         <div style={{ flex: 1 }} />
-        <button style={secBtn}><Icon name="search" size={16} /> Filter</button>
-        <button style={primaryBtn} onClick={() => setModal(true)}><Icon name="plus" size={16} /> New demand</button>
+        <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
+        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New demand</Button>
       </div>
 
       <div style={{ display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
@@ -122,38 +125,25 @@ function NewDemandModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
       <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 4 }}>New demand</div>
       <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Score the request on value and effort; it enters the funnel as a draft.</div>
       <Lbl>Title</Lbl>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short description of the demand" style={inputStyle} />
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short description of the demand" />
       <Lbl>Department</Lbl>
-      <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Requesting department" style={inputStyle} />
+      <Input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Requesting department" />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div><Lbl>Value (1–5)</Lbl><input type="number" min={1} max={5} value={value} onChange={(e) => setValue(Math.max(1, Math.min(5, +e.target.value)))} style={inputStyle} /></div>
-        <div><Lbl>Effort (1–5)</Lbl><input type="number" min={1} max={5} value={effort} onChange={(e) => setEffort(Math.max(1, Math.min(5, +e.target.value)))} style={inputStyle} /></div>
+        <div><Lbl>Value (1–5)</Lbl><Input type="number" min={1} max={5} value={value} onChange={(e) => setValue(Math.max(1, Math.min(5, +e.target.value)))} /></div>
+        <div><Lbl>Effort (1–5)</Lbl><Input type="number" min={1} max={5} value={effort} onChange={(e) => setEffort(Math.max(1, Math.min(5, +e.target.value)))} /></div>
       </div>
       <Lbl>Priority</Lbl>
-      <select value={priority} onChange={(e) => setPriority(e.target.value as keyof typeof PRIORITY)} style={inputStyle}>
+      <Select value={priority} onChange={(e) => setPriority(e.target.value as keyof typeof PRIORITY)}>
         {Object.keys(PRIORITY).map((p) => <option key={p} value={p}>{p}</option>)}
-      </select>
+      </Select>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-        <button onClick={onClose} style={secBtn}>Cancel</button>
-        <button onClick={submit} style={primaryBtn}>Create demand</button>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit}>Create demand</Button>
       </div>
     </Overlay>
   );
 }
 
-// Shared modal overlay
-export function Overlay({ children, onClose, width = 460 }: { children: React.ReactNode; onClose: () => void; width?: number }) {
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(17,22,58,0.42)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", background: color.surface, borderRadius: 16, padding: 24, boxShadow: "0 24px 60px rgba(17,22,58,0.3)" }}>
-        {children}
-      </div>
-    </div>
-  );
-}
 function Lbl({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
 }
-const inputStyle: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
-const secBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

@@ -12,13 +12,14 @@ export interface Blocker {
   id: string; title: string; projectId: string; projectName: string; owner: string; status: BlockerStatus;
 }
 
-export const STATUS_FILTERS = [
+export interface StatusFilter { key: string; label: string; match: (p: Project) => boolean; ink: string; tint: string; }
+export const STATUS_FILTERS: StatusFilter[] = [
   { key: "all",   label: "All",      match: () => true,                           ink: "#fff",     tint: "#0F6CBD" },
   { key: "green", label: "On track", match: (p: Project) => p.status === "green", ink: "#0B6B37", tint: "#E7F4EC" },
   { key: "amber", label: "At risk",  match: (p: Project) => p.status === "amber", ink: "#8A6300", tint: "#FBF2D7" },
   { key: "red",   label: "Critical", match: (p: Project) => p.status === "red",   ink: "#A1282B", tint: "#FBE7E8" },
   { key: "hold",  label: "On hold",  match: (p: Project) => p.status === "hold",  ink: "#566077", tint: "#EEF0F4" },
-] as const;
+];
 
 export function useProjects() {
   return useQuery({

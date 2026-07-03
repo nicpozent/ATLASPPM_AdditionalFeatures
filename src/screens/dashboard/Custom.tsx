@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { ProgressBar } from "@/components/ui";
 import { Sparkline, HealthDonut, BudgetChart, Gauge } from "./charts";
 import {
-  WIDGET_DEFS, DEFAULT_WIDGETS, KPI_DEFS, PIPELINE_STAGES, HEALTH_SEGMENTS,
+  WIDGET_DEFS, DEFAULT_WIDGETS, PIPELINE_STAGES, HEALTH_SEGMENTS,
   type WidgetDef, type DashboardData,
 } from "./data";
 
@@ -106,6 +106,7 @@ export function Custom({ d }: { d: DashboardData }) {
   const [widgets, setWidgets] = useState<Placed[]>(loadWidgets);
   const [helpOpen, setHelpOpen] = useState(false);
   const drag = useRef<{ kind: "add" | "move"; key?: string; uid?: string } | null>(null);
+  const seq = useRef(0); // monotonic counter for stable, unique widget ids
 
   const persist = useCallback((list: Placed[]) => {
     setWidgets(list);
@@ -123,7 +124,7 @@ export function Custom({ d }: { d: DashboardData }) {
   }, []);
   const defOf = (key: string) => WIDGET_DEFS.find((w) => w.key === key);
 
-  const addWidget = (key: string) => persist([...widgets, { uid: `w${Date.now()}${Math.floor(Math.random() * 999)}`, key }]);
+  const addWidget = (key: string) => persist([...widgets, { uid: `w-${key}-${seq.current++}`, key }]);
   const removeWidget = (uid: string) => persist(widgets.filter((w) => w.uid !== uid));
   const allowDrop = (e: React.DragEvent) => { e.preventDefault(); try { e.dataTransfer.dropEffect = drag.current?.kind === "move" ? "move" : "copy"; } catch { /* */ } };
   const dropOnCanvas = (e: React.DragEvent) => { e.preventDefault(); const dd = drag.current; drag.current = null; if (dd?.kind === "add" && dd.key) addWidget(dd.key); };

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { Button } from "@/components/ui";
 
 const FIN_SOURCES = [
   { value: "erp", label: "ERP / Finance system" },
@@ -65,7 +66,7 @@ export default function Financials() {
         }}>
           {FIN_SOURCES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <button style={primaryBtn}><Icon name="download" size={16} /> Export</button>
+        <Button style={{ padding: "9px 14px" }}><Icon name="download" size={16} /> Export</Button>
       </div>
 
       {/* KPI row */}
@@ -144,4 +145,3 @@ export default function Financials() {
 const cols = "1.8fr 0.8fr 0.8fr 0.8fr 0.9fr 0.9fr 0.8fr";
 const legend: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: color.textMuted };
 const swatch: React.CSSProperties = { width: 10, height: 10, borderRadius: 3, flex: "none" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

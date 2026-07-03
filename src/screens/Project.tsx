@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, EmptyBlock, ProgressBar } from "@/components/ui";
+import { Card, EmptyBlock, ProgressBar, Button } from "@/components/ui";
 import { SCREENS } from "@/nav";
 
 // ---- data (empty until API exists) -----------------------------------------
@@ -65,8 +65,8 @@ export default function Project() {
             <div style={{ fontSize: 13, color: color.faint }}>{p ? `${p.dept} · Sponsor ${p.owner} · ${p.methodology}` : "Select a project from the Portfolio to view its detail."}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={secBtn}><Icon name="download" size={16} /> Status PPTX</button>
-            <button style={primaryBtn} onClick={() => navigate(SCREENS.gantt.path)}><Icon name="gantt" size={16} /> Timeline</button>
+            <Button variant="secondary"><Icon name="download" size={16} /> Status PPTX</Button>
+            <Button onClick={() => navigate(SCREENS.gantt.path)}><Icon name="gantt" size={16} /> Timeline</Button>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 18, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${color.bg}` }}>
@@ -151,7 +151,7 @@ function Tasks() {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <button style={primaryBtn}><Icon name="plus" size={16} /> New task</button>
+        <Button><Icon name="plus" size={16} /> New task</Button>
       </div>
       {view === "board" ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
@@ -223,7 +223,7 @@ function Comments() {
       <EmptyBlock message="No comments yet. Start the conversation below." minHeight={90} />
       <div style={{ display: "flex", gap: 10, marginTop: 12, borderTop: `1px solid ${color.bg}`, paddingTop: 16 }}>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a comment…" style={{ flex: 1, minHeight: 44, resize: "vertical", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", color: color.text, outline: "none" }} />
-        <button style={{ ...primaryBtn, alignSelf: "flex-end" }} onClick={() => setText("")}>Comment</button>
+        <Button style={{ alignSelf: "flex-end" }} onClick={() => setText("")}>Comment</Button>
       </div>
     </Card>
   );
@@ -240,5 +240,3 @@ function Meta({ label, children }: { label: string; children: React.ReactNode })
     </div>
   );
 }
-const secBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

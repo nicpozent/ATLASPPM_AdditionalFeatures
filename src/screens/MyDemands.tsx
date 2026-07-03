@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select, Textarea } from "@/components/ui";
 
 type StageKey = "draft" | "backlog" | "approved" | "progress" | "hold";
 const STAGE_META: Record<StageKey, { label: string; tint: string; ink: string }> = {
@@ -39,7 +40,7 @@ export default function MyDemands() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Submit a new demand and track where it is in the intake funnel.</div>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setModal(true)} style={primaryBtn}><Icon name="plus" size={16} /> Submit a demand</button>
+        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> Submit a demand</Button>
       </div>
 
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -99,18 +100,18 @@ function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
         <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Submit a demand</div>
         <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Describe what you need; it enters the intake funnel as a draft for review.</div>
         <Lbl>Title</Lbl>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short description of the demand" style={inputStyle} />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short description of the demand" />
         <Lbl>Department</Lbl>
-        <input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Requesting department" style={inputStyle} />
+        <Input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Requesting department" />
         <Lbl>Priority</Lbl>
-        <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={inputStyle}>
+        <Select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
           {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+        </Select>
         <Lbl>Description</Lbl>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is needed and why?" style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is needed and why?" style={{ minHeight: 72, resize: "vertical" }} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={secBtn}>Cancel</button>
-          <button onClick={submit} style={primaryBtn}>Submit demand</button>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>Submit demand</Button>
         </div>
       </div>
     </div>
@@ -120,6 +121,3 @@ function SubmitDemandModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
 function Lbl({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
 }
-const inputStyle: React.CSSProperties = { width: "100%", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 11px", fontSize: 13, fontFamily: "inherit", color: color.text, background: "#fff", outline: "none" };
-const secBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 14px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
-const primaryBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
