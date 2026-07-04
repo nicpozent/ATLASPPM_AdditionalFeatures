@@ -50,6 +50,10 @@ public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks);
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics);
 
+public record ArtifactVersionDto(int Id, int Version, string FileName, long Size, string UploadedAt);
+public record ArtifactDto(int Id, string Name, string Type, string Owner, string Status, List<ArtifactVersionDto> Versions);
+public record ArtifactsDto(bool CanEdit, List<ArtifactDto> Artifacts);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

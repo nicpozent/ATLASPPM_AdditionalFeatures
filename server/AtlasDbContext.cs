@@ -33,6 +33,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<SecurityControl> SecurityControls => Set<SecurityControl>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Epic> Epics => Set<Epic>();
+    public DbSet<Artifact> Artifacts => Set<Artifact>();
+    public DbSet<ArtifactVersion> ArtifactVersions => Set<ArtifactVersion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -118,6 +120,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<ProjectTask>().HasIndex(x => x.ProjectId);
         b.Entity<Epic>().HasKey(x => x.Id);
         b.Entity<Epic>().HasIndex(x => x.ProjectId);
+        b.Entity<Artifact>().HasKey(x => x.Id);
+        b.Entity<Artifact>().HasIndex(x => x.ProjectId);
+        b.Entity<Artifact>().HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ArtifactVersion>().HasKey(x => x.Id);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

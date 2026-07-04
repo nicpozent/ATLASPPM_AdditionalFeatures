@@ -327,6 +327,31 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Artifacts (document register + file versions) ------------------------
+public class Artifact
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string Type { get; set; } = "Governance";    // Governance | Waterfall | Agile | Design | Test | Other
+    public string Owner { get; set; } = "";
+    public string Status { get; set; } = "Draft";        // Draft | In review | Approved | Living
+    public int Ord { get; set; }
+    public List<ArtifactVersion> Versions { get; set; } = new();
+}
+
+public class ArtifactVersion
+{
+    public int Id { get; set; }
+    public int ArtifactId { get; set; }
+    public int Version { get; set; }                      // 1, 2, 3 …
+    public string FileName { get; set; } = default!;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long Size { get; set; }
+    public string UploadedAt { get; set; } = "";          // display date
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
+}
+
 // ---- Epics ----------------------------------------------------------------
 public class Epic
 {
