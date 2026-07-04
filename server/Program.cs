@@ -38,6 +38,8 @@ if (authEnabled)
 }
 
 var app = builder.Build();
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Atlas.Startup");
+startupLog.LogInformation("Atlas API starting — auth {AuthMode}", authEnabled ? "ENABLED (Entra bearer)" : "disabled (anonymous, dev)");
 
 // Apply migrations on startup. Demo seed is OFF by default — production starts
 // empty and fills with real data; set Seed:Enabled=true (env Seed__Enabled) to
@@ -45,13 +47,30 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
-    db.Database.Migrate();
-    // Roles & capabilities are structural reference data (the permission matrix
-    // chrome) — always seeded, idempotent, independent of the demo portfolio.
-    await Rbac.SeedAsync(db);
-    if (cfg.GetValue("Seed:Enabled", false))
-        await Seed.RunAsync(db);
+    try
+    {
+        db.Database.Migrate();
+        startupLog.LogInformation("Database migrations applied.");
+        // Roles & capabilities are structural reference data (the permission matrix
+        // chrome) — always seeded, idempotent, independent of the demo portfolio.
+        await Rbac.SeedAsync(db);
+        if (cfg.GetValue("Seed:Enabled", false))
+        {
+            await Seed.RunAsync(db);
+            startupLog.LogInformation("Demo portfolio seed applied (Seed:Enabled=true).");
+        }
+    }
+    catch (Exception ex)
+    {
+        // A failed migration/seed leaves the API unusable — log clearly and stop.
+        startupLog.LogCritical(ex, "Startup database initialisation failed: {Message}. " +
+            "Check the Postgres connection string (ConnectionStrings__Postgres) and that the database is reachable.", ex.Message);
+        throw;
+    }
 }
+
+// Log & handle every failing request centrally before routing to endpoints.
+app.UseAtlasRequestLogging();
 
 if (authEnabled)
 {
@@ -62,4 +81,5 @@ if (authEnabled)
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapAtlasEndpoints();
 
+startupLog.LogInformation("Atlas API ready.");
 app.Run();
