@@ -79,6 +79,13 @@ public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
 public record CostLineDto(int Id, string Label, string Note, List<string> OwnerRoles, decimal Amount, bool CanEdit, bool IsSystem);
 public record CostsDto(bool CanManage, decimal Total, decimal Savings, List<CostLineDto> Lines);
 
+// ---- Risk engine & status report ------------------------------------------
+public record RiskFindingDto(string Severity, string Category, string Title, string Detail, string Framework, string Control);
+public record RiskReportDto(int High, int Medium, int Low, List<RiskFindingDto> Findings);
+public record StatusReportDto(string Name, string Phase, string Health, int Progress, string BudgetLine,
+    int TasksDone, int TasksTotal, int Blocked, int Spillover, int PassRate, int OpenDefects,
+    int GatesApproved, int GatesTotal, string DpiaLevel, List<string> Highlights, List<RiskFindingDto> TopRisks);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
