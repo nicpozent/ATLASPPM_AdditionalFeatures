@@ -13,6 +13,19 @@ import {
 } from "./portfolio/data";
 
 const fmtBudget = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
+
+// Target date <-> the display string projects store ("12 Sep 2026"). Lets the
+// edit modal use a native calendar picker while keeping the friendly display.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const toIsoDate = (display: string): string => {
+  const d = new Date(display);
+  return isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const toDisplayDate = (iso: string): string => {
+  if (!iso) return "TBD";
+  const [y, m, dd] = iso.split("-").map(Number);
+  return y && m && dd ? `${dd} ${MONTHS[m - 1]} ${y}` : "TBD";
+};
 const BLK_COLORS: Record<BlockerStatus, { dot: string; ink: string; tint: string }> = {
   Active:        { dot: "#D13438", ink: "#A1282B", tint: "#FBE7E8" },
   "In progress": { dot: "#E0A100", ink: "#8A6300", tint: "#FBF2D7" },
@@ -287,7 +300,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Progress %"><Input type="number" value={progress} onChange={(e) => setProgress(e.target.value)} /></Field>
-        <Field label="Target date"><Input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 12 Sep 2026" /></Field>
+        <Field label="Target date"><Input type="date" value={toIsoDate(target)} onChange={(e) => setTarget(toDisplayDate(e.target.value))} /></Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></Field>

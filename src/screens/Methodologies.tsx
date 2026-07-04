@@ -274,6 +274,21 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
               <Input value={tpl.owner} onChange={(e) => setTpl({ ...tpl, owner: e.target.value })} placeholder="Project lead" />
             </div>
           </div>
+
+          {/* Template preview — shown as soon as a methodology is selected, so the
+              coherent, methodology-specific steps are visible before naming. */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 9 }}>The <b style={{ color: color.text }}>{tpl.methodology}</b> template will scaffold these work items:</div>
+            <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden" }}>
+              {scaffold.map((it, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 13px", borderBottom: i < scaffold.length - 1 ? "1px solid #F4F6FA" : "none" }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#566077", background: color.bg, padding: "2px 7px", borderRadius: 5, minWidth: 38, textAlign: "center" }}>{it.type}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
             <Button variant="secondary" onClick={onClose} style={{ padding: "10px 16px" }}>Cancel</Button>
             <Button onClick={() => { if (tpl.name.trim()) setStep(2); }} style={{ padding: "10px 18px" }}>Next: scaffold</Button>
