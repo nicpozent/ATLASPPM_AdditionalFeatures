@@ -122,10 +122,7 @@ function Overview({ projectId }: { projectId: string | null }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <Card padding="18px 22px">
-          <SectionTitle>People &amp; roles</SectionTitle>
-          <EmptyBlock message="No people assigned yet." minHeight={70} />
-        </Card>
+        <PeopleRoles projectId={projectId} />
         {/* AI assist (structural chrome) */}
         <div style={{ background: "linear-gradient(120deg,#0F1B3D,#123B7A)", border: "1px solid #14264F", borderRadius: 16, padding: "20px 22px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
@@ -150,6 +147,75 @@ function Overview({ projectId }: { projectId: string | null }) {
         <Card padding="18px 20px"><SectionTitle>Change requests</SectionTitle><EmptyBlock message="No change requests." minHeight={70} /></Card>
       </div>
     </div>
+  );
+}
+
+// People & roles — the project lead is assigned by the PMO, the architecture
+// roles by the Chief Architect; everyone else sees the panel read-only. Mirrors
+// the prototype's peoplePanelEl exactly. Server enforces who may change what.
+interface RoleRow { key: string; label: string; person: string; }
+interface Assignments {
+  canAssignLead: boolean; canAssignArch: boolean; leadKey: string; leadLabel: string;
+  lead: string; archRoles: RoleRow[]; options: string[]; missingArch: string[];
+}
+
+function PeopleRoles({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["assignments", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<Assignments | null> => {
+      try { return await api<Assignments>(`/projects/${projectId}/assignments`); } catch { return null; }
+    },
+  });
+  const assign = useMutation({
+    mutationFn: (v: { key: string; person: string }) =>
+      api(`/projects/${projectId}/assignments/${v.key}`, { method: "PUT", body: JSON.stringify({ person: v.person }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["assignments", projectId] }),
+  });
+
+  const options = data?.options ?? [];
+  const roRow = (label: string, val: string) => (
+    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
+      <span style={{ flex: 1, fontSize: 12.5, color: "#56607A" }}>{label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: val ? "#1C2233" : "#B0B7C5" }}>{val === "N/A" ? "N/A" : val || "Unassigned"}</span>
+    </div>
+  );
+  const selRow = (key: string, label: string, val: string) => (
+    <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
+      <span style={{ flex: 1, fontSize: 12.5, color: "#56607A" }}>{label}</span>
+      <select value={val || ""} onChange={(e) => assign.mutate({ key, person: e.target.value })} disabled={!projectId || assign.isPending}
+        style={{ border: "1px solid #E0E5EE", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: "#1C2233", background: "#fff", cursor: "pointer", minWidth: 190 }}>
+        <option value="">— Unassigned —</option>
+        <option value="N/A">N/A</option>
+        {options.map((m) => <option key={m} value={m}>{m}</option>)}
+      </select>
+    </div>
+  );
+
+  return (
+    <Card padding="20px 22px">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: "#11163A" }}>People &amp; roles</div>
+        <div style={{ flex: 1 }} />
+      </div>
+      <div style={{ fontSize: 11.5, color: "#8A92A6", lineHeight: 1.45, marginBottom: 14 }}>
+        PMO assigns the project manager; the Chief Architect assigns architecture roles. Others see read-only.
+      </div>
+      {!projectId ? (
+        <EmptyBlock message="Select a project from the Portfolio to assign people." minHeight={70} />
+      ) : (
+        <>
+          {data?.canAssignLead ? selRow(data.leadKey, data.leadLabel, data.lead) : roRow(data?.leadLabel ?? "Project Manager", data?.lead ?? "")}
+          {data?.canAssignArch && (data.missingArch.length > 0) && (
+            <div style={{ margin: "12px 0 4px", fontSize: 12, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 9, padding: "9px 12px", lineHeight: 1.45 }}>
+              ⚠ {data.missingArch.length} architecture role{data.missingArch.length > 1 ? "s" : ""} not yet assigned: {data.missingArch.join(", ")}
+            </div>
+          )}
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", letterSpacing: "0.05em", textTransform: "uppercase", margin: "16px 0 2px" }}>Architecture roles</div>
+          {(data?.archRoles ?? []).map((r) => data?.canAssignArch ? selRow(r.key, r.label, r.person) : roRow(r.label, r.person))}
+        </>
+      )}
+    </Card>
   );
 }
 
