@@ -311,6 +311,18 @@ public class GateCriterion
     public int Ord { get; set; }
 }
 
+// ---- RAID register --------------------------------------------------------
+public class RaidItem
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Type { get; set; } = "Risk";        // Risk | Issue | Assumption | Dependency
+    public string Title { get; set; } = default!;
+    public string Owner { get; set; } = "";
+    public string Status { get; set; } = "Open";
+    public int Ord { get; set; }
+}
+
 // ---- Decision log (ADR) ---------------------------------------------------
 public class Decision
 {

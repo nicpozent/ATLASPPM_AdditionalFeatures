@@ -34,7 +34,6 @@ const BOARD_COLS = [
   { label: "To Do", color: "#8A93A6" }, { label: "In Progress", color: "#0F6CBD" },
   { label: "In Review", color: "#E0A100" }, { label: "Done", color: "#15A34A" }, { label: "Blocked", color: "#D13438" },
 ];
-const RAID_TYPES = ["Risks", "Issues", "Assumptions", "Dependencies"];
 
 export default function Project() {
   const [params] = useSearchParams();
@@ -94,7 +93,7 @@ export default function Project() {
       {tab === "overview" && <Overview />}
       {tab === "tasks" && <Tasks />}
       {tab === "governance" && <Governance projectId={id} />}
-      {tab === "raid" && <Raid />}
+      {tab === "raid" && <Raid projectId={id} />}
       {tab === "comments" && <Comments />}
       {["epics", "requirements", "quality", "architecture", "security", "dependencies", "vacations", "artifacts"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
@@ -362,20 +361,107 @@ function DecLabel({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
 }
 
-function Raid() {
-  const [type, setType] = useState(RAID_TYPES[0]);
+interface RaidItem { id: number; type: string; title: string; owner: string; status: string; }
+const RAID_TYPE_COLORS: Record<string, { ink: string; tint: string }> = {
+  Risk:       { ink: "#8A6300", tint: "#FBF2D7" },
+  Issue:      { ink: "#A1282B", tint: "#FBE7E8" },
+  Assumption: { ink: "#0C5798", tint: "#E6EFFB" },
+  Dependency: { ink: "#5E2E89", tint: "#F0E8F7" },
+};
+const RAID_STATUS: Record<string, { ink: string; tint: string; dot: string }> = {
+  Open:       { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
+  Mitigating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
+  Validating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
+  "On track": { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  Resolved:   { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  Closed:     { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+};
+const raidStatus = (s: string) => RAID_STATUS[s] ?? { ink: "#56607A", tint: "#EEF1F6", dot: "#8A92A6" };
+const RAID_TYPES = ["Risk", "Issue", "Assumption", "Dependency"];
+const RAID_STATUSES = ["Open", "Mitigating", "Validating", "On track", "Resolved", "Closed"];
+
+function Raid({ projectId }: { projectId: string | null }) {
+  const [modal, setModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["raid", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; items: RaidItem[] }> =>
+      (await api<{ canEdit: boolean; items: RaidItem[] }>(`/projects/${projectId}/raid`)) ?? { canEdit: false, items: [] },
+  });
+  const items = data?.items ?? [];
+  const canEdit = data?.canEdit ?? false;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its RAID register." /></Card>;
+
   return (
-    <Card padding={0} style={{ overflow: "hidden" }}>
-      <div style={{ display: "flex", gap: 4, padding: "14px 20px 0" }}>
-        {RAID_TYPES.map((t) => (
-          <button key={t} onClick={() => setType(t)} style={{ padding: "8px 14px", border: "none", borderBottom: type === t ? "2.5px solid #0F6CBD" : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: type === t ? 700 : 500, color: type === t ? color.primary : "#6A7488", fontFamily: "inherit" }}>{t}</button>
-        ))}
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Risks, issues, assumptions &amp; dependencies for this project.</div>
+        <div style={{ flex: 1 }} />
+        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New item</Button>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 1fr 0.8fr 0.8fr", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderTop: `1px solid ${color.bg}`, borderBottom: `1px solid ${color.bg}` }}>
-        <div>ID</div><div>Description</div><div>Owner</div><div>Impact</div><div>Status</div>
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", padding: "14px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Type</div><div>Item</div><div>Owner</div><div>Status</div>
+        </div>
+        {items.length === 0 ? (
+          <EmptyBlock message="No RAID items logged yet." minHeight={140} />
+        ) : items.map((r) => {
+          const tc = RAID_TYPE_COLORS[r.type] ?? RAID_TYPE_COLORS.Risk;
+          const sc = raidStatus(r.status);
+          return (
+            <div key={r.id} style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: tc.ink, background: tc.tint, padding: "3px 10px", borderRadius: 6 }}>{r.type}</span></div>
+              <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500 }}>{r.title}</div>
+              <div style={{ fontSize: 13, color: color.subtle }}>{r.owner}</div>
+              <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />{r.status}</span></div>
+            </div>
+          );
+        })}
+      </Card>
+      {modal && <RaidModal projectId={projectId} onClose={() => setModal(false)} />}
+    </>
+  );
+}
+
+function RaidModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [type, setType] = useState(RAID_TYPES[0]);
+  const [title, setTitle] = useState("");
+  const [owner, setOwner] = useState("");
+  const [status, setStatus] = useState(RAID_STATUSES[0]);
+
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/raid`, { method: "POST", body: JSON.stringify({ type, title: title.trim(), owner: owner.trim(), status }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["raid", projectId] }); onClose(); },
+  });
+  const submit = () => { if (title.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={480} label="New RAID item">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Log a risk, issue, assumption or dependency against this project.</div>
+      <DecLabel>Type</DecLabel>
+      <Select value={type} onChange={(e) => setType(e.target.value)} style={{ marginBottom: 14 }}>
+        {RAID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+      </Select>
+      <DecLabel>Item</DecLabel>
+      <Textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Describe the risk / issue / assumption / dependency" style={{ minHeight: 60, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Owner</DecLabel>
+          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Status</DecLabel>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            {RAID_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </div>
       </div>
-      <EmptyBlock message={`No ${type.toLowerCase()} logged yet.`} minHeight={140} />
-    </Card>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !title.trim()}>{create.isPending ? "Adding…" : "Add item"}</Button>
+      </div>
+    </Modal>
   );
 }
 

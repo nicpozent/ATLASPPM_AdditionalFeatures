@@ -4,6 +4,7 @@ namespace Atlas.Api;
 
 public record ToggleCriterionReq(bool Met);
 public record CreateDecisionReq(string Title, string? Context, string? Decision, string? Owner, string? Status);
+public record CreateRaidReq(string Type, string Title, string? Owner, string? Status);
 
 // ============================================================================
 //  Stage gates (G0–G5). Every project carries the standard six-gate rail; the
@@ -97,6 +98,36 @@ public static class Gates
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{id}/decisions/{dec.Code}",
                 new DecisionDto(dec.Code, dec.Title, dec.Context, dec.DecisionText, dec.Owner, dec.Date, dec.Status));
+        });
+
+        // ---- RAID register ------------------------------------------------
+        api.MapGet("/projects/{id}/raid", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            var items = await db.RaidItems.Where(r => r.ProjectId == id).OrderBy(r => r.Ord).ToListAsync();
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            return Results.Ok(new RaidDto(canEdit,
+                items.Select(r => new RaidItemDto(r.Id, r.Type, r.Title, r.Owner, r.Status)).ToList()));
+        });
+
+        api.MapPost("/projects/{id}/raid", async (string id, CreateRaidReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var type = new[] { "Risk", "Issue", "Assumption", "Dependency" }.Contains(req.Type) ? req.Type : "Risk";
+            var next = (await db.RaidItems.Where(r => r.ProjectId == id).Select(r => (int?)r.Ord).MaxAsync() ?? 0) + 1;
+            var item = new RaidItem
+            {
+                ProjectId = id, Ord = next, Type = type, Title = req.Title.Trim(),
+                Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner!.Trim(),
+                Status = string.IsNullOrWhiteSpace(req.Status) ? "Open" : req.Status!.Trim(),
+            };
+            db.RaidItems.Add(item);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "RAID", $"Logged {type.ToLower()}", $"{id} · {item.Title}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/projects/{id}/raid/{item.Id}",
+                new RaidItemDto(item.Id, item.Type, item.Title, item.Owner, item.Status));
         });
     }
 

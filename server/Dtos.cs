@@ -34,6 +34,9 @@ public record GatesDto(bool CanGovern, List<GateDto> Gates);
 public record DecisionDto(string Code, string Title, string Context, string Decision, string Owner, string Date, string Status);
 public record DecisionsDto(bool CanGovern, List<DecisionDto> Decisions);
 
+public record RaidItemDto(int Id, string Type, string Title, string Owner, string Status);
+public record RaidDto(bool CanEdit, List<RaidItemDto> Items);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
