@@ -50,6 +50,17 @@ public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks);
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics);
 
+public record ArtifactVersionDto(int Id, int Version, string FileName, long Size, string UploadedAt);
+public record ArtifactDto(int Id, string Name, string Type, string Owner, string Status, List<ArtifactVersionDto> Versions);
+public record ArtifactsDto(bool CanEdit, List<ArtifactDto> Artifacts);
+
+public record RequirementDto(int Id, string Code, string Title, string Type, string Priority, string Status,
+    string Epic, string Story, string Test, string TestStatus, string Release, bool Verified);
+public record ChangeRequestDto(int Id, string Code, string Title, string ReqCode, string Impact, string Sdp,
+    string Status, string RaisedBy, string Date);
+public record ReqStatsDto(int Total, int Approved, int Coverage, int Verified);
+public record RequirementsDto(bool CanEdit, ReqStatsDto Stats, List<RequirementDto> Requirements, List<ChangeRequestDto> ChangeRequests);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

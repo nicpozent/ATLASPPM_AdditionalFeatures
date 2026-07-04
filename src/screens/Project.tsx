@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
-import { api } from "@/api";
+import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { SCREENS } from "@/nav";
@@ -106,8 +106,10 @@ export default function Project() {
       {tab === "raid" && <Raid projectId={id} />}
       {tab === "security" && <Security projectId={id} />}
       {tab === "epics" && <Epics projectId={id} />}
+      {tab === "artifacts" && <Artifacts projectId={id} />}
+      {tab === "requirements" && <Requirements projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["requirements", "quality", "architecture", "dependencies", "vacations", "artifacts"].includes(tab) && (
+      {["quality", "architecture", "dependencies", "vacations"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -953,6 +955,349 @@ function NewEpicModal({ projectId, onClose }: { projectId: string; onClose: () =
     </Modal>
   );
 }
+
+// ---- Artifacts -------------------------------------------------------------
+interface ArtifactVersion { id: number; version: number; fileName: string; size: number; uploadedAt: string; }
+interface ArtifactItem { id: number; name: string; type: string; owner: string; status: string; versions: ArtifactVersion[]; }
+const ARTIFACT_TYPES = ["Governance", "Waterfall", "Agile", "Design", "Test", "Other"];
+const ARTIFACT_STATUSES = ["Draft", "In review", "Approved", "Living"];
+const ARTIFACT_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved:    { ink: "#0B6B37", tint: "#E7F4EC" },
+  "In review": { ink: "#8A6300", tint: "#FBF2D7" },
+  Living:      { ink: "#0C5798", tint: "#E6EFFB" },
+  Draft:       { ink: "#56607A", tint: "#EEF1F6" },
+};
+const fmtSize = (b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+
+function Artifacts({ projectId }: { projectId: string | null }) {
+  const [modal, setModal] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const { data } = useQuery({
+    queryKey: ["artifacts", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; artifacts: ArtifactItem[] }> =>
+      (await api<{ canEdit: boolean; artifacts: ArtifactItem[] }>(`/projects/${projectId}/artifacts`)) ?? { canEdit: false, artifacts: [] },
+  });
+  const artifacts = data?.artifacts ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const open = artifacts.find((a) => a.id === openId) ?? null;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its artifacts." /></Card>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Waterfall &amp; agile artifacts — each carries its own file versions.</div>
+        <div style={{ flex: 1 }} />
+        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New artifact</Button>}
+      </div>
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        {artifacts.length === 0 ? (
+          <EmptyBlock message="No artifacts yet." minHeight={140} />
+        ) : artifacts.map((a) => {
+          const sc = ARTIFACT_STATUS[a.status] ?? ARTIFACT_STATUS.Draft;
+          return (
+            <div key={a.id} onClick={() => setOpenId(a.id)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
+              <span style={{ color: color.primary, display: "flex" }}><Icon name="sheet" size={20} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{a.name}</div>
+                <div style={{ fontSize: 11.5, color: color.faint3 }}>{a.type} · Owner {a.owner}</div>
+              </div>
+              <span style={{ fontSize: 12, color: color.faint }}>{a.versions.length ? `${a.versions.length} version${a.versions.length > 1 ? "s" : ""}` : "No file yet"}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{a.status}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: color.primary }}><Icon name="externalLink" size={15} /> Open</span>
+            </div>
+          );
+        })}
+      </Card>
+      {modal && <NewArtifactModal projectId={projectId} onClose={() => setModal(false)} />}
+      {open && <ArtifactWindow projectId={projectId} artifact={open} canEdit={canEdit} onClose={() => setOpenId(null)} />}
+    </div>
+  );
+}
+
+function NewArtifactModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [type, setType] = useState(ARTIFACT_TYPES[0]);
+  const [owner, setOwner] = useState("");
+  const [status, setStatus] = useState("Draft");
+  const [file, setFile] = useState<File | null>(null);
+
+  const create = useMutation({
+    mutationFn: async () => {
+      const art = await api<{ id: number }>(`/projects/${projectId}/artifacts`, { method: "POST", body: JSON.stringify({ name: name.trim(), type, owner: owner.trim(), status }) });
+      if (art?.id && file) { const fd = new FormData(); fd.append("file", file); await apiUpload(`/artifacts/${art.id}/versions`, fd); }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["artifacts", projectId] }); onClose(); },
+  });
+  const submit = () => { if (name.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={480} label="New artifact">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Register a document; attach its first file version now or later.</div>
+      <DecLabel>Name</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Solution Architecture (SAD)" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={type} onChange={(e) => setType(e.target.value)}>{ARTIFACT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{ARTIFACT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <DecLabel>Owner</DecLabel>
+      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Document owner" style={{ marginBottom: 14 }} />
+      <DecLabel>First version (optional)</DecLabel>
+      <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12.5, color: color.subtle }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Saving…" : "Create artifact"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: string; artifact: ArtifactItem; canEdit: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const sc = ARTIFACT_STATUS[artifact.status] ?? ARTIFACT_STATUS.Draft;
+  const upload = useMutation({
+    mutationFn: async (file: File) => { const fd = new FormData(); fd.append("file", file); await apiUpload(`/artifacts/${artifact.id}/versions`, fd); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["artifacts", projectId] }),
+  });
+
+  return (
+    <Modal onClose={onClose} width={560} label={artifact.name}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <span style={{ fontSize: 12, color: color.faint3 }}>{artifact.type} · Owner {artifact.owner}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{artifact.status}</span>
+      </div>
+      <div style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.ink, margin: "18px 0 10px" }}>Versions</div>
+      {artifact.versions.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: color.faint3, padding: "14px 0" }}>No file versions uploaded yet.</div>
+      ) : (
+        <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {artifact.versions.map((v) => (
+            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderBottom: "1px solid #F2F4F9" }}>
+              <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: color.primary, background: color.primaryTint, padding: "2px 8px", borderRadius: 6 }}>v{v.version}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: color.text, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.fileName}</div>
+                <div style={{ fontSize: 11, color: color.faint3 }}>{fmtSize(v.size)} · {v.uploadedAt}</div>
+              </div>
+              <button onClick={() => apiDownload(`/artifact-versions/${v.id}`, v.fileName)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={15} /> Download</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {canEdit && (
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 13px", cursor: upload.isPending ? "default" : "pointer" }}>
+          <Icon name="paperclip" size={15} /> {upload.isPending ? "Uploading…" : "Upload new version"}
+          <input type="file" style={{ display: "none" }} disabled={upload.isPending} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ""; }} />
+        </label>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- Requirements & traceability -------------------------------------------
+interface Requirement { id: number; code: string; title: string; type: string; priority: string; status: string; epic: string; story: string; test: string; testStatus: string; release: string; verified: boolean; }
+interface ChangeRequest { id: number; code: string; title: string; reqCode: string; impact: string; sdp: string; status: string; raisedBy: string; date: string; }
+interface ReqData { canEdit: boolean; stats: { total: number; approved: number; coverage: number; verified: number }; requirements: Requirement[]; changeRequests: ChangeRequest[]; }
+
+const REQ_TYPES = ["Functional", "Non-functional", "Compliance"];
+const REQ_STATUSES = ["Draft", "In review", "Approved"];
+const REQ_PRIORITIES = ["Critical", "High", "Medium", "Low"];
+const TEST_RESULTS = ["Not run", "In test", "Passed", "Failed"];
+const CR_IMPACTS = ["Low", "Medium", "High"];
+const REQ_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "In review": { ink: "#0C5798", tint: "#E6EFFB" }, Draft: { ink: "#56607A", tint: "#EEF1F6" },
+};
+const TEST_STATUS: Record<string, { ink: string; tint: string }> = {
+  Passed: { ink: "#0B6B37", tint: "#E7F4EC" }, "In test": { ink: "#0C5798", tint: "#E6EFFB" }, Failed: { ink: "#A1282B", tint: "#FBE7E8" }, "Not run": { ink: "#56607A", tint: "#EEF1F6" },
+};
+const CR_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, Pending: { ink: "#8A6300", tint: "#FBF2D7" }, Rejected: { ink: "#A1282B", tint: "#FBE7E8" },
+};
+const REQ_COLS = "2.4fr 1fr 1.1fr 0.9fr 1fr 1fr 60px";
+const CR_COLS = "0.7fr 2.2fr 0.9fr 0.8fr 1fr 0.9fr 1fr";
+
+function Requirements({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [reqModal, setReqModal] = useState(false);
+  const [crFor, setCrFor] = useState<string | null>(null); // req code prefill, or "" for blank
+  const { data } = useQuery({
+    queryKey: ["requirements", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<ReqData | null> => await api<ReqData>(`/projects/${projectId}/requirements`),
+  });
+  const setResult = useMutation({
+    mutationFn: (v: { id: number; testStatus: string }) => api(`/requirements/${v.id}`, { method: "PATCH", body: JSON.stringify({ testStatus: v.testStatus }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["requirements", projectId] }),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its requirements." /></Card>;
+  if (!data) return <Card><EmptyBlock minHeight={220} message="Loading requirements…" /></Card>;
+
+  const { stats, requirements, changeRequests, canEdit } = data;
+  const statCards: [string, number | string, string][] = [
+    ["Requirements", stats.total, color.ink], ["Approved", stats.approved, "#0B6B37"],
+    ["Test coverage", `${stats.coverage}%`, "#0F6CBD"], ["Verified", stats.verified, color.ink],
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 13, marginBottom: 16 }}>
+        {statCards.map(([label, value, ink]) => (
+          <div key={label} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11.5, color: "#7B849A" }}>{label}</div>
+            <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: ink, marginTop: 3 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* traceability matrix */}
+      <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
+          <div style={{ flex: 1 }}>
+            <div style={sectionTitleS}>Traceability matrix</div>
+            <div style={{ fontSize: 12, color: color.faint2 }}>Requirement → epic / story → test → release</div>
+          </div>
+          {canEdit && <Button onClick={() => setReqModal(true)}><Icon name="plus" size={16} /> New requirement</Button>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: REQ_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Requirement</div><div>Status</div><div>Epic / Story</div><div>Test</div><div>Result</div><div>Release</div><div />
+        </div>
+        {requirements.length === 0 ? (
+          <EmptyBlock message="No requirements yet." minHeight={120} />
+        ) : requirements.map((r) => {
+          const sc = REQ_STATUS[r.status] ?? REQ_STATUS.Draft;
+          const tc = TEST_STATUS[r.testStatus] ?? TEST_STATUS["Not run"];
+          return (
+            <div key={r.id} style={{ display: "grid", gridTemplateColumns: REQ_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.title}</div>
+                <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{r.code} · {r.type} · {r.priority}</div>
+              </div>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{r.status}</span></div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{r.epic || "—"}<div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{r.story}</div></div>
+              <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{r.test}</div>
+              <div>
+                <select value={r.testStatus} disabled={!canEdit} onChange={(e) => setResult.mutate({ id: r.id, testStatus: e.target.value })}
+                  style={{ fontSize: 11, fontWeight: 600, color: tc.ink, background: tc.tint, border: "none", borderRadius: 20, padding: "3px 8px", fontFamily: "inherit", cursor: canEdit ? "pointer" : "default" }}>
+                  {TEST_RESULTS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{r.release}</div>
+              <div style={{ textAlign: "right" }}>
+                {canEdit && <button onClick={() => setCrFor(r.code)} title="Raise change request" style={{ fontSize: 10.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: `1px solid ${color.border}`, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>CR</button>}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* change requests */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
+          <div style={{ flex: 1 }}>
+            <div style={sectionTitleS}>Change requests</div>
+            <div style={{ fontSize: 12, color: color.faint2 }}>Scope changes against requirements · PMO approval workflow</div>
+          </div>
+          {canEdit && <Button onClick={() => setCrFor("")}><Icon name="plus" size={16} /> Raise CR</Button>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: CR_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>ID</div><div>Change</div><div>Requirement</div><div>Impact</div><div>SDP change</div><div>Raised by</div><div>Status</div>
+        </div>
+        {changeRequests.length === 0 ? (
+          <EmptyBlock message="No change requests raised yet." minHeight={110} />
+        ) : changeRequests.map((c) => {
+          const sc = CR_STATUS[c.status] ?? CR_STATUS.Pending;
+          return (
+            <div key={c.id} style={{ display: "grid", gridTemplateColumns: CR_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
+              <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{c.title}</div>
+              <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{c.reqCode || "—"}</div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{c.impact}</div>
+              <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{c.sdp || "—"}</div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{c.raisedBy}</div>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{c.status}</span></div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {reqModal && <NewRequirementModal projectId={projectId} onClose={() => setReqModal(false)} />}
+      {crFor !== null && <RaiseCrModal projectId={projectId} reqCodes={requirements.map((r) => r.code)} prefill={crFor} onClose={() => setCrFor(null)} />}
+    </div>
+  );
+}
+
+function NewRequirementModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ title: "", type: REQ_TYPES[0], priority: "Medium", status: "Draft", epic: "", story: "", test: "", release: "" });
+  const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/requirements`, { method: "POST", body: JSON.stringify({ ...f, title: f.title.trim() }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["requirements", projectId] }); onClose(); },
+  });
+  return (
+    <Modal onClose={onClose} width={520} label="New requirement">
+      <DecLabel>Requirement</DecLabel>
+      <Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="What must the solution do?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={f.type} onChange={(e) => set("type", e.target.value)}>{REQ_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Priority</DecLabel><Select value={f.priority} onChange={(e) => set("priority", e.target.value)}>{REQ_PRIORITIES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={f.status} onChange={(e) => set("status", e.target.value)}>{REQ_STATUSES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={f.epic} onChange={(e) => set("epic", e.target.value)} placeholder="Epic" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Story</DecLabel><Input value={f.story} onChange={(e) => set("story", e.target.value)} placeholder="e.g. CHK-204" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Test</DecLabel><Input value={f.test} onChange={(e) => set("test", e.target.value)} placeholder="e.g. TC-118" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Release</DecLabel><Input value={f.release} onChange={(e) => set("release", e.target.value)} placeholder="e.g. R2.0 · Aug" /></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => f.title.trim() && create.mutate()} disabled={create.isPending || !f.title.trim()}>{create.isPending ? "Adding…" : "Add requirement"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function RaiseCrModal({ projectId, reqCodes, prefill, onClose }: { projectId: string; reqCodes: string[]; prefill: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [reqCode, setReqCode] = useState(prefill || reqCodes[0] || "");
+  const [impact, setImpact] = useState("Medium");
+  const [sdp, setSdp] = useState("");
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/change-requests`, { method: "POST", body: JSON.stringify({ title: title.trim(), reqCode, impact, sdp: sdp.trim() }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["requirements", projectId] }); onClose(); },
+  });
+  return (
+    <Modal onClose={onClose} width={480} label="Raise change request">
+      <DecLabel>Change</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is changing?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Requirement</DecLabel>
+          <Select value={reqCode} onChange={(e) => setReqCode(e.target.value)}>
+            <option value="">—</option>
+            {reqCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+        </div>
+        <div style={{ flex: 1 }}><DecLabel>Impact</DecLabel><Select value={impact} onChange={(e) => setImpact(e.target.value)}>{CR_IMPACTS.map((i) => <option key={i}>{i}</option>)}</Select></div>
+      </div>
+      <DecLabel>SDP change (optional)</DecLabel>
+      <Input value={sdp} onChange={(e) => setSdp(e.target.value)} placeholder="e.g. SDP-48213" />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => title.trim() && create.mutate()} disabled={create.isPending || !title.trim()}>{create.isPending ? "Raising…" : "Raise CR"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+const sectionTitleS: React.CSSProperties = { fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink };
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink, marginBottom: 12 }}>{children}</div>;

@@ -33,6 +33,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<SecurityControl> SecurityControls => Set<SecurityControl>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Epic> Epics => Set<Epic>();
+    public DbSet<Artifact> Artifacts => Set<Artifact>();
+    public DbSet<ArtifactVersion> ArtifactVersions => Set<ArtifactVersion>();
+    public DbSet<Requirement> Requirements => Set<Requirement>();
+    public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -118,6 +122,14 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<ProjectTask>().HasIndex(x => x.ProjectId);
         b.Entity<Epic>().HasKey(x => x.Id);
         b.Entity<Epic>().HasIndex(x => x.ProjectId);
+        b.Entity<Artifact>().HasKey(x => x.Id);
+        b.Entity<Artifact>().HasIndex(x => x.ProjectId);
+        b.Entity<Artifact>().HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ArtifactVersion>().HasKey(x => x.Id);
+        b.Entity<Requirement>().HasKey(x => x.Id);
+        b.Entity<Requirement>().HasIndex(x => x.ProjectId);
+        b.Entity<ChangeRequest>().HasKey(x => x.Id);
+        b.Entity<ChangeRequest>().HasIndex(x => x.ProjectId);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);
