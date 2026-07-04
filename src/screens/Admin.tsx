@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
-import { api } from "@/api";
+import { api, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -397,11 +398,20 @@ function useAudit() {
 
 function AuditSection() {
   const { data: entries = [] } = useAudit();
+  const { can } = usePermissions();
+  const mayExport = can("cap-export", "V") && can("cap-audit", "V");
   return (
     <Card padding={0} style={{ overflow: "hidden" }}>
-      <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
-        <div style={sectionTitle}>Audit log</div>
-        <div style={sectionSub}>Append-only record of role, permission &amp; portfolio changes</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
+        <div style={{ flex: 1 }}>
+          <div style={sectionTitle}>Audit log</div>
+          <div style={sectionSub}>Append-only record of role, permission &amp; portfolio changes</div>
+        </div>
+        {mayExport && (
+          <Button variant="secondary" onClick={() => apiDownload("/audit.csv", "atlas-audit-log.csv")}>
+            <Icon name="download" size={15} /> Export CSV
+          </Button>
+        )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: AUDIT_COLS, padding: "11px 22px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle }}>
         {["Timestamp", "Actor", "Action", "Subject", "Detail"].map((h) => <div key={h}>{h}</div>)}

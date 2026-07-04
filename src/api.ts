@@ -62,9 +62,9 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<T | nu
 export async function apiDownload(path: string, filename: string): Promise<void> {
   const token = await getToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...roleHeader() },
   });
-  if (!res.ok) throw new Error(`API ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await errorFrom(res);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
