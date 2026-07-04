@@ -15,6 +15,7 @@ public record UpdateBlockerStatusReq(string Status);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects);
+public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
 public record CreateKrReq(string Title, string? Link, int? Progress);
 public record UpdateKrProgressReq(int Progress);
@@ -220,6 +221,29 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
                 p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>()));
+        });
+
+        // ---- Releases ------------------------------------------------------
+        api.MapPost("/releases", async (CreateReleaseReq req, AtlasDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+            var scope = new[] { "Product", "Project", "Program" }.Contains(req.Scope) ? req.Scope! : "Product";
+            var r = new Release
+            {
+                Id = await NextId(db.Releases.Select(x => x.Id), "REL-", db),
+                Name = req.Name.Trim(),
+                Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
+                Link = req.Link?.Trim() ?? "",
+                Scope = scope,
+                Date = req.Date?.Trim() ?? "",
+                Env = string.IsNullOrWhiteSpace(req.Env) ? "Staging" : req.Env!.Trim(),
+                Risk = string.IsNullOrWhiteSpace(req.Risk) ? "Low" : req.Risk!.Trim(),
+                Status = "Planned",
+            };
+            db.Releases.Add(r);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/releases/{r.Id}", new ReleaseDto(
+                r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status));
         });
 
         // ---- OKRs ----------------------------------------------------------

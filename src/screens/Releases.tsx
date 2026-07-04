@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
-import { Card, EmptyBlock } from "@/components/ui";
+import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 // ---- data ----------------------------------------------------------------
 type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back";
@@ -68,11 +69,19 @@ function PillBtn({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
+interface NewRelease { name: string; owner: string; link: string; scope: ReleaseScope; date: string; env: string; risk: string }
+
 export default function Releases() {
   const [scope, setScope] = useState("all");
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"table" | "calendar">("table");
+  const [modal, setModal] = useState(false);
   const { data: releases = [] } = useReleases();
+  const qc = useQueryClient();
+  const createRelease = useMutation({
+    mutationFn: (body: NewRelease) => api<Release>("/releases", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
+  });
 
   const stats = {
     total: releases.length,
@@ -95,10 +104,13 @@ export default function Releases() {
         <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ ...selectStyle, marginRight: 8 }}>
           {SCOPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...selectStyle, marginRight: 8 }}>
           {STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New release</Button>
       </div>
+      {modal && <NewReleaseModal submitting={createRelease.isPending} onClose={() => setModal(false)}
+        onCreate={(body) => createRelease.mutate(body, { onSuccess: () => setModal(false) })} />}
 
       {/* stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 13, marginBottom: 18 }}>
@@ -167,5 +179,71 @@ export default function Releases() {
         </Card>
       )}
     </div>
+  );
+}
+
+function RelLbl({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+}
+
+function NewReleaseModal({ onClose, onCreate, submitting }: {
+  onClose: () => void; onCreate: (r: NewRelease) => void; submitting?: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
+  const [link, setLink] = useState("");
+  const [scope, setScope] = useState<ReleaseScope>("Product");
+  const [date, setDate] = useState("");
+  const [env, setEnv] = useState("Staging");
+  const [risk, setRisk] = useState("Low");
+  const submit = () => { if (name.trim()) onCreate({ name: name.trim(), owner: owner.trim(), link: link.trim(), scope, date, env, risk }); };
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.navy, marginBottom: 4 }}>New release</div>
+      <div style={{ fontSize: 12.5, color: color.faint3, marginBottom: 16 }}>Schedule a release; requirements &amp; change requests link in as it progresses.</div>
+      <RelLbl>Name</RelLbl>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Storefront 24.5" />
+      <RelLbl>Owner</RelLbl>
+      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Release owner" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <RelLbl>Scope</RelLbl>
+          <Select value={scope} onChange={(e) => setScope(e.target.value as ReleaseScope)}>
+            <option value="Product">Product</option>
+            <option value="Project">Project</option>
+            <option value="Program">Program</option>
+          </Select>
+        </div>
+        <div>
+          <RelLbl>Linked to</RelLbl>
+          <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="PRD-01 / PRJ-204" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div>
+          <RelLbl>Target date</RelLbl>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <RelLbl>Environment</RelLbl>
+          <Select value={env} onChange={(e) => setEnv(e.target.value)}>
+            <option value="Staging">Staging</option>
+            <option value="Production">Production</option>
+          </Select>
+        </div>
+        <div>
+          <RelLbl>Risk</RelLbl>
+          <Select value={risk} onChange={(e) => setRisk(e.target.value)}>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </Select>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={submitting || !name.trim()}>{submitting ? "Creating…" : "Create release"}</Button>
+      </div>
+    </Overlay>
   );
 }
