@@ -100,7 +100,7 @@ export default function Project() {
         })}
       </div>
 
-      {tab === "overview" && <Overview />}
+      {tab === "overview" && <Overview projectId={id} />}
       {tab === "tasks" && <Tasks projectId={id} />}
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
@@ -117,7 +117,8 @@ export default function Project() {
   );
 }
 
-function Overview() {
+function Overview({ projectId }: { projectId: string | null }) {
+  const [modal, setModal] = useState<null | "risks" | "report">(null);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -134,10 +135,12 @@ function Overview() {
           </div>
           <div style={{ fontSize: 12.5, color: "#AEBEDC", lineHeight: 1.5, marginBottom: 14 }}>Draft an executive status report or scan this project for delivery risks — generated from live project data.</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#0F1B3D", background: "#fff", border: "none", padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>✦ Draft status report</button>
-            <button style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>◆ Detect risks</button>
+            <button onClick={() => projectId && setModal("report")} disabled={!projectId} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#0F1B3D", background: "#fff", border: "none", padding: "10px 16px", borderRadius: 9, cursor: projectId ? "pointer" : "not-allowed", opacity: projectId ? 1 : 0.55, fontFamily: "inherit" }}>✦ Draft status report</button>
+            <button onClick={() => projectId && setModal("risks")} disabled={!projectId} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", padding: "10px 16px", borderRadius: 9, cursor: projectId ? "pointer" : "not-allowed", opacity: projectId ? 1 : 0.55, fontFamily: "inherit" }}>◆ Detect risks</button>
           </div>
         </div>
+        {modal === "risks" && projectId && <RisksModal projectId={projectId} onClose={() => setModal(null)} />}
+        {modal === "report" && projectId && <StatusReportModal projectId={projectId} onClose={() => setModal(null)} />}
         <Card padding={22}><SectionTitle>Summary</SectionTitle><EmptyBlock message="No project summary yet." minHeight={70} /></Card>
         <Card padding={22}><SectionTitle>Epic progress</SectionTitle><EmptyBlock message="No epics tracked yet." minHeight={80} /></Card>
         <Card padding={22}><SectionTitle>Stakeholder matrix · power / interest</SectionTitle><EmptyBlock message="No stakeholders mapped yet." minHeight={120} /></Card>
@@ -1398,6 +1401,107 @@ function Architecture({ projectId }: { projectId: string | null }) {
         })}
       </Card>
     </div>
+  );
+}
+
+// ---- Detect Risks + Draft Status Report ------------------------------------
+interface RiskFinding { severity: string; category: string; title: string; detail: string; framework: string; control: string; }
+interface RiskReport { high: number; medium: number; low: number; findings: RiskFinding[]; }
+interface StatusReport { name: string; phase: string; health: string; progress: number; budgetLine: string; tasksDone: number; tasksTotal: number; blocked: number; spillover: number; passRate: number; openDefects: number; gatesApproved: number; gatesTotal: number; dpiaLevel: string; highlights: string[]; topRisks: RiskFinding[]; }
+
+const RISK_SEV: Record<string, { ink: string; tint: string }> = {
+  High: { ink: "#A1282B", tint: "#FBE7E8" }, Medium: { ink: "#8A6300", tint: "#FBF2D7" }, Low: { ink: "#56607A", tint: "#EEF1F6" },
+};
+const FRAMEWORK_TINT: Record<string, { ink: string; tint: string }> = {
+  "ISO 27001": { ink: "#0C5798", tint: "#E6EFFB" }, "ISO 42001": { ink: "#5E2E89", tint: "#F0E8F7" },
+  GDPR: { ink: "#0B6B37", tint: "#E7F4EC" }, "PCI-DSS": { ink: "#A1282B", tint: "#FBE7E8" },
+  "MITRE ATT&CK": { ink: "#8A6300", tint: "#FBF2D7" }, "PMO governance": { ink: "#56607A", tint: "#EEF1F6" },
+};
+
+function RiskRow({ r }: { r: RiskFinding }) {
+  const sc = RISK_SEV[r.severity] ?? RISK_SEV.Low;
+  const fc = FRAMEWORK_TINT[r.framework] ?? FRAMEWORK_TINT["PMO governance"];
+  return (
+    <div style={{ padding: "12px 0", borderTop: "1px solid #F2F4F9" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "2px 8px", borderRadius: 6 }}>{r.severity}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{r.title}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, color: color.faint3 }}>{r.category}</span>
+      </div>
+      <div style={{ fontSize: 12, color: color.faint, lineHeight: 1.45, marginBottom: 6 }}>{r.detail}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: fc.ink, background: fc.tint, padding: "2px 8px", borderRadius: 6 }}>{r.framework}</span>
+        <span style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{r.control}</span>
+      </div>
+    </div>
+  );
+}
+
+function RisksModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const { data } = useQuery({
+    queryKey: ["risks", projectId], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<RiskReport> => (await api<RiskReport>(`/projects/${projectId}/risks`)) ?? { high: 0, medium: 0, low: 0, findings: [] },
+  });
+  const findings = data?.findings ?? [];
+  return (
+    <Modal onClose={onClose} width={560} label="Detected risks">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 12 }}>Deterministic scan of live project data — each finding maps to a standard/control.</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+        {(["High", "Medium", "Low"] as const).map((s) => {
+          const sc = RISK_SEV[s]; const n = s === "High" ? data?.high : s === "Medium" ? data?.medium : data?.low;
+          return <span key={s} style={{ fontSize: 11.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "4px 11px", borderRadius: 20 }}>{n ?? 0} {s}</span>;
+        })}
+      </div>
+      {findings.length === 0 ? (
+        <div style={{ padding: "26px 0", textAlign: "center", fontSize: 13, color: color.faint3 }}>No risks detected from the current project data. 🎉</div>
+      ) : findings.map((r, i) => <RiskRow key={i} r={r} />)}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}><Button variant="secondary" onClick={onClose}>Close</Button></div>
+    </Modal>
+  );
+}
+
+function StatusReportModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const { data: r } = useQuery({
+    queryKey: ["status-report", projectId], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<StatusReport | null> => await api<StatusReport>(`/projects/${projectId}/status-report`),
+  });
+  const copy = () => { if (r) navigator.clipboard?.writeText(`${r.name} — status report\n\n${r.highlights.join("\n")}`).catch(() => {}); };
+  return (
+    <Modal onClose={onClose} width={560} label="Status report">
+      {!r ? <EmptyBlock message="Generating…" minHeight={120} /> : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{r.name}</div>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{r.health}</span>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, color: color.faint3 }}>{r.phase} · {r.progress}%</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
+            {[["Budget", r.budgetLine], ["Tasks", `${r.tasksDone}/${r.tasksTotal}`], ["Pass rate", `${r.passRate}%`], ["Open defects", `${r.openDefects}`]].map(([l, v]) => (
+              <div key={l} style={{ background: color.bg, borderRadius: 10, padding: "10px 12px" }}>
+                <div style={{ fontSize: 10.5, color: color.faint3 }}>{l}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: color.text, fontFamily: font.mono }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: font.head, fontSize: 13, fontWeight: 600, color: color.ink, marginBottom: 6 }}>Summary</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
+            {r.highlights.map((h, i) => <div key={i} style={{ display: "flex", gap: 7, fontSize: 12.5, color: color.text }}><span style={{ color: color.primary }}>•</span><span>{h}</span></div>)}
+          </div>
+          {r.topRisks.length > 0 && (
+            <>
+              <div style={{ fontFamily: font.head, fontSize: 13, fontWeight: 600, color: color.ink }}>Top risks</div>
+              {r.topRisks.map((x, i) => <RiskRow key={i} r={x} />)}
+            </>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 16 }}>
+            <Button variant="secondary" onClick={copy}><Icon name="paperclip" size={15} /> Copy</Button>
+            <Button onClick={onClose}>Done</Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
