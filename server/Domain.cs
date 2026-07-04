@@ -327,6 +327,32 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Quality (test plans & defects) ---------------------------------------
+public class TestPlan
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public int Cases { get; set; }
+    public int Passed { get; set; }
+    public int Failed { get; set; }
+    public int Blocked { get; set; }
+    public int Ord { get; set; }
+}
+
+public class Defect
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;         // "DEF-01"
+    public string Title { get; set; } = default!;
+    public string Severity { get; set; } = "Medium";      // Critical | High | Medium | Low
+    public string Owner { get; set; } = "";
+    public string Status { get; set; } = "Open";          // Open | In progress | Resolved | Closed
+    public string Test { get; set; } = "";
+    public int Ord { get; set; }
+}
+
 // ---- Architecture governance (TOGAF ADM) ----------------------------------
 public class ArchProfile
 {

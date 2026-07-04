@@ -64,6 +64,11 @@ public record RequirementsDto(bool CanEdit, ReqStatsDto Stats, List<RequirementD
 public record AdmPhaseDto(int Id, string Code, string Phase, string Focus, string Owner, string Artefact, string Status);
 public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases);
 
+public record TestPlanDto(int Id, string Name, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct);
+public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);
+public record QualityTotalsDto(int Cases, int Coverage, int PassRate, int Failed, int OpenDefects);
+public record QualityDto(bool CanEdit, QualityTotalsDto Totals, List<TestPlanDto> Plans, List<DefectDto> Defects);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
