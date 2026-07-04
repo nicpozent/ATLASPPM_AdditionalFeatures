@@ -368,7 +368,8 @@ public class ProjectTask
 public class CostLine
 {
     public int Id { get; set; }
-    public string ProjectId { get; set; } = default!;
+    public string Scope { get; set; } = "project";        // project | program | product
+    public string OwnerId { get; set; } = default!;       // the project/program/product id
     public string Key { get; set; } = "";                 // "laborDev"… for system lines; "" for custom
     public string Label { get; set; } = default!;
     public string Note { get; set; } = "";                 // owner display, e.g. "Eng. Manager / Developers Manager"

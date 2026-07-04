@@ -317,7 +317,7 @@ public static class WriteEndpoints
             await db.Defects.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.ProjectDependencies.Where(x => x.ProjectId == id || x.DependsOnId == id).ExecuteDeleteAsync();
             await db.Absences.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.CostLines.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.CostLines.Where(x => x.Scope == "project" && x.OwnerId == id).ExecuteDeleteAsync();
             db.Projects.Remove(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();

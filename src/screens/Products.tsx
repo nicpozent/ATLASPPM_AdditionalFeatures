@@ -5,6 +5,7 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { CostsModal } from "@/components/CostsModal";
 
 type Source = "jira" | "ado";
 
@@ -149,6 +150,7 @@ function NewProductModal({ onClose, onCreate, submitting }: {
 
 function ProductDetail({ product, onClose }: { product: Product; onClose: () => void }) {
   const src = SOURCE_META[product.source];
+  const [costsOpen, setCostsOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(product.tasks);
   const [members, setMembers] = useState<Member[]>(product.members ?? []);
   const relOpts = useMemo(() => {
@@ -174,6 +176,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
             <div style={{ fontSize: 12.5, color: color.faint2 }}>Owner {product.owner} · Projects: {product.projects.join(", ") || "—"}</div>
           </div>
           <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#fff", background: src.c, padding: "6px 12px", borderRadius: 8 }}><Icon name="sync" size={16} /> Synced from {src.label}</span>
+          <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
         </div>
       </div>
 
@@ -247,6 +250,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         <div style={{ fontSize: 11.5, color: color.faint2, marginBottom: 14 }}>Absences for resources on this product</div>
         <div style={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No absences recorded.</div>
       </div>
+      {costsOpen && <CostsModal scope="products" id={product.id} name={product.name} onClose={() => setCostsOpen(false)} />}
     </div>
   );
 }
