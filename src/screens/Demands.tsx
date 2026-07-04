@@ -70,6 +70,13 @@ export default function Demands() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["demands"] }),
   });
+  const advanceDemand = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
+      api<Demand>(`/demands/${id}`, { method: "PATCH", body: JSON.stringify({ stage }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["demands"] }),
+  });
+  const dragId = useRef<string | null>(null);
+  const [overStage, setOverStage] = useState<string | null>(null);
 
   return (
     <div>
@@ -83,8 +90,18 @@ export default function Demands() {
       <div style={{ display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
         {STAGES.map((s) => {
           const items = demands.filter((d) => d.stage === s.key);
+          const over = overStage === s.key;
           return (
-            <div key={s.key} style={{ width: 280, flex: "none", background: "#F4F6FA", border: `1px solid ${color.border}`, borderRadius: 14, padding: "13px 12px" }}>
+            <div key={s.key}
+              onDragOver={(e) => { e.preventDefault(); if (overStage !== s.key) setOverStage(s.key); }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverStage(null); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = dragId.current; dragId.current = null; setOverStage(null);
+                const dragged = demands.find((x) => x.id === id);
+                if (id && dragged && dragged.stage !== s.key) advanceDemand.mutate({ id, stage: s.key });
+              }}
+              style={{ width: 280, flex: "none", background: over ? "#EAF2FB" : "#F4F6FA", border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : color.border}`, borderRadius: 14, padding: "13px 12px", transition: "background .1s" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 13, padding: "0 3px" }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.color }} />
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{s.label}</span>
@@ -98,7 +115,12 @@ export default function Demands() {
                 ) : items.map((d) => {
                   const pr = PRIORITY[d.priority];
                   return (
-                    <div key={d.id} onClick={() => setDetailId(d.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
+                    <div key={d.id}
+                      draggable
+                      onDragStart={(e) => { dragId.current = d.id; e.dataTransfer.effectAllowed = "move"; }}
+                      onDragEnd={() => { dragId.current = null; setOverStage(null); }}
+                      onClick={() => setDetailId(d.id)}
+                      style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
                         <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{d.id}</span>
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "2px 8px", borderRadius: 20 }}>{d.priority}</span>
