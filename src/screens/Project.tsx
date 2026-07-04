@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
@@ -31,9 +31,19 @@ const TABS = [
 type TabId = (typeof TABS)[number][0];
 
 const BOARD_COLS = [
-  { label: "To Do", color: "#8A93A6" }, { label: "In Progress", color: "#0F6CBD" },
-  { label: "In Review", color: "#E0A100" }, { label: "Done", color: "#15A34A" }, { label: "Blocked", color: "#D13438" },
+  { label: "To Do", color: "#8A93A6", tint: "#EEF1F6", ink: "#56607A" },
+  { label: "In Progress", color: "#0F6CBD", tint: "#E6EFFB", ink: "#0C5798" },
+  { label: "In Review", color: "#E0A100", tint: "#FBF2D7", ink: "#8A6300" },
+  { label: "Done", color: "#15A34A", tint: "#E7F4EC", ink: "#0B6B37" },
+  { label: "Blocked", color: "#D13438", tint: "#FBE7E8", ink: "#A1282B" },
 ];
+const TASK_PRIORITY: Record<string, { ink: string; tint: string }> = {
+  Critical: { ink: "#A1282B", tint: "#FBE7E8" },
+  High:     { ink: "#8A6300", tint: "#FBF2D7" },
+  Medium:   { ink: "#0C5798", tint: "#E6EFFB" },
+  Low:      { ink: "#56607A", tint: "#EEF1F6" },
+};
+const TASK_PRIORITIES = ["Critical", "High", "Medium", "Low"];
 
 export default function Project() {
   const [params] = useSearchParams();
@@ -91,7 +101,7 @@ export default function Project() {
       </div>
 
       {tab === "overview" && <Overview />}
-      {tab === "tasks" && <Tasks />}
+      {tab === "tasks" && <Tasks projectId={id} />}
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
       {tab === "security" && <Security projectId={id} />}
@@ -136,41 +146,160 @@ function Overview() {
   );
 }
 
-function Tasks() {
-  const [view, setView] = useState<"board" | "list">("board");
+interface Task { id: number; code: string; name: string; epic: string; assignee: string; status: string; sprint: string; baseline: string; priority: string; }
+
+function Tasks({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [view, setView] = useState<"board" | "table">("board");
+  const [modal, setModal] = useState(false);
+  const dragId = useRef<number | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+
+  const { data } = useQuery({
+    queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[] }> =>
+      (await api<{ canEdit: boolean; tasks: Task[] }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+  });
+  const move = useMutation({
+    mutationFn: (v: { id: number; status: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", projectId] }),
+  });
+
+  const tasks = data?.tasks ?? [];
+  const canEdit = data?.canEdit ?? false;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its tasks." /></Card>;
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
-          {(["board", "list"] as const).map((v) => (
+          {(["board", "table"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", textTransform: "capitalize", background: view === v ? "#fff" : "transparent", color: view === v ? color.primary : "#6A7488", boxShadow: view === v ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v}</button>
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <Button><Icon name="plus" size={16} /> New task</Button>
+        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New task</Button>}
       </div>
+
       {view === "board" ? (
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
-          {BOARD_COLS.map((c) => (
-            <div key={c.label} style={{ width: 250, flex: "none", background: "#F4F6FA", border: `1px solid ${color.border}`, borderRadius: 14, padding: "13px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 13, padding: "0 3px" }}>
-                <span style={{ width: 9, height: 9, borderRadius: "50%", background: c.color }} />
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{c.label}</span>
-                <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.faint, background: "#fff", border: `1px solid ${color.border}`, padding: "0 7px", borderRadius: 20 }}>0</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, alignItems: "start" }}>
+          {BOARD_COLS.map((c) => {
+            const cards = tasks.filter((t) => t.status === c.label);
+            const over = overCol === c.label;
+            return (
+              <div key={c.label}
+                onDragOver={(e) => { if (canEdit) { e.preventDefault(); if (overCol !== c.label) setOverCol(c.label); } }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = dragId.current; dragId.current = null; setOverCol(null);
+                  const t = tasks.find((x) => x.id === id);
+                  if (id && t && t.status !== c.label) move.mutate({ id, status: c.label });
+                }}
+                style={{ background: over ? "#EAF2FB" : "#F5F7FA", border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : "#EAEEF4"}`, borderRadius: 13, padding: 10, minHeight: 120 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#3A4358" }}>{c.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: c.ink, background: c.tint, padding: "1px 8px", borderRadius: 20 }}>{cards.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  {cards.map((t) => {
+                    const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
+                    return (
+                      <div key={t.id} draggable={canEdit} onDragStart={() => { dragId.current = t.id; }}
+                        style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: canEdit ? "grab" : "default", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+                          <span style={{ fontFamily: font.mono, fontSize: 10, color: color.faint3 }}>{t.code}</span>
+                          <span style={{ flex: 1 }} />
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "1px 6px", borderRadius: 20 }}>{t.priority}</span>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: color.text, lineHeight: 1.35, marginBottom: 9 }}>{t.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: color.faint }}>
+                          <span style={{ fontFamily: font.mono }}>{t.sprint || "—"}</span>
+                          <span style={{ flex: 1 }} />
+                          <span>{t.assignee}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {cards.length === 0 && <div style={{ fontSize: 11.5, color: color.faint3, textAlign: "center", padding: "14px 6px" }}>No tasks</div>}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: color.faint3, textAlign: "center", padding: "18px 6px" }}>No tasks</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <Card padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "0.8fr 2.4fr 1fr 1fr 0.8fr 0.8fr", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-            <div>ID</div><div>Task</div><div>Assignee</div><div>Sprint</div><div>Priority</div><div>Status</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", padding: "14px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+            <div>Task</div><div>Epic</div><div>Assignee</div><div>Sprint</div><div>Baseline</div><div>Status</div>
           </div>
-          <EmptyBlock message="No tasks yet." minHeight={140} />
+          {tasks.length === 0 ? (
+            <EmptyBlock message="No tasks yet." minHeight={140} />
+          ) : tasks.map((t) => {
+            const col = BOARD_COLS.find((c) => c.label === t.status) ?? BOARD_COLS[0];
+            return (
+              <div key={t.id} style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+                  <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: color.subtle }}>{t.epic || "—"}</div>
+                <div style={{ fontSize: 13, color: color.textMuted }}>{t.assignee}</div>
+                <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono }}>{t.sprint || "—"}</div>
+                <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono }}>{t.baseline || "—"}</div>
+                <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: col.ink, background: col.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color }} />{t.status}</span></div>
+              </div>
+            );
+          })}
         </Card>
       )}
+
+      {modal && <NewTaskModal projectId={projectId} onClose={() => setModal(false)} />}
     </div>
+  );
+}
+
+function NewTaskModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [epic, setEpic] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [sprint, setSprint] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [status, setStatus] = useState("To Do");
+
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify({ name: name.trim(), epic: epic.trim(), assignee: assignee.trim(), sprint: sprint.trim(), baseline: sprint.trim(), priority, status }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks", projectId] }); onClose(); },
+  });
+  const submit = () => { if (name.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={480} label="New task">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Add a task to this project's board.</div>
+      <DecLabel>Task</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="What needs doing?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} placeholder="Epic / feature" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Assignee</DecLabel><Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Assignee" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><Input value={sprint} onChange={(e) => setSprint(e.target.value)} placeholder="e.g. PI2 · S5" /></div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Priority</DecLabel>
+          <Select value={priority} onChange={(e) => setPriority(e.target.value)}>{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</Select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Status</DecLabel>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>{BOARD_COLS.map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}</Select>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Adding…" : "Add task"}</Button>
+      </div>
+    </Modal>
   );
 }
 
