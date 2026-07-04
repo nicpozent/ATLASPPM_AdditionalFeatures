@@ -36,30 +36,64 @@ public static class Costs
         string.IsNullOrEmpty(uiRole) || uiRole == "admin" || uiRole == "pmo" || ownerRoles.Contains(uiRole);
     static bool CanManage(string uiRole) => string.IsNullOrEmpty(uiRole) || uiRole == "admin" || uiRole == "pmo";
 
-    static async Task EnsureAsync(AtlasDbContext db, string projectId)
+    static async Task EnsureAsync(AtlasDbContext db, string scope, string ownerId)
     {
-        if (await db.CostLines.AnyAsync(c => c.ProjectId == projectId)) return;
+        if (await db.CostLines.AnyAsync(c => c.Scope == scope && c.OwnerId == ownerId)) return;
         for (var i = 0; i < Template.Length; i++)
         {
             var t = Template[i];
-            db.CostLines.Add(new CostLine { ProjectId = projectId, Key = t.Key, Label = t.Label, Note = t.Note, OwnerRoles = t.Roles.ToList(), IsSystem = true, Amount = 0, Ord = i });
+            db.CostLines.Add(new CostLine { Scope = scope, OwnerId = ownerId, Key = t.Key, Label = t.Label, Note = t.Note, OwnerRoles = t.Roles.ToList(), IsSystem = true, Amount = 0, Ord = i });
         }
         await db.SaveChangesAsync();
     }
 
+    // Does the scoped owner (project / program / product) exist?
+    static async Task<bool> OwnerExistsAsync(AtlasDbContext db, string scope, string id) => scope switch
+    {
+        "program" => await db.Programs.AnyAsync(p => p.Id == id),
+        "product" => await db.Products.AnyAsync(p => p.Id == id),
+        _ => await db.Projects.AnyAsync(p => p.Id == id),
+    };
+
+    static async Task<IResult> GetCostsAsync(string scope, string id, AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    {
+        if (!await OwnerExistsAsync(db, scope, id)) return Results.NotFound();
+        await EnsureAsync(db, scope, id);
+        var lines = await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id).OrderBy(c => c.Ord).ToListAsync();
+        var uiRole = Permissions.EffectiveUiRole(http, cfg);
+        var total = lines.Where(l => l.Key != "savings").Sum(l => l.Amount);
+        var savings = lines.Where(l => l.Key == "savings").Sum(l => l.Amount);
+        return Results.Ok(new CostsDto(CanManage(uiRole), total, savings,
+            lines.Select(l => new CostLineDto(l.Id, l.Label, l.Note, l.OwnerRoles, l.Amount, CanEditLine(uiRole, l.OwnerRoles), l.IsSystem)).ToList()));
+    }
+
+    static async Task<IResult> AddCostAsync(string scope, string id, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    {
+        var uiRole = Permissions.EffectiveUiRole(http, cfg);
+        if (!CanManage(uiRole)) return Results.Json(new { error = "Only PMO / Admin can add cost lines." }, statusCode: StatusCodes.Status403Forbidden);
+        if (!await OwnerExistsAsync(db, scope, id)) return Results.NotFound();
+        if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
+        var ord = (await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id).Select(c => (int?)c.Ord).MaxAsync() ?? 0) + 1;
+        var line = new CostLine
+        {
+            Scope = scope, OwnerId = id, Ord = ord, Key = "", Label = req.Label.Trim(), Note = req.Note?.Trim() ?? "Custom",
+            OwnerRoles = req.OwnerRoles ?? new(), IsSystem = false, Amount = Math.Max(0, req.Amount ?? 0),
+        };
+        db.CostLines.Add(line);
+        db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", "Added cost line", $"{scope} {id} · {line.Label}"));
+        await db.SaveChangesAsync();
+        return Results.Created($"/api/v1/costs/{line.Id}",
+            new CostLineDto(line.Id, line.Label, line.Note, line.OwnerRoles, line.Amount, true, false));
+    }
+
     public static void MapCostEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/projects/{id}/costs", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        // Same role-owned cost taxonomy for projects, programs and products.
+        foreach (var (route, scope) in new[] { ("projects", "project"), ("programs", "program"), ("products", "product") })
         {
-            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
-            await EnsureAsync(db, id);
-            var lines = await db.CostLines.Where(c => c.ProjectId == id).OrderBy(c => c.Ord).ToListAsync();
-            var uiRole = Permissions.EffectiveUiRole(http, cfg);
-            var total = lines.Where(l => l.Key != "savings").Sum(l => l.Amount);
-            var savings = lines.Where(l => l.Key == "savings").Sum(l => l.Amount);
-            return Results.Ok(new CostsDto(CanManage(uiRole), total, savings,
-                lines.Select(l => new CostLineDto(l.Id, l.Label, l.Note, l.OwnerRoles, l.Amount, CanEditLine(uiRole, l.OwnerRoles), l.IsSystem)).ToList()));
-        });
+            api.MapGet($"/{route}/{{id}}/costs", (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) => GetCostsAsync(scope, id, db, cfg, http));
+            api.MapPost($"/{route}/{{id}}/costs", (string id, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) => AddCostAsync(scope, id, req, db, cfg, http));
+        }
 
         api.MapPatch("/costs/{lineId:int}", async (int lineId, UpdateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
@@ -70,28 +104,9 @@ public static class Costs
                 return Results.Json(new { error = "This cost line is owned by another role." }, statusCode: StatusCodes.Status403Forbidden);
             if (req.Amount < 0) return Results.BadRequest(new { error = "Amount cannot be negative." });
             line.Amount = req.Amount;
-            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", $"Updated {line.Label}", $"{line.ProjectId} · €{req.Amount:N0}"));
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", $"Updated {line.Label}", $"{line.Scope} {line.OwnerId} · €{req.Amount:N0}"));
             await db.SaveChangesAsync();
             return Results.Ok(new CostLineDto(line.Id, line.Label, line.Note, line.OwnerRoles, line.Amount, true, line.IsSystem));
-        });
-
-        api.MapPost("/projects/{id}/costs", async (string id, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
-        {
-            var uiRole = Permissions.EffectiveUiRole(http, cfg);
-            if (!CanManage(uiRole)) return Results.Json(new { error = "Only PMO / Admin can add cost lines." }, statusCode: StatusCodes.Status403Forbidden);
-            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
-            if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
-            var ord = (await db.CostLines.Where(c => c.ProjectId == id).Select(c => (int?)c.Ord).MaxAsync() ?? 0) + 1;
-            var line = new CostLine
-            {
-                ProjectId = id, Ord = ord, Key = "", Label = req.Label.Trim(), Note = req.Note?.Trim() ?? "Custom",
-                OwnerRoles = req.OwnerRoles ?? new(), IsSystem = false, Amount = Math.Max(0, req.Amount ?? 0),
-            };
-            db.CostLines.Add(line);
-            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", "Added cost line", $"{id} · {line.Label}"));
-            await db.SaveChangesAsync();
-            return Results.Created($"/api/v1/costs/{line.Id}",
-                new CostLineDto(line.Id, line.Label, line.Note, line.OwnerRoles, line.Amount, true, false));
         });
 
         api.MapDelete("/costs/{lineId:int}", async (int lineId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -102,7 +117,7 @@ public static class Costs
             if (line is null) return Results.NotFound();
             if (line.IsSystem) return Results.BadRequest(new { error = "Standard cost lines can't be removed." });
             db.CostLines.Remove(line);
-            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", "Removed cost line", $"{line.ProjectId} · {line.Label}"));
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Costs", "Removed cost line", $"{line.Scope} {line.OwnerId} · {line.Label}"));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });

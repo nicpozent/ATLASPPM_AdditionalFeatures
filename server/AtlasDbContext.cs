@@ -152,7 +152,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Absence>().HasKey(x => x.Id);
         b.Entity<Absence>().HasIndex(x => x.ProjectId);
         b.Entity<CostLine>().HasKey(x => x.Id);
-        b.Entity<CostLine>().HasIndex(x => x.ProjectId);
+        b.Entity<CostLine>().HasIndex(x => new { x.Scope, x.OwnerId });
+        b.Entity<CostLine>().Property(x => x.Scope).HasDefaultValue("project");
         b.Entity<CostLine>().Property(x => x.OwnerRoles).HasDefaultValueSql("'{}'::text[]");
         b.Entity<RoleAssignment>().HasKey(x => x.Id);
         b.Entity<RoleAssignment>().HasIndex(x => new { x.ProjectId, x.RoleKey }).IsUnique();

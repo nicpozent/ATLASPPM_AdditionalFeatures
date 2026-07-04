@@ -5,6 +5,7 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { CostsModal } from "@/components/CostsModal";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
@@ -140,6 +141,7 @@ function Stat({ n, label }: { n: React.ReactNode; label: string }) {
 
 function ProgramDetail({ program, projectOpts, onClose }: { program: Program; projectOpts: ProjOpt[]; onClose: () => void }) {
   const h = HEALTH[program.health] ?? HEALTH.hold;
+  const [costsOpen, setCostsOpen] = useState(false);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [skName, setSkName] = useState("");
   const [skRole, setSkRole] = useState("");
@@ -177,7 +179,10 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
             <div style={{ fontSize: 13, color: color.faint2 }}>{program.goal}</div>
             <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}</div>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: h.ink, background: h.tint, padding: "4px 12px", borderRadius: 20 }}>{HEALTH[program.health]?.label ?? program.status}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: h.ink, background: h.tint, padding: "4px 12px", borderRadius: 20 }}>{HEALTH[program.health]?.label ?? program.status}</span>
+            <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
+          </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 18, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${color.bg}` }}>
           {kpi("Projects", <div style={{ fontFamily: font.head, fontSize: 20, fontWeight: 700, color: color.navy }}>{program.projects.length}</div>)}
@@ -261,6 +266,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           </div>
         </div>
       </div>
+      {costsOpen && <CostsModal scope="programs" id={program.id} name={program.name} onClose={() => setCostsOpen(false)} />}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Modal, Input } from "@/components/ui";
+import { CostsModal } from "@/components/CostsModal";
 
 const FIN_SOURCES = [
   { value: "erp", label: "ERP / Finance system" },
@@ -140,61 +141,8 @@ export default function Financials() {
         })}
       </div>
 
-      {editCost && <CostModal project={editCost} onClose={() => setEditCost(null)} />}
+      {editCost && <CostsModal scope="projects" id={editCost.id} name={editCost.name} onClose={() => setEditCost(null)} />}
     </div>
-  );
-}
-
-// ---- Role-owned cost lines --------------------------------------------------
-interface CostLine { id: number; label: string; note: string; ownerRoles: string[]; amount: number; canEdit: boolean; isSystem: boolean; }
-interface CostsData { canManage: boolean; total: number; savings: number; lines: CostLine[]; }
-
-function CostModal({ project, onClose }: { project: { id: string; name: string }; onClose: () => void }) {
-  const qc = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["costs", project.id], retry: false, staleTime: 15_000,
-    queryFn: async (): Promise<CostsData> => (await api<CostsData>(`/projects/${project.id}/costs`)) ?? { canManage: false, total: 0, savings: 0, lines: [] },
-  });
-  const save = useMutation({
-    mutationFn: (v: { lineId: number; amount: number }) => api(`/costs/${v.lineId}`, { method: "PATCH", body: JSON.stringify({ amount: v.amount }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["costs", project.id] }); qc.invalidateQueries({ queryKey: ["financials"] }); },
-  });
-  const lines = data?.lines ?? [];
-
-  return (
-    <Modal onClose={onClose} width={480} label={`Project costs · ${project.name}`}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 9, background: "#E7F4EC", color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
-        <div style={{ fontSize: 12, color: color.faint2 }}>€ thousands · You can edit only the cost lines your role owns.</div>
-      </div>
-      {lines.map((ln) => (
-        <div key={ln.id} style={{ marginBottom: 12 }}>
-          <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>
-            {ln.label} <span style={{ color: color.faint3 }}>· {ln.note}</span>
-          </label>
-          <CostInput line={ln} onCommit={(amount) => save.mutate({ lineId: ln.id, amount })} />
-        </div>
-      ))}
-      <div style={{ fontSize: 11, color: color.faint3, marginTop: 4 }}>You can edit only the cost lines your role owns.</div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-        <Button onClick={onClose}>Done</Button>
-      </div>
-    </Modal>
-  );
-}
-
-// Uncontrolled + key so it re-syncs after save; edits commit on blur. Values in
-// € thousands (stored in whole euros → shown /1000).
-function CostInput({ line, onCommit }: { line: CostLine; onCommit: (amountEuros: number) => void }) {
-  const shown = (line.amount / 1000).toFixed(2);
-  return (
-    <Input key={shown} type="number" step="0.01" defaultValue={shown} disabled={!line.canEdit}
-      title={line.canEdit ? undefined : "Owned by another role — read-only for you"}
-      onBlur={(e) => {
-        const v = parseFloat(e.target.value);
-        if (!isNaN(v) && (v * 1000) !== line.amount) onCommit(Math.round(v * 1000));
-      }}
-      style={line.canEdit ? undefined : { background: color.bg, color: color.faint2, cursor: "not-allowed" }} />
   );
 }
 
