@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Modal as Overlay } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 
 export { Overlay };
 
@@ -56,6 +57,8 @@ interface NewDemand {
 export default function Demands() {
   const { data: demands = [] } = useDemands();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const maySubmit = can("cap-submit-demand", "E");
   const [modal, setModal] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const createDemand = useMutation({
@@ -84,7 +87,7 @@ export default function Demands() {
         <div style={{ fontSize: 13.5, color: color.subtle }}>Intake scored on <b style={{ color: color.primary }}>value</b> vs <b style={{ color: "#C98A00" }}>effort</b> · drag to advance through the funnel</div>
         <div style={{ flex: 1 }} />
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
-        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New demand</Button>
+        <Button onClick={() => setModal(true)} disabled={!maySubmit} title={maySubmit ? undefined : "Your role can't submit demands"}><Icon name="plus" size={16} /> New demand</Button>
       </div>
 
       <div style={{ display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
@@ -107,7 +110,7 @@ export default function Demands() {
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{s.label}</span>
                 <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.faint, background: "#fff", border: `1px solid ${color.border}`, padding: "0 7px", borderRadius: 20 }}>{items.length}</span>
                 <div style={{ flex: 1 }} />
-                <span onClick={() => setModal(true)} style={{ color: color.faint3, display: "flex", cursor: "pointer" }}><Icon name="plus" size={16} /></span>
+                {maySubmit && <span onClick={() => setModal(true)} style={{ color: color.faint3, display: "flex", cursor: "pointer" }}><Icon name="plus" size={16} /></span>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {items.length === 0 ? (

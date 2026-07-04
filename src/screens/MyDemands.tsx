@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, Textarea } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 
 type StageKey = "draft" | "backlog" | "approved" | "progress" | "hold";
 const STAGE_META: Record<StageKey, { label: string; tint: string; ink: string }> = {
@@ -34,6 +35,8 @@ interface NewDemand { title: string; dept: string; priority: Priority; }
 export default function MyDemands() {
   const { data: demands = [] } = useMyDemands();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const maySubmit = can("cap-submit-demand", "E");
   const [modal, setModal] = useState(false);
   const submitDemand = useMutation({
     mutationFn: (body: NewDemand) => api("/demands", { method: "POST", body: JSON.stringify(body) }),
@@ -49,7 +52,7 @@ export default function MyDemands() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Submit a new demand and track where it is in the intake funnel.</div>
         <div style={{ flex: 1 }} />
-        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> Submit a demand</Button>
+        <Button onClick={() => setModal(true)} disabled={!maySubmit} title={maySubmit ? undefined : "Your role can't submit demands"}><Icon name="plus" size={16} /> Submit a demand</Button>
       </div>
 
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>

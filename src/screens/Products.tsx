@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 
 type Source = "jira" | "ado";
 
@@ -40,6 +41,8 @@ interface NewProduct { name: string; owner: string; source: Source; projects: st
 export default function Products() {
   const { data: products = [] } = useProducts();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const mayCreate = can("cap-projects", "F");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
   const selected = useMemo(() => products.find((p) => p.id === selectedId) ?? null, [products, selectedId]);
@@ -60,7 +63,7 @@ export default function Products() {
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div style={{ fontSize: 13.5, color: color.subtle, flex: 1 }}>Products are durable containers; projects &amp; programs deliver against them. Tasks sync from Jira/ADO and are mapped to releases.</div>
-        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New product</Button>
+        <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create products"}><Icon name="plus" size={16} /> New product</Button>
       </div>
       {products.length === 0 ? (
         <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>

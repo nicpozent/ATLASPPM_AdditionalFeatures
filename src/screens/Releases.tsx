@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 
 // ---- data ----------------------------------------------------------------
@@ -78,6 +79,8 @@ export default function Releases() {
   const [modal, setModal] = useState(false);
   const { data: releases = [] } = useReleases();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const mayCreate = can("cap-projects", "E");
   const createRelease = useMutation({
     mutationFn: (body: NewRelease) => api<Release>("/releases", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
@@ -107,7 +110,7 @@ export default function Releases() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...selectStyle, marginRight: 8 }}>
           {STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New release</Button>
+        <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create releases"}><Icon name="plus" size={16} /> New release</Button>
       </div>
       {modal && <NewReleaseModal submitting={createRelease.isPending} onClose={() => setModal(false)}
         onCreate={(body) => createRelease.mutate(body, { onSuccess: () => setModal(false) })} />}
