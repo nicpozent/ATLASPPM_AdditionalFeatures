@@ -15,6 +15,7 @@ public static class Endpoints
         api.MapAtlasWriteEndpoints();
         api.MapRoleEndpoints();
         api.MapGateEndpoints();
+        api.MapSecurityEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

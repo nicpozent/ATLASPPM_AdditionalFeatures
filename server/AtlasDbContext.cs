@@ -29,6 +29,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<GateCriterion> GateCriteria => Set<GateCriterion>();
     public DbSet<Decision> Decisions => Set<Decision>();
     public DbSet<RaidItem> RaidItems => Set<RaidItem>();
+    public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
+    public DbSet<SecurityControl> SecurityControls => Set<SecurityControl>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -106,6 +108,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Decision>().HasIndex(x => x.ProjectId);
         b.Entity<RaidItem>().HasKey(x => x.Id);
         b.Entity<RaidItem>().HasIndex(x => x.ProjectId);
+        b.Entity<SecurityProfile>().HasKey(x => x.ProjectId);
+        b.Entity<SecurityProfile>().Property(x => x.ProjectId).ValueGeneratedNever();
+        b.Entity<SecurityControl>().HasKey(x => x.Id);
+        b.Entity<SecurityControl>().HasIndex(x => x.ProjectId);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

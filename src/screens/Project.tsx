@@ -94,8 +94,9 @@ export default function Project() {
       {tab === "tasks" && <Tasks />}
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
+      {tab === "security" && <Security projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["epics", "requirements", "quality", "architecture", "security", "dependencies", "vacations", "artifacts"].includes(tab) && (
+      {["epics", "requirements", "quality", "architecture", "dependencies", "vacations", "artifacts"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -476,6 +477,252 @@ function Comments() {
         <Button style={{ alignSelf: "flex-end" }} onClick={() => setText("")}>Comment</Button>
       </div>
     </Card>
+  );
+}
+
+// ---- Security, privacy & compliance ---------------------------------------
+interface SecProfile {
+  classification: string; residency: string; subjects: string; retention: string;
+  personalData: boolean; specialCategory: boolean; automatedDecisions: boolean; cardholderData: boolean;
+  gdpr: boolean; pci: boolean; iso: boolean; aiAct: boolean; soc2: boolean; nis2: boolean;
+}
+interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; }
+interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; }
+
+const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
+const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
+const FRAMEWORK_OPTS = ["ISO 27001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "EU AI Act"];
+const CTL_STATUSES = ["Planned", "Partial", "Implemented"];
+const CTL_STATUS: Record<string, { ink: string; tint: string }> = {
+  Implemented: { ink: "#0B6B37", tint: "#E7F4EC" },
+  Partial:     { ink: "#8A6300", tint: "#FBF2D7" },
+  Planned:     { ink: "#56607A", tint: "#EEF1F6" },
+};
+const SEC_FLAGS: { key: keyof SecProfile; label: string; desc: string }[] = [
+  { key: "gdpr", label: "GDPR", desc: "Personal data of EU/EEA data subjects" },
+  { key: "pci", label: "PCI-DSS", desc: "Cardholder data in scope" },
+  { key: "iso", label: "ISO 27001", desc: "ISMS Annex A controls apply" },
+  { key: "aiAct", label: "EU AI Act", desc: "Automated recommendation model" },
+  { key: "soc2", label: "SOC 2", desc: "Vendor assurance for SaaS components" },
+  { key: "nis2", label: "NIS2", desc: "Essential-entity operational resilience" },
+];
+const DPIA_COLOR: Record<string, { ink: string; tint: string }> = {
+  Required:      { ink: "#A1282B", tint: "#FBE7E8" },
+  Recommended:   { ink: "#8A6300", tint: "#FBF2D7" },
+  "Not required":{ ink: "#0B6B37", tint: "#E7F4EC" },
+};
+function dpiaVerdict(p: SecProfile): { level: string; reason: string } {
+  if (p.specialCategory || p.automatedDecisions || p.classification === "Restricted")
+    return { level: "Required", reason: "Special-category data, automated decision-making, or restricted classification triggers a mandatory DPIA under GDPR Art. 35." };
+  if (p.personalData || p.cardholderData)
+    return { level: "Recommended", reason: "Personal or cardholder data is processed — a screening DPIA is recommended to confirm residual risk." };
+  return { level: "Not required", reason: "No personal, special-category or cardholder data identified in scope." };
+}
+const SEC_COLS = "0.6fr 1.9fr 0.9fr 1.9fr 1.1fr 0.9fr";
+
+function Security({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["security", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<SecData | null> => await api<SecData>(`/projects/${projectId}/security`),
+  });
+  const patch = useMutation({
+    mutationFn: (body: Partial<SecProfile>) => api(`/projects/${projectId}/security`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["security", projectId] }),
+  });
+  const cycle = useMutation({
+    mutationFn: (v: { id: number; status: string }) => api(`/security/controls/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["security", projectId] }),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its security posture." /></Card>;
+  if (!data) return <Card><EmptyBlock minHeight={220} message="Loading security profile…" /></Card>;
+
+  const { profile: p, controls, canEdit } = data;
+  const dpia = dpiaVerdict(p);
+  const dc = DPIA_COLOR[dpia.level];
+  const toggles: { key: keyof SecProfile; label: string }[] = [
+    { key: "personalData", label: "Personal data processed" },
+    { key: "specialCategory", label: "Special-category data" },
+    { key: "automatedDecisions", label: "Automated decision-making" },
+    { key: "cardholderData", label: "Cardholder data" },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.ink }}>Security, privacy &amp; compliance</div>
+        {canEdit && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>● Security governance enabled</span>}
+      </div>
+
+      {/* data classification & privacy profile */}
+      <Card style={{ marginBottom: 16 }}>
+        <SectionTitle>Data classification &amp; privacy profile</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "14px 26px" }}>
+          <SecField label="Data classification">
+            <Select value={p.classification} disabled={!canEdit} onChange={(e) => patch.mutate({ classification: e.target.value })}>
+              {CLASS_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </Select>
+          </SecField>
+          <SecField label="Data residency">
+            <Select value={p.residency} disabled={!canEdit} onChange={(e) => patch.mutate({ residency: e.target.value })}>
+              {RESIDENCY_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </Select>
+          </SecField>
+          <SecField label="Data subjects">
+            <SecTextField value={p.subjects} disabled={!canEdit} placeholder="e.g. ~4.8M shoppers (Nordic)" onCommit={(v) => patch.mutate({ subjects: v })} />
+          </SecField>
+          <SecField label="Retention">
+            <SecTextField value={p.retention} disabled={!canEdit} placeholder="e.g. 7 years (financial)" onCommit={(v) => patch.mutate({ retention: v })} />
+          </SecField>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+          {toggles.map((t) => (
+            <Toggle key={t.key} on={!!p[t.key]} label={t.label} disabled={!canEdit} onClick={() => patch.mutate({ [t.key]: !p[t.key] } as Partial<SecProfile>)} />
+          ))}
+        </div>
+      </Card>
+
+      {/* DPIA banner */}
+      <div style={{ border: `1px solid ${dc.ink}`, background: dc.tint, borderRadius: 16, padding: "18px 22px", marginBottom: 16 }}>
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 700, color: dc.ink }}>DPIA / PIA — {dpia.level}</div>
+        <div style={{ fontSize: 13, color: "#3A4358", lineHeight: 1.55, marginTop: 8 }}>{dpia.reason}</div>
+      </div>
+
+      {/* compliance flags */}
+      <Card style={{ marginBottom: 16 }}>
+        <SectionTitle>Applicable frameworks &amp; regulations</SectionTitle>
+        <div style={{ fontSize: 12, color: color.faint2, marginTop: -6, marginBottom: 14 }}>Toggle the regimes in scope for this initiative — these drive the required controls and gates.</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {SEC_FLAGS.map((f) => {
+            const on = !!p[f.key];
+            return (
+              <div key={f.key} onClick={() => canEdit && patch.mutate({ [f.key]: !on } as Partial<SecProfile>)} style={{ minWidth: 150, borderRadius: 11, border: `1px solid ${color.border}`, overflow: "hidden", cursor: canEdit ? "pointer" : "default" }}>
+                <div style={{ background: on ? color.primary : "#EEF0F4", color: on ? "#fff" : "#7B849A", fontSize: 13, fontWeight: 700, padding: "9px 13px" }}>{f.label}</div>
+                <div style={{ fontSize: 11, color: "#7B849A", padding: "8px 13px", lineHeight: 1.4 }}>{f.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* security review gates (structural; follow-up) */}
+      <Card padding={0} style={{ overflow: "hidden", marginBottom: 16 }}>
+        <div style={{ padding: "15px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Security review gates</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1.3fr 0.9fr 1fr", padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Gate</div><div>Owner</div><div>Date</div><div>Status</div>
+        </div>
+        <EmptyBlock message="No security review gates scheduled yet." minHeight={110} />
+      </Card>
+
+      {/* control evidence register */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
+          <span style={{ flex: 1, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Control evidence register</span>
+          {canEdit && <button onClick={() => setAddOpen(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add control</button>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: SEC_COLS, padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>ID</div><div>Control</div><div>Framework</div><div>Evidence</div><div>Owner</div><div>Status</div>
+        </div>
+        {controls.length === 0 ? (
+          <EmptyBlock message="No controls logged yet." minHeight={120} />
+        ) : controls.map((c) => {
+          const sc = CTL_STATUS[c.status] ?? CTL_STATUS.Planned;
+          const nextStatus = CTL_STATUSES[(CTL_STATUSES.indexOf(c.status) + 1) % CTL_STATUSES.length];
+          return (
+            <div key={c.id} style={{ display: "grid", gridTemplateColumns: SEC_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
+              <div style={{ fontSize: 12.5, color: color.text, fontWeight: 600 }}>{c.control}</div>
+              <div style={{ fontSize: 11.5, color: color.subtle }}>{c.framework}</div>
+              <div style={{ fontSize: 11.5, color: "#7B849A", lineHeight: 1.4 }}>{c.evidence}</div>
+              <div style={{ fontSize: 11.5, color: color.subtle }}>{c.owner}</div>
+              <div>
+                <button onClick={() => canEdit && cycle.mutate({ id: c.id, status: nextStatus })} disabled={!canEdit || cycle.isPending}
+                  title={canEdit ? "Click to change status" : undefined}
+                  style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "5px 10px", borderRadius: 20, border: "none", cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{c.status}</button>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {addOpen && <AddControlModal projectId={projectId} onClose={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
+function SecField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function SecTextField({ value, disabled, placeholder, onCommit }: { value: string; disabled?: boolean; placeholder?: string; onCommit: (v: string) => void }) {
+  // Uncontrolled + key ensures the field re-syncs when the server value changes,
+  // while local typing stays uncommitted until blur (no effect-driven setState).
+  return (
+    <Input key={value} defaultValue={value} disabled={disabled} placeholder={placeholder}
+      onBlur={(e) => { if (e.target.value !== value) onCommit(e.target.value); }} />
+  );
+}
+
+function Toggle({ on, label, disabled, onClick }: { on: boolean; label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <div onClick={() => !disabled && onClick()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, padding: "9px 14px", borderRadius: 9, border: `1px solid ${color.border2}`, background: "#F7F9FC", color: "#3A4358", cursor: disabled ? "default" : "pointer" }}>
+      <span style={{ width: 34, height: 19, borderRadius: 20, background: on ? "#15A34A" : "#CBD2DE", position: "relative", flex: "none", transition: "background .15s" }}>
+        <span style={{ position: "absolute", top: 2, left: on ? 17 : 2, width: 15, height: 15, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+      </span>
+      {label}
+    </div>
+  );
+}
+
+function AddControlModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [control, setControl] = useState("");
+  const [framework, setFramework] = useState(FRAMEWORK_OPTS[0]);
+  const [evidence, setEvidence] = useState("");
+  const [owner, setOwner] = useState("");
+  const [status, setStatus] = useState(CTL_STATUSES[0]);
+
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/security/controls`, { method: "POST", body: JSON.stringify({ control: control.trim(), framework, evidence: evidence.trim(), owner: owner.trim(), status }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security", projectId] }); onClose(); },
+  });
+  const submit = () => { if (control.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={500} label="Add a control">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Record a control and its evidence in the register.</div>
+      <DecLabel>Control</DecLabel>
+      <Input value={control} onChange={(e) => setControl(e.target.value)} placeholder="e.g. A.8.24 Use of cryptography" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Framework</DecLabel>
+          <Select value={framework} onChange={(e) => setFramework(e.target.value)}>
+            {FRAMEWORK_OPTS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </Select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Status</DecLabel>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            {CTL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </div>
+      </div>
+      <DecLabel>Evidence</DecLabel>
+      <Textarea value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="What demonstrates this control is in place?" style={{ minHeight: 56, resize: "vertical", marginBottom: 14 }} />
+      <DecLabel>Owner</DecLabel>
+      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Control owner" />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !control.trim()}>{create.isPending ? "Adding…" : "Add control"}</Button>
+      </div>
+    </Modal>
   );
 }
 
