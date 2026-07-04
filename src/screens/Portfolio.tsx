@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
@@ -225,16 +225,27 @@ function RowActions({ open, onToggle, project, mayEdit, mayDelete, mayRequest, o
       <span style={{ display: "flex", color: danger ? "#D13438" : color.faint2 }}>{icon}</span>{label}
     </button>
   );
+  // Fixed positioning (computed from the button) so the menu isn't clipped by the
+  // table Card's overflow:hidden.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  useLayoutEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 5, right: Math.max(8, window.innerWidth - r.right) });
+    }
+  }, [open]);
+
   return (
     <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }}>
-      <button aria-label="Project actions" onClick={onToggle} style={{
+      <button ref={btnRef} aria-label="Project actions" onClick={onToggle} style={{
         width: 30, height: 30, borderRadius: 8, border: `1px solid ${color.border}`, background: open ? color.bg : color.surface,
         cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: color.faint2,
       }}><Icon name="more" size={16} /></button>
-      {open && (
+      {open && pos && (
         <>
-          <div onClick={(e) => { e.stopPropagation(); onToggle(e); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div style={{ position: "absolute", right: 0, top: 34, zIndex: 41, minWidth: 172, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(20,26,60,0.16)", padding: 5, overflow: "hidden" }}>
+          <div onClick={(e) => { e.stopPropagation(); onToggle(e); }} style={{ position: "fixed", inset: 0, zIndex: 300 }} />
+          <div style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 301, minWidth: 172, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(20,26,60,0.16)", padding: 5, overflow: "hidden" }}>
             {mayEdit && item("Edit details", <Icon name="edit" size={15} />, onEdit)}
             {mayEdit && (project.archived
               ? item("Restore", <Icon name="refresh" size={15} />, () => onArchive(false))
@@ -269,6 +280,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
   const [methodology, setMethodology] = useState(project.methodology);
   const [status, setStatus] = useState<Project["status"]>(project.status);
   const [progress, setProgress] = useState(String(project.progress));
+  const [startDate, setStartDate] = useState(project.startDate ?? "");
   const [target, setTarget] = useState(project.target);
   const [budget, setBudget] = useState(String(project.budget));
   const [spent, setSpent] = useState(String(project.spent));
@@ -279,7 +291,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
       body: JSON.stringify({
         name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology, status,
         progress: Math.max(0, Math.min(100, Number(progress) || 0)),
-        target: target.trim(), budget: Number(budget) || 0, spent: Number(spent) || 0,
+        target: target.trim(), startDate: startDate.trim(), budget: Number(budget) || 0, spent: Number(spent) || 0,
       }),
     }),
     onSuccess: onSaved,
@@ -305,8 +317,9 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
           </Select>
         </Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <Field label="Progress %"><Input type="number" value={progress} onChange={(e) => setProgress(e.target.value)} /></Field>
+        <Field label="Start date"><Input type="date" value={toIsoDate(startDate)} onChange={(e) => setStartDate(toDisplayDate(e.target.value))} /></Field>
         <Field label="Target date"><Input type="date" value={toIsoDate(target)} onChange={(e) => setTarget(toDisplayDate(e.target.value))} /></Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

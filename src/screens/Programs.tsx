@@ -13,10 +13,17 @@ type PowInt = "High" | "Low";
 
 interface Program {
   id: string; name: string; owner: string; goal: string; status: string;
-  projects: string[]; budget: number; spent: number; progress: number; health: Health;
+  projects: string[]; budget: number; spent: number; progress: number; health: Health; startDate?: string;
 }
-interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[] }
+interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[]; startDate: string }
 interface ProjOpt { id: string; name: string; dept?: string; health?: string; status?: Health; progress?: number; budget?: number }
+
+const PG_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const pgToDisplay = (iso: string): string => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  return y && m && d ? `${d} ${PG_MONTHS[m - 1]} ${y}` : "";
+};
 interface Stakeholder { id: string; user: string; role: string; power: PowInt; interest: PowInt }
 
 const STATUS_OPTS = ["Planning", "On track", "At risk", "Critical", "On hold", "Completed", "Closed"] as const;
@@ -177,7 +184,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           <div style={{ flex: 1, minWidth: 240 }}>
             <h2 style={{ fontFamily: font.head, fontSize: 22, fontWeight: 600, color: color.navy, margin: "0 0 4px" }}>{program.name}</h2>
             <div style={{ fontSize: 13, color: color.faint2 }}>{program.goal}</div>
-            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}</div>
+            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}{program.startDate ? ` · Start ${program.startDate}` : ""}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: h.ink, background: h.tint, padding: "4px 12px", borderRadius: 20 }}>{HEALTH[program.health]?.label ?? program.status}</span>
@@ -323,13 +330,14 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
   const [owner, setOwner] = useState("");
   const [goal, setGoal] = useState("");
   const [status, setStatus] = useState<string>("Planning");
+  const [startDate, setStartDate] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const submit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(), owner: owner.trim() || "Unassigned", goal: goal.trim(), status,
-      projects: selected,
+      projects: selected, startDate: pgToDisplay(startDate),
     });
   };
   const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
@@ -349,10 +357,16 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
         <div><label style={lbl}>Owner</label><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Program manager" /></div>
         <div><label style={lbl}>Goal</label><Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Strategic objective" /></div>
       </div>
-      <label style={lbl}>Status</label>
-      <Select value={status} onChange={(e) => setStatus(e.target.value)} style={{ marginBottom: 14 }}>
-        {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
-      </Select>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+        <div><label style={lbl}>Status</label>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </div>
+        <div><label style={lbl}>Start date</label>
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+      </div>
       <label style={{ ...lbl, marginBottom: 7 }}>Projects to include</label>
       <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, maxHeight: 220, overflowY: "auto" }}>
         {projectOpts.length === 0 ? (

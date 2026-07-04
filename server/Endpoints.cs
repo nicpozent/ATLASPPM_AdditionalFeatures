@@ -69,7 +69,7 @@ public static class Endpoints
               : q.Where(p => !p.Archived && p.Status != "completed");
             return await q.OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,
-                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem)).ToListAsync();
+                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate)).ToListAsync();
         });
 
         api.MapGet("/projects/my", async (AtlasDbContext db) =>
@@ -83,7 +83,7 @@ public static class Endpoints
             return p is null
                 ? Results.NotFound()
                 : Results.Ok(new ProjectDetailDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology,
-                    p.Status, p.Health, p.Progress, p.Phase, p.Budget, p.Spent, p.Due));
+                    p.Status, p.Health, p.Progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target));
         });
 
         api.MapGet("/blockers", async (AtlasDbContext db) =>
@@ -100,7 +100,7 @@ public static class Endpoints
 
         api.MapGet("/programs", async (AtlasDbContext db) =>
             await db.Programs.OrderBy(x => x.Id).Select(x => new ProgramDto(
-                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health))
+                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate))
                 .ToListAsync());
 
         api.MapGet("/products", async (AtlasDbContext db) =>

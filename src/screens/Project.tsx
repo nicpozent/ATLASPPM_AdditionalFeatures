@@ -11,7 +11,7 @@ import { SCREENS } from "@/nav";
 interface ProjectDetail {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: string; health: string; progress: number; phase: string;
-  budget: number; spent: number; due: string;
+  budget: number; spent: number; due: string; startDate?: string; target?: string;
 }
 function useProject(id: string | null) {
   return useQuery({
@@ -83,7 +83,8 @@ export default function Project() {
           </Meta>
           <Meta label="Phase"><span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{dash(p?.phase)}</span></Meta>
           <Meta label="Budget"><span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{p ? `${fmt(p.spent)} / ${fmt(p.budget)}` : "—"}</span></Meta>
-          <Meta label="Target"><span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{dash(p?.due)}</span></Meta>
+          <Meta label="Start"><span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{dash(p?.startDate || undefined)}</span></Meta>
+          <Meta label="Target"><span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{dash(p?.target || p?.due)}</span></Meta>
         </div>
       </Card>
 

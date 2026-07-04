@@ -52,6 +52,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     {
         b.Entity<Project>().HasKey(x => x.Id);
         b.Entity<Project>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<Project>().Property(x => x.StartDate).HasDefaultValue("");
         b.Entity<Project>()
             .HasMany(x => x.Blockers)
             .WithOne(x => x.Project!)
@@ -87,6 +88,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
 
         b.Entity<Program>().HasKey(x => x.Id);
         b.Entity<Program>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<Program>().Property(x => x.StartDate).HasDefaultValue("");
 
         b.Entity<Product>().HasKey(x => x.Id);
         b.Entity<Product>().Property(x => x.Id).ValueGeneratedNever();

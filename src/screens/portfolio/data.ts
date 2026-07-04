@@ -6,7 +6,7 @@ export interface Project {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: "green" | "amber" | "red" | "hold" | "completed"; health: string; progress: number;
   budget: number; spent: number; target: string; blockerCount: number;
-  archived?: boolean; isSystem?: boolean;
+  archived?: boolean; isSystem?: boolean; startDate?: string;
 }
 export type ProjectBucket = "active" | "completed" | "archived";
 export type BlockerStatus = "Active" | "In progress" | "Resolved";

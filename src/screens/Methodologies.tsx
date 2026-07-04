@@ -291,7 +291,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
             <Button variant="secondary" onClick={onClose} style={{ padding: "10px 16px" }}>Cancel</Button>
-            <Button onClick={() => { if (tpl.name.trim()) setStep(2); }} style={{ padding: "10px 18px" }}>Next: scaffold</Button>
+            <Button onClick={() => { if (tpl.name.trim()) setStep(2); }} style={{ padding: "10px 18px" }}>Next</Button>
           </div>
         </div>
       )}

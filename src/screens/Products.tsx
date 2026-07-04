@@ -7,7 +7,7 @@ import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 
-type Source = "jira" | "ado";
+type Source = "jira" | "ado" | "manual";
 
 interface Task { id: string; title: string; status: string; points: number; dateISO: string; mappedRelease: string }
 interface Member { name: string; alloc: number }
@@ -23,6 +23,7 @@ const PRODUCT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
 const SOURCE_META: Record<Source, { label: string; c: string }> = {
   jira: { label: "Jira", c: "#2684FF" },
   ado: { label: "Azure DevOps", c: "#0078D7" },
+  manual: { label: "Manual", c: "#566077" },
 };
 const STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
   "Done": { ink: "#0B6B37", tint: "#E7F4EC" },
@@ -131,7 +132,7 @@ function NewProductModal({ onClose, onCreate, submitting }: {
 }) {
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("");
-  const [source, setSource] = useState<Source>("jira");
+  const [source, setSource] = useState<Source>("manual");
   const [projects, setProjects] = useState("");
   const submit = () => {
     if (!name.trim()) return;
@@ -150,6 +151,7 @@ function NewProductModal({ onClose, onCreate, submitting }: {
       <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Product owner" />
       <Lbl>Source</Lbl>
       <Select value={source} onChange={(e) => setSource(e.target.value as Source)}>
+        <option value="manual">Manual (created here)</option>
         <option value="jira">Jira</option>
         <option value="ado">Azure DevOps</option>
       </Select>
@@ -197,7 +199,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
             <div style={{ fontFamily: font.head, fontSize: 20, fontWeight: 600, color: color.navy }}>{product.name}</div>
             <div style={{ fontSize: 12.5, color: color.faint2 }}>Owner {product.owner} · Projects: {product.projects.join(", ") || "—"}</div>
           </div>
-          <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#fff", background: src.c, padding: "6px 12px", borderRadius: 8 }}><Icon name="sync" size={16} /> Synced from {src.label}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#fff", background: src.c, padding: "6px 12px", borderRadius: 8 }}><Icon name={product.source === "manual" ? "edit" : "sync"} size={16} /> {product.source === "manual" ? "Manually created" : `Synced from ${src.label}`}</span>
           {(() => { const c = PRODUCT_STATUS_COLOR[product.status ?? "Active"] ?? PRODUCT_STATUS_COLOR.Active; return (
             <span style={{ fontSize: 12, fontWeight: 700, color: c.ink, background: c.tint, padding: "5px 11px", borderRadius: 20 }}>{product.status ?? "Active"}</span>
           ); })()}
