@@ -311,6 +311,22 @@ public class GateCriterion
     public int Ord { get; set; }
 }
 
+// ---- Project tasks (board + table) ----------------------------------------
+public class ProjectTask
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;        // "T-1042"
+    public string Name { get; set; } = default!;
+    public string Epic { get; set; } = "";
+    public string Assignee { get; set; } = "";
+    public string Status { get; set; } = "To Do";        // To Do | In Progress | In Review | Done | Blocked
+    public string Sprint { get; set; } = "";
+    public string Baseline { get; set; } = "";
+    public string Priority { get; set; } = "Medium";     // Critical | High | Medium | Low
+    public int Ord { get; set; }
+}
+
 // ---- Security, privacy & compliance ---------------------------------------
 // One profile per project; controls are a per-project evidence register.
 public class SecurityProfile

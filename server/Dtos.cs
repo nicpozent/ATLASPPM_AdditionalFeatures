@@ -43,6 +43,10 @@ public record SecurityProfileDto(string Classification, string Residency, string
 public record SecurityControlDto(int Id, string Code, string Control, string Framework, string Evidence, string Owner, string Status);
 public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls);
 
+public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
+    string Status, string Sprint, string Baseline, string Priority);
+public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
