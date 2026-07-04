@@ -7,6 +7,28 @@ import { getToken } from "./auth";
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || "/api/v1";
 
+// The selected role (cosmetic switcher, persisted by RoleContext). When auth is
+// OFF the API reads this header so the demo can show real permission enforcement;
+// when auth is ON the server ignores it and trusts the Entra token instead.
+function roleHeader(): Record<string, string> {
+  try {
+    const r = localStorage.getItem("atlas.role");
+    return r ? { "X-Atlas-Role": r } : {};
+  } catch {
+    return {};
+  }
+}
+
+// Reads a server-provided { error } message from a failed response so callers
+// (e.g. a 403 from the permission matrix) can show why the action was refused.
+async function errorFrom(res: Response): Promise<Error> {
+  try {
+    const body = await res.clone().json();
+    if (body && typeof body.error === "string") return new Error(body.error);
+  } catch { /* not JSON — fall through */ }
+  return new Error(`API ${res.status} ${res.statusText}`);
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T | null> {
   const token = await getToken();
   const res = await fetch(`${BASE}${path}`, {
@@ -14,10 +36,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T | 
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...roleHeader(),
       ...init.headers,
     },
   });
-  if (!res.ok) throw new Error(`API ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await errorFrom(res);
   return res.status === 204 ? null : ((await res.json()) as T);
 }
 
@@ -27,10 +50,10 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<T | nu
   const token = await getToken();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...roleHeader() },
     body: form,
   });
-  if (!res.ok) throw new Error(`API ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await errorFrom(res);
   return res.status === 204 ? null : ((await res.json()) as T);
 }
 
