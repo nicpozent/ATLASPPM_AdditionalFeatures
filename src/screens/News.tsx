@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
@@ -226,28 +226,27 @@ export default function News() {
   const qc = useQueryClient();
   const canEdit = data?.canEdit ?? false;
 
-  const [theme, setTheme] = useState<ThemeKey>("aurora");
-  const [layout, setLayout] = useState<Layout>("masonry");
+  // Server is the source of truth; local state only holds the edit toggle,
+  // in-progress field drafts, and immediate theme/layout feedback.
   const [edit, setEdit] = useState(false);
-  const [blocks, setBlocks] = useState<NewsBlock[]>([]);
+  const [themeOverride, setThemeOverride] = useState<ThemeKey | null>(null);
+  const [layoutOverride, setLayoutOverride] = useState<Layout | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, Partial<NewsBlock>>>({});
 
-  // Sync local state from the server whenever the query resolves.
-  useEffect(() => {
-    if (!data) return;
-    setTheme((THEMES[data.theme as ThemeKey] ? data.theme : "aurora") as ThemeKey);
-    setLayout((LAYOUTS.some((l) => l.key === data.layout) ? data.layout : "masonry") as Layout);
-    setBlocks(data.blocks);
-  }, [data]);
-
+  const serverTheme = (data && THEMES[data.theme as ThemeKey] ? data.theme : "aurora") as ThemeKey;
+  const serverLayout = (data && LAYOUTS.some((l) => l.key === data.layout) ? data.layout : "masonry") as Layout;
+  const theme = themeOverride ?? serverTheme;
+  const layout = layoutOverride ?? serverLayout;
+  const blocks: NewsBlock[] = (data?.blocks ?? []).map((b) => (drafts[b.id] ? { ...b, ...drafts[b.id] } : b));
   const nt = THEMES[theme];
 
   const addBlock = useMutation({
     mutationFn: (kind: BlockKind) => api<NewsBlock>("/news/blocks", { method: "POST", body: JSON.stringify({ kind }) }),
-    onSuccess: (block) => { if (block) setBlocks((bs) => [...bs, block]); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
   });
   const removeBlockMut = useMutation({
     mutationFn: (id: number) => api<void>(`/news/blocks/${id}`, { method: "DELETE" }),
-    onSuccess: (_r, id) => setBlocks((bs) => bs.filter((b) => b.id !== id)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
   });
   const commitBlock = useMutation({
     mutationFn: (b: NewsBlock) => api<NewsBlock>(`/news/blocks/${b.id}`, {
@@ -257,18 +256,25 @@ export default function News() {
         tone: b.tone ?? "good", who: b.who ?? "", caption: b.caption ?? "", date: b.date ?? "", meta: b.meta ?? "",
       }),
     }),
+    onSuccess: (_r, b) => {
+      setDrafts((d) => { const next = { ...d }; delete next[b.id]; return next; });
+      qc.invalidateQueries({ queryKey: ["news"] });
+    },
   });
   const saveConfig = useMutation({
     mutationFn: (cfg: { theme?: string; layout?: string }) =>
       api<void>("/news/config", { method: "PATCH", body: JSON.stringify(cfg) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
+    onSuccess: () => {
+      setThemeOverride(null); setLayoutOverride(null);
+      qc.invalidateQueries({ queryKey: ["news"] });
+    },
   });
 
-  const chooseTheme = (k: ThemeKey) => { setTheme(k); saveConfig.mutate({ theme: k }); };
-  const chooseLayout = (k: Layout) => { setLayout(k); saveConfig.mutate({ layout: k }); };
+  const chooseTheme = (k: ThemeKey) => { setThemeOverride(k); saveConfig.mutate({ theme: k }); };
+  const chooseLayout = (k: Layout) => { setLayoutOverride(k); saveConfig.mutate({ layout: k }); };
   const removeBlock = (id: number) => removeBlockMut.mutate(id);
   const updateField = (id: number, field: keyof NewsBlock, v: string) =>
-    setBlocks((bs) => bs.map((b) => (b.id === id ? { ...b, [field]: v } : b)));
+    setDrafts((d) => ({ ...d, [id]: { ...d[id], [field]: v } }));
 
   const wallStyle: React.CSSProperties =
     layout === "masonry" ? { columnCount: 3, columnGap: 16 }
