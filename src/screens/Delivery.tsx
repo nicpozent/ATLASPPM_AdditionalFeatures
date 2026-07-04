@@ -26,6 +26,15 @@ function useDelivery() {
   });
 }
 
+type SpilloverSummary = { total: number; projects: number; byProject: { id: string; name: string; count: number }[] };
+function useSpillover() {
+  return useQuery({
+    queryKey: ["spillover-summary"], retry: false, staleTime: 30000,
+    queryFn: async (): Promise<SpilloverSummary> =>
+      (await api<SpilloverSummary>("/spillover")) ?? { total: 0, projects: 0, byProject: [] },
+  });
+}
+
 const PERIODS: { key: Period; label: string; report: string }[] = [
   { key: "weekly", label: "Weekly", report: "This week" },
   { key: "monthly", label: "Monthly", report: "This month" },
@@ -74,6 +83,7 @@ export default function Delivery() {
   const [period, setPeriod] = useState<Period>("monthly");
   const [view, setView] = useState<"delivery" | "cfo">("delivery");
   const { data = {} } = useDelivery();
+  const { data: spill } = useSpillover();
 
   const meta = PERIODS.find((p) => p.key === period)!;
   const dd = data[period];
@@ -149,6 +159,22 @@ export default function Delivery() {
                 {dd?.velTrend && <span style={{ fontSize: 12, fontWeight: 700, color: color.successInk }}>{dd.velTrend}</span>}
               </div>
               <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 3 }}>pts / sprint avg</div>
+            </div>
+          </div>
+
+          {/* Sprint spillover — live across the portfolio (tasks past their baseline). */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: (spill?.total ?? 0) > 0 ? "#FDF8E9" : color.surface, border: `1px solid ${(spill?.total ?? 0) > 0 ? "#F0E4B8" : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 9, flex: "none" }}>
+              <span style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: (spill?.total ?? 0) > 0 ? "#8A6300" : color.ink }}>{spill?.total ?? 0}</span>
+              <span style={{ fontSize: 12.5, color: color.faint }}>tasks spilled over{spill && spill.projects > 0 ? ` · ${spill.projects} project${spill.projects === 1 ? "" : "s"}` : ""}</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 200, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(spill?.byProject ?? []).slice(0, 5).map((p) => (
+                <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 20, padding: "3px 11px" }}>
+                  {p.name} <span style={{ fontFamily: font.mono, fontWeight: 700 }}>{p.count}</span>
+                </span>
+              ))}
+              {(!spill || spill.total === 0) && <span style={{ fontSize: 12, color: color.faint3 }}>No tasks are past their baselined sprint.</span>}
             </div>
           </div>
 

@@ -104,10 +104,12 @@ public static class Gates
         api.MapGet("/projects/{id}/raid", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            // Keep the auto-raised spillover risk in sync before reading the log.
+            await Spillover.ReconcileRaidAsync(db, id, http, cfg);
             var items = await db.RaidItems.Where(r => r.ProjectId == id).OrderBy(r => r.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             return Results.Ok(new RaidDto(canEdit,
-                items.Select(r => new RaidItemDto(r.Id, r.Type, r.Title, r.Owner, r.Status)).ToList()));
+                items.Select(r => new RaidItemDto(r.Id, r.Type, r.Title, r.Owner, r.Status, r.Auto)).ToList()));
         });
 
         api.MapPost("/projects/{id}/raid", async (string id, CreateRaidReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
