@@ -144,6 +144,7 @@ function Overview({ projectId }: { projectId: string | null }) {
         </div>
         {modal === "risks" && projectId && <RisksModal projectId={projectId} onClose={() => setModal(null)} />}
         {modal === "report" && projectId && <StatusReportModal projectId={projectId} onClose={() => setModal(null)} />}
+        <OperationalImpact projectId={projectId} />
         <Card padding={22}><SectionTitle>Summary</SectionTitle><EmptyBlock message="No project summary yet." minHeight={70} /></Card>
         <Card padding={22}><SectionTitle>Epic progress</SectionTitle><EmptyBlock message="No epics tracked yet." minHeight={80} /></Card>
         <Card padding={22}><SectionTitle>Stakeholder matrix · power / interest</SectionTitle><EmptyBlock message="No stakeholders mapped yet." minHeight={120} /></Card>
@@ -243,6 +244,122 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
         </>
       )}
     </Card>
+  );
+}
+
+// Operational impact — incidents / maintenance / changes that can affect this
+// project. Active high-severity items are picked up by the risk engine. Logged
+// manually here; the Source field is connector-ready (ServiceNow / SDP / Jira).
+interface OperationalItem { id: number; ref: string; title: string; type: string; severity: string; status: string; source: string; owner: string; date: string; }
+const OPS_TYPES = ["Incident", "Maintenance", "Service request", "On-call", "Change"];
+const OPS_SEVERITIES = ["Critical", "High", "Medium", "Low"];
+const OPS_STATUSES = ["Open", "In progress", "Resolved", "Closed"];
+const OPS_SOURCES = ["Manual", "ServiceNow", "ManageEngine SDP", "Jira", "Azure DevOps"];
+const OPS_SEV_COLOR: Record<string, { ink: string; tint: string }> = {
+  Critical: { ink: "#A1282B", tint: "#FBE7E8" }, High: { ink: "#A1282B", tint: "#FBE7E8" },
+  Medium: { ink: "#8A6300", tint: "#FBF2D7" }, Low: { ink: "#566077", tint: "#EEF1F6" },
+};
+const opsActive = (s: string) => s === "Open" || s === "In progress";
+
+function OperationalImpact({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [modal, setModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["operational", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; items: OperationalItem[] }> =>
+      (await api<{ canEdit: boolean; items: OperationalItem[] }>(`/projects/${projectId}/operational`)) ?? { canEdit: false, items: [] },
+  });
+  const items = data?.items ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const activeCount = items.filter((o) => opsActive(o.status)).length;
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["operational", projectId] });
+    qc.invalidateQueries({ queryKey: ["operational-all"] });    // portfolio strip on Delivery
+    qc.invalidateQueries({ queryKey: ["risks", projectId] });   // ops feeds the risk engine
+  };
+  const patch = useMutation({
+    mutationFn: (v: { id: number; status: string }) => api(`/operational/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/operational/${id}`, { method: "DELETE" }),
+    onSuccess: refresh,
+  });
+
+  return (
+    <Card padding="18px 22px">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <SectionTitle>Operational impact</SectionTitle>
+        {activeCount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{activeCount} active</span>}
+        <div style={{ flex: 1 }} />
+        {canEdit && projectId && <Button variant="secondary" onClick={() => setModal(true)} style={{ marginBottom: 12, padding: "7px 12px" }}><Icon name="plus" size={15} /> Log item</Button>}
+      </div>
+      <div style={{ fontSize: 12, color: color.faint2, marginTop: -6, marginBottom: 14 }}>Incidents, maintenance & changes that can affect delivery. Active high-severity items are flagged as risks.</div>
+      {items.length === 0 ? (
+        <EmptyBlock message="No operational items linked to this project." minHeight={60} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {items.map((o) => {
+            const sev = OPS_SEV_COLOR[o.severity] ?? OPS_SEV_COLOR.Medium;
+            const resolved = o.status === "Resolved" || o.status === "Closed";
+            return (
+              <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid #F4F6FA", opacity: resolved ? 0.6 : 1 }}>
+                <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none", width: 54 }}>{o.ref}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.title}</div>
+                  <div style={{ fontSize: 11, color: color.faint3 }}>{o.type} · {o.owner} · {o.date}{o.source !== "Manual" ? ` · ${o.source}` : ""}</div>
+                </div>
+                <span style={{ flex: "none", fontSize: 10.5, fontWeight: 700, color: sev.ink, background: sev.tint, padding: "2px 8px", borderRadius: 6 }}>{o.severity}</span>
+                {canEdit ? (
+                  <select value={o.status} onChange={(e) => patch.mutate({ id: o.id, status: e.target.value })}
+                    style={{ flex: "none", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", color: color.textMuted, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 7, padding: "5px 8px", cursor: "pointer" }}>
+                    {OPS_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ flex: "none", fontSize: 11.5, fontWeight: 600, color: color.textMuted }}>{o.status}</span>
+                )}
+                {canEdit && (
+                  <button onClick={() => remove.mutate(o.id)} title="Remove" style={{ flex: "none", width: 28, height: 28, borderRadius: 7, border: `1px solid ${color.border}`, background: "#fff", color: color.faint2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trash" size={14} /></button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {modal && projectId && <OperationalModal projectId={projectId} onClose={() => setModal(false)} onSaved={() => { setModal(false); refresh(); }} />}
+    </Card>
+  );
+}
+
+function OperationalModal({ projectId, onClose, onSaved }: { projectId: string; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState(OPS_TYPES[0]);
+  const [severity, setSeverity] = useState("Medium");
+  const [owner, setOwner] = useState("");
+  const [source, setSource] = useState(OPS_SOURCES[0]);
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/operational`, { method: "POST", body: JSON.stringify({ title: title.trim(), type, severity, owner: owner.trim(), source }) }),
+    onSuccess: onSaved,
+  });
+  return (
+    <Modal onClose={onClose} width={480} label="Log operational item">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Record operational work that can affect this project's delivery.</div>
+      <DecLabel>Title</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. POS outage in Nässjö region" style={{ marginBottom: 14 }} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div><DecLabel>Type</DecLabel><Select value={type} onChange={(e) => setType(e.target.value)}>{OPS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></div>
+        <div><DecLabel>Severity</DecLabel><Select value={severity} onChange={(e) => setSeverity(e.target.value)}>{OPS_SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+        <div><DecLabel>Owner</DecLabel><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Assignee" /></div>
+        <div><DecLabel>Source</DecLabel><Select value={source} onChange={(e) => setSource(e.target.value)}>{OPS_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => title.trim() && create.mutate()} disabled={create.isPending || !title.trim()}>{create.isPending ? "Logging…" : "Log item"}</Button>
+      </div>
+    </Modal>
   );
 }
 

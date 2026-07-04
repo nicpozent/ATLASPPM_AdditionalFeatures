@@ -87,6 +87,11 @@ public record SpilledTaskDto(string Code, string Name, string Baseline, string S
 public record ProjectSpilloverDto(string Id, string Name, int Count);
 public record SpilloverSummaryDto(int Total, int Projects, List<ProjectSpilloverDto> ByProject);
 
+// ---- Operational items (ops work that can affect a project) -----------------
+public record OperationalItemDto(int Id, string Ref, string Title, string Type, string Severity,
+    string Status, string Source, string? ProjectId, string? ProjectName, string Owner, string Date);
+public record OperationalDto(bool CanEdit, List<OperationalItemDto> Items);
+
 // ---- People & roles (project assignments) ----------------------------------
 public record RoleAssignmentDto(string Key, string Label, string Person);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,
