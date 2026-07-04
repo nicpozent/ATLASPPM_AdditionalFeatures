@@ -184,12 +184,13 @@ export function Modal({ children, onClose, width = 460, label }: {
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  // Keep the latest onClose without re-running the focus-trap effect: if this
-  // effect re-ran on every render (e.g. a caller whose form state lives in a
+  // Keep the latest onClose without re-running the focus-trap effect: if the
+  // trap re-ran on every render (e.g. a caller whose form state lives in a
   // parent, so each keystroke re-renders and passes a new onClose), it would
-  // steal focus back to the first control on every keypress.
+  // steal focus back to the first control on every keypress. Update the ref in
+  // an effect (never during render).
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
