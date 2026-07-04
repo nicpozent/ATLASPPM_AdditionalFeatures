@@ -1,9 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { RoleProvider } from "@/components/RoleContext";
 import { AuthProvider } from "@/components/AuthContext";
+import { Toaster, toast } from "@/components/Toast";
 import { msal, handleRedirect } from "./auth";
 
 // Global resets (kept minimal; screens style inline to match the prototype).
@@ -18,7 +19,13 @@ reset.textContent = `
 `;
 document.head.appendChild(reset);
 
-const qc = new QueryClient();
+// Surface failed writes (e.g. a permission-matrix 403) as a toast instead of
+// failing silently. Mutations may still opt into their own handling.
+const qc = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (err) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"),
+  }),
+});
 
 async function boot() {
   if (msal) {
@@ -31,6 +38,7 @@ async function boot() {
         <AuthProvider>
           <RoleProvider>
             <App />
+            <Toaster />
           </RoleProvider>
         </AuthProvider>
       </QueryClientProvider>

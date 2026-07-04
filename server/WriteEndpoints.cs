@@ -34,8 +34,9 @@ public static class WriteEndpoints
     public static void MapAtlasWriteEndpoints(this RouteGroupBuilder api)
     {
         // ---- Demands -------------------------------------------------------
-        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-submit-demand", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var authEnabled = cfg.GetValue("Auth:Enabled", false);
             var criticality = req.Criticality is >= 1 and <= 5 ? req.Criticality.Value : 0;
@@ -93,12 +94,13 @@ public static class WriteEndpoints
         });
 
         // Upload one or more attachments (multipart) to a demand.
-        api.MapPost("/demands/{id}/attachments", async (string id, HttpRequest http, AtlasDbContext db) =>
+        api.MapPost("/demands/{id}/attachments", async (string id, HttpContext http, AtlasDbContext db, IConfiguration cfg) =>
         {
-            if (!http.HasFormContentType) return Results.BadRequest(new { error = "Expected multipart/form-data." });
+            if (await Permissions.Deny(http, db, cfg, "cap-submit-demand", "E") is { } denied) return denied;
+            if (!http.Request.HasFormContentType) return Results.BadRequest(new { error = "Expected multipart/form-data." });
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
-            var form = await http.ReadFormAsync();
+            var form = await http.Request.ReadFormAsync();
             var saved = new List<AttachmentDto>();
             foreach (var file in form.Files)
             {
@@ -127,8 +129,9 @@ public static class WriteEndpoints
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });
 
-        api.MapPatch("/demands/{id}", async (string id, UpdateDemandStageReq req, AtlasDbContext db) =>
+        api.MapPatch("/demands/{id}", async (string id, UpdateDemandStageReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-demand-scoring", "E") is { } denied) return denied;
             if (!Stages.Contains(req.Stage)) return Results.BadRequest(new { error = "Unknown stage." });
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
@@ -149,8 +152,9 @@ public static class WriteEndpoints
         });
 
         // ---- Blockers ------------------------------------------------------
-        api.MapPost("/blockers", async (CreateBlockerReq req, AtlasDbContext db) =>
+        api.MapPost("/blockers", async (CreateBlockerReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var project = await db.Projects.FindAsync(req.ProjectId);
             if (project is null) return Results.BadRequest(new { error = "Unknown projectId." });
@@ -168,8 +172,9 @@ public static class WriteEndpoints
                 new BlockerDto(b.Id, b.Title, b.ProjectId, project.Name, b.Owner, b.Status));
         });
 
-        api.MapPatch("/blockers/{id}", async (string id, UpdateBlockerStatusReq req, AtlasDbContext db) =>
+        api.MapPatch("/blockers/{id}", async (string id, UpdateBlockerStatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (!BlockerStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var b = await db.Blockers.Include(x => x.Project).FirstOrDefaultAsync(x => x.Id == id);
             if (b is null) return Results.NotFound();
@@ -179,8 +184,9 @@ public static class WriteEndpoints
         });
 
         // ---- Projects ------------------------------------------------------
-        api.MapPost("/projects", async (CreateProjectReq req, AtlasDbContext db) =>
+        api.MapPost("/projects", async (CreateProjectReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var p = new Project
             {
@@ -199,8 +205,9 @@ public static class WriteEndpoints
         });
 
         // ---- Programs ------------------------------------------------------
-        api.MapPost("/programs", async (CreateProgramReq req, AtlasDbContext db) =>
+        api.MapPost("/programs", async (CreateProgramReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var pg = new Program
             {
@@ -219,8 +226,9 @@ public static class WriteEndpoints
         });
 
         // ---- Products ------------------------------------------------------
-        api.MapPost("/products", async (CreateProductReq req, AtlasDbContext db) =>
+        api.MapPost("/products", async (CreateProductReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var p = new Product
             {
@@ -237,8 +245,9 @@ public static class WriteEndpoints
         });
 
         // ---- Releases ------------------------------------------------------
-        api.MapPost("/releases", async (CreateReleaseReq req, AtlasDbContext db) =>
+        api.MapPost("/releases", async (CreateReleaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var scope = new[] { "Product", "Project", "Program" }.Contains(req.Scope) ? req.Scope! : "Product";
             var r = new Release
@@ -260,8 +269,9 @@ public static class WriteEndpoints
         });
 
         // ---- OKRs ----------------------------------------------------------
-        api.MapPost("/okrs", async (CreateObjectiveReq req, AtlasDbContext db) =>
+        api.MapPost("/okrs", async (CreateObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var o = new Objective
             {
@@ -276,8 +286,9 @@ public static class WriteEndpoints
                 new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon, new List<KrDto>()));
         });
 
-        api.MapPost("/okrs/{id}/krs", async (string id, CreateKrReq req, AtlasDbContext db) =>
+        api.MapPost("/okrs/{id}/krs", async (string id, CreateKrReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var obj = await db.Objectives.FindAsync(id);
             if (obj is null) return Results.NotFound();
@@ -295,8 +306,9 @@ public static class WriteEndpoints
                 new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
         });
 
-        api.MapPatch("/krs/{id}", async (string id, UpdateKrProgressReq req, AtlasDbContext db) =>
+        api.MapPatch("/krs/{id}", async (string id, UpdateKrProgressReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var kr = await db.KeyResults.FindAsync(id);
             if (kr is null) return Results.NotFound();
             kr.Progress = Math.Clamp(req.Progress, 0, 100);
