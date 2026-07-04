@@ -364,22 +364,73 @@ function StakeholdersSection() {
 }
 
 // ---- ARCHIVE & DELETIONS --------------------------------------------------
+interface DeletionReq { id: number; projectId: string; projectName: string; requestedBy: string; requestedRole: string; date: string; }
+interface ArchivedProj { id: string; name: string; dept: string; owner: string; isSystem: boolean; }
+interface ArchiveAdmin { canGovern: boolean; canDelete: boolean; requests: DeletionReq[]; archived: ArchivedProj[]; }
+
 function ArchiveSection() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["archive-admin"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<ArchiveAdmin> => (await api<ArchiveAdmin>("/deletion-requests")) ?? { canGovern: false, canDelete: false, requests: [], archived: [] },
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["archive-admin"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  };
+  const approve = useMutation({ mutationFn: (id: number) => api(`/deletion-requests/${id}/approve`, { method: "POST" }), onSuccess: refresh });
+  const reject = useMutation({ mutationFn: (id: number) => api(`/deletion-requests/${id}`, { method: "DELETE" }), onSuccess: refresh });
+  const restore = useMutation({ mutationFn: (id: string) => api(`/projects/${id}/unarchive`, { method: "POST" }), onSuccess: refresh });
+  const purge = useMutation({ mutationFn: (id: string) => api(`/projects/${id}`, { method: "DELETE" }), onSuccess: refresh });
+
+  const d = data ?? { canGovern: false, canDelete: false, requests: [], archived: [] };
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, alignItems: "start" }}>
       <Card padding={0} style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
           <div style={sectionTitle}>Deletion requests · PMO approval</div>
-          <div style={sectionSub}>Approving archives the project (not deleted). Names starting with “test” are hard-deleted directly.</div>
+          <div style={sectionSub}>Approving archives the project (a soft delete) — it stays recoverable in the archive.</div>
         </div>
-        <EmptyBlock message="No pending deletion requests." />
+        {d.requests.length === 0 ? (
+          <EmptyBlock message="No pending deletion requests." />
+        ) : d.requests.map((r) => (
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: "1px solid #F4F6FA" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.projectName}</div>
+              <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{r.projectId} · by {r.requestedBy} ({r.requestedRole}) · {r.date}</div>
+            </div>
+            {d.canGovern ? (
+              <>
+                <button onClick={() => approve.mutate(r.id)} disabled={approve.isPending} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#15A34A", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Approve → Archive</button>
+                <button onClick={() => reject.mutate(r.id)} disabled={reject.isPending} style={{ fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
+              </>
+            ) : <span style={{ fontSize: 11.5, color: color.faint3 }}>Awaiting PMO</span>}
+          </div>
+        ))}
       </Card>
       <Card padding={0} style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
           <div style={sectionTitle}>Archive</div>
-          <div style={sectionSub}>Recoverable by Platform Admin & PMO Lead only.</div>
+          <div style={sectionSub}>Recoverable by Platform Admin &amp; PMO Lead only.</div>
         </div>
-        <EmptyBlock message="Archive is empty." />
+        {d.archived.length === 0 ? (
+          <EmptyBlock message="Archive is empty." />
+        ) : d.archived.map((a) => (
+          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: "1px solid #F4F6FA" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{a.name}</div>
+              <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{a.id} · {a.dept} · {a.owner}</div>
+            </div>
+            {d.canGovern && (
+              <button onClick={() => restore.mutate(a.id)} disabled={restore.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "1px solid #CFE0F4", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
+            )}
+            {d.canDelete && !a.isSystem && (
+              <button onClick={() => purge.mutate(a.id)} disabled={purge.isPending} title="Permanently delete (Platform Admin)" style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
+            )}
+          </div>
+        ))}
       </Card>
     </div>
   );

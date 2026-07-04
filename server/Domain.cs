@@ -55,6 +55,20 @@ public class Blocker
     public string Status { get; set; } = "Active";    // Active|In progress|Resolved
 }
 
+// A request to delete a project, routed to PMO/Admin for approval. Approving
+// archives the project (soft delete); rejecting drops the request. Lets roles
+// that can't archive directly still ask for a project to be removed.
+public class DeletionRequest
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string ProjectName { get; set; } = default!;
+    public string RequestedBy { get; set; } = "";
+    public string RequestedRole { get; set; } = "";
+    public string Date { get; set; } = "";            // display date
+    public string Status { get; set; } = "Pending";
+}
+
 // Operational work (incidents, maintenance, service requests, on-call, changes)
 // that can affect a project's delivery. Linked to the project it impacts; active
 // high-severity items surface as deterministic risks. Source is Manual today but
