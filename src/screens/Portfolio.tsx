@@ -38,6 +38,7 @@ export default function Portfolio() {
   const mayCreate = can("cap-projects", "F");
   const mayEdit = can("cap-projects", "E");
   const mayDelete = role === "admin"; // hard delete is Platform Admin only (cosmetic gate; API enforces)
+  const mayRequest = !mayEdit && !mayDelete; // roles that can't archive/delete can request it instead
 
   const refetchProjects = () => {
     qc.invalidateQueries({ queryKey: ["projects"] });
@@ -61,6 +62,10 @@ export default function Portfolio() {
   const del = useMutation({
     mutationFn: (id: string) => api(`/projects/${id}`, { method: "DELETE" }),
     onSuccess: () => { refetchProjects(); setMenuFor(null); setConfirmDelete(null); },
+  });
+  const requestDeletion = useMutation({
+    mutationFn: (id: string) => api(`/projects/${id}/deletion-request`, { method: "POST" }),
+    onSuccess: () => { setMenuFor(null); qc.invalidateQueries({ queryKey: ["archive-admin"] }); },
   });
 
   const blkCounts = {
@@ -143,18 +148,19 @@ export default function Portfolio() {
                     <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.textMuted, width: 34, textAlign: "right" }}>{p.progress}%</span>
                   </div>
                 </div>
-                <div style={{ textAlign: "right", paddingRight: (mayEdit || mayDelete) ? 30 : 0 }}>
+                <div style={{ textAlign: "right", paddingRight: (mayEdit || mayDelete || mayRequest) ? 30 : 0 }}>
                   <div style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.text }}>{fmtBudget(p.budget)}</div>
                   <div style={{ fontSize: 11, color: color.faint3 }}>{fmtBudget(p.spent)} spent</div>
                 </div>
-                {(mayEdit || mayDelete) && (
+                {(mayEdit || mayDelete || mayRequest) && (
                   <RowActions
                     open={menuFor === p.id}
                     onToggle={(e) => { e.stopPropagation(); setMenuFor(menuFor === p.id ? null : p.id); }}
-                    project={p} mayEdit={mayEdit} mayDelete={mayDelete}
+                    project={p} mayEdit={mayEdit} mayDelete={mayDelete} mayRequest={mayRequest}
                     onEdit={() => { setEditProject(p); setMenuFor(null); }}
                     onArchive={(on) => archive.mutate({ id: p.id, on })}
                     onDelete={() => { setConfirmDelete(p); setMenuFor(null); }}
+                    onRequest={() => requestDeletion.mutate(p.id)}
                   />
                 )}
               </div>
@@ -184,10 +190,10 @@ export default function Portfolio() {
 // Row-level actions: a kebab that reveals edit / archive / delete. Stops row
 // navigation on click. Delete is Platform-Admin-only and never for seeded
 // (system) projects — both mirrored from the server's authoritative rules.
-function RowActions({ open, onToggle, project, mayEdit, mayDelete, onEdit, onArchive, onDelete }: {
+function RowActions({ open, onToggle, project, mayEdit, mayDelete, mayRequest, onEdit, onArchive, onDelete, onRequest }: {
   open: boolean; onToggle: (e: React.MouseEvent) => void; project: Project;
-  mayEdit: boolean; mayDelete: boolean;
-  onEdit: () => void; onArchive: (on: boolean) => void; onDelete: () => void;
+  mayEdit: boolean; mayDelete: boolean; mayRequest: boolean;
+  onEdit: () => void; onArchive: (on: boolean) => void; onDelete: () => void; onRequest: () => void;
 }) {
   const canDelete = mayDelete && !project.isSystem;
   const item = (label: string, icon: React.ReactNode, onClick: () => void, danger?: boolean) => (
@@ -214,6 +220,7 @@ function RowActions({ open, onToggle, project, mayEdit, mayDelete, onEdit, onArc
             {mayEdit && (project.archived
               ? item("Restore", <Icon name="refresh" size={15} />, () => onArchive(false))
               : item("Archive", <Icon name="archive" size={15} />, () => onArchive(true)))}
+            {mayRequest && !project.archived && item("Request deletion", <Icon name="trash" size={15} />, onRequest)}
             {canDelete && (
               <>
                 <div style={{ height: 1, background: color.bg, margin: "5px 0" }} />
