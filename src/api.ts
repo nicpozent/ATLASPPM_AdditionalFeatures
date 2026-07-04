@@ -21,6 +21,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T | 
   return res.status === 204 ? null : ((await res.json()) as T);
 }
 
+// Multipart upload (files). Attaches the bearer token but lets the browser set
+// the multipart boundary — so we don't force a JSON Content-Type here.
+export async function apiUpload<T>(path: string, form: FormData): Promise<T | null> {
+  const token = await getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`API ${res.status} ${res.statusText}`);
+  return res.status === 204 ? null : ((await res.json()) as T);
+}
+
 // Example (extend per feature — see CLAUDE.md § Data & API):
 // export interface Project { id: string; code: string; name: string; /* ... */ }
 // export const getProjects = () => api<Project[]>("/projects");

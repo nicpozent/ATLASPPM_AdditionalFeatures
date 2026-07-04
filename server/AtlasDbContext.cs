@@ -7,6 +7,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Blocker> Blockers => Set<Blocker>();
     public DbSet<Demand> Demands => Set<Demand>();
+    public DbSet<DemandAttachment> DemandAttachments => Set<DemandAttachment>();
     public DbSet<Program> Programs => Set<Program>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductTask> ProductTasks => Set<ProductTask>();
@@ -36,6 +37,26 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
 
         b.Entity<Demand>().HasKey(x => x.Id);
         b.Entity<Demand>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<Demand>()
+            .HasMany(x => x.Attachments)
+            .WithOne()
+            .HasForeignKey(x => x.DemandId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<DemandAttachment>().HasKey(x => x.Id);
+        // Defaults so adding these columns is safe on tables that already hold rows.
+        var d = b.Entity<Demand>();
+        d.Property(x => x.Description).HasDefaultValue("");
+        d.Property(x => x.Source).HasDefaultValue("");
+        d.Property(x => x.GeoImpact).HasDefaultValueSql("'{}'::text[]");
+        d.Property(x => x.HasDeadline).HasDefaultValue(false);
+        d.Property(x => x.BusinessProblem).HasDefaultValue("");
+        d.Property(x => x.ImprovementExisting).HasDefaultValue(false);
+        d.Property(x => x.Criticality).HasDefaultValue(0);
+        d.Property(x => x.Risk).HasDefaultValue(0);
+        d.Property(x => x.ExpectedBenefits).HasDefaultValue("");
+        d.Property(x => x.BenefitValue).HasDefaultValue(0);
+        d.Property(x => x.Stakeholders).HasDefaultValueSql("'{}'::text[]");
+        d.Property(x => x.AllStakeholders).HasDefaultValue(false);
 
         b.Entity<Program>().HasKey(x => x.Id);
         b.Entity<Program>().Property(x => x.Id).ValueGeneratedNever();

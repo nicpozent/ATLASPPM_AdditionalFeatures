@@ -3,7 +3,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Atlas.Api;
 
 // ---- Request bodies --------------------------------------------------------
-public record CreateDemandReq(string Title, string? Dept, string? Priority, int? Value, int? Effort);
+public record CreateDemandReq(
+    string Title, string? Dept, string? Priority, int? Value, int? Effort,
+    // IT Request & Innovation intake form
+    string? Description, string? Source, List<string>? GeoImpact, bool? HasDeadline, string? Deadline,
+    string? BusinessProblem, bool? ImprovementExisting, int? Criticality, int? Risk,
+    string? ExpectedBenefits, int? BenefitValue, List<string>? Stakeholders, bool? AllStakeholders);
 public record UpdateDemandStageReq(string Stage);
 public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status);
 public record UpdateBlockerStatusReq(string Status);
@@ -24,23 +29,89 @@ public static class WriteEndpoints
         api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var criticality = req.Criticality is >= 1 and <= 5 ? req.Criticality.Value : 0;
+            // Priority follows criticality when the intake form supplied it, else the explicit priority.
+            var priority = criticality > 0
+                ? new[] { "Low", "Low", "Medium", "High", "Critical" }[criticality - 1]
+                : Clamp(req.Priority, new[] { "High", "Medium", "Critical", "Low" }, "Medium");
+            var benefit = req.BenefitValue is >= 1 and <= 5 ? req.BenefitValue.Value : (req.Value ?? 3);
             var d = new Demand
             {
                 Id = await NextId(db.Demands.Select(x => x.Id), "DM-", db),
                 Title = req.Title.Trim(),
                 Dept = string.IsNullOrWhiteSpace(req.Dept) ? "Unassigned" : req.Dept!.Trim(),
-                Priority = Clamp(req.Priority, new[] { "High", "Medium", "Critical", "Low" }, "Medium"),
-                Value = Math.Clamp(req.Value ?? 3, 1, 5),
+                Priority = priority,
+                Value = Math.Clamp(benefit, 1, 5),                    // funnel "value" = benefit rank
                 Effort = Math.Clamp(req.Effort ?? 3, 1, 5),
                 Stage = "draft",
                 Requester = "You",
                 Mine = true,
                 Date = DateTime.UtcNow.ToString("MMM dd"),
+                Description = req.Description?.Trim() ?? "",
+                Source = req.Source ?? "",
+                GeoImpact = req.GeoImpact ?? new(),
+                HasDeadline = req.HasDeadline ?? false,
+                Deadline = req.Deadline,
+                BusinessProblem = req.BusinessProblem?.Trim() ?? "",
+                ImprovementExisting = req.ImprovementExisting ?? false,
+                Criticality = criticality,
+                Risk = req.Risk is >= 1 and <= 5 ? req.Risk.Value : 0,
+                ExpectedBenefits = req.ExpectedBenefits?.Trim() ?? "",
+                BenefitValue = req.BenefitValue is >= 1 and <= 5 ? req.BenefitValue.Value : 0,
+                Stakeholders = req.Stakeholders ?? new(),
+                AllStakeholders = req.AllStakeholders ?? false,
             };
             db.Demands.Add(d);
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/demands/{d.Id}",
                 new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
+        });
+
+        // Full demand incl. intake fields + attachment metadata.
+        api.MapGet("/demands/{id}", async (string id, AtlasDbContext db) =>
+        {
+            var d = await db.Demands.Include(x => x.Attachments).FirstOrDefaultAsync(x => x.Id == id);
+            return d is null ? Results.NotFound() : Results.Ok(new DemandDetailDto(
+                d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date,
+                d.Description, d.Source, d.GeoImpact, d.HasDeadline, d.Deadline, d.BusinessProblem,
+                d.ImprovementExisting, d.Criticality, d.Risk, d.ExpectedBenefits, d.BenefitValue,
+                d.Stakeholders, d.AllStakeholders,
+                d.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.Size)).ToList()));
+        });
+
+        // Upload one or more attachments (multipart) to a demand.
+        api.MapPost("/demands/{id}/attachments", async (string id, HttpRequest http, AtlasDbContext db) =>
+        {
+            if (!http.HasFormContentType) return Results.BadRequest(new { error = "Expected multipart/form-data." });
+            var d = await db.Demands.FindAsync(id);
+            if (d is null) return Results.NotFound();
+            var form = await http.ReadFormAsync();
+            var saved = new List<AttachmentDto>();
+            foreach (var file in form.Files)
+            {
+                if (file.Length <= 0) continue;
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms);
+                var att = new DemandAttachment
+                {
+                    DemandId = id,
+                    FileName = Path.GetFileName(file.FileName),
+                    ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                    Size = file.Length,
+                    Bytes = ms.ToArray(),
+                };
+                db.DemandAttachments.Add(att);
+                saved.Add(new AttachmentDto(0, att.FileName, att.ContentType, att.Size));
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok(saved);
+        });
+
+        // Download an attachment's bytes.
+        api.MapGet("/attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        {
+            var a = await db.DemandAttachments.FindAsync(attId);
+            return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });
 
         api.MapPatch("/demands/{id}", async (string id, UpdateDemandStageReq req, AtlasDbContext db) =>

@@ -62,6 +62,32 @@ public class Demand
     public string Date { get; set; } = default!;      // display date, e.g. "Jun 23"
     public bool Mine { get; set; }                     // feeds /demands/my
     public bool PendingApproval { get; set; }          // feeds dashboard approvals
+
+    // --- IT Request & Innovation intake form -------------------------------
+    public string Description { get; set; } = "";
+    public string Source { get; set; } = "";           // business|regulatory|internal
+    public List<string> GeoImpact { get; set; } = new();
+    public bool HasDeadline { get; set; }
+    public string? Deadline { get; set; }              // ISO date when HasDeadline
+    public string BusinessProblem { get; set; } = "";
+    public bool ImprovementExisting { get; set; }
+    public int Criticality { get; set; }               // 1..5
+    public int Risk { get; set; }                      // 1..5 (risk of NOT doing it)
+    public string ExpectedBenefits { get; set; } = "";
+    public int BenefitValue { get; set; }              // 1..5
+    public List<string> Stakeholders { get; set; } = new();
+    public bool AllStakeholders { get; set; }
+    public List<DemandAttachment> Attachments { get; set; } = new();
+}
+
+public class DemandAttachment
+{
+    public int Id { get; set; }
+    public string DemandId { get; set; } = default!;
+    public string FileName { get; set; } = default!;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long Size { get; set; }
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
 }
 
 public class Program
