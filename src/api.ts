@@ -34,6 +34,25 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<T | nu
   return res.status === 204 ? null : ((await res.json()) as T);
 }
 
+// Authenticated file download — fetches with the bearer token (a plain <a href>
+// wouldn't carry it) and triggers a browser download of the returned blob.
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const token = await getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`API ${res.status} ${res.statusText}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Example (extend per feature — see CLAUDE.md § Data & API):
 // export interface Project { id: string; code: string; name: string; /* ... */ }
 // export const getProjects = () => api<Project[]>("/projects");

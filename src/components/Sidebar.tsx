@@ -1,5 +1,7 @@
 import { NavLink } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { color, font, layout } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
@@ -8,8 +10,9 @@ import {
   type ScreenId,
 } from "@/nav";
 
-function NavItem({ id }: { id: ScreenId }) {
+function NavItem({ id, badge }: { id: ScreenId; badge?: string }) {
   const s = SCREENS[id];
+  const shown = badge ?? s.badge;
   return (
     <NavLink
       to={s.path}
@@ -29,16 +32,28 @@ function NavItem({ id }: { id: ScreenId }) {
             <Icon name={s.icon} size={19} />
           </span>
           <span style={{ flex: 1 }}>{s.label}</span>
-          {s.badge && (
+          {shown && (
             <span style={{
               fontSize: 11, fontWeight: 700, background: color.primary, color: "#fff",
               borderRadius: 20, padding: "1px 8px", fontFamily: font.mono,
-            }}>{s.badge}</span>
+            }}>{shown}</span>
           )}
         </>
       )}
     </NavLink>
   );
+}
+
+// Live count of open demands for the Demand Pipeline nav badge (shared cache
+// with the Demands screen; shows the real number, not a hardcoded one).
+function useOpenDemandCount(): string | undefined {
+  const { data } = useQuery({
+    queryKey: ["demands"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<{ id: string }[]> => {
+      try { return (await api<{ id: string }[]>("/demands")) ?? []; } catch { return []; }
+    },
+  });
+  return data && data.length > 0 ? String(data.length) : undefined;
 }
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
@@ -56,6 +71,7 @@ export function Sidebar() {
   const isStakeholder = role === "stakeholder";
   const main = isStakeholder ? NAV_STAKEHOLDER_MAIN : NAV_MAIN;
   const config = isStakeholder ? NAV_STAKEHOLDER_CONFIG : NAV_CONFIG;
+  const demandBadge = useOpenDemandCount();
 
   return (
     <aside style={{
@@ -81,7 +97,7 @@ export function Sidebar() {
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
         <GroupLabel>Workspace</GroupLabel>
-        {main.map((id) => <NavItem key={id} id={id} />)}
+        {main.map((id) => <NavItem key={id} id={id} badge={id === "demands" ? demandBadge : undefined} />)}
         <GroupLabel>Configuration</GroupLabel>
         {config.map((id) => <NavItem key={id} id={id} />)}
       </nav>

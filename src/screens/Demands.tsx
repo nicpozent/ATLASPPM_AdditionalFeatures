@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
-import { api, apiUpload } from "@/api";
+import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Modal as Overlay } from "@/components/ui";
 
@@ -57,6 +57,7 @@ export default function Demands() {
   const { data: demands = [] } = useDemands();
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const createDemand = useMutation({
     mutationFn: async ({ body, files }: { body: NewDemand; files: File[] }) => {
       const created = await api<Demand>("/demands", { method: "POST", body: JSON.stringify(body) });
@@ -97,7 +98,7 @@ export default function Demands() {
                 ) : items.map((d) => {
                   const pr = PRIORITY[d.priority];
                   return (
-                    <div key={d.id} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
+                    <div key={d.id} onClick={() => setDetailId(d.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
                         <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{d.id}</span>
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "2px 8px", borderRadius: 20 }}>{d.priority}</span>
@@ -121,6 +122,98 @@ export default function Demands() {
       </div>
 
       {modal && <NewDemandModal submitting={createDemand.isPending} onClose={() => setModal(false)} onCreate={(body, files) => createDemand.mutate({ body, files }, { onSuccess: () => setModal(false) })} />}
+      {detailId && <DemandDetailModal id={detailId} onClose={() => setDetailId(null)} />}
+    </div>
+  );
+}
+
+// ---- Demand detail (read-only view of the full intake record) --------------
+interface Attachment { id: number; fileName: string; contentType: string; size: number }
+interface DemandDetail {
+  id: string; title: string; stage: string; priority: string; requester: string; dept: string; date: string;
+  description: string; source: string; geoImpact: string[]; hasDeadline: boolean; deadline?: string;
+  businessProblem: string; improvementExisting: boolean; criticality: number; risk: number;
+  expectedBenefits: string; benefitValue: number; stakeholders: string[]; allStakeholders: boolean;
+  attachments: Attachment[];
+}
+
+function DemandDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["demands", id], retry: false,
+    queryFn: async (): Promise<DemandDetail | null> => { try { return await api<DemandDetail>(`/demands/${id}`); } catch { return null; } },
+  });
+  const fmt = (n: number) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+  const scored = (opts: { value: number; icon: string; label: string }[], v: number) => opts.find((o) => o.value === v);
+  const stageMeta = STAGES.find((s) => s.key === data?.stage);
+  const src = SOURCES.find((s) => s.value === data?.source);
+
+  return (
+    <Overlay onClose={onClose} width={620}>
+      {isLoading || !data ? (
+        <div style={{ padding: "40px 0", textAlign: "center", color: color.faint3 }}>{isLoading ? "Loading…" : "Demand not found."}</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3, marginBottom: 3 }}>{data.id}</div>
+              <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.ink, lineHeight: 1.25 }}>{data.title}</div>
+            </div>
+            {stageMeta && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#fff", background: stageMeta.color, padding: "4px 11px", borderRadius: 20 }}>{stageMeta.label}</span>}
+          </div>
+
+          <Row label="Requester">{data.requester} · {data.dept}</Row>
+          <Row label="Priority">{data.priority}</Row>
+          {src && <Row label="Source"><span style={{ fontSize: 15 }}>{src.icon}</span> {src.label}</Row>}
+          {data.geoImpact.length > 0 && <Row label="Geographic impact">{data.geoImpact.join(", ")}</Row>}
+          <Row label="Deadline">{data.hasDeadline ? (data.deadline || "Yes") : "No"}</Row>
+          <Row label="Improvement on existing">{data.improvementExisting ? "Yes" : "No"}</Row>
+          {scored(CRITICALITY, data.criticality) && <Row label="Criticality"><span style={{ fontSize: 15 }}>{scored(CRITICALITY, data.criticality)!.icon}</span> {scored(CRITICALITY, data.criticality)!.label}</Row>}
+          {scored(RISK, data.risk) && <Row label="Risk of not doing"><span style={{ fontSize: 15 }}>{scored(RISK, data.risk)!.icon}</span> {scored(RISK, data.risk)!.label}</Row>}
+          {scored(BENEFIT, data.benefitValue) && <Row label="Benefit value"><span style={{ fontSize: 15 }}>{scored(BENEFIT, data.benefitValue)!.icon}</span> {scored(BENEFIT, data.benefitValue)!.label}</Row>}
+          {data.stakeholders.length > 0 && <Row label="Stakeholders">{data.stakeholders.join(", ")}{data.allStakeholders ? " · complete" : ""}</Row>}
+
+          {data.description && <Block label="Request description">{data.description}</Block>}
+          {data.businessProblem && <Block label="Business problem / opportunity">{data.businessProblem}</Block>}
+          {data.expectedBenefits && <Block label="Expected benefits">{data.expectedBenefits}</Block>}
+
+          {data.attachments.length > 0 && (
+            <>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: color.text, margin: "16px 0 7px" }}>Attachments</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {data.attachments.map((a) => (
+                  <button key={a.id} type="button" onClick={() => apiDownload(`/attachments/${a.id}`, a.fileName)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontSize: 12.5, color: color.text, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontFamily: "inherit" }}>
+                    <Icon name="sheet" size={14} />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.fileName}</span>
+                    <span style={{ color: color.faint3, fontFamily: font.mono, fontSize: 11 }}>{fmt(a.size)}</span>
+                    <span style={{ color: color.primary, display: "flex" }}><Icon name="download" size={14} /></span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+            <Button variant="secondary" onClick={onClose}>Close</Button>
+          </div>
+        </>
+      )}
+    </Overlay>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "7px 0", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 13 }}>
+      <span style={{ width: 170, flex: "none", color: color.faint2, fontWeight: 600 }}>{label}</span>
+      <span style={{ color: color.text, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>{children}</span>
+    </div>
+  );
+}
+function Block({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: color.text, marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{children}</div>
     </div>
   );
 }
