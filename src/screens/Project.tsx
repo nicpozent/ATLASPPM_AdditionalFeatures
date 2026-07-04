@@ -109,8 +109,9 @@ export default function Project() {
       {tab === "artifacts" && <Artifacts projectId={id} />}
       {tab === "requirements" && <Requirements projectId={id} />}
       {tab === "architecture" && <Architecture projectId={id} />}
+      {tab === "quality" && <Quality projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["quality", "dependencies", "vacations"].includes(tab) && (
+      {["dependencies", "vacations"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -1398,6 +1399,177 @@ function Architecture({ projectId }: { projectId: string | null }) {
         })}
       </Card>
     </div>
+  );
+}
+
+// ---- Quality (test plans & defects) ----------------------------------------
+interface TestPlan { id: number; name: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; }
+interface Defect { id: number; code: string; title: string; severity: string; owner: string; status: string; test: string; }
+interface QualityData { canEdit: boolean; totals: { cases: number; coverage: number; passRate: number; failed: number; openDefects: number }; plans: TestPlan[]; defects: Defect[]; }
+
+const QUALITY_SOURCES: [string, string][] = [["jira", "Jira / Xray"], ["ado", "Azure Test Plans"], ["sdp", "ServiceDesk Plus"], ["manual", "Manual"]];
+const DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"];
+const DEFECT_STATUSES = ["Open", "In progress", "Resolved", "Closed"];
+const SEV_COLOR: Record<string, { ink: string; tint: string }> = {
+  Critical: { ink: "#A1282B", tint: "#FBE7E8" }, High: { ink: "#8A6300", tint: "#FBF2D7" }, Medium: { ink: "#0C5798", tint: "#E6EFFB" }, Low: { ink: "#56607A", tint: "#EEF1F6" },
+};
+const DEFECT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
+  Open: { ink: "#A1282B", tint: "#FBE7E8" }, "In progress": { ink: "#8A6300", tint: "#FBF2D7" }, Resolved: { ink: "#0B6B37", tint: "#E7F4EC" }, Closed: { ink: "#56607A", tint: "#EEF1F6" },
+};
+const DEF_COLS = "0.7fr 2.4fr 0.9fr 1fr 1fr 0.8fr";
+
+function Quality({ projectId }: { projectId: string | null }) {
+  const [source, setSource] = useState("jira");
+  const [planModal, setPlanModal] = useState(false);
+  const [defectModal, setDefectModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["quality", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<QualityData | null> => await api<QualityData>(`/projects/${projectId}/quality`),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its quality data." /></Card>;
+  if (!data) return <Card><EmptyBlock minHeight={220} message="Loading quality data…" /></Card>;
+
+  const { totals, plans, defects, canEdit } = data;
+  const statCards: [string, number | string, string][] = [
+    ["Test cases", totals.cases, color.ink], ["Executed", `${totals.coverage}%`, "#0F6CBD"],
+    ["Pass rate", `${totals.passRate}%`, "#0B6B37"], ["Failed", totals.failed, "#A1282B"], ["Open defects", totals.openDefects, color.ink],
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Test plans, execution &amp; defects for this project.</div>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, color: color.faint3 }}>Source</span>
+        <div style={{ minWidth: 170 }}><Select value={source} onChange={(e) => setSource(e.target.value)}>{QUALITY_SOURCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 13, marginBottom: 18 }}>
+        {statCards.map(([label, value, ink]) => (
+          <div key={label} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11.5, color: "#7B849A" }}>{label}</div>
+            <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: ink, marginTop: 3 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* test plans */}
+      <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
+          <span style={{ flex: 1, ...sectionTitleS }}>Test plans &amp; execution</span>
+          {canEdit && <Button onClick={() => setPlanModal(true)}><Icon name="plus" size={16} /> New plan</Button>}
+        </div>
+        {plans.length === 0 ? (
+          <EmptyBlock message="No test plans yet." minHeight={110} />
+        ) : plans.map((p) => {
+          const pct = (n: number) => p.cases === 0 ? "0%" : `${(100 * n / p.cases).toFixed(1)}%`;
+          return (
+            <div key={p.id} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.name}</span>
+                <span style={{ fontSize: 11.5, color: color.faint }}>{p.cases} cases · {p.execPct}% executed</span>
+              </div>
+              <div style={{ display: "flex", height: 9, borderRadius: 5, overflow: "hidden", background: color.bg }}>
+                <div style={{ width: pct(p.passed), background: "#15A34A" }} />
+                <div style={{ width: pct(p.failed), background: "#D13438" }} />
+                <div style={{ width: pct(p.blocked), background: "#E0A100" }} />
+              </div>
+              <div style={{ display: "flex", gap: 16, marginTop: 7 }}>
+                <span style={{ fontSize: 11, color: "#0B6B37" }}>● {p.passed} passed</span>
+                <span style={{ fontSize: 11, color: "#A1282B" }}>● {p.failed} failed</span>
+                <span style={{ fontSize: 11, color: "#8A6300" }}>● {p.blocked} blocked</span>
+                <span style={{ fontSize: 11, color: color.faint3 }}>○ {p.notRun} not run</span>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* defects */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
+          <span style={{ flex: 1, ...sectionTitleS }}>Defects</span>
+          {canEdit && <Button onClick={() => setDefectModal(true)}><Icon name="plus" size={16} /> Log defect</Button>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: DEF_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>ID</div><div>Defect</div><div>Severity</div><div>Owner</div><div>Status</div><div>Test</div>
+        </div>
+        {defects.length === 0 ? (
+          <EmptyBlock message="No defects logged yet." minHeight={110} />
+        ) : defects.map((d) => {
+          const sv = SEV_COLOR[d.severity] ?? SEV_COLOR.Medium;
+          const st = DEFECT_STATUS_COLOR[d.status] ?? DEFECT_STATUS_COLOR.Open;
+          return (
+            <div key={d.id} style={{ display: "grid", gridTemplateColumns: DEF_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
+              <div style={{ fontSize: 13, color: color.text, fontWeight: 500 }}>{d.title}</div>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: sv.ink, background: sv.tint, padding: "3px 9px", borderRadius: 6 }}>{d.severity}</span></div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{d.owner}</div>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: st.ink, background: st.tint, padding: "3px 9px", borderRadius: 6 }}>{d.status}</span></div>
+              <div style={{ fontSize: 11.5, color: color.subtle, fontFamily: font.mono }}>{d.test || "—"}</div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {planModal && <NewPlanModal projectId={projectId} onClose={() => setPlanModal(false)} />}
+      {defectModal && <NewDefectModal projectId={projectId} onClose={() => setDefectModal(false)} />}
+    </div>
+  );
+}
+
+function NewPlanModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ name: "", cases: "", passed: "", failed: "", blocked: "" });
+  const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/test-plans`, { method: "POST", body: JSON.stringify({ name: f.name.trim(), cases: Number(f.cases) || 0, passed: Number(f.passed) || 0, failed: Number(f.failed) || 0, blocked: Number(f.blocked) || 0 }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["quality", projectId] }); onClose(); },
+  });
+  return (
+    <Modal onClose={onClose} width={480} label="New test plan">
+      <DecLabel>Plan name</DecLabel>
+      <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Checkout regression" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Cases</DecLabel><Input type="number" value={f.cases} onChange={(e) => set("cases", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Passed</DecLabel><Input type="number" value={f.passed} onChange={(e) => set("passed", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Failed</DecLabel><Input type="number" value={f.failed} onChange={(e) => set("failed", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Blocked</DecLabel><Input type="number" value={f.blocked} onChange={(e) => set("blocked", e.target.value)} placeholder="0" /></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => f.name.trim() && create.mutate()} disabled={create.isPending || !f.name.trim()}>{create.isPending ? "Adding…" : "Add plan"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function NewDefectModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ title: "", severity: "Medium", owner: "", status: "Open", test: "" });
+  const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/defects`, { method: "POST", body: JSON.stringify({ ...f, title: f.title.trim() }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["quality", projectId] }); onClose(); },
+  });
+  return (
+    <Modal onClose={onClose} width={480} label="Log defect">
+      <DecLabel>Defect</DecLabel>
+      <Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="What's the defect?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Severity</DecLabel><Select value={f.severity} onChange={(e) => set("severity", e.target.value)}>{DEFECT_SEVERITIES.map((s) => <option key={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={f.status} onChange={(e) => set("status", e.target.value)}>{DEFECT_STATUSES.map((s) => <option key={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Owner</DecLabel><Input value={f.owner} onChange={(e) => set("owner", e.target.value)} placeholder="Owner" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Test</DecLabel><Input value={f.test} onChange={(e) => set("test", e.target.value)} placeholder="e.g. TC-090" /></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => f.title.trim() && create.mutate()} disabled={create.isPending || !f.title.trim()}>{create.isPending ? "Logging…" : "Log defect"}</Button>
+      </div>
+    </Modal>
   );
 }
 
