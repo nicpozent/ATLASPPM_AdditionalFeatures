@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea } from "@/components/ui";
+import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea, Modal } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { SCREENS } from "@/nav";
 import {
@@ -23,11 +23,13 @@ interface RaiseBlocker { title: string; projectId: string; owner: string; status
 export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
+  const [newProject, setNewProject] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: projects = [] } = useProjects();
   const { data: blockers = [] } = useBlockers();
   const { can } = usePermissions();
+  const mayCreate = can("cap-projects", "F");
 
   const raiseBlocker = useMutation({
     mutationFn: (body: RaiseBlocker) => api("/blockers", { method: "POST", body: JSON.stringify(body) }),
@@ -59,7 +61,7 @@ export default function Portfolio() {
         </div>
         <div style={{ flex: 1 }} />
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
-        <Button disabled={!can("cap-projects", "F")} title={can("cap-projects", "F") ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
+        <Button onClick={() => setNewProject(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
       </div>
 
       {tab === "projects" ? (
@@ -123,7 +125,50 @@ export default function Portfolio() {
           onRaise={(payload) => raiseBlocker.mutate(payload)}
         />
       )}
+
+      {newProject && <CreateProjectModal onClose={() => setNewProject(false)} onCreated={(id) => { setNewProject(false); openProject(id); }} />}
     </div>
+  );
+}
+
+const METHODOLOGIES = ["Scrum", "Kanban", "Scrumban", "SAFe", "Waterfall", "V-Model", "Stage-Gate", "Spiral", "Iterative", "RAD", "DevOps"];
+
+function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [dept, setDept] = useState("");
+  const [owner, setOwner] = useState("");
+  const [methodology, setMethodology] = useState(METHODOLOGIES[0]);
+
+  const create = useMutation({
+    mutationFn: () => api<{ id: string }>("/projects", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology }),
+    }),
+    onSuccess: (p) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      if (p?.id) onCreated(p.id); else onClose();
+    },
+  });
+
+  const submit = () => { if (name.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={460} label="New project">
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Create a project directly in the portfolio. It starts in Planning with an empty schedule.</div>
+      <Field label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Store Network Expansion" /></Field>
+      <Field label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Owning department" /></Field>
+      <Field label="Owner"><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Project manager" /></Field>
+      <Field label="Methodology">
+        <Select value={methodology} onChange={(e) => setMethodology(e.target.value)}>
+          {METHODOLOGIES.map((m) => <option key={m} value={m}>{m}</option>)}
+        </Select>
+      </Field>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Creating…" : "Create project"}</Button>
+      </div>
+    </Modal>
   );
 }
 
