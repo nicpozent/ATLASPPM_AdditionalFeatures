@@ -69,6 +69,24 @@ public class BackupRun
     public string Status { get; set; } = "Completed";
 }
 
+// A block on the PMO-curated Weekly Updates news wall. Kind drives which fields
+// are shown; all content fields are optional strings.
+public class NewsBlock
+{
+    public int Id { get; set; }
+    public string Kind { get; set; } = "headline"; // headline|highlight|shoutout|image|milestone|doc
+    public string Title { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string Metric { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Tone { get; set; } = "good";
+    public string Who { get; set; } = "";
+    public string Caption { get; set; } = "";
+    public string Date { get; set; } = "";
+    public string Meta { get; set; } = "";
+    public int Ord { get; set; }
+}
+
 // Simple operator settings (key → value), e.g. the integration/backup toggles.
 public class Setting
 {

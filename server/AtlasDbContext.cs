@@ -49,6 +49,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<DeletionRequest> DeletionRequests => Set<DeletionRequest>();
     public DbSet<BackupRun> BackupRuns => Set<BackupRun>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<NewsBlock> NewsBlocks => Set<NewsBlock>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -172,6 +173,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<BackupRun>().HasIndex(x => x.At);
         b.Entity<Setting>().HasKey(x => x.Key);
         b.Entity<Setting>().Property(x => x.Key).ValueGeneratedNever();
+        b.Entity<NewsBlock>().HasKey(x => x.Id);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

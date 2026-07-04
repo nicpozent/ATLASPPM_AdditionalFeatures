@@ -87,6 +87,11 @@ public record SpilledTaskDto(string Code, string Name, string Baseline, string S
 public record ProjectSpilloverDto(string Id, string Name, int Count);
 public record SpilloverSummaryDto(int Total, int Projects, List<ProjectSpilloverDto> ByProject);
 
+// ---- Weekly Updates news wall ----------------------------------------------
+public record NewsBlockDto(int Id, string Kind, string Title, string Body, string Metric, string Label,
+    string Tone, string Who, string Caption, string Date, string Meta);
+public record NewsWallDto(bool CanEdit, string Theme, string Layout, List<NewsBlockDto> Blocks);
+
 // ---- Backups & settings ----------------------------------------------------
 public record BackupComponentDto(string Name, string Schedule, string Retention, int Records, string LastBackup);
 public record BackupRunDto(string At, string Actor, string Role, string Size, int Records, string Status);

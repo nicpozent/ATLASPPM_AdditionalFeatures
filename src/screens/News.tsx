@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 
 // ---- theme presets (from the prototype) ----------------------------------
@@ -20,7 +22,7 @@ const LAYOUTS: { key: Layout; label: string }[] = [
 
 type BlockKind = "headline" | "highlight" | "shoutout" | "image" | "milestone" | "doc";
 type NewsBlock = {
-  uid: string; kind: BlockKind;
+  id: number; kind: BlockKind;
   title?: string; body?: string; metric?: string; label?: string; tone?: "good" | "bad";
   who?: string; caption?: string; date?: string; meta?: string;
 };
@@ -33,19 +35,6 @@ const PALETTE: { kind: BlockKind; label: string; icon: string }[] = [
   { kind: "milestone", label: "Milestone", icon: "flag" },
   { kind: "doc", label: "Document", icon: "paperclip" },
 ];
-
-function makeBlock(kind: BlockKind): NewsBlock {
-  const uid = "n" + Date.now() + Math.random().toString(36).slice(2, 6);
-  const defs: Record<BlockKind, Omit<NewsBlock, "uid" | "kind">> = {
-    headline: { title: "New announcement", body: "Write your update here…" },
-    highlight: { metric: "00", label: "Metric label", tone: "good" },
-    shoutout: { who: "Team", body: "Shout-out message…" },
-    image: { caption: "Image caption" },
-    milestone: { title: "Milestone", date: "TBD", body: "Details…" },
-    doc: { title: "Document.pdf", meta: "Uploaded file" },
-  };
-  return { uid, kind, ...defs[kind] };
-}
 
 // ---- small style helpers -------------------------------------------------
 const inpStyle: React.CSSProperties = {
@@ -80,18 +69,19 @@ function BlockWrap({ editing, extra, onRemove, children }: {
   );
 }
 
-function NewsBlockEl({ block, editing, onField, onRemove }: {
+function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
   block: NewsBlock; editing: boolean;
-  onField: (uid: string, field: keyof NewsBlock, v: string) => void; onRemove: (uid: string) => void;
+  onField: (id: number, field: keyof NewsBlock, v: string) => void;
+  onCommit: (b: NewsBlock) => void; onRemove: (id: number) => void;
 }) {
   const b = block;
   const inp = (field: keyof NewsBlock, ph: string, st?: React.CSSProperties) => (
-    <input value={(b[field] as string) || ""} placeholder={ph} onChange={(e) => onField(b.uid, field, e.target.value)} style={{ ...inpStyle, ...st }} />
+    <input value={(b[field] as string) || ""} placeholder={ph} onChange={(e) => onField(b.id, field, e.target.value)} onBlur={() => onCommit(b)} style={{ ...inpStyle, ...st }} />
   );
   const txt = (field: keyof NewsBlock, ph: string) => (
-    <textarea value={(b[field] as string) || ""} placeholder={ph} onChange={(e) => onField(b.uid, field, e.target.value)} style={txtStyle} />
+    <textarea value={(b[field] as string) || ""} placeholder={ph} onChange={(e) => onField(b.id, field, e.target.value)} onBlur={() => onCommit(b)} style={txtStyle} />
   );
-  const remove = () => onRemove(b.uid);
+  const remove = () => onRemove(b.id);
 
   if (b.kind === "headline") {
     return (
@@ -218,17 +208,73 @@ function NewsBlockEl({ block, editing, onField, onRemove }: {
   );
 }
 
-export default function News() {
-  const [theme, setTheme] = useState<ThemeKey>("aurora");
-  const [layout, setLayout] = useState<Layout>("masonry");
-  const [edit, setEdit] = useState(false);
-  const [blocks, setBlocks] = useState<NewsBlock[]>([]);
+interface NewsWall { canEdit: boolean; theme: string; layout: string; blocks: NewsBlock[] }
 
+function useNews() {
+  return useQuery({
+    queryKey: ["news"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<NewsWall> => {
+      try {
+        return (await api<NewsWall>("/news")) ?? { canEdit: false, theme: "aurora", layout: "masonry", blocks: [] };
+      } catch { return { canEdit: false, theme: "aurora", layout: "masonry", blocks: [] }; }
+    },
+  });
+}
+
+export default function News() {
+  const { data } = useNews();
+  const qc = useQueryClient();
+  const canEdit = data?.canEdit ?? false;
+
+  // Server is the source of truth; local state only holds the edit toggle,
+  // in-progress field drafts, and immediate theme/layout feedback.
+  const [edit, setEdit] = useState(false);
+  const [themeOverride, setThemeOverride] = useState<ThemeKey | null>(null);
+  const [layoutOverride, setLayoutOverride] = useState<Layout | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, Partial<NewsBlock>>>({});
+
+  const serverTheme = (data && THEMES[data.theme as ThemeKey] ? data.theme : "aurora") as ThemeKey;
+  const serverLayout = (data && LAYOUTS.some((l) => l.key === data.layout) ? data.layout : "masonry") as Layout;
+  const theme = themeOverride ?? serverTheme;
+  const layout = layoutOverride ?? serverLayout;
+  const blocks: NewsBlock[] = (data?.blocks ?? []).map((b) => (drafts[b.id] ? { ...b, ...drafts[b.id] } : b));
   const nt = THEMES[theme];
-  const addBlock = (kind: BlockKind) => setBlocks((bs) => [...bs, makeBlock(kind)]);
-  const removeBlock = (uid: string) => setBlocks((bs) => bs.filter((b) => b.uid !== uid));
-  const updateField = (uid: string, field: keyof NewsBlock, v: string) =>
-    setBlocks((bs) => bs.map((b) => (b.uid === uid ? { ...b, [field]: v } : b)));
+
+  const addBlock = useMutation({
+    mutationFn: (kind: BlockKind) => api<NewsBlock>("/news/blocks", { method: "POST", body: JSON.stringify({ kind }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
+  });
+  const removeBlockMut = useMutation({
+    mutationFn: (id: number) => api<void>(`/news/blocks/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
+  });
+  const commitBlock = useMutation({
+    mutationFn: (b: NewsBlock) => api<NewsBlock>(`/news/blocks/${b.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        title: b.title ?? "", body: b.body ?? "", metric: b.metric ?? "", label: b.label ?? "",
+        tone: b.tone ?? "good", who: b.who ?? "", caption: b.caption ?? "", date: b.date ?? "", meta: b.meta ?? "",
+      }),
+    }),
+    onSuccess: (_r, b) => {
+      setDrafts((d) => { const next = { ...d }; delete next[b.id]; return next; });
+      qc.invalidateQueries({ queryKey: ["news"] });
+    },
+  });
+  const saveConfig = useMutation({
+    mutationFn: (cfg: { theme?: string; layout?: string }) =>
+      api<void>("/news/config", { method: "PATCH", body: JSON.stringify(cfg) }),
+    onSuccess: () => {
+      setThemeOverride(null); setLayoutOverride(null);
+      qc.invalidateQueries({ queryKey: ["news"] });
+    },
+  });
+
+  const chooseTheme = (k: ThemeKey) => { setThemeOverride(k); saveConfig.mutate({ theme: k }); };
+  const chooseLayout = (k: Layout) => { setLayoutOverride(k); saveConfig.mutate({ layout: k }); };
+  const removeBlock = (id: number) => removeBlockMut.mutate(id);
+  const updateField = (id: number, field: keyof NewsBlock, v: string) =>
+    setDrafts((d) => ({ ...d, [id]: { ...d[id], [field]: v } }));
 
   const wallStyle: React.CSSProperties =
     layout === "masonry" ? { columnCount: 3, columnGap: 16 }
@@ -247,10 +293,12 @@ export default function News() {
       {/* PMO editor toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap", background: "#fff", border: `1px solid ${color.border}`, borderRadius: 13, padding: "13px 16px" }}>
         <span style={{ fontSize: 12.5, fontWeight: 700, color: color.navy }}>PMO editor</span>
-        <button onClick={() => setEdit((e) => !e)} style={{
-          display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+        <button onClick={() => setEdit((e) => !e)} disabled={!canEdit}
+          title={canEdit ? undefined : "Your role can't edit the news wall"} style={{
+          display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, cursor: canEdit ? "pointer" : "not-allowed", fontFamily: "inherit",
           color: edit ? "#fff" : color.primary, background: edit ? color.primary : color.primaryTint,
           border: `1px solid ${edit ? color.primary : "#CFE0F4"}`, padding: "7px 13px", borderRadius: 8,
+          opacity: canEdit ? 1 : 0.55,
         }}>
           <Icon name={edit ? "check" : "edit"} size={15} /> {edit ? "Done editing" : "Edit wall"}
         </button>
@@ -258,7 +306,7 @@ export default function News() {
         <span style={{ fontSize: 11.5, color: color.faint3 }}>Theme</span>
         <div style={{ display: "flex", gap: 6 }}>
           {(Object.keys(THEMES) as ThemeKey[]).map((k) => (
-            <button key={k} onClick={() => setTheme(k)} title={THEMES[k].name} style={{
+            <button key={k} onClick={() => chooseTheme(k)} disabled={!canEdit} title={THEMES[k].name} style={{
               width: 30, height: 24, borderRadius: 7, background: THEMES[k].hero,
               border: `2px solid ${theme === k ? color.navy : "transparent"}`, cursor: "pointer",
             }} />
@@ -270,7 +318,7 @@ export default function News() {
           {LAYOUTS.map((lo) => {
             const a = layout === lo.key;
             return (
-              <button key={lo.key} onClick={() => setLayout(lo.key)} style={{
+              <button key={lo.key} onClick={() => chooseLayout(lo.key)} disabled={!canEdit} style={{
                 padding: "5px 11px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
                 background: a ? "#fff" : "transparent", color: a ? color.primary : "#6A7488",
               }}>{lo.label}</button>
@@ -284,7 +332,7 @@ export default function News() {
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 18 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#56607A" }}>Add block:</span>
           {PALETTE.map((ab) => (
-            <button key={ab.kind} onClick={() => addBlock(ab.kind)} style={{
+            <button key={ab.kind} onClick={() => addBlock.mutate(ab.kind)} style={{
               display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.primary,
               background: "#fff", border: "1px solid #CFE0F4", padding: "8px 12px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
             }}>
@@ -308,7 +356,7 @@ export default function News() {
       ) : (
         <div style={wallStyle}>
           {blocks.map((b) => (
-            <NewsBlockEl key={b.uid} block={b} editing={edit} onField={updateField} onRemove={removeBlock} />
+            <NewsBlockEl key={b.id} block={b} editing={edit && canEdit} onField={updateField} onCommit={(bl) => commitBlock.mutate(bl)} onRemove={removeBlock} />
           ))}
         </div>
       )}
