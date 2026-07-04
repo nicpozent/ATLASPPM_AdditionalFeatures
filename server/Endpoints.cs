@@ -15,6 +15,16 @@ public static class Endpoints
         api.MapAtlasWriteEndpoints();
         api.MapRoleEndpoints();
 
+        // Audit log — visible to roles with at least View on "Audit & activity log".
+        api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-audit", "V") is { } denied) return denied;
+            var items = await db.AuditEvents.OrderByDescending(e => e.At).Take(200)
+                .Select(e => new AuditEventDto(e.At.ToString("o"), e.Actor, e.Role, e.Category, e.Action, e.Target))
+                .ToListAsync();
+            return Results.Ok(items);
+        });
+
         api.MapGet("/projects", async (AtlasDbContext db) =>
             await db.Projects.OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,

@@ -73,6 +73,7 @@ public static class WriteEndpoints
                 CreatedBy = authEnabled ? Rbac.CallerId(user) : "",
             };
             db.Demands.Add(d);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Created demand", d.Id));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/demands/{d.Id}",
                 new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
@@ -136,17 +137,19 @@ public static class WriteEndpoints
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
             d.Stage = req.Stage;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", $"Advanced demand to {req.Stage}", d.Id));
             await db.SaveChangesAsync();
             return Results.Ok(new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
 
-        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
             // You can delete your own initiatives; Platform Admins can delete any.
             if (!CanDelete(d, user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             db.Demands.Remove(d);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Deleted demand", id));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -167,6 +170,7 @@ public static class WriteEndpoints
                 Status = Clamp(req.Status, BlockerStatuses, "Active"),
             };
             db.Blockers.Add(b);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Blockers", "Raised blocker", $"{b.Id} ({project.Name})"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/blockers/{b.Id}",
                 new BlockerDto(b.Id, b.Title, b.ProjectId, project.Name, b.Owner, b.Status));
@@ -199,6 +203,7 @@ public static class WriteEndpoints
                 Target = "TBD", Phase = "Planning", Due = "TBD",
             };
             db.Projects.Add(p);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Created project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{p.Id}", new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0));
@@ -220,6 +225,7 @@ public static class WriteEndpoints
                 Health = "green",
             };
             db.Programs.Add(pg);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
                 pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health));
@@ -239,6 +245,7 @@ public static class WriteEndpoints
                 Projects = req.Projects ?? new(),
             };
             db.Products.Add(p);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Created product", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
                 p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>()));
@@ -263,6 +270,7 @@ public static class WriteEndpoints
                 Status = "Planned",
             };
             db.Releases.Add(r);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Created release", $"{r.Id} · {r.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/releases/{r.Id}", new ReleaseDto(
                 r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status));
@@ -281,6 +289,7 @@ public static class WriteEndpoints
                 Horizon = string.IsNullOrWhiteSpace(req.Horizon) ? "FY26" : req.Horizon!.Trim(),
             };
             db.Objectives.Add(o);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "OKRs", "Created objective", $"{o.Id} · {o.Title}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/okrs/{o.Id}",
                 new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon, new List<KrDto>()));
