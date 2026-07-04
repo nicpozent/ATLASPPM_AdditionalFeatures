@@ -1,13 +1,15 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 
-// ---- Identity, email & directory (Microsoft 365) — structural sections ----
-interface Identity { name: string; icon: string; detail: string; tint: string; ink: string }
+// ---- Identity, email & directory (Microsoft 365) — persisted via /settings --
+interface Identity { key: string; name: string; icon: string; detail: string; tint: string; ink: string }
 const IDENTITY: Identity[] = [
-  { name: "Microsoft Entra ID — Single Sign-On", icon: "shield", detail: "SAML 2.0 / OIDC · enforce MFA for all members", tint: "#E6EFFB", ink: color.primary },
-  { name: "Exchange Online — Email notifications", icon: "mail", detail: "Microsoft Graph · digest & alert delivery", tint: "#E7F4EC", ink: "#0B6B37" },
-  { name: "Active Directory — Users & Groups sync", icon: "users", detail: "Enterprise Application · SCIM provisioning", tint: color.accentTint, ink: color.accent },
+  { key: "integration.sso", name: "Microsoft Entra ID — Single Sign-On", icon: "shield", detail: "SAML 2.0 / OIDC · enforce MFA for all members", tint: "#E6EFFB", ink: color.primary },
+  { key: "integration.email", name: "Exchange Online — Email notifications", icon: "mail", detail: "Microsoft Graph · digest & alert delivery", tint: "#E7F4EC", ink: "#0B6B37" },
+  { key: "integration.adsync", name: "Active Directory — Users & Groups sync", icon: "users", detail: "Enterprise Application · SCIM provisioning", tint: color.accentTint, ink: color.accent },
 ];
 
 // ---- Connector catalogue — structural chrome (render all; "Not connected" by default) ----
@@ -38,7 +40,16 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 }
 
 export default function Integrations() {
-  const [idOn, setIdOn] = useState<Record<string, boolean>>({});
+  const qc = useQueryClient();
+  const { data: settings = {} } = useQuery({
+    queryKey: ["settings"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<Record<string, string>> => (await api<Record<string, string>>("/settings")) ?? {},
+  });
+  const setSetting = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: boolean }) =>
+      api(`/settings/${key}`, { method: "PATCH", body: JSON.stringify({ value: value ? "true" : "false" }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+  });
   const [connected, setConnected] = useState<Record<string, boolean>>({});
 
   return (
@@ -47,14 +58,14 @@ export default function Integrations() {
       <div style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 13 }}>Identity, email &amp; directory · Microsoft 365</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 30 }}>
         {IDENTITY.map((x) => {
-          const on = !!idOn[x.name];
+          const on = settings[x.key] === "true";
           return (
             <div key={x.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 19 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 13 }}>
                 <div style={{ width: 42, height: 42, borderRadius: 11, background: x.tint, color: x.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Icon name={x.icon} size={20} />
                 </div>
-                <Toggle on={on} onClick={() => setIdOn((s) => ({ ...s, [x.name]: !s[x.name] }))} />
+                <Toggle on={on} onClick={() => setSetting.mutate({ key: x.key, value: !on })} />
               </div>
               <div style={{ fontSize: 14.5, fontWeight: 600, color: color.ink, marginBottom: 6, lineHeight: 1.3 }}>{x.name}</div>
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: color.faint }}>{x.detail}</div>
