@@ -26,20 +26,10 @@ public static class WriteEndpoints
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
     static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved" };
 
-    // Stable id of the signed-in user (Entra object id, falling back to UPN/name).
-    static string CallerId(ClaimsPrincipal u) =>
-        u.FindFirst("oid")?.Value
-        ?? u.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
-        ?? u.FindFirst("preferred_username")?.Value
-        ?? u.Identity?.Name ?? "";
-
-    static bool IsPlatformAdmin(ClaimsPrincipal u) =>
-        u.FindAll("roles").Any(c => c.Value == "PlatformAdmin") || u.IsInRole("PlatformAdmin");
-
     // Who may delete a demand: anyone when auth is off (single-user dev), else the
-    // creator or a Platform Administrator.
+    // creator or a Platform Administrator. Identity/role helpers live in Rbac.
     static bool CanDelete(Demand d, ClaimsPrincipal u, bool authEnabled) =>
-        !authEnabled || IsPlatformAdmin(u) || (!string.IsNullOrEmpty(d.CreatedBy) && d.CreatedBy == CallerId(u));
+        !authEnabled || Rbac.IsPlatformAdmin(u) || (!string.IsNullOrEmpty(d.CreatedBy) && d.CreatedBy == Rbac.CallerId(u));
 
     public static void MapAtlasWriteEndpoints(this RouteGroupBuilder api)
     {
@@ -79,7 +69,7 @@ public static class WriteEndpoints
                 BenefitValue = req.BenefitValue is >= 1 and <= 5 ? req.BenefitValue.Value : 0,
                 Stakeholders = req.Stakeholders ?? new(),
                 AllStakeholders = req.AllStakeholders ?? false,
-                CreatedBy = authEnabled ? CallerId(user) : "",
+                CreatedBy = authEnabled ? Rbac.CallerId(user) : "",
             };
             db.Demands.Add(d);
             await db.SaveChangesAsync();

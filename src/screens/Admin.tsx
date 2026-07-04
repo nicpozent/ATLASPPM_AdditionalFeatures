@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, EmptyBlock, Input, Select } from "@/components/ui";
+import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -25,41 +27,30 @@ const ADMIN_TABS: { id: string; label: string }[] = [
   { id: "integrations", label: "Integration Setup" },
 ];
 
-// Canonical role definitions that head the permission matrix (structural chrome).
-const ROLE_CARDS = [
-  { name: "Platform Administrator", who: "IT / Platform team", icon: "shieldUser", color: "#11163A", tint: "#E6EAF5", desc: "Full control of the platform — configuration, integrations, users, roles, backups & restore." },
-  { name: "PMO Lead", who: "Portfolio office", icon: "shield", color: "#0F6CBD", tint: "#E6EFFB", desc: "Governs the portfolio: methodologies, demand approvals, cross-project reporting." },
-  { name: "Project Manager", who: "Delivery", icon: "folder", color: "#7A3FB0", tint: "#F0E8F7", desc: "Plans and runs projects: schedule, tasks, artifacts, RAID, status reporting." },
-  { name: "Team Member", who: "Squads & contributors", icon: "users", color: "#15A34A", tint: "#E7F4EC", desc: "Works assigned tasks, updates progress, comments and raises blockers." },
-  { name: "Executive / Sponsor", who: "Leadership", icon: "trendUp", color: "#C98A00", tint: "#FBF2D7", desc: "Read-only dashboards, approves gates and funding, exports board reports." },
-  { name: "Stakeholder", who: "Business / requesters", icon: "userCheck", color: "#0E7C7B", tint: "#DEF2F1", desc: "Sees only projects where they are a stakeholder; can submit demands and track their status." },
-];
+// ---- Roles & permissions (data-driven; DB-backed matrix) ------------------
+type PermLevel = "F" | "E" | "V" | "N";
+interface Capability { key: string; label: string; }
+interface RoleRow {
+  id: string; name: string; short: string; who: string; description: string;
+  icon: string; color: string; tint: string; isSystem: boolean;
+  permissions: Record<string, PermLevel>;
+}
+interface RolesMatrix { capabilities: Capability[]; roles: RoleRow[]; canManage: boolean; }
 
 // Permission legend — tinted cells per code (F Full, E Edit, V View, N None).
-const PERM_LEGEND: Record<string, { label: string; cell: string; ink: string; tint: string }> = {
+const PERM_LEGEND: Record<PermLevel, { label: string; cell: string; ink: string; tint: string }> = {
   F: { label: "F", cell: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
   E: { label: "E", cell: "#0F6CBD", ink: "#0C5798", tint: "#E6EFFB" },
   V: { label: "V", cell: "#C98A00", ink: "#8A6300", tint: "#FBF2D7" },
   N: { label: "—", cell: "#D7DCE5", ink: "#9AA2B4", tint: "#F1F3F8" },
 };
-const PERM_ROLES = ["Admin", "PMO", "PM", "Team", "Exec", "Stkhldr"];
-const PERM_ROWS: string[][] = [
-  ["Dashboards & reports", "F", "F", "F", "V", "V", "N"],
-  ["Pull / export reports", "F", "F", "E", "N", "V", "N"],
-  ["Stakeholder projects", "F", "F", "F", "F", "V", "V"],
-  ["Projects & tasks", "F", "F", "F", "E", "N", "N"],
-  ["Submit a demand", "F", "F", "E", "E", "N", "E"],
-  ["Track own demand status", "F", "F", "F", "F", "F", "V"],
-  ["Edit demand fields", "F", "F", "E", "N", "N", "N"],
-  ["Demand scoring", "F", "F", "E", "E", "N", "N"],
-  ["Approve demands & gates", "F", "F", "N", "N", "F", "N"],
-  ["Methodology templates", "F", "F", "N", "N", "N", "N"],
-  ["Comments & artifacts", "F", "F", "F", "E", "V", "N"],
-  ["Integrations & connectors", "F", "N", "N", "N", "N", "N"],
-  ["Users, groups & roles", "F", "N", "N", "N", "N", "N"],
-  ["Backups & restore", "F", "N", "N", "N", "N", "N"],
-  ["Platform & SSO settings", "F", "N", "N", "N", "N", "N"],
-  ["Audit & activity log", "F", "V", "N", "N", "N", "N"],
+// Clicking a cell cycles through the levels (admins only).
+const NEXT_LEVEL: Record<PermLevel, PermLevel> = { N: "V", V: "E", E: "F", F: "N" };
+// Icons offered when creating a role — all exist in Icon.tsx.
+const ROLE_ICONS = ["shield", "shieldUser", "userCheck", "users", "folder", "trendUp", "key", "lock", "star", "briefcase", "building", "target", "flag", "award"];
+const ROLE_COLORS: [string, string][] = [
+  ["#11163A", "#E6EAF5"], ["#0F6CBD", "#E6EFFB"], ["#7A3FB0", "#F0E8F7"],
+  ["#15A34A", "#E7F4EC"], ["#C98A00", "#FBF2D7"], ["#0E7C7B", "#DEF2F1"], ["#B4232A", "#FBE6E7"],
 ];
 
 type Guide = { id: string; name: string; sub: string; icon?: string; time?: string; brand?: string; initials?: string; steps: string[] };
@@ -145,27 +136,70 @@ function TableCard({ title, subtitle, cols, headers, empty }: {
 }
 
 // ---- ROLES & PERMISSIONS --------------------------------------------------
+function useRolesMatrix() {
+  return useQuery({
+    queryKey: ["roles"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<RolesMatrix> =>
+      (await api<RolesMatrix>("/roles")) ?? { capabilities: [], roles: [], canManage: false },
+  });
+}
+
 function RolesSection() {
+  const { data } = useRolesMatrix();
+  const qc = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const roles = data?.roles ?? [];
+  const caps = data?.capabilities ?? [];
+  const canManage = data?.canManage ?? false;
+
+  const setCell = useMutation({
+    mutationFn: (v: { roleId: string; capabilityKey: string; level: PermLevel }) =>
+      api(`/roles/${v.roleId}/permissions`, { method: "PUT", body: JSON.stringify({ capabilityKey: v.capabilityKey, level: v.level }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["roles"] }),
+  });
+  const removeRole = useMutation({
+    mutationFn: (id: string) => api(`/roles/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["roles"] }),
+  });
+
+  const cols = `2fr repeat(${Math.max(roles.length, 1)},1fr)`;
+
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 13, marginBottom: 22 }}>
-        {ROLE_CARDS.map((r) => (
-          <div key={r.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 17 }}>
+        {roles.map((r) => (
+          <div key={r.id} style={{ position: "relative", background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 17 }}>
+            {canManage && !r.isSystem && (
+              <button type="button" title={`Delete ${r.name}`} aria-label={`Delete ${r.name}`}
+                onClick={() => { if (confirm(`Delete the “${r.name}” role? This cannot be undone.`)) removeRole.mutate(r.id); }}
+                style={{ position: "absolute", top: 12, right: 12, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, border: "none", background: "transparent", color: color.faint2, cursor: "pointer", borderRadius: 7 }}>
+                <Icon name="trash" size={14} />
+              </button>
+            )}
             <div style={{ width: 40, height: 40, borderRadius: radius.lg, background: r.tint, color: r.color, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
               <Icon name={r.icon} size={20} />
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: color.ink, lineHeight: 1.25, marginBottom: 3 }}>{r.name}</div>
-            <div style={{ fontSize: 11, color: color.faint3, marginBottom: 9 }}>{r.who}</div>
-            <div style={{ fontSize: 12, lineHeight: 1.5, color: color.subtle }}>{r.desc}</div>
+            <div style={{ fontSize: 11, color: color.faint3, marginBottom: 9 }}>{r.who}{!r.isSystem && " · custom"}</div>
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: color.subtle }}>{r.description}</div>
           </div>
         ))}
+        {canManage && (
+          <button type="button" onClick={() => setCreating(true)}
+            style={{ background: color.surface, border: `1.5px dashed ${color.border2}`, borderRadius: radius.xl, padding: 17, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", color: color.primary, fontFamily: "inherit", minHeight: 120 }}>
+            <Icon name="plus" size={22} />
+            <span style={{ fontSize: 13, fontWeight: 700 }}>New role</span>
+          </button>
+        )}
       </div>
 
       <Card padding={0} style={{ overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "17px 22px 14px", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={sectionTitle}>Permission matrix</div>
-            <div style={{ fontSize: 12, color: color.faint2 }}>What each role can do across the platform</div>
+            <div style={{ fontSize: 12, color: color.faint2 }}>
+              {canManage ? "Click any cell to change what a role can do." : "What each role can do across the platform"}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 13, fontSize: 11.5, color: color.faint }}>
             {[["Full", "#15A34A"], ["Edit", "#0F6CBD"], ["View", "#C98A00"], ["None", "#D7DCE5"]].map(([label, c]) => (
@@ -175,25 +209,92 @@ function RolesSection() {
             ))}
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr repeat(6,1fr)", padding: "0 22px 11px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle, letterSpacing: "0.04em" }}>
+        <div style={{ display: "grid", gridTemplateColumns: cols, padding: "0 22px 11px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle, letterSpacing: "0.04em" }}>
           <div>Capability</div>
-          {PERM_ROLES.map((rn) => <div key={rn} style={{ textAlign: "center" }}>{rn}</div>)}
+          {roles.map((r) => <div key={r.id} style={{ textAlign: "center" }}>{r.short || r.name}</div>)}
         </div>
-        {PERM_ROWS.map((row) => (
-          <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "2fr repeat(6,1fr)", alignItems: "center", padding: "11px 22px", borderBottom: "1px solid #F4F6FA" }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: color.text }}>{row[0]}</div>
-            {row.slice(1).map((code, i) => {
+        {caps.length === 0 ? (
+          <EmptyBlock message="No capabilities defined yet." />
+        ) : caps.map((cap) => (
+          <div key={cap.key} style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", padding: "11px 22px", borderBottom: "1px solid #F4F6FA" }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: color.text }}>{cap.label}</div>
+            {roles.map((r) => {
+              const code = (r.permissions[cap.key] ?? "N") as PermLevel;
               const p = PERM_LEGEND[code];
               return (
-                <div key={i} style={{ display: "flex", justifyContent: "center" }}>
-                  <span style={{ minWidth: 46, textAlign: "center", fontSize: 11.5, fontWeight: 700, color: p.ink, background: p.tint, padding: "4px 0", borderRadius: 8 }}>{p.label}</span>
+                <div key={r.id} style={{ display: "flex", justifyContent: "center" }}>
+                  <button type="button" disabled={!canManage || setCell.isPending}
+                    title={canManage ? `${r.name} · ${cap.label} — click to change` : undefined}
+                    aria-label={`${r.name} ${cap.label}: ${code}`}
+                    onClick={() => canManage && setCell.mutate({ roleId: r.id, capabilityKey: cap.key, level: NEXT_LEVEL[code] })}
+                    style={{ minWidth: 46, textAlign: "center", fontSize: 11.5, fontWeight: 700, color: p.ink, background: p.tint, padding: "4px 0", borderRadius: 8, border: "none", fontFamily: "inherit", cursor: canManage ? "pointer" : "default" }}>
+                    {p.label}
+                  </button>
                 </div>
               );
             })}
           </div>
         ))}
       </Card>
+
+      {creating && <NewRoleModal onClose={() => setCreating(false)} />}
     </>
+  );
+}
+
+function NewRoleModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [who, setWho] = useState("");
+  const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState(ROLE_ICONS[0]);
+  const [palette, setPalette] = useState(0);
+
+  const create = useMutation({
+    mutationFn: () => api("/roles", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim(), who: who.trim(), description: description.trim(), icon, color: ROLE_COLORS[palette][0], tint: ROLE_COLORS[palette][1] }),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["roles"] }); onClose(); },
+  });
+
+  const submit = () => { if (name.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={480} label="Add a role">
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>
+        Create a role and set its access in the matrix. New roles start with no permissions.
+        A matching app role must also be added in the Entra app registration for SSO sign-ins to carry it.
+      </div>
+      <label style={labelStyle}>Role name</label>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Security Officer" style={{ marginBottom: 13 }} />
+      <label style={labelStyle}>Who it's for</label>
+      <Input value={who} onChange={(e) => setWho(e.target.value)} placeholder="e.g. Risk & compliance" style={{ marginBottom: 13 }} />
+      <label style={labelStyle}>Description</label>
+      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this role is responsible for" style={{ minHeight: 64, resize: "vertical", marginBottom: 13 }} />
+      <label style={labelStyle}>Icon</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 13 }}>
+        {ROLE_ICONS.map((ic) => (
+          <button key={ic} type="button" onClick={() => setIcon(ic)} aria-label={ic} aria-pressed={icon === ic}
+            style={{ width: 38, height: 38, borderRadius: radius.lg, border: `1.5px solid ${icon === ic ? color.primary : color.border2}`, background: icon === ic ? color.primaryTint : color.surface, color: icon === ic ? color.primary : color.subtle, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <Icon name={ic} size={18} />
+          </button>
+        ))}
+      </div>
+      <label style={labelStyle}>Colour</label>
+      <div style={{ display: "flex", gap: 8 }}>
+        {ROLE_COLORS.map(([c, t], i) => (
+          <button key={c} type="button" onClick={() => setPalette(i)} aria-label={`Colour ${i + 1}`} aria-pressed={palette === i}
+            style={{ width: 34, height: 34, borderRadius: radius.lg, border: `2px solid ${palette === i ? color.ink : "transparent"}`, background: t, color: c, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <span style={{ width: 14, height: 14, borderRadius: 5, background: c }} />
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Creating…" : "Create role"}</Button>
+      </div>
+    </Modal>
   );
 }
 

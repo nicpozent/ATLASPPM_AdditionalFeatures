@@ -21,6 +21,9 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
     public DbSet<MyTask> MyTasks => Set<MyTask>();
     public DbSet<BudgetSnapshot> BudgetSnapshots => Set<BudgetSnapshot>();
+    public DbSet<RoleDef> RoleDefs => Set<RoleDef>();
+    public DbSet<Capability> Capabilities => Set<Capability>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -76,6 +79,18 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Resource>().HasKey(x => x.Id);
         b.Entity<Release>().HasKey(x => x.Id);
         b.Entity<Release>().Property(x => x.Id).ValueGeneratedNever();
+
+        b.Entity<RoleDef>().HasKey(x => x.Id);
+        b.Entity<RoleDef>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<RoleDef>()
+            .HasMany(x => x.Permissions)
+            .WithOne()
+            .HasForeignKey(x => x.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<Capability>().HasKey(x => x.Key);
+        b.Entity<Capability>().Property(x => x.Key).ValueGeneratedNever();
+        b.Entity<RolePermission>().HasKey(x => x.Id);
+        b.Entity<RolePermission>().HasIndex(x => new { x.RoleId, x.CapabilityKey }).IsUnique();
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

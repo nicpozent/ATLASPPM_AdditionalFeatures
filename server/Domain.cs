@@ -91,6 +91,42 @@ public class DemandAttachment
     public byte[] Bytes { get; set; } = Array.Empty<byte>();
 }
 
+// ---- Roles & permissions (in-app RBAC) ------------------------------------
+// The permission matrix on Admin → Roles & Permissions is DB-backed: the six
+// canonical roles + capability catalogue ship as reference data (IsSystem), and
+// a Platform Administrator can add custom roles and edit any cell. This is the
+// app's own authorization layer — Entra app roles stay a small, stable set and
+// are NOT written from here (see the "New role" guidance in the UI).
+public class RoleDef
+{
+    public string Id { get; set; } = default!;        // slug, e.g. "admin" or "role-7"
+    public string Name { get; set; } = default!;      // "Platform Administrator"
+    public string Short { get; set; } = "";           // column header, e.g. "Admin"
+    public string Who { get; set; } = "";             // "IT / Platform team"
+    public string Description { get; set; } = "";
+    public string Icon { get; set; } = "shield";
+    public string Color { get; set; } = "#11163A";
+    public string Tint { get; set; } = "#E6EAF5";
+    public bool IsSystem { get; set; }                 // canonical role — cannot be deleted
+    public int Sort { get; set; }
+    public List<RolePermission> Permissions { get; set; } = new();
+}
+
+public class Capability
+{
+    public string Key { get; set; } = default!;        // slug, e.g. "demands.approve"
+    public string Label { get; set; } = default!;      // "Approve demands & gates"
+    public int Sort { get; set; }
+}
+
+public class RolePermission
+{
+    public int Id { get; set; }
+    public string RoleId { get; set; } = default!;
+    public string CapabilityKey { get; set; } = default!;
+    public string Level { get; set; } = "N";           // F(ull) | E(dit) | V(iew) | N(one)
+}
+
 public class Program
 {
     public string Id { get; set; } = default!;

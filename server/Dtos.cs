@@ -23,6 +23,12 @@ public record DemandDetailDto(string Id, string Title, string Stage, string Prio
     int Risk, string ExpectedBenefits, int BenefitValue, List<string> Stakeholders, bool AllStakeholders,
     List<AttachmentDto> Attachments, bool CanDelete);
 
+// ---- Roles & permissions ---------------------------------------------------
+public record CapabilityDto(string Key, string Label);
+public record RoleDto(string Id, string Name, string Short, string Who, string Description,
+    string Icon, string Color, string Tint, bool IsSystem, Dictionary<string, string> Permissions);
+public record RolesMatrixDto(List<CapabilityDto> Capabilities, List<RoleDto> Roles, bool CanManage);
+
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
     List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health);
 
