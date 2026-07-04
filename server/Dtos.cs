@@ -80,6 +80,8 @@ public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
 public record CostLineDto(int Id, string Label, string Note, List<string> OwnerRoles, decimal Amount, bool CanEdit, bool IsSystem);
 public record CostsDto(bool CanManage, decimal Total, decimal Savings, List<CostLineDto> Lines);
 
+public record ScaffoldItemDto(string Type, string Title);
+
 // ---- People & roles (project assignments) ----------------------------------
 public record RoleAssignmentDto(string Key, string Label, string Person);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,
