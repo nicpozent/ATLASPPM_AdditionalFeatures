@@ -327,6 +327,18 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Team absences (vacation calendar) ------------------------------------
+public class Absence
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Person { get; set; } = default!;
+    public string From { get; set; } = default!;          // ISO date "2026-07-14"
+    public string To { get; set; } = default!;
+    public string Type { get; set; } = "vacation";        // vacation | sick | training
+    public int Ord { get; set; }
+}
+
 // ---- Project dependencies (cross-project links) ---------------------------
 // A row means: project ProjectId depends on project DependsOnId (upstream).
 public class ProjectDependency

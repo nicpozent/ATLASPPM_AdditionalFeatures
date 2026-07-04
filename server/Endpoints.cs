@@ -22,6 +22,7 @@ public static class Endpoints
         api.MapArchitectureEndpoints();
         api.MapQualityEndpoints();
         api.MapDependencyEndpoints();
+        api.MapVacationEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
