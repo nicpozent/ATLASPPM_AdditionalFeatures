@@ -327,6 +327,40 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Requirements & traceability ------------------------------------------
+public class Requirement
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;         // "REQ-01"
+    public string Title { get; set; } = default!;
+    public string Type { get; set; } = "Functional";     // Functional | Non-functional | Compliance
+    public string Priority { get; set; } = "Medium";      // Critical | High | Medium | Low
+    public string Status { get; set; } = "Draft";         // Draft | In review | Approved
+    public string Epic { get; set; } = "";
+    public string Story { get; set; } = "";
+    public string Test { get; set; } = "—";
+    public string TestStatus { get; set; } = "Not run";   // Not run | In test | Passed | Failed
+    public string Release { get; set; } = "Backlog";
+    public bool Verified { get; set; }
+    public int Ord { get; set; }
+}
+
+public class ChangeRequest
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;          // "CR-01"
+    public string Title { get; set; } = default!;
+    public string ReqCode { get; set; } = "";
+    public string Impact { get; set; } = "Medium";        // Low | Medium | High
+    public string Sdp { get; set; } = "";
+    public string Status { get; set; } = "Pending";       // Pending | Approved | Rejected
+    public string RaisedBy { get; set; } = "";
+    public string Date { get; set; } = "";
+    public int Ord { get; set; }
+}
+
 // ---- Artifacts (document register + file versions) ------------------------
 public class Artifact
 {
