@@ -34,6 +34,7 @@ public static class Endpoints
         api.MapLifecycleEndpoints();
         api.MapBackupEndpoints();
         api.MapNewsEndpoints();
+        api.MapProjectExtraEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -102,7 +103,7 @@ public static class Endpoints
 
         api.MapGet("/programs", async (AtlasDbContext db) =>
             await db.Programs.OrderBy(x => x.Id).Select(x => new ProgramDto(
-                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate))
+                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate, x.Archived))
                 .ToListAsync());
 
         api.MapGet("/products", async (AtlasDbContext db) =>
@@ -156,7 +157,7 @@ public static class Endpoints
 
         api.MapGet("/releases", async (AtlasDbContext db) =>
             await db.Releases.OrderBy(r => r.Id).Select(r => new ReleaseDto(
-                r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status))
+                r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status, r.Archived))
                 .ToListAsync());
 
         api.MapGet("/delivery", async (AtlasDbContext db) =>

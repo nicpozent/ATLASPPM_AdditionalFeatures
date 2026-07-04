@@ -130,7 +130,9 @@ function Overview({ projectId }: { projectId: string | null }) {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <PeopleRoles projectId={projectId} />
+        <WaysOfWorking projectId={projectId} />
         <TeamCapacity projectId={projectId} />
+        <CommunicationPlan projectId={projectId} />
         {/* AI assist (structural chrome) */}
         <div style={{ background: "linear-gradient(120deg,#0F1B3D,#123B7A)", border: "1px solid #14264F", borderRadius: 16, padding: "20px 22px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
@@ -2180,6 +2182,169 @@ function Vacations({ projectId }: { projectId: string | null }) {
         </div>
       )}
     </Card>
+  );
+}
+
+// ---- Ways of working — methodology-specific ceremonies, artifacts & roles ---
+interface WowItem { label: string; detail: string; }
+interface WaysOfWorkingData { methodology: string; cadence: string; summary: string; ceremonies: WowItem[]; artifacts: string[]; roles: string[]; }
+
+function WaysOfWorking({ projectId }: { projectId: string | null }) {
+  const { data } = useQuery({
+    queryKey: ["wow", projectId], enabled: !!projectId, retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<WaysOfWorkingData | null> => {
+      try { return await api<WaysOfWorkingData>(`/projects/${projectId}/ways-of-working`); } catch { return null; }
+    },
+  });
+  if (!projectId || !data) return null;
+  const chip = (t: string, ink: string, tint: string) => (
+    <span key={t} style={{ fontSize: 11.5, fontWeight: 600, color: ink, background: tint, padding: "3px 10px", borderRadius: 20 }}>{t}</span>
+  );
+  return (
+    <Card padding={22}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+        <SectionTitle>Ways of working</SectionTitle>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{data.cadence}</span>
+      </div>
+      <div style={{ fontSize: 12.5, color: color.faint2, lineHeight: 1.5, marginBottom: 16 }}>{data.summary}</div>
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Ceremonies &amp; cadences</div>
+      <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+        {data.ceremonies.map((c, i) => (
+          <div key={c.label} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 13px", borderBottom: i < data.ceremonies.length - 1 ? "1px solid #F4F6FA" : "none" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0F6CBD", marginTop: 6, flex: "none" }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{c.label}</div>
+              <div style={{ fontSize: 12, color: color.faint2, lineHeight: 1.45 }}>{c.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Key artifacts</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.artifacts.map((a) => chip(a, "#6A2E9E", "#F0E8F7"))}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Roles</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.roles.map((r) => chip(r, "#0B6B37", "#E7F4EC"))}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ---- Communication plan — per-stakeholder channel / type / cadence ---------
+interface CommEntry { id: number; stakeholder: string; channel: string; commType: string; schedule: string; owner: string; notes: string; }
+const COMM_CHANNELS = ["Email", "Teams", "Meeting", "Report", "Slack", "Call"];
+const COMM_TYPES = ["Status update", "Steering", "Escalation", "Newsletter", "Review", "Ad-hoc"];
+const COMM_SCHEDULES = ["Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Ad-hoc"];
+
+function CommunicationPlan({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["comms", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; entries: CommEntry[] }> =>
+      (await api<{ canEdit: boolean; entries: CommEntry[] }>(`/projects/${projectId}/comms`)) ?? { canEdit: false, entries: [] },
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["comms", projectId] });
+  const add = useMutation({
+    mutationFn: (body: Partial<CommEntry>) => api(`/projects/${projectId}/comms`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: invalidate,
+  });
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: Partial<CommEntry> }) => api(`/comms/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/comms/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+
+  const [stakeholder, setStakeholder] = useState("");
+  const [channel, setChannel] = useState(COMM_CHANNELS[0]);
+  const [commType, setCommType] = useState(COMM_TYPES[0]);
+  const [schedule, setSchedule] = useState(COMM_SCHEDULES[1]);
+  const [owner, setOwner] = useState("");
+
+  if (!projectId) return null;
+  const entries = data?.entries ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const GRID = canEdit ? "1.4fr 1fr 1.2fr 1fr 1fr 32px" : "1.4fr 1fr 1.2fr 1fr 1fr";
+
+  const submit = () => {
+    if (!stakeholder.trim()) return;
+    add.mutate({ stakeholder: stakeholder.trim(), channel, commType, schedule, owner: owner.trim() });
+    setStakeholder(""); setOwner("");
+  };
+
+  return (
+    <Card padding={22}>
+      <SectionTitle>Communication plan</SectionTitle>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Who is kept informed, through which channel and on what cadence.</div>
+
+      <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "10px 14px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Stakeholder</div><div>Channel</div><div>Type</div><div>Schedule</div><div>Owner</div>{canEdit && <div />}
+        </div>
+        {entries.length === 0 ? (
+          <div style={{ padding: "26px 14px", textAlign: "center", fontSize: 12.5, color: color.faint3 }}>
+            {canEdit ? "No communication entries yet. Add stakeholders below." : "No communication plan defined yet."}
+          </div>
+        ) : entries.map((e) => (
+          <CommRow key={e.id} entry={e} canEdit={canEdit} grid={GRID}
+            onPatch={(body) => patch.mutate({ id: e.id, body })} onRemove={() => remove.mutate(e.id)} />
+        ))}
+      </div>
+
+      {canEdit && (
+        <div style={{ background: "#F8FAFD", border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add a communication</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1.2fr 1fr", gap: 9, marginBottom: 9 }}>
+            <Input value={stakeholder} onChange={(e) => setStakeholder(e.target.value)} placeholder="Stakeholder / group" />
+            <Select value={channel} onChange={(e) => setChannel(e.target.value)}>{COMM_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</Select>
+            <Select value={commType} onChange={(e) => setCommType(e.target.value)}>{COMM_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}</Select>
+            <Select value={schedule} onChange={(e) => setSchedule(e.target.value)}>{COMM_SCHEDULES.map((c) => <option key={c} value={c}>{c}</option>)}</Select>
+          </div>
+          <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
+            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Responsible owner" style={{ flex: 1 }} />
+            <Button onClick={submit} disabled={add.isPending || !stakeholder.trim()}>{add.isPending ? "Adding…" : "Add"}</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// A communication-plan row. When editable, fields commit to the server on
+// change (selects) / blur (text). Local state is seeded once from the entry.
+function CommRow({ entry, canEdit, grid, onPatch, onRemove }: {
+  entry: CommEntry; canEdit: boolean; grid: string;
+  onPatch: (body: Partial<CommEntry>) => void; onRemove: () => void;
+}) {
+  const [stakeholder, setStakeholder] = useState(entry.stakeholder);
+  const [owner, setOwner] = useState(entry.owner);
+  const cellSelect: React.CSSProperties = { border: "none", background: "transparent", fontSize: 12.5, fontFamily: "inherit", color: color.text, cursor: "pointer", outline: "none", width: "100%" };
+  const cellInput: React.CSSProperties = { border: "none", background: "transparent", fontSize: 12.5, fontFamily: "inherit", color: color.text, outline: "none", width: "100%" };
+  if (!canEdit) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "11px 14px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5, color: color.text }}>
+        <div style={{ fontWeight: 600 }}>{entry.stakeholder}</div>
+        <div>{entry.channel}</div><div>{entry.commType}</div><div>{entry.schedule}</div><div>{entry.owner || "—"}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "8px 14px", borderBottom: "1px solid #F4F6FA" }}>
+      <input value={stakeholder} onChange={(e) => setStakeholder(e.target.value)} onBlur={() => stakeholder !== entry.stakeholder && onPatch({ stakeholder })} style={{ ...cellInput, fontWeight: 600 }} />
+      <select value={entry.channel} onChange={(e) => onPatch({ channel: e.target.value })} style={cellSelect}>{COMM_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+      <select value={entry.commType} onChange={(e) => onPatch({ commType: e.target.value })} style={cellSelect}>{COMM_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+      <select value={entry.schedule} onChange={(e) => onPatch({ schedule: e.target.value })} style={cellSelect}>{COMM_SCHEDULES.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+      <input value={owner} onChange={(e) => setOwner(e.target.value)} onBlur={() => owner !== entry.owner && onPatch({ owner })} placeholder="—" style={cellInput} />
+      <button onClick={onRemove} title="Remove" style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
+    </div>
   );
 }
 

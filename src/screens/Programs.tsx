@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, Input, Select, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { Overlay } from "./Demands";
@@ -13,7 +13,7 @@ type PowInt = "High" | "Low";
 
 interface Program {
   id: string; name: string; owner: string; goal: string; status: string;
-  projects: string[]; budget: number; spent: number; progress: number; health: Health; startDate?: string;
+  projects: string[]; budget: number; spent: number; progress: number; health: Health; startDate?: string; archived?: boolean;
 }
 interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[]; startDate: string }
 interface ProjOpt { id: string; name: string; dept?: string; health?: string; status?: Health; progress?: number; budget?: number }
@@ -63,14 +63,29 @@ export default function Programs() {
   const { data: projectOpts = [] } = useProjectOpts();
   const { can } = usePermissions();
   const mayCreate = can("cap-projects", "F");
+  const mayEdit = can("cap-projects", "E");
+  const mayDelete = can("cap-projects", "F");
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<Program | null>(null);
   const createProgram = useMutation({
     mutationFn: (body: NewProgram) => api<Program>("/programs", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
   });
+  const archive = useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api(`/programs/${id}/${on ? "archive" : "unarchive"}`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api(`/programs/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["programs"] }); setConfirmDel(null); },
+  });
   const selected = programs.find((p) => p.id === selectedId) ?? null;
+  const activeCount = programs.filter((p) => !p.archived).length;
+  const archivedCount = programs.filter((p) => p.archived).length;
+  const shown = programs.filter((p) => (showArchived ? p.archived : !p.archived));
 
   if (selected) {
     return (
@@ -88,24 +103,51 @@ export default function Programs() {
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create programs"}><Icon name="plus" size={16} /> New program</Button>
       </div>
 
-      {programs.length === 0 ? (
+      {(archivedCount > 0 || showArchived) && (
+        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+          {[["Active", false, activeCount], ["Archived", true, archivedCount]].map(([label, arch, n]) => (
+            <button key={label as string} onClick={() => setShowArchived(arch as boolean)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: showArchived === arch ? "#fff" : "transparent", color: showArchived === arch ? color.primary : "#6A7488", boxShadow: showArchived === arch ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+              {label as string} · {n as number}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
         <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
-          No programs yet. Create one to aggregate related projects.
+          {showArchived ? "No archived programs." : "No programs yet. Create one to aggregate related projects."}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
-          {programs.map((pg) => {
+          {shown.map((pg) => {
             const sc = STATUS_COLOR[pg.status] ?? STATUS_COLOR.Planning;
             const h = HEALTH[pg.health] ?? HEALTH.hold;
             return (
-              <div key={pg.id} onClick={() => setSelectedId(pg.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer" }}>
+              <div key={pg.id} onClick={() => setSelectedId(pg.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer", opacity: pg.archived ? 0.72 : 1 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 13, marginBottom: 14 }}>
                   <div style={folderBadge(42)}><Icon name="folders" size={20} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15.5, fontWeight: 600, color: color.navy, lineHeight: 1.25 }}>{pg.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <div style={{ fontSize: 15.5, fontWeight: 600, color: color.navy, lineHeight: 1.25 }}>{pg.name}</div>
+                      {pg.archived && <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
+                    </div>
                     <div style={{ fontSize: 12, color: color.faint2, marginTop: 2 }}>{pg.goal}</div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20, flex: "none" }}>{pg.status}</span>
+                  {(mayEdit || mayDelete) && (
+                    <div onClick={(e) => e.stopPropagation()} style={{ flex: "none" }}>
+                      <RowMenu ariaLabel="Program actions" width={176}>
+                        {(close) => (
+                          <>
+                            {mayEdit && (pg.archived
+                              ? <MenuItem label="Restore" icon={<Icon name="refresh" size={15} />} onClick={() => { archive.mutate({ id: pg.id, on: false }); close(); }} />
+                              : <MenuItem label="Archive" icon={<Icon name="archive" size={15} />} onClick={() => { archive.mutate({ id: pg.id, on: true }); close(); }} />)}
+                            {mayDelete && <><MenuDivider /><MenuItem label="Delete permanently" icon={<Icon name="trash" size={15} />} danger onClick={() => { setConfirmDel(pg); close(); }} /></>}
+                          </>
+                        )}
+                      </RowMenu>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 20, marginBottom: 13 }}>
                   <Stat n={pg.projects.length} label="Projects" />
@@ -132,6 +174,19 @@ export default function Programs() {
           onClose={() => setModal(false)}
           onCreate={(body) => createProgram.mutate(body, { onSuccess: () => setModal(false) })}
         />
+      )}
+      {confirmDel && (
+        <Overlay onClose={() => setConfirmDel(null)} width={440}>
+          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.navy, marginBottom: 10 }}>Delete program</div>
+          <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
+            Permanently delete <strong>{confirmDel.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span>? Its linked projects are not deleted.
+          </div>
+          <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
+            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 18px", borderRadius: 9, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
+          </div>
+        </Overlay>
       )}
     </div>
   );

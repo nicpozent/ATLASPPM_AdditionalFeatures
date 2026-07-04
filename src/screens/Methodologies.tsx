@@ -161,7 +161,20 @@ const INTEGRATION_OPTS = [
   { value: "none", label: "None (Atlas only)" },
 ] as const;
 
-interface TplState { methodology: string; name: string; dept: string; owner: string; integration: string }
+interface TplState { methodology: string; name: string; dept: string; owner: string; startDate: string; target: string; integration: string }
+
+// Target/start dates are stored as the friendly display string ("12 Sep 2026")
+// but edited with a native calendar picker.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const toIso = (display: string): string => {
+  const d = new Date(display);
+  return isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const toDisplay = (iso: string): string => {
+  if (!iso) return "";
+  const [y, m, dd] = iso.split("-").map(Number);
+  return y && m && dd ? `${dd} ${MONTHS[m - 1]} ${y}` : "";
+};
 
 export default function Methodologies() {
   const [tpl, setTpl] = useState<TplState | null>(null);
@@ -192,7 +205,7 @@ export default function Methodologies() {
                   <span style={{ fontSize: 11.5, color: color.faint3 }}>Best for {m.best}</span>
                 </div>
                 <button
-                  onClick={() => setTpl({ methodology: m.name, name: "", dept: "", owner: "", integration: "jira" })}
+                  onClick={() => setTpl({ methodology: m.name, name: "", dept: "", owner: "", startDate: "", target: "", integration: "jira" })}
                   style={useBtn}
                   onMouseEnter={(e) => { e.currentTarget.style.background = color.primary; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = color.primary; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = color.primary; e.currentTarget.style.borderColor = "#CFE0F4"; }}
@@ -211,7 +224,7 @@ export default function Methodologies() {
 interface Created { name: string; methodology: string; dept: string; owner: string; integration: string | null; items: { title: string; ext: string | null; pushed: boolean }[] }
 
 interface CreatedProject { id: string; name: string }
-interface NewProject { name: string; dept: string; owner: string; methodology: string; applyTemplate: boolean }
+interface NewProject { name: string; dept: string; owner: string; methodology: string; applyTemplate: boolean; startDate: string; target: string }
 
 function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: TplState) => void; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -226,7 +239,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
   });
 
   const create = () => {
-    const body: NewProject = { name: tpl.name.trim(), dept: tpl.dept.trim(), owner: tpl.owner.trim(), methodology: tpl.methodology, applyTemplate: true };
+    const body: NewProject = { name: tpl.name.trim(), dept: tpl.dept.trim(), owner: tpl.owner.trim(), methodology: tpl.methodology, applyTemplate: true, startDate: tpl.startDate, target: tpl.target };
     createProject.mutate(body, {
       onSuccess: (project) => {
         qc.invalidateQueries({ queryKey: ["projects"] });
@@ -270,8 +283,18 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
               <Input value={tpl.dept} onChange={(e) => setTpl({ ...tpl, dept: e.target.value })} placeholder="Department" />
             </div>
             <div>
-              <label style={lbl}>Owner</label>
-              <Input value={tpl.owner} onChange={(e) => setTpl({ ...tpl, owner: e.target.value })} placeholder="Project lead" />
+              <label style={lbl}>Project manager</label>
+              <Input value={tpl.owner} onChange={(e) => setTpl({ ...tpl, owner: e.target.value })} placeholder="Project lead / owner" />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+            <div>
+              <label style={lbl}>Start date</label>
+              <Input type="date" value={toIso(tpl.startDate)} onChange={(e) => setTpl({ ...tpl, startDate: toDisplay(e.target.value) })} />
+            </div>
+            <div>
+              <label style={lbl}>Target date</label>
+              <Input type="date" value={toIso(tpl.target)} onChange={(e) => setTpl({ ...tpl, target: toDisplay(e.target.value) })} />
             </div>
           </div>
 

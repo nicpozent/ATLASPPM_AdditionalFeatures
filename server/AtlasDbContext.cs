@@ -15,6 +15,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Objective> Objectives => Set<Objective>();
     public DbSet<KeyResult> KeyResults => Set<KeyResult>();
     public DbSet<Resource> Resources => Set<Resource>();
+    public DbSet<CommunicationEntry> CommunicationEntries => Set<CommunicationEntry>();
     public DbSet<Release> Releases => Set<Release>();
     public DbSet<DeliveryReport> DeliveryReports => Set<DeliveryReport>();
     public DbSet<DashboardKpi> DashboardKpis => Set<DashboardKpi>();
@@ -107,6 +108,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<KeyResult>().Property(x => x.Id).ValueGeneratedNever();
 
         b.Entity<Resource>().HasKey(x => x.Id);
+        b.Entity<CommunicationEntry>().HasKey(x => x.Id);
         b.Entity<Release>().HasKey(x => x.Id);
         b.Entity<Release>().Property(x => x.Id).ValueGeneratedNever();
 

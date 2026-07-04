@@ -228,6 +228,7 @@ public class Program
     public int Progress { get; set; }
     public string Health { get; set; } = "green";
     public string StartDate { get; set; } = "";        // display date, program start
+    public bool Archived { get; set; }
 }
 
 public class Product
@@ -296,6 +297,20 @@ public class Resource
     public bool Over { get; set; }
 }
 
+// A row in a project's stakeholder communication plan — which stakeholder is
+// reached, through which channel, what kind of communication and on what cadence.
+public class CommunicationEntry
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Stakeholder { get; set; } = "";
+    public string Channel { get; set; } = "";      // Email | Teams | Meeting | Report | Slack | Call
+    public string CommType { get; set; } = "";      // Status update | Steering | Escalation | Newsletter …
+    public string Schedule { get; set; } = "";      // Weekly | Bi-weekly | Monthly | Quarterly | Ad-hoc
+    public string Owner { get; set; } = "";
+    public string Notes { get; set; } = "";
+}
+
 public class Release
 {
     public string Id { get; set; } = default!;
@@ -309,7 +324,8 @@ public class Release
     public string Env { get; set; } = default!;
     public int Progress { get; set; }
     public string Risk { get; set; } = default!;
-    public string Status { get; set; } = "Planned";    // Planned|In progress|Deployed|Rolled back
+    public string Status { get; set; } = "Planned";    // Planned|In progress|Deployed|Rolled back|Completed|Cancelled
+    public bool Archived { get; set; }
 }
 
 public class DeliveryReport

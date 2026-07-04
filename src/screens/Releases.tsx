@@ -2,19 +2,19 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
-import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay } from "@/components/ui";
+import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 
 // ---- data ----------------------------------------------------------------
-type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed";
+type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed" | "Cancelled";
 type ReleaseScope = "Product" | "Project" | "Program";
-const RELEASE_STATUSES: ReleaseStatus[] = ["Planned", "In progress", "Deployed", "Rolled back", "Completed"];
+const RELEASE_STATUSES: ReleaseStatus[] = ["Planned", "In progress", "Deployed", "Rolled back", "Completed", "Cancelled"];
 
 type Release = {
   id: string; name: string; reqs: number; crs: number; owner: string;
   link: string; scope: ReleaseScope; date: string; env: string;
-  progress: number; risk: string; status: ReleaseStatus;
+  progress: number; risk: string; status: ReleaseStatus; archived?: boolean;
 };
 
 function useReleases() {
@@ -39,6 +39,7 @@ const STATUS_OPTS = [
   { value: "In progress", label: "In progress" },
   { value: "Deployed", label: "Deployed" },
   { value: "Completed", label: "Completed" },
+  { value: "Cancelled", label: "Cancelled" },
 ];
 
 const STATUS_COLORS: Record<string, { ink: string; tint: string }> = {
@@ -47,6 +48,7 @@ const STATUS_COLORS: Record<string, { ink: string; tint: string }> = {
   Deployed: { ink: "#0B6B37", tint: "#E7F4EC" },
   "Rolled back": { ink: "#A1282B", tint: "#FBE7E8" },
   Completed: { ink: "#0C5798", tint: "#E6EFFB" },
+  Cancelled: { ink: "#566077", tint: "#EEF0F4" },
 };
 const RISK_COLORS: Record<string, { ink: string; tint: string }> = {
   Low: { ink: "#0B6B37", tint: "#E7F4EC" },
@@ -54,7 +56,7 @@ const RISK_COLORS: Record<string, { ink: string; tint: string }> = {
   High: { ink: "#A1282B", tint: "#FBE7E8" },
 };
 
-const GRID = "0.6fr 1.7fr 1.2fr 0.9fr 0.9fr 1fr 0.8fr 0.9fr";
+const GRID = "0.6fr 1.7fr 1.2fr 0.9fr 0.9fr 1fr 0.8fr 0.9fr 44px";
 
 const selectStyle: React.CSSProperties = {
   border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px",
@@ -80,10 +82,14 @@ export default function Releases() {
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"table" | "calendar">("table");
   const [modal, setModal] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<Release | null>(null);
   const { data: releases = [] } = useReleases();
   const qc = useQueryClient();
   const { can } = usePermissions();
   const mayCreate = can("cap-projects", "E");
+  const mayEdit = can("cap-projects", "E");
+  const mayDelete = can("cap-projects", "F");
   const createRelease = useMutation({
     mutationFn: (body: NewRelease) => api<Release>("/releases", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
@@ -93,14 +99,25 @@ export default function Releases() {
       api(`/releases/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
   });
+  const archive = useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api(`/releases/${id}/${on ? "archive" : "unarchive"}`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api(`/releases/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["releases"] }); setConfirmDel(null); },
+  });
 
+  const live = releases.filter((r) => !r.archived);
+  const archivedCount = releases.filter((r) => r.archived).length;
   const stats = {
-    total: releases.length,
-    deployed: releases.filter((r) => r.status === "Deployed").length,
-    inProgress: releases.filter((r) => r.status === "In progress").length,
-    planned: releases.filter((r) => r.status === "Planned").length,
+    total: live.length,
+    deployed: live.filter((r) => r.status === "Deployed").length,
+    inProgress: live.filter((r) => r.status === "In progress").length,
+    planned: live.filter((r) => r.status === "Planned").length,
   };
   const list = releases
+    .filter((r) => (showArchived ? r.archived : !r.archived))
     .filter((r) => status === "all" || r.status === status)
     .filter((r) => scope === "all" || r.scope === scope);
 
@@ -118,6 +135,11 @@ export default function Releases() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...selectStyle, marginRight: 8 }}>
           {STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+        {(archivedCount > 0 || showArchived) && (
+          <button onClick={() => setShowArchived((s) => !s)} style={{ ...selectStyle, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6, color: showArchived ? color.primary : color.textMuted, background: showArchived ? color.primaryTint : "#fff", border: `1px solid ${showArchived ? "#CFE0F4" : color.border2}` }}>
+            <Icon name="archive" size={14} /> Archived · {archivedCount}
+          </button>
+        )}
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create releases"}><Icon name="plus" size={16} /> New release</Button>
       </div>
       {modal && <NewReleaseModal submitting={createRelease.isPending} onClose={() => setModal(false)}
@@ -152,7 +174,7 @@ export default function Releases() {
         <Card padding={0} style={{ overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "13px 22px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
             <div>Release</div><div>Name</div><div>Linked to</div><div>Target date</div>
-            <div>Environment</div><div>Progress</div><div>Risk</div><div>Status</div>
+            <div>Environment</div><div>Progress</div><div>Risk</div><div>Status</div><div />
           </div>
           {list.length === 0 ? (
             <div style={{ padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
@@ -165,7 +187,10 @@ export default function Releases() {
               <div key={r.id} style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
                 <div style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.text }}>{r.id}</div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.name}</span>
+                    {r.archived && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
+                  </div>
                   <div style={{ fontSize: 11, color: color.faint3 }}>{r.reqs} reqs · {r.crs} CRs · {r.owner}</div>
                 </div>
                 <div style={{ minWidth: 0, fontSize: 12.5, color: color.text }}>
@@ -193,10 +218,38 @@ export default function Releases() {
                     <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 7px", borderRadius: 6 }}>{r.status}</span>
                   )}
                 </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  {(mayEdit || mayDelete) && (
+                    <RowMenu ariaLabel="Release actions" width={176}>
+                      {(close) => (
+                        <>
+                          {mayEdit && (r.archived
+                            ? <MenuItem label="Restore" icon={<Icon name="refresh" size={15} />} onClick={() => { archive.mutate({ id: r.id, on: false }); close(); }} />
+                            : <MenuItem label="Archive" icon={<Icon name="archive" size={15} />} onClick={() => { archive.mutate({ id: r.id, on: true }); close(); }} />)}
+                          {mayDelete && <><MenuDivider /><MenuItem label="Delete permanently" icon={<Icon name="trash" size={15} />} danger onClick={() => { setConfirmDel(r); close(); }} /></>}
+                        </>
+                      )}
+                    </RowMenu>
+                  )}
+                </div>
               </div>
             );
           })}
         </Card>
+      )}
+
+      {confirmDel && (
+        <Overlay onClose={() => setConfirmDel(null)} width={440}>
+          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.navy, marginBottom: 10 }}>Delete release</div>
+          <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
+            Permanently delete <strong>{confirmDel.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span>?
+          </div>
+          <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it or mark it Cancelled instead.</div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <Button variant="secondary" onClick={() => setConfirmDel(null)}>Cancel</Button>
+            <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 16px", borderRadius: 10, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
+          </div>
+        </Overlay>
       )}
     </div>
   );

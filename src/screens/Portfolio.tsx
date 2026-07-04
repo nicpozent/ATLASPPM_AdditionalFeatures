@@ -1,10 +1,10 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea, Modal } from "@/components/ui";
+import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea, Modal, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { SCREENS } from "@/nav";
@@ -40,7 +40,6 @@ export default function Portfolio() {
   const [newProject, setNewProject] = useState(false);
   const [bucket, setBucket] = useState<ProjectBucket>("active");
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -70,15 +69,15 @@ export default function Portfolio() {
   const archive = useMutation({
     mutationFn: ({ id, on }: { id: string; on: boolean }) =>
       api(`/projects/${id}/${on ? "archive" : "unarchive"}`, { method: "POST" }),
-    onSuccess: () => { refetchProjects(); setMenuFor(null); },
+    onSuccess: () => refetchProjects(),
   });
   const del = useMutation({
     mutationFn: (id: string) => api(`/projects/${id}`, { method: "DELETE" }),
-    onSuccess: () => { refetchProjects(); setMenuFor(null); setConfirmDelete(null); },
+    onSuccess: () => { refetchProjects(); setConfirmDelete(null); },
   });
   const requestDeletion = useMutation({
     mutationFn: (id: string) => api(`/projects/${id}/deletion-request`, { method: "POST" }),
-    onSuccess: () => { setMenuFor(null); qc.invalidateQueries({ queryKey: ["archive-admin"] }); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["archive-admin"] }),
   });
 
   const blkCounts = {
@@ -105,7 +104,7 @@ export default function Portfolio() {
         {tab === "projects" && (
           <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
             {(["active", "completed", "archived"] as ProjectBucket[]).map((b) => (
-              <TabBtn key={b} active={bucket === b} onClick={() => { setBucket(b); setFilter("all"); setMenuFor(null); }}>
+              <TabBtn key={b} active={bucket === b} onClick={() => { setBucket(b); setFilter("all"); }}>
                 {b[0].toUpperCase() + b.slice(1)}
               </TabBtn>
             ))}
@@ -138,7 +137,7 @@ export default function Portfolio() {
                 {bucket === "archived" ? "No archived projects." : bucket === "completed" ? "No completed projects yet." : projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
               </div>
             ) : filtered.map((p) => (
-              <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", zIndex: menuFor === p.id ? 30 : undefined, display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer", opacity: p.archived ? 0.72 : 1, background: menuFor === p.id ? color.surface : undefined }}>
+              <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer", opacity: p.archived ? 0.72 : 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", background: statusDot(p.status), flex: "none" }} />
                   <div style={{ minWidth: 0 }}>
@@ -172,15 +171,15 @@ export default function Portfolio() {
                   <div style={{ fontSize: 11, color: color.faint3 }}>{fmtBudget(p.spent)} spent</div>
                 </div>
                 {(mayEdit || mayDelete || mayRequest) && (
-                  <RowActions
-                    open={menuFor === p.id}
-                    onToggle={(e) => { e.stopPropagation(); setMenuFor(menuFor === p.id ? null : p.id); }}
-                    project={p} mayEdit={mayEdit} mayDelete={mayDelete} mayRequest={mayRequest}
-                    onEdit={() => { setEditProject(p); setMenuFor(null); }}
-                    onArchive={(on) => archive.mutate({ id: p.id, on })}
-                    onDelete={() => { setConfirmDelete(p); setMenuFor(null); }}
-                    onRequest={() => requestDeletion.mutate(p.id)}
-                  />
+                  <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} onClick={(e) => e.stopPropagation()}>
+                    <RowActions
+                      project={p} mayEdit={mayEdit} mayDelete={mayDelete} mayRequest={mayRequest}
+                      onEdit={() => setEditProject(p)}
+                      onArchive={(on) => archive.mutate({ id: p.id, on })}
+                      onDelete={() => setConfirmDelete(p)}
+                      onRequest={() => requestDeletion.mutate(p.id)}
+                    />
+                  </div>
                 )}
               </div>
             ))}
@@ -206,64 +205,37 @@ export default function Portfolio() {
   );
 }
 
-// Row-level actions: a kebab that reveals edit / archive / delete. Stops row
-// navigation on click. Delete is Platform-Admin-only and never for seeded
-// (system) projects — both mirrored from the server's authoritative rules.
-function RowActions({ open, onToggle, project, mayEdit, mayDelete, mayRequest, onEdit, onArchive, onDelete, onRequest }: {
-  open: boolean; onToggle: (e: React.MouseEvent) => void; project: Project;
+// Row-level actions: a kebab that reveals edit / archive / delete. The popover
+// is portalled to <body> (see RowMenu) so it's never clipped by the table Card's
+// overflow:hidden. Delete is Platform-Admin-only and never for seeded (system)
+// projects — both mirrored from the server's authoritative rules.
+function RowActions({ project, mayEdit, mayDelete, mayRequest, onEdit, onArchive, onDelete, onRequest }: {
+  project: Project;
   mayEdit: boolean; mayDelete: boolean; mayRequest: boolean;
   onEdit: () => void; onArchive: (on: boolean) => void; onDelete: () => void; onRequest: () => void;
 }) {
   const canDelete = mayDelete && !project.isSystem;
-  const item = (label: string, icon: React.ReactNode, onClick: () => void, danger?: boolean) => (
-    <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
-      display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 13px", border: "none",
-      background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", textAlign: "left",
-      color: danger ? "#A1282B" : color.text,
-    }} onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#FBE7E8" : color.bg)}
-       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-      <span style={{ display: "flex", color: danger ? "#D13438" : color.faint2 }}>{icon}</span>{label}
-    </button>
-  );
-  // Fixed positioning (computed from the button) so the menu isn't clipped by the
-  // table Card's overflow:hidden.
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  useLayoutEffect(() => {
-    if (open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 5, right: Math.max(8, window.innerWidth - r.right) });
-    }
-  }, [open]);
-
   return (
-    <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }}>
-      <button ref={btnRef} aria-label="Project actions" onClick={onToggle} style={{
-        width: 30, height: 30, borderRadius: 8, border: `1px solid ${color.border}`, background: open ? color.bg : color.surface,
-        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: color.faint2,
-      }}><Icon name="more" size={16} /></button>
-      {open && pos && (
+    <RowMenu ariaLabel="Project actions" width={182}>
+      {(close) => (
         <>
-          <div onClick={(e) => { e.stopPropagation(); onToggle(e); }} style={{ position: "fixed", inset: 0, zIndex: 300 }} />
-          <div style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 301, minWidth: 172, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(20,26,60,0.16)", padding: 5, overflow: "hidden" }}>
-            {mayEdit && item("Edit details", <Icon name="edit" size={15} />, onEdit)}
-            {mayEdit && (project.archived
-              ? item("Restore", <Icon name="refresh" size={15} />, () => onArchive(false))
-              : item("Archive", <Icon name="archive" size={15} />, () => onArchive(true)))}
-            {mayRequest && !project.archived && item("Request deletion", <Icon name="trash" size={15} />, onRequest)}
-            {canDelete && (
-              <>
-                <div style={{ height: 1, background: color.bg, margin: "5px 0" }} />
-                {item("Delete permanently", <Icon name="trash" size={15} />, onDelete, true)}
-              </>
-            )}
-            {mayDelete && project.isSystem && (
-              <div style={{ padding: "7px 13px", fontSize: 11, color: color.faint3, lineHeight: 1.4 }}>Seeded projects can't be deleted — archive instead.</div>
-            )}
-          </div>
+          {mayEdit && <MenuItem label="Edit details" icon={<Icon name="edit" size={15} />} onClick={() => { onEdit(); close(); }} />}
+          {mayEdit && (project.archived
+            ? <MenuItem label="Restore" icon={<Icon name="refresh" size={15} />} onClick={() => { onArchive(false); close(); }} />
+            : <MenuItem label="Archive" icon={<Icon name="archive" size={15} />} onClick={() => { onArchive(true); close(); }} />)}
+          {mayRequest && !project.archived && <MenuItem label="Request deletion" icon={<Icon name="trash" size={15} />} onClick={() => { onRequest(); close(); }} />}
+          {canDelete && (
+            <>
+              <MenuDivider />
+              <MenuItem label="Delete permanently" icon={<Icon name="trash" size={15} />} danger onClick={() => { onDelete(); close(); }} />
+            </>
+          )}
+          {mayDelete && project.isSystem && (
+            <div style={{ padding: "7px 13px", fontSize: 11, color: color.faint3, lineHeight: 1.4 }}>Seeded projects can't be deleted — archive instead.</div>
+          )}
         </>
       )}
-    </div>
+    </RowMenu>
   );
 }
 
@@ -361,11 +333,13 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [dept, setDept] = useState("");
   const [owner, setOwner] = useState("");
   const [methodology, setMethodology] = useState(METHODOLOGIES[0]);
+  const [startDate, setStartDate] = useState("");
+  const [target, setTarget] = useState("");
 
   const create = useMutation({
     mutationFn: () => api<{ id: string }>("/projects", {
       method: "POST",
-      body: JSON.stringify({ name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology }),
+      body: JSON.stringify({ name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology, startDate, target }),
     }),
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ["projects"] });
@@ -379,13 +353,19 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
     <Modal onClose={onClose} width={460} label="New project">
       <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Create a project directly in the portfolio. It starts in Planning with an empty schedule.</div>
       <Field label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Store Network Expansion" /></Field>
-      <Field label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Owning department" /></Field>
-      <Field label="Owner"><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Project manager" /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} placeholder="Owning department" /></Field>
+        <Field label="Project manager"><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Project manager / owner" /></Field>
+      </div>
       <Field label="Methodology">
         <Select value={methodology} onChange={(e) => setMethodology(e.target.value)}>
           {METHODOLOGIES.map((m) => <option key={m} value={m}>{m}</option>)}
         </Select>
       </Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Start date"><Input type="date" value={toIsoDate(startDate)} onChange={(e) => setStartDate(toDisplayDate(e.target.value))} /></Field>
+        <Field label="Target date"><Input type="date" value={toIsoDate(target)} onChange={(e) => setTarget(toDisplayDate(e.target.value))} /></Field>
+      </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Creating…" : "Create project"}</Button>
