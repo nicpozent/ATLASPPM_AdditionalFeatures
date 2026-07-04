@@ -2,12 +2,18 @@ import { useLocation } from "react-router-dom";
 import { color, font, layout } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
+import { useAuth } from "./AuthContext";
 import { ROLES, SCREENS } from "@/nav";
 
 export function Topbar() {
   const { role, setRole } = useRole();
-  // Platform Administrator can view every role (troubleshooting); others see only their own.
-  const visibleRoles = role === "admin" ? ROLES : ROLES.filter((r) => r.value === role);
+  const { enabled, user } = useAuth();
+  // Who may switch roles is decided by the REAL identity, not the currently
+  // selected view — so a Platform Administrator can move through every role and
+  // back again. In the demo (auth off) all identities are switchable, as in the
+  // prototype; signed in, only a Platform Admin may impersonate other roles.
+  const canSwitchAll = !enabled || user?.role === "admin";
+  const visibleRoles = canSwitchAll ? ROLES : ROLES.filter((r) => r.value === role);
   const { pathname } = useLocation();
   const screen = Object.values(SCREENS).find((s) => s.path === pathname) ?? SCREENS.dashboard;
 

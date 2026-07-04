@@ -9,10 +9,23 @@ import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { SCREENS } from "@/nav";
 import {
-  STATUS_FILTERS, useProjects, useBlockers, type Project, type Blocker, type BlockerStatus,
+  STATUS_FILTERS, useProjects, useBlockers, type Project, type ProjectBucket, type Blocker, type BlockerStatus,
 } from "./portfolio/data";
 
 const fmtBudget = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
+
+// Target date <-> the display string projects store ("12 Sep 2026"). Lets the
+// edit modal use a native calendar picker while keeping the friendly display.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const toIsoDate = (display: string): string => {
+  const d = new Date(display);
+  return isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const toDisplayDate = (iso: string): string => {
+  if (!iso) return "TBD";
+  const [y, m, dd] = iso.split("-").map(Number);
+  return y && m && dd ? `${dd} ${MONTHS[m - 1]} ${y}` : "TBD";
+};
 const BLK_COLORS: Record<BlockerStatus, { dot: string; ink: string; tint: string }> = {
   Active:        { dot: "#D13438", ink: "#A1282B", tint: "#FBE7E8" },
   "In progress": { dot: "#E0A100", ink: "#8A6300", tint: "#FBF2D7" },
@@ -25,13 +38,13 @@ export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
   const [newProject, setNewProject] = useState(false);
-  const [viewArchived, setViewArchived] = useState(false);
+  const [bucket, setBucket] = useState<ProjectBucket>("active");
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: projects = [] } = useProjects(viewArchived);
+  const { data: projects = [] } = useProjects(bucket);
   const { data: blockers = [] } = useBlockers();
   const { can } = usePermissions();
   const { role } = useRole();
@@ -91,8 +104,11 @@ export default function Portfolio() {
         <div style={{ flex: 1 }} />
         {tab === "projects" && (
           <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
-            <TabBtn active={!viewArchived} onClick={() => { setViewArchived(false); setMenuFor(null); }}>Active</TabBtn>
-            <TabBtn active={viewArchived} onClick={() => { setViewArchived(true); setMenuFor(null); }}>Archived</TabBtn>
+            {(["active", "completed", "archived"] as ProjectBucket[]).map((b) => (
+              <TabBtn key={b} active={bucket === b} onClick={() => { setBucket(b); setFilter("all"); setMenuFor(null); }}>
+                {b[0].toUpperCase() + b.slice(1)}
+              </TabBtn>
+            ))}
           </div>
         )}
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
@@ -119,7 +135,7 @@ export default function Portfolio() {
             </div>
             {filtered.length === 0 ? (
               <div style={{ padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
-                {viewArchived ? "No archived projects." : projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
+                {bucket === "archived" ? "No archived projects." : bucket === "completed" ? "No completed projects yet." : projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
               </div>
             ) : filtered.map((p) => (
               <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", zIndex: menuFor === p.id ? 30 : undefined, display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer", opacity: p.archived ? 0.72 : 1, background: menuFor === p.id ? color.surface : undefined }}>
@@ -130,6 +146,9 @@ export default function Portfolio() {
                       <span style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                       {p.archived && (
                         <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>
+                      )}
+                      {!p.archived && p.status === "completed" && (
+                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Completed</span>
                       )}
                       {p.blockerCount > 0 && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flex: "none", color: "#D13438", background: "#FBE7E8", borderRadius: 6, padding: "1px 6px 1px 4px", fontSize: 10.5, fontWeight: 700 }}><Icon name="alert" size={12} />{p.blockerCount}</span>
@@ -240,6 +259,7 @@ function RowActions({ open, onToggle, project, mayEdit, mayDelete, mayRequest, o
 const EDIT_STATUSES: { key: Project["status"]; label: string }[] = [
   { key: "green", label: "On track" }, { key: "amber", label: "At risk" },
   { key: "red", label: "Critical" }, { key: "hold", label: "On hold" },
+  { key: "completed", label: "Completed" },
 ];
 
 function EditProjectModal({ project, onClose, onSaved }: { project: Project; onClose: () => void; onSaved: () => void }) {
@@ -287,7 +307,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Progress %"><Input type="number" value={progress} onChange={(e) => setProgress(e.target.value)} /></Field>
-        <Field label="Target date"><Input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 12 Sep 2026" /></Field>
+        <Field label="Target date"><Input type="date" value={toIsoDate(target)} onChange={(e) => setTarget(toDisplayDate(e.target.value))} /></Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></Field>

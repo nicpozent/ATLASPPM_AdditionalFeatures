@@ -27,12 +27,13 @@ public static class WriteEndpoints
 {
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
     static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved" };
-    static readonly string[] Statuses = { "green", "amber", "red", "hold" };
+    static readonly string[] Statuses = { "green", "amber", "red", "hold", "completed" };
 
     // Keep the display Health string consistent with the traffic-light Status.
     static string HealthFor(string status) => status switch
     {
-        "green" => "On track", "amber" => "At risk", "red" => "Critical", "hold" => "On hold", _ => "On track",
+        "green" => "On track", "amber" => "At risk", "red" => "Critical",
+        "hold" => "On hold", "completed" => "Completed", _ => "On track",
     };
 
     // Who may delete a demand: anyone when auth is off (single-user dev), else the

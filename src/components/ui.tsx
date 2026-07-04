@@ -63,10 +63,11 @@ export function EmptyBlock({ message, minHeight = 96 }: { message: string; minHe
 }
 
 const HEALTH_COLORS: Record<string, { ink: string; tint: string }> = {
-  green: { ink: "#0B6B37", tint: "#E7F4EC" },
-  amber: { ink: "#8A6300", tint: "#FBF2D7" },
-  red:   { ink: "#A1282B", tint: "#FBE7E8" },
-  hold:  { ink: "#4A5266", tint: "#EEF1F6" },
+  green:     { ink: "#0B6B37", tint: "#E7F4EC" },
+  amber:     { ink: "#8A6300", tint: "#FBF2D7" },
+  red:       { ink: "#A1282B", tint: "#FBE7E8" },
+  hold:      { ink: "#4A5266", tint: "#EEF1F6" },
+  completed: { ink: "#0C5798", tint: "#E6EFFB" },
 };
 export function HealthPill({ status, label }: { status: string; label: string }) {
   const c = HEALTH_COLORS[status] ?? HEALTH_COLORS.hold;
@@ -74,7 +75,7 @@ export function HealthPill({ status, label }: { status: string; label: string })
 }
 
 export function statusDot(status: string): string {
-  return { green: chart.onTrack, amber: chart.atRisk, red: chart.critical, hold: chart.onHold }[status] ?? chart.onHold;
+  return { green: chart.onTrack, amber: chart.atRisk, red: chart.critical, hold: chart.onHold, completed: "#0F6CBD" }[status] ?? chart.onHold;
 }
 
 // ============================================================================
