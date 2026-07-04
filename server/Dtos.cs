@@ -69,6 +69,10 @@ public record DefectDto(int Id, string Code, string Title, string Severity, stri
 public record QualityTotalsDto(int Cases, int Coverage, int PassRate, int Failed, int OpenDefects);
 public record QualityDto(bool CanEdit, QualityTotalsDto Totals, List<TestPlanDto> Plans, List<DefectDto> Defects);
 
+public record DepLinkDto(string Id, string Name, string Dept, string Status, string Health);
+public record DependenciesDto(bool CanEdit, List<DepLinkDto> DependsOn, List<DepLinkDto> Blocks,
+    bool InheritedRisk, string OwnHealth, string EffHealth, string DepRiskTitle);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

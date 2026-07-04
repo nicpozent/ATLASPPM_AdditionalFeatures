@@ -327,6 +327,16 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Project dependencies (cross-project links) ---------------------------
+// A row means: project ProjectId depends on project DependsOnId (upstream).
+public class ProjectDependency
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string DependsOnId { get; set; } = default!;
+    public int Ord { get; set; }
+}
+
 // ---- Quality (test plans & defects) ---------------------------------------
 public class TestPlan
 {

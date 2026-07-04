@@ -110,8 +110,9 @@ export default function Project() {
       {tab === "requirements" && <Requirements projectId={id} />}
       {tab === "architecture" && <Architecture projectId={id} />}
       {tab === "quality" && <Quality projectId={id} />}
+      {tab === "dependencies" && <Dependencies projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["dependencies", "vacations"].includes(tab) && (
+      {["vacations"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -1568,6 +1569,106 @@ function NewDefectModal({ projectId, onClose }: { projectId: string; onClose: ()
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => f.title.trim() && create.mutate()} disabled={create.isPending || !f.title.trim()}>{create.isPending ? "Logging…" : "Log defect"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- Dependencies (cross-project links) ------------------------------------
+interface DepLink { id: string; name: string; dept: string; status: string; health: string; }
+interface DepData { canEdit: boolean; dependsOn: DepLink[]; blocks: DepLink[]; inheritedRisk: boolean; ownHealth: string; effHealth: string; depRiskTitle: string; }
+const STATUS_PILL: Record<string, { ink: string; tint: string; dot: string }> = {
+  green: { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  amber: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
+  red:   { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
+  hold:  { ink: "#56607A", tint: "#EEF1F6", dot: "#8A93A6" },
+};
+
+function Dependencies({ projectId }: { projectId: string | null }) {
+  const navigate = useNavigate();
+  const [modal, setModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["dependencies", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<DepData | null> => await api<DepData>(`/projects/${projectId}/dependencies`),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its dependencies." /></Card>;
+  if (!data) return <Card><EmptyBlock minHeight={220} message="Loading dependencies…" /></Card>;
+
+  const { dependsOn, blocks, inheritedRisk, ownHealth, effHealth, depRiskTitle, canEdit } = data;
+  const openProject = (pid: string) => navigate(`${SCREENS.project.path}?id=${pid}`);
+
+  const column = (title: string, icon: React.ReactNode, links: DepLink[], empty: string) => (
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 18px", borderBottom: `1px solid ${color.bg}` }}>
+        {icon}<span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.ink }}>{title}</span>
+      </div>
+      {links.length === 0 ? (
+        <div style={{ padding: "22px 18px", textAlign: "center", fontSize: 12.5, color: color.faint3 }}>{empty}</div>
+      ) : links.map((d) => {
+        const sc = STATUS_PILL[d.status] ?? STATUS_PILL.green;
+        return (
+          <div key={d.id} onClick={() => openProject(d.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "13px 18px", borderBottom: "1px solid #F4F6FA", cursor: "pointer" }}>
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: sc.dot, flex: "none" }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{d.name}</div>
+              <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{d.id} · {d.dept}</div>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{d.health}</span>
+          </div>
+        );
+      })}
+    </Card>
+  );
+
+  return (
+    <div style={{ maxWidth: 880 }}>
+      <div style={{ fontSize: 13.5, color: color.faint, marginBottom: 16 }}>Cross-project links for this project. Task &amp; epic dependencies are shown on their own tabs.</div>
+      {inheritedRisk && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "#FBF6E8", border: "1px solid #F0E2BC", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+          <span style={{ color: "#8A6300", display: "flex", marginTop: 1 }}><Icon name="alert" size={18} /></span>
+          <div style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A1F" }}>
+            <b>Aggregated status: {effHealth}.</b> This project's own health is <b>{ownHealth}</b>, but it inherits risk from a dependency — {depRiskTitle}. Resolve the upstream item to clear the rollup.
+          </div>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {column("Depends on", <span style={{ color: "#C98A00", display: "flex" }}><Icon name="arrowRight" size={16} /></span>, dependsOn, "No upstream dependencies.")}
+        {column("Blocks / enables", <span style={{ color: color.primary, display: "flex", transform: "rotate(180deg)" }}><Icon name="arrowRight" size={16} /></span>, blocks, "Nothing depends on this project.")}
+      </div>
+      {canEdit && (
+        <button onClick={() => setModal(true)} style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.border}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>
+          <Icon name="plus" size={16} /> Link a project
+        </button>
+      )}
+      {modal && <LinkProjectModal projectId={projectId} existing={dependsOn.map((d) => d.id)} onClose={() => setModal(false)} />}
+    </div>
+  );
+}
+
+function LinkProjectModal({ projectId, existing, onClose }: { projectId: string; existing: string[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<{ id: string; name: string }[]> => (await api<{ id: string; name: string }[]>("/projects")) ?? [],
+  });
+  const options = projects.filter((p) => p.id !== projectId && !existing.includes(p.id));
+  const [dependsOnId, setDependsOnId] = useState("");
+  const link = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/dependencies`, { method: "POST", body: JSON.stringify({ dependsOnId }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["dependencies", projectId] }); onClose(); },
+  });
+  return (
+    <Modal onClose={onClose} width={440} label="Link a project">
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>This project will depend on the one you choose; its risk rolls up here.</div>
+      <DecLabel>Depends on</DecLabel>
+      <Select value={dependsOnId} onChange={(e) => setDependsOnId(e.target.value)}>
+        <option value="">{options.length ? "Select a project" : "No other projects available"}</option>
+        {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => dependsOnId && link.mutate()} disabled={link.isPending || !dependsOnId}>{link.isPending ? "Linking…" : "Link project"}</Button>
       </div>
     </Modal>
   );
