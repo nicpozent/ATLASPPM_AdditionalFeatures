@@ -62,6 +62,7 @@ public class Demand
     public string Date { get; set; } = default!;      // display date, e.g. "Jun 23"
     public bool Mine { get; set; }                     // feeds /demands/my
     public bool PendingApproval { get; set; }          // feeds dashboard approvals
+    public string CreatedBy { get; set; } = "";        // owner id (Entra oid/upn); "" when auth off
 
     // --- IT Request & Innovation intake form -------------------------------
     public string Description { get; set; } = "";

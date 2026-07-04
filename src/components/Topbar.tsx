@@ -6,6 +6,8 @@ import { ROLES, SCREENS } from "@/nav";
 
 export function Topbar() {
   const { role, setRole } = useRole();
+  // Platform Administrator can view every role (troubleshooting); others see only their own.
+  const visibleRoles = role === "admin" ? ROLES : ROLES.filter((r) => r.value === role);
   const { pathname } = useLocation();
   const screen = Object.values(SCREENS).find((s) => s.path === pathname) ?? SCREENS.dashboard;
 
@@ -32,15 +34,18 @@ export function Topbar() {
       }}>
         <span style={{ color: color.primary, display: "flex" }}><Icon name="userCheck" size={16} /></span>
         <span style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</span>
+        {/* Only Platform Administrator may view/switch other roles (for support);
+            every other role is locked to its own view. */}
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
+          disabled={visibleRoles.length <= 1}
           style={{
             border: "none", background: "transparent", fontSize: 13, fontWeight: 600,
-            color: color.ink, fontFamily: "inherit", cursor: "pointer", outline: "none",
+            color: color.ink, fontFamily: "inherit", cursor: visibleRoles.length <= 1 ? "default" : "pointer", outline: "none",
           }}
         >
-          {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          {visibleRoles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
       </div>
 

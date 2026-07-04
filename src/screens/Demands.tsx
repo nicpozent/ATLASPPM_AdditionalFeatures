@@ -156,13 +156,18 @@ interface DemandDetail {
   description: string; source: string; geoImpact: string[]; hasDeadline: boolean; deadline?: string;
   businessProblem: string; improvementExisting: boolean; criticality: number; risk: number;
   expectedBenefits: string; benefitValue: number; stakeholders: string[]; allStakeholders: boolean;
-  attachments: Attachment[];
+  attachments: Attachment[]; canDelete: boolean;
 }
 
 function DemandDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["demands", id], retry: false,
     queryFn: async (): Promise<DemandDetail | null> => { try { return await api<DemandDetail>(`/demands/${id}`); } catch { return null; } },
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/demands/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["demands"] }); onClose(); },
   });
   const fmt = (n: number) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
   const scored = (opts: { value: number; icon: string; label: string }[], v: number) => opts.find((o) => o.value === v);
@@ -214,7 +219,15 @@ function DemandDetailModal({ id, onClose }: { id: string; onClose: () => void })
             </>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 20 }}>
+            {data.canDelete && (
+              <button type="button" onClick={() => del.mutate()} disabled={del.isPending} style={{
+                display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+                color: color.danger, background: color.dangerTint, border: "none", padding: "9px 14px", borderRadius: 9,
+                cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1,
+              }}><Icon name="x" size={15} /> {del.isPending ? "Deleting…" : "Delete initiative"}</button>
+            )}
+            <div style={{ flex: 1 }} />
             <Button variant="secondary" onClick={onClose}>Close</Button>
           </div>
         </>

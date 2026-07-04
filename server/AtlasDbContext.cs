@@ -57,6 +57,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         d.Property(x => x.BenefitValue).HasDefaultValue(0);
         d.Property(x => x.Stakeholders).HasDefaultValueSql("'{}'::text[]");
         d.Property(x => x.AllStakeholders).HasDefaultValue(false);
+        d.Property(x => x.CreatedBy).HasDefaultValue("");
 
         b.Entity<Program>().HasKey(x => x.Id);
         b.Entity<Program>().Property(x => x.Id).ValueGeneratedNever();

@@ -21,7 +21,7 @@ public record DemandDetailDto(string Id, string Title, string Stage, string Prio
     string Requester, string Dept, string Date, string Description, string Source, List<string> GeoImpact,
     bool HasDeadline, string? Deadline, string BusinessProblem, bool ImprovementExisting, int Criticality,
     int Risk, string ExpectedBenefits, int BenefitValue, List<string> Stakeholders, bool AllStakeholders,
-    List<AttachmentDto> Attachments);
+    List<AttachmentDto> Attachments, bool CanDelete);
 
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
     List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health);
