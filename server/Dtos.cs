@@ -31,6 +31,9 @@ public record GateDto(int Id, string Code, string Name, string Approver, string 
     int Pct, string MetLabel, List<GateCriterionDto> Criteria);
 public record GatesDto(bool CanGovern, List<GateDto> Gates);
 
+public record DecisionDto(string Code, string Title, string Context, string Decision, string Owner, string Date, string Status);
+public record DecisionsDto(bool CanGovern, List<DecisionDto> Decisions);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
