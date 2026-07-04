@@ -20,6 +20,8 @@ public static class Seed
             new Project { Id = "PRJ-231", Name = "Store Network Expansion – Baltics", Dept = "Expansion", Owner = "Kaisa Nieminen", Methodology = "Stage-Gate", Status = "green", Health = "On track", Progress = 22, Budget = 12500, Spent = 1400, Target = "30 Apr 2027", Phase = "Planning", Due = "30 Apr 2027", Capex = 9800, Forecast = 12400, Roi = 24, LaborDev = 300, LaborArch = 250, LaborInfra = 400 },
             new Project { Id = "PRJ-189", Name = "Loyalty Program Revamp", Dept = "Marketing", Owner = "Petter Haugen", Methodology = "Scrumban", Status = "hold", Health = "On hold", Progress = 48, Budget = 2200, Spent = 1200, Target = "On hold", Phase = "On hold", Due = "On hold", Capex = 1000, Forecast = 2200, Roi = 12, LaborDev = 600, LaborArch = 150, LaborInfra = 150 }
         );
+        // Seeded projects are reference/demo data: archivable but never hard-deletable.
+        foreach (var e in db.ChangeTracker.Entries<Project>()) e.Entity.IsSystem = true;
 
         db.Blockers.AddRange(
             new Blocker { Id = "BLK-051", Title = "Payment gateway certification delayed", ProjectId = "PRJ-204", Owner = "Astrid Holmqvist", Status = "Active" },

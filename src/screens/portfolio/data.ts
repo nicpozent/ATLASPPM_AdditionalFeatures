@@ -6,6 +6,7 @@ export interface Project {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: "green" | "amber" | "red" | "hold"; health: string; progress: number;
   budget: number; spent: number; target: string; blockerCount: number;
+  archived?: boolean; isSystem?: boolean;
 }
 export type BlockerStatus = "Active" | "In progress" | "Resolved";
 export interface Blocker {
@@ -21,11 +22,11 @@ export const STATUS_FILTERS: StatusFilter[] = [
   { key: "hold",  label: "On hold",  match: (p: Project) => p.status === "hold",  ink: "#566077", tint: "#EEF0F4" },
 ];
 
-export function useProjects() {
+export function useProjects(archived = false) {
   return useQuery({
-    queryKey: ["projects"], retry: false, staleTime: 60_000,
+    queryKey: ["projects", archived ? "archived" : "active"], retry: false, staleTime: 60_000,
     queryFn: async (): Promise<Project[]> => {
-      try { return (await api<Project[]>("/projects")) ?? []; } catch { return []; }
+      try { return (await api<Project[]>(`/projects${archived ? "?archived=true" : ""}`)) ?? []; } catch { return []; }
     },
   });
 }

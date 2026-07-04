@@ -52,13 +52,14 @@ public static class Endpoints
             return Results.File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "atlas-audit-log.csv");
         });
 
-        api.MapGet("/projects", async (AtlasDbContext db) =>
-            await db.Projects.OrderBy(p => p.Id).Select(p => new ProjectDto(
+        api.MapGet("/projects", async (AtlasDbContext db, bool? archived) =>
+            await db.Projects.Where(p => (archived ?? false) ? p.Archived : !p.Archived)
+                .OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,
-                p.Budget, p.Spent, p.Target, p.Blockers.Count)).ToListAsync());
+                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem)).ToListAsync());
 
         api.MapGet("/projects/my", async (AtlasDbContext db) =>
-            await db.Projects.Where(p => p.StakeholderVisible).OrderBy(p => p.Id).Select(p =>
+            await db.Projects.Where(p => p.StakeholderVisible && !p.Archived).OrderBy(p => p.Id).Select(p =>
                 new StakeholderProjectDto(p.Id, p.Name, p.Dept, p.Status, p.Health, p.Progress, p.Target, p.Phase))
                 .ToListAsync());
 
@@ -107,7 +108,7 @@ public static class Endpoints
                 .ToListAsync());
 
         api.MapGet("/financials", async (AtlasDbContext db) =>
-            await db.Projects.OrderBy(p => p.Id).Select(p => new FinRowDto(
+            await db.Projects.Where(p => !p.Archived).OrderBy(p => p.Id).Select(p => new FinRowDto(
                 p.Id, p.Name, p.Budget, p.Spent, p.Capex, p.Forecast, p.Budget - p.Forecast, p.Roi,
                 p.LaborDev, p.LaborArch, p.LaborInfra,
                 p.Budget > 0 ? (int)Math.Round(p.Spent / p.Budget * 100) : 0,
@@ -137,7 +138,7 @@ public static class DashboardEndpoint
 
     public static async Task<DashboardDto> Build(AtlasDbContext db)
     {
-        var projects = await db.Projects.OrderBy(p => p.Id).ToListAsync();
+        var projects = await db.Projects.Where(p => !p.Archived).OrderBy(p => p.Id).ToListAsync();
         var demands = await db.Demands.ToListAsync();
 
         var kpis = (await db.DashboardKpis.OrderBy(k => k.Ord).ToListAsync())

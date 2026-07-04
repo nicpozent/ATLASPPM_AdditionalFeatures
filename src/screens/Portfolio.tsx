@@ -6,9 +6,10 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea, Modal } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { useRole } from "@/components/RoleContext";
 import { SCREENS } from "@/nav";
 import {
-  STATUS_FILTERS, useProjects, useBlockers, type Blocker, type BlockerStatus,
+  STATUS_FILTERS, useProjects, useBlockers, type Project, type Blocker, type BlockerStatus,
 } from "./portfolio/data";
 
 const fmtBudget = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
@@ -24,12 +25,25 @@ export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
   const [newProject, setNewProject] = useState(false);
+  const [viewArchived, setViewArchived] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Project | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: projects = [] } = useProjects();
+  const { data: projects = [] } = useProjects(viewArchived);
   const { data: blockers = [] } = useBlockers();
   const { can } = usePermissions();
+  const { role } = useRole();
   const mayCreate = can("cap-projects", "F");
+  const mayEdit = can("cap-projects", "E");
+  const mayDelete = role === "admin"; // hard delete is Platform Admin only (cosmetic gate; API enforces)
+
+  const refetchProjects = () => {
+    qc.invalidateQueries({ queryKey: ["projects"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    qc.invalidateQueries({ queryKey: ["financials"] });
+  };
 
   const raiseBlocker = useMutation({
     mutationFn: (body: RaiseBlocker) => api("/blockers", { method: "POST", body: JSON.stringify(body) }),
@@ -37,6 +51,16 @@ export default function Portfolio() {
       qc.invalidateQueries({ queryKey: ["blockers"] });
       qc.invalidateQueries({ queryKey: ["projects"] }); // blockerCount changes
     },
+  });
+
+  const archive = useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) =>
+      api(`/projects/${id}/${on ? "archive" : "unarchive"}`, { method: "POST" }),
+    onSuccess: () => { refetchProjects(); setMenuFor(null); },
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api(`/projects/${id}`, { method: "DELETE" }),
+    onSuccess: () => { refetchProjects(); setMenuFor(null); setConfirmDelete(null); },
   });
 
   const blkCounts = {
@@ -60,6 +84,12 @@ export default function Portfolio() {
           </TabBtn>
         </div>
         <div style={{ flex: 1 }} />
+        {tab === "projects" && (
+          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+            <TabBtn active={!viewArchived} onClick={() => { setViewArchived(false); setMenuFor(null); }}>Active</TabBtn>
+            <TabBtn active={viewArchived} onClick={() => { setViewArchived(true); setMenuFor(null); }}>Archived</TabBtn>
+          </div>
+        )}
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
         <Button onClick={() => setNewProject(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
       </div>
@@ -84,15 +114,18 @@ export default function Portfolio() {
             </div>
             {filtered.length === 0 ? (
               <div style={{ padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
-                {projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
+                {viewArchived ? "No archived projects." : projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
               </div>
             ) : filtered.map((p) => (
-              <div key={p.id} onClick={() => openProject(p.id)} style={{ display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
+              <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", zIndex: menuFor === p.id ? 30 : undefined, display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer", opacity: p.archived ? 0.72 : 1, background: menuFor === p.id ? color.surface : undefined }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", background: statusDot(p.status), flex: "none" }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                      {p.archived && (
+                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>
+                      )}
                       {p.blockerCount > 0 && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flex: "none", color: "#D13438", background: "#FBE7E8", borderRadius: 6, padding: "1px 6px 1px 4px", fontSize: 10.5, fontWeight: 700 }}><Icon name="alert" size={12} />{p.blockerCount}</span>
                       )}
@@ -110,10 +143,20 @@ export default function Portfolio() {
                     <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.textMuted, width: 34, textAlign: "right" }}>{p.progress}%</span>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div style={{ textAlign: "right", paddingRight: (mayEdit || mayDelete) ? 30 : 0 }}>
                   <div style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.text }}>{fmtBudget(p.budget)}</div>
                   <div style={{ fontSize: 11, color: color.faint3 }}>{fmtBudget(p.spent)} spent</div>
                 </div>
+                {(mayEdit || mayDelete) && (
+                  <RowActions
+                    open={menuFor === p.id}
+                    onToggle={(e) => { e.stopPropagation(); setMenuFor(menuFor === p.id ? null : p.id); }}
+                    project={p} mayEdit={mayEdit} mayDelete={mayDelete}
+                    onEdit={() => { setEditProject(p); setMenuFor(null); }}
+                    onArchive={(on) => archive.mutate({ id: p.id, on })}
+                    onDelete={() => { setConfirmDelete(p); setMenuFor(null); }}
+                  />
+                )}
               </div>
             ))}
           </Card>
@@ -127,7 +170,146 @@ export default function Portfolio() {
       )}
 
       {newProject && <CreateProjectModal onClose={() => setNewProject(false)} onCreated={(id) => { setNewProject(false); openProject(id); }} />}
+      {editProject && <EditProjectModal project={editProject} onClose={() => setEditProject(null)} onSaved={() => { setEditProject(null); refetchProjects(); }} />}
+      {confirmDelete && (
+        <ConfirmDeleteModal
+          project={confirmDelete} pending={del.isPending} error={del.error as Error | null}
+          onCancel={() => setConfirmDelete(null)} onConfirm={() => del.mutate(confirmDelete.id)}
+        />
+      )}
     </div>
+  );
+}
+
+// Row-level actions: a kebab that reveals edit / archive / delete. Stops row
+// navigation on click. Delete is Platform-Admin-only and never for seeded
+// (system) projects — both mirrored from the server's authoritative rules.
+function RowActions({ open, onToggle, project, mayEdit, mayDelete, onEdit, onArchive, onDelete }: {
+  open: boolean; onToggle: (e: React.MouseEvent) => void; project: Project;
+  mayEdit: boolean; mayDelete: boolean;
+  onEdit: () => void; onArchive: (on: boolean) => void; onDelete: () => void;
+}) {
+  const canDelete = mayDelete && !project.isSystem;
+  const item = (label: string, icon: React.ReactNode, onClick: () => void, danger?: boolean) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
+      display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 13px", border: "none",
+      background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", textAlign: "left",
+      color: danger ? "#A1282B" : color.text,
+    }} onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#FBE7E8" : color.bg)}
+       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+      <span style={{ display: "flex", color: danger ? "#D13438" : color.faint2 }}>{icon}</span>{label}
+    </button>
+  );
+  return (
+    <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }}>
+      <button aria-label="Project actions" onClick={onToggle} style={{
+        width: 30, height: 30, borderRadius: 8, border: `1px solid ${color.border}`, background: open ? color.bg : color.surface,
+        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: color.faint2,
+      }}><Icon name="more" size={16} /></button>
+      {open && (
+        <>
+          <div onClick={(e) => { e.stopPropagation(); onToggle(e); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div style={{ position: "absolute", right: 0, top: 34, zIndex: 41, minWidth: 172, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(20,26,60,0.16)", padding: 5, overflow: "hidden" }}>
+            {mayEdit && item("Edit details", <Icon name="edit" size={15} />, onEdit)}
+            {mayEdit && (project.archived
+              ? item("Restore", <Icon name="refresh" size={15} />, () => onArchive(false))
+              : item("Archive", <Icon name="archive" size={15} />, () => onArchive(true)))}
+            {canDelete && (
+              <>
+                <div style={{ height: 1, background: color.bg, margin: "5px 0" }} />
+                {item("Delete permanently", <Icon name="trash" size={15} />, onDelete, true)}
+              </>
+            )}
+            {mayDelete && project.isSystem && (
+              <div style={{ padding: "7px 13px", fontSize: 11, color: color.faint3, lineHeight: 1.4 }}>Seeded projects can't be deleted — archive instead.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const EDIT_STATUSES: { key: Project["status"]; label: string }[] = [
+  { key: "green", label: "On track" }, { key: "amber", label: "At risk" },
+  { key: "red", label: "Critical" }, { key: "hold", label: "On hold" },
+];
+
+function EditProjectModal({ project, onClose, onSaved }: { project: Project; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(project.name);
+  const [dept, setDept] = useState(project.dept);
+  const [owner, setOwner] = useState(project.owner);
+  const [methodology, setMethodology] = useState(project.methodology);
+  const [status, setStatus] = useState<Project["status"]>(project.status);
+  const [progress, setProgress] = useState(String(project.progress));
+  const [target, setTarget] = useState(project.target);
+  const [budget, setBudget] = useState(String(project.budget));
+  const [spent, setSpent] = useState(String(project.spent));
+
+  const save = useMutation({
+    mutationFn: () => api(`/projects/${project.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology, status,
+        progress: Math.max(0, Math.min(100, Number(progress) || 0)),
+        target: target.trim(), budget: Number(budget) || 0, spent: Number(spent) || 0,
+      }),
+    }),
+    onSuccess: onSaved,
+  });
+
+  return (
+    <Modal onClose={onClose} width={520} label={`Edit ${project.id}`}>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Update the project's details. Health follows the status you pick.</div>
+      <Field label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} /></Field>
+        <Field label="Owner"><Input value={owner} onChange={(e) => setOwner(e.target.value)} /></Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Methodology">
+          <Select value={methodology} onChange={(e) => setMethodology(e.target.value)}>
+            {METHODOLOGIES.map((m) => <option key={m} value={m}>{m}</option>)}
+          </Select>
+        </Field>
+        <Field label="Status">
+          <Select value={status} onChange={(e) => setStatus(e.target.value as Project["status"])}>
+            {EDIT_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </Select>
+        </Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Progress %"><Input type="number" value={progress} onChange={(e) => setProgress(e.target.value)} /></Field>
+        <Field label="Target date"><Input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 12 Sep 2026" /></Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></Field>
+        <Field label="Spent (€k)"><Input type="number" value={spent} onChange={(e) => setSpent(e.target.value)} /></Field>
+      </div>
+      {save.error && <div style={{ fontSize: 12.5, color: "#A1282B", marginTop: 6 }}>{(save.error as Error).message}</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => name.trim() && save.mutate()} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function ConfirmDeleteModal({ project, pending, error, onCancel, onConfirm }: {
+  project: Project; pending: boolean; error: Error | null; onCancel: () => void; onConfirm: () => void;
+}) {
+  return (
+    <Modal onClose={onCancel} width={440} label="Delete project">
+      <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 6 }}>
+        Permanently delete <strong>{project.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({project.id})</span> and all of its tasks, gates, artifacts, costs and other records?
+      </div>
+      <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
+      {error && <div style={{ fontSize: 12.5, color: "#A1282B", marginBottom: 10 }}>{error.message}</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <button onClick={onConfirm} disabled={pending} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 16px", borderRadius: 10, cursor: pending ? "not-allowed" : "pointer", opacity: pending ? 0.6 : 1, fontFamily: "inherit" }}>{pending ? "Deleting…" : "Delete permanently"}</button>
+      </div>
+    </Modal>
   );
 }
 

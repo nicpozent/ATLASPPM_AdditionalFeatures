@@ -14,6 +14,8 @@ public record UpdateDemandStageReq(string Stage);
 public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status);
 public record UpdateBlockerStatusReq(string Status);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology);
+public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
+    string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
@@ -25,6 +27,13 @@ public static class WriteEndpoints
 {
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
     static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved" };
+    static readonly string[] Statuses = { "green", "amber", "red", "hold" };
+
+    // Keep the display Health string consistent with the traffic-light Status.
+    static string HealthFor(string status) => status switch
+    {
+        "green" => "On track", "amber" => "At risk", "red" => "Critical", "hold" => "On hold", _ => "On track",
+    };
 
     // Who may delete a demand: anyone when auth is off (single-user dev), else the
     // creator or a Platform Administrator. Identity/role helpers live in Rbac.
@@ -206,7 +215,107 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Created project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{p.Id}", new ProjectDto(
-                p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0));
+                p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0,
+                p.Archived, p.IsSystem));
+        });
+
+        // Edit a project's fields. Only supplied (non-null) fields change; Health
+        // is kept consistent with Status. Requires Edit on "Create / edit projects".
+        api.MapPatch("/projects/{id}", async (string id, UpdateProjectReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var p = await db.Projects.Include(x => x.Blockers).FirstOrDefaultAsync(x => x.Id == id);
+            if (p is null) return Results.NotFound();
+
+            if (!string.IsNullOrWhiteSpace(req.Name)) p.Name = req.Name!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Dept)) p.Dept = req.Dept!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Owner)) p.Owner = req.Owner!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Methodology)) p.Methodology = req.Methodology!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Status) && Statuses.Contains(req.Status))
+            {
+                p.Status = req.Status!;
+                p.Health = HealthFor(p.Status);
+            }
+            if (req.Progress is int pr) p.Progress = Math.Clamp(pr, 0, 100);
+            if (!string.IsNullOrWhiteSpace(req.Phase)) p.Phase = req.Phase!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Target)) { p.Target = req.Target!.Trim(); p.Due = p.Target; }
+            if (req.Budget is decimal b && b >= 0) p.Budget = b;
+            if (req.Spent is decimal s && s >= 0) p.Spent = s;
+            if (req.Forecast is decimal fc && fc >= 0) p.Forecast = fc;
+
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Updated project", $"{p.Id} · {p.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new ProjectDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
+                p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem));
+        });
+
+        // Archive / restore a project (soft delete). Archived projects drop out of
+        // the active portfolio, dashboards and financials but are fully retained.
+        api.MapPost("/projects/{id}/archive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var p = await db.Projects.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            p.Archived = true;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Archived project", $"{p.Id} · {p.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        api.MapPost("/projects/{id}/unarchive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var p = await db.Projects.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            p.Archived = false;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Restored project", $"{p.Id} · {p.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // Hard delete — Platform Administrator only, and never for seeded/demo
+        // (system) projects. Purges all child rows in one transaction, since only
+        // Blockers cascade via FK. Intended for cleaning up test projects.
+        api.MapDelete("/projects/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            if (!Permissions.IsPlatformAdmin(http, cfg))
+                return Results.Json(new { error = "Only a Platform Administrator can permanently delete a project." },
+                    statusCode: StatusCodes.Status403Forbidden);
+            var p = await db.Projects.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            if (p.IsSystem)
+                return Results.Json(new { error = "Seeded projects cannot be deleted — archive them instead." },
+                    statusCode: StatusCodes.Status400BadRequest);
+
+            await using var tx = await db.Database.BeginTransactionAsync();
+            var artifactIds = await db.Artifacts.Where(a => a.ProjectId == id).Select(a => a.Id).ToListAsync();
+            var gateIds = await db.Gates.Where(g => g.ProjectId == id).Select(g => g.Id).ToListAsync();
+            await db.ArtifactVersions.Where(v => artifactIds.Contains(v.ArtifactId)).ExecuteDeleteAsync();
+            await db.GateCriteria.Where(c => gateIds.Contains(c.GateId)).ExecuteDeleteAsync();
+            await db.Blockers.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.ProjectTasks.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Epics.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Artifacts.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Requirements.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.ChangeRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Gates.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Decisions.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.RaidItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.SecurityControls.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.SecurityProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.ArchProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.AdmPhases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.TestPlans.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Defects.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.ProjectDependencies.Where(x => x.ProjectId == id || x.DependsOnId == id).ExecuteDeleteAsync();
+            await db.Absences.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.CostLines.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            db.Projects.Remove(p);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return Results.NoContent();
         });
 
         // ---- Programs ------------------------------------------------------

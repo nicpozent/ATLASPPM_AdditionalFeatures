@@ -7,7 +7,8 @@ namespace Atlas.Api;
 // ============================================================================
 
 public record ProjectDto(string Id, string Name, string Dept, string Owner, string Methodology,
-    string Status, string Health, int Progress, decimal Budget, decimal Spent, string Target, int BlockerCount);
+    string Status, string Health, int Progress, decimal Budget, decimal Spent, string Target, int BlockerCount,
+    bool Archived = false, bool IsSystem = false);
 
 public record BlockerDto(string Id, string Title, string ProjectId, string ProjectName, string Owner, string Status);
 

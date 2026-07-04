@@ -36,6 +36,12 @@ public class Project
     // Stakeholder visibility (feeds /projects/my for the demo stakeholder).
     public bool StakeholderVisible { get; set; }
 
+    // Lifecycle. IsSystem marks seeded/demo projects — they can be archived but
+    // never hard-deleted. Archived projects drop out of the active portfolio,
+    // dashboards and financials but are retained (soft delete).
+    public bool IsSystem { get; set; }
+    public bool Archived { get; set; }
+
     public List<Blocker> Blockers { get; set; } = new();
 }
 
