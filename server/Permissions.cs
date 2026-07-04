@@ -71,6 +71,16 @@ public static class Permissions
             statusCode: StatusCodes.Status403Forbidden);
     }
 
+    // True when the caller is a Platform Administrator (or the dev no-header
+    // default, which has full access). Gates the destructive, admin-only actions
+    // such as hard-deleting a project — separate from the capability matrix so it
+    // stays admin-only regardless of how the matrix is edited.
+    public static bool IsPlatformAdmin(HttpContext http, IConfiguration cfg)
+    {
+        var roleId = ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false));
+        return roleId is null || roleId == "admin";
+    }
+
     // The caller's fine-grained UI role for cosmetic, role-owned controls (e.g.
     // financial cost lines). With auth off this is the raw X-Atlas-Role header
     // (the 9 identities, so devmgr ≠ inframgr). With auth on only the six
