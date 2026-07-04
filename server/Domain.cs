@@ -327,6 +327,22 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Financial cost lines (role-owned) ------------------------------------
+// Each project carries a standard set of cost lines; a line is editable only by
+// the roles that own it (plus PMO/Admin). Amounts are stored in whole euros.
+public class CostLine
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Key { get; set; } = "";                 // "laborDev"… for system lines; "" for custom
+    public string Label { get; set; } = default!;
+    public string Note { get; set; } = "";                 // owner display, e.g. "Eng. Manager / Developers Manager"
+    public List<string> OwnerRoles { get; set; } = new();  // UI role values that own this line
+    public bool IsSystem { get; set; }                     // standard taxonomy line (can't be deleted)
+    public decimal Amount { get; set; }
+    public int Ord { get; set; }
+}
+
 // ---- Team absences (vacation calendar) ------------------------------------
 public class Absence
 {

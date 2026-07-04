@@ -76,6 +76,9 @@ public record DependenciesDto(bool CanEdit, List<DepLinkDto> DependsOn, List<Dep
 public record AbsenceDto(int Id, string Person, string From, string To, string Type);
 public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
 
+public record CostLineDto(int Id, string Label, string Note, List<string> OwnerRoles, decimal Amount, bool CanEdit, bool IsSystem);
+public record CostsDto(bool CanManage, decimal Total, decimal Savings, List<CostLineDto> Lines);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
