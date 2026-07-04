@@ -9,7 +9,10 @@ const KEY = "atlas.role";
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [role, setRoleState] = useState<string>(() => localStorage.getItem(KEY) || "pmo");
+  // When signed in via Entra, start from the user's own app role (so a Platform
+  // Administrator lands as Admin, not the demo default). With auth off, fall back
+  // to the last-picked role, then the demo default.
+  const [role, setRoleState] = useState<string>(() => (user?.role || localStorage.getItem(KEY) || "pmo"));
   const setRole = (r: string) => { setRoleState(r); localStorage.setItem(KEY, r); };
   const identity = useMemo<RoleIdentity>(() => {
     const base = ROLES.find((x) => x.value === role) ?? ROLES[1];

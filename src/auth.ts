@@ -34,7 +34,23 @@ const API_SCOPE = `${import.meta.env.VITE_API_AUDIENCE}/${(import.meta.env.VITE_
 // Scopes for the initial interactive sign-in (identity + the API).
 const LOGIN_SCOPES = ["openid", "profile", "email", API_SCOPE];
 
-export interface AuthUser { name: string; username: string; initials: string; }
+export interface AuthUser { name: string; username: string; initials: string; role: string; }
+
+// Entra app roles (see CLAUDE.md §7) → the cosmetic UI identity used by the
+// role switcher/nav. The API stays authoritative from the token; this only
+// drives which identity + nav the signed-in user lands on.
+const ENTRA_TO_UI: Record<string, string> = {
+  PlatformAdmin: "admin", PMO: "pmo", ProjectManager: "pm",
+  TeamMember: "teammgr", Executive: "pmo", Stakeholder: "stakeholder",
+};
+const ROLE_PRIORITY = ["admin", "pmo", "pm", "teammgr", "stakeholder"];
+
+function roleFromClaims(a: AccountInfo): string {
+  const claims = a.idTokenClaims as { roles?: string[] } | undefined;
+  const mapped = (claims?.roles ?? []).map((r) => ENTRA_TO_UI[r]).filter(Boolean);
+  // Highest-privilege wins when a user carries several app roles.
+  return ROLE_PRIORITY.find((p) => mapped.includes(p)) ?? "";
+}
 
 function toUser(a: AccountInfo): AuthUser {
   const name = a.name || a.username;
@@ -44,7 +60,7 @@ function toUser(a: AccountInfo): AuthUser {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("") || "?";
-  return { name, username: a.username, initials };
+  return { name, username: a.username, initials, role: roleFromClaims(a) };
 }
 
 // The signed-in account, if any.
