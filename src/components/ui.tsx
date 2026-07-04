@@ -3,8 +3,10 @@
 //  recurring card / pill / progress / empty patterns in the prototype so
 //  screens stay consistent without a CSS framework.
 // ============================================================================
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { color, font, radius, chart } from "@/theme";
+import { Icon } from "./Icon";
 
 export function Card({ children, style, padding = 20, onClick }: {
   children: React.ReactNode; style?: React.CSSProperties; padding?: number | string; onClick?: () => void;
@@ -240,6 +242,68 @@ export function Modal({ children, onClose, width = 460, label }: {
       >{children}</div>
     </div>
   );
+}
+
+// ============================================================================
+//  Row kebab menu — a "⋯" trigger whose popover is rendered through a portal to
+//  document.body, so it can never be clipped by a table's overflow:hidden or an
+//  ancestor's stacking/transform context. Position is computed from the button.
+//  Children receive a `close` callback to dismiss the menu after an action.
+// ============================================================================
+export function RowMenu({ children, ariaLabel = "Actions", width = 180 }: {
+  children: (close: () => void) => React.ReactNode; ariaLabel?: string; width?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  useLayoutEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 5, right: Math.max(8, window.innerWidth - r.right) });
+    }
+  }, [open]);
+  const close = () => setOpen(false);
+  return (
+    <>
+      <button ref={btnRef} aria-label={ariaLabel} aria-haspopup="menu" aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        style={{
+          width: 30, height: 30, borderRadius: 8, border: `1px solid ${color.border}`,
+          background: open ? color.bg : color.surface, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", color: color.faint2,
+        }}><Icon name="more" size={16} /></button>
+      {open && pos && createPortal(
+        <>
+          <div onClick={(e) => { e.stopPropagation(); close(); }} style={{ position: "fixed", inset: 0, zIndex: 1000 }} />
+          <div role="menu" onClick={(e) => e.stopPropagation()} style={{
+            position: "fixed", top: pos.top, right: pos.right, zIndex: 1001, minWidth: width,
+            background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(20,26,60,0.16)", padding: 5, overflow: "hidden",
+          }}>{children(close)}</div>
+        </>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+export function MenuItem({ label, icon, onClick, danger }: {
+  label: string; icon?: React.ReactNode; onClick: () => void; danger?: boolean;
+}) {
+  return (
+    <button role="menuitem" onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
+      display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "9px 13px", border: "none",
+      background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", textAlign: "left",
+      color: danger ? "#A1282B" : color.text, borderRadius: 6,
+    }} onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#FBE7E8" : color.bg)}
+       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+      {icon && <span style={{ display: "flex", color: danger ? "#D13438" : color.faint2 }}>{icon}</span>}{label}
+    </button>
+  );
+}
+
+export function MenuDivider() {
+  return <div style={{ height: 1, background: color.bg, margin: "5px 0" }} />;
 }
 
 // ============================================================================

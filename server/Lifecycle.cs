@@ -14,7 +14,7 @@ public static class Lifecycle
 {
     static readonly string[] ProductStatuses = { "Active", "Retired", "Replaced" };
     static readonly string[] ObjectiveStatuses = { "Active", "Completed" };
-    static readonly string[] ReleaseStatuses = { "Planned", "In progress", "Deployed", "Rolled back", "Completed" };
+    static readonly string[] ReleaseStatuses = { "Planned", "In progress", "Deployed", "Rolled back", "Completed", "Cancelled" };
 
     public static void MapLifecycleEndpoints(this RouteGroupBuilder api)
     {

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { api } from "@/api";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, RowMenu, MenuItem } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 
 // ---------------------------------------------------------------------------
@@ -35,11 +35,13 @@ const krFill = (p: number) => (p >= 66 ? "#15A34A" : p >= 33 ? "#E0A100" : "#D13
 export default function Okrs() {
   const { can } = usePermissions();
   const canEdit = can("cap-projects", "E"); // cosmetic gate, driven by the matrix (API is authoritative)
+  const canDelete = can("cap-projects", "F");
   const { data: objectives = [] } = useObjectives();
   const qc = useQueryClient();
 
   // Modal state: obj = new objective, { objId } = add key result to objId.
   const [modal, setModal] = useState<null | { kind: "obj" } | { kind: "kr"; objId: string }>(null);
+  const [confirmDel, setConfirmDel] = useState<Objective | null>(null);
 
   const createObjective = useMutation({
     mutationFn: (body: NewObjective) => api<Objective>("/okrs", { method: "POST", body: JSON.stringify(body) }),
@@ -59,6 +61,10 @@ export default function Okrs() {
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api(`/okrs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api(`/okrs/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["okrs"] }); setConfirmDel(null); },
   });
 
   const [okrStatus, setOkrStatus] = useState<OkrStatus>("Active");
@@ -126,6 +132,13 @@ export default function Okrs() {
                       ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
                       : <button onClick={() => setStatus.mutate({ id: o.id, status: "Completed" })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", border: "1px solid #BFE6CE", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="check" size={14} /> Mark complete</button>
                   )}
+                  {canDelete && (
+                    <RowMenu ariaLabel="Objective actions" width={168}>
+                      {(close) => (
+                        <MenuItem label="Delete objective" icon={<Icon name="trash" size={15} />} danger onClick={() => { setConfirmDel(o); close(); }} />
+                      )}
+                    </RowMenu>
+                  )}
                 </div>
                 <div style={{ padding: "8px 22px 16px" }}>
                   {o.krs.length === 0 && (
@@ -180,6 +193,20 @@ export default function Okrs() {
           onClose={() => setModal(null)}
           onSave={(body) => createKr.mutate({ objId: modal.objId, body }, { onSuccess: () => setModal(null) })}
         />
+      )}
+      {confirmDel && (
+        <ModalShell title="Delete objective" onClose={() => setConfirmDel(null)} width={440}>
+          <div style={{ padding: 20 }}>
+            <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
+              Permanently delete <strong>{confirmDel.title}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span> and all of its key results?
+            </div>
+            <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px" }}>This can't be undone. To keep the record, mark it complete instead.</div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
+            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "9px 16px", borderRadius: 9, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

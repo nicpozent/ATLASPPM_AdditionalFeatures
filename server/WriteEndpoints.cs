@@ -13,7 +13,8 @@ public record CreateDemandReq(
 public record UpdateDemandStageReq(string Stage);
 public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status);
 public record UpdateBlockerStatusReq(string Status);
-public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate);
+public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate,
+    string? StartDate, string? Target);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
     string? StartDate);
@@ -211,7 +212,9 @@ public static class WriteEndpoints
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
                 Methodology = string.IsNullOrWhiteSpace(req.Methodology) ? "Scrum" : req.Methodology!.Trim(),
                 Status = "green", Health = "On track", Progress = 0,
-                Target = "TBD", Phase = "Planning", Due = "TBD",
+                Target = string.IsNullOrWhiteSpace(req.Target) ? "TBD" : req.Target!.Trim(),
+                StartDate = string.IsNullOrWhiteSpace(req.StartDate) ? "" : req.StartDate!.Trim(),
+                Phase = "Planning", Due = string.IsNullOrWhiteSpace(req.Target) ? "TBD" : req.Target!.Trim(),
             };
             db.Projects.Add(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Created project", $"{p.Id} · {p.Name}"));
@@ -225,7 +228,7 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{p.Id}", new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0,
-                p.Archived, p.IsSystem));
+                p.Archived, p.IsSystem, p.StartDate));
         });
 
         // Edit a project's fields. Only supplied (non-null) fields change; Health
@@ -324,6 +327,7 @@ public static class WriteEndpoints
             await db.OperationalItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.RoleAssignments.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.DeletionRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.CommunicationEntries.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             db.Projects.Remove(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
@@ -351,7 +355,41 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
-                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate));
+                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived));
+        });
+
+        // Archive / restore a program (soft delete — kept, just hidden from the
+        // active list). Requires Edit on "Create / edit projects".
+        api.MapPost("/programs/{id}/archive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var pg = await db.Programs.FindAsync(id);
+            if (pg is null) return Results.NotFound();
+            pg.Archived = true;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Archived program", $"{pg.Id} · {pg.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+        api.MapPost("/programs/{id}/unarchive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var pg = await db.Programs.FindAsync(id);
+            if (pg is null) return Results.NotFound();
+            pg.Archived = false;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Restored program", $"{pg.Id} · {pg.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+        // Permanently delete a program. Requires Full on "Create / edit projects".
+        api.MapDelete("/programs/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            var pg = await db.Programs.FindAsync(id);
+            if (pg is null) return Results.NotFound();
+            db.Programs.Remove(pg);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Deleted program", $"{pg.Id} · {pg.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // ---- Products ------------------------------------------------------
@@ -397,7 +435,40 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Created release", $"{r.Id} · {r.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/releases/{r.Id}", new ReleaseDto(
-                r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status));
+                r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status, r.Archived));
+        });
+
+        // Archive / restore a release. Requires Edit on "Create / edit projects".
+        api.MapPost("/releases/{id}/archive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var r = await db.Releases.FindAsync(id);
+            if (r is null) return Results.NotFound();
+            r.Archived = true;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Archived release", $"{r.Id} · {r.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+        api.MapPost("/releases/{id}/unarchive", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var r = await db.Releases.FindAsync(id);
+            if (r is null) return Results.NotFound();
+            r.Archived = false;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Restored release", $"{r.Id} · {r.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+        // Permanently delete a release. Requires Full on "Create / edit projects".
+        api.MapDelete("/releases/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            var r = await db.Releases.FindAsync(id);
+            if (r is null) return Results.NotFound();
+            db.Releases.Remove(r);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Deleted release", $"{r.Id} · {r.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // ---- OKRs ----------------------------------------------------------
@@ -447,6 +518,20 @@ public static class WriteEndpoints
             kr.Progress = Math.Clamp(req.Progress, 0, 100);
             await db.SaveChangesAsync();
             return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
+        });
+
+        // Permanently delete an objective and its key results. Requires Full on
+        // "Create / edit projects".
+        api.MapDelete("/okrs/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            var o = await db.Objectives.FindAsync(id);
+            if (o is null) return Results.NotFound();
+            await db.KeyResults.Where(k => k.ObjectiveId == id).ExecuteDeleteAsync();
+            db.Objectives.Remove(o);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "OKRs", "Deleted objective", $"{o.Id} · {o.Title}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
     }
 
