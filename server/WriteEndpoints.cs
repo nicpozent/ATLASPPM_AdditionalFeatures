@@ -13,7 +13,7 @@ public record CreateDemandReq(
 public record UpdateDemandStageReq(string Stage);
 public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status);
 public record UpdateBlockerStatusReq(string Status);
-public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology);
+public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
@@ -213,6 +213,13 @@ public static class WriteEndpoints
             };
             db.Projects.Add(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Created project", $"{p.Id} · {p.Name}"));
+            // From the methodology wizard: seed the project with its methodology's
+            // scaffold (phases/gates/epics/tasks) so each methodology differs.
+            if (req.ApplyTemplate == true)
+            {
+                await Templates.ApplyAsync(db, p.Id, p.Methodology);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Applied methodology template", $"{p.Id} · {p.Methodology}"));
+            }
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{p.Id}", new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0,

@@ -211,7 +211,7 @@ export default function Methodologies() {
 interface Created { name: string; methodology: string; dept: string; owner: string; integration: string | null; items: { title: string; ext: string | null; pushed: boolean }[] }
 
 interface CreatedProject { id: string; name: string }
-interface NewProject { name: string; dept: string; owner: string; methodology: string }
+interface NewProject { name: string; dept: string; owner: string; methodology: string; applyTemplate: boolean }
 
 function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: TplState) => void; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -226,10 +226,16 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
   });
 
   const create = () => {
-    const body: NewProject = { name: tpl.name.trim(), dept: tpl.dept.trim(), owner: tpl.owner.trim(), methodology: tpl.methodology };
+    const body: NewProject = { name: tpl.name.trim(), dept: tpl.dept.trim(), owner: tpl.owner.trim(), methodology: tpl.methodology, applyTemplate: true };
     createProject.mutate(body, {
       onSuccess: (project) => {
         qc.invalidateQueries({ queryKey: ["projects"] });
+        if (project?.id) {
+          // The scaffold was materialised server-side; refresh those views.
+          qc.invalidateQueries({ queryKey: ["tasks", project.id] });
+          qc.invalidateQueries({ queryKey: ["epics", project.id] });
+          qc.invalidateQueries({ queryKey: ["gates", project.id] });
+        }
         const sys = tpl.integration === "jira" ? "Jira" : tpl.integration === "ado" ? "Azure DevOps" : null;
         const prefix = tpl.integration === "jira" ? "BILT" : "ADO";
         setCreated({
