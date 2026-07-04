@@ -285,6 +285,32 @@ public class BudgetSnapshot
     public int Max { get; set; }
 }
 
+// ---- Stage gates (G0–G5 governance) ---------------------------------------
+// Each project carries the standard six-gate rail; the gate names & criteria
+// labels are the reference framework (structural), while status/date/criteria
+// completion are real per-project governance data.
+public class Gate
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;      // "G0".."G5"
+    public string Name { get; set; } = default!;       // "G0 · Concept / Mandate"
+    public string Approver { get; set; } = "";         // e.g. "Sponsor", "PMO Lead"
+    public string Status { get; set; } = "Not started"; // Not started | Pending | Approved | Rejected
+    public string Date { get; set; } = "";             // display date when decided
+    public int Ord { get; set; }
+    public List<GateCriterion> Criteria { get; set; } = new();
+}
+
+public class GateCriterion
+{
+    public int Id { get; set; }
+    public int GateId { get; set; }
+    public string Label { get; set; } = default!;
+    public bool Met { get; set; }
+    public int Ord { get; set; }
+}
+
 // ---- Audit log ------------------------------------------------------------
 // Append-only record of governance-relevant actions (role & permission changes,
 // creates/deletes). Written from the write endpoints; read on Admin → Audit Log.
