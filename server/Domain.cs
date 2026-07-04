@@ -55,6 +55,17 @@ public class Blocker
     public string Status { get; set; } = "Active";    // Active|In progress|Resolved
 }
 
+// A person assigned to a project role. RoleKey is "pm" (the project lead, set by
+// PMO) or one of the architecture role keys (set by the Chief Architect). One
+// row per (project, role). Person "" = unassigned, "N/A" = not applicable.
+public class RoleAssignment
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string RoleKey { get; set; } = default!;
+    public string Person { get; set; } = "";
+}
+
 public class Demand
 {
     public string Id { get; set; } = default!;
