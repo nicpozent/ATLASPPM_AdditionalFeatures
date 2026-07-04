@@ -39,6 +39,10 @@ export default function MyDemands() {
     mutationFn: (body: NewDemand) => api("/demands", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["demands", "my"] }),
   });
+  const deleteDemand = useMutation({
+    mutationFn: (id: string) => api(`/demands/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["demands", "my"] }),
+  });
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -49,8 +53,8 @@ export default function MyDemands() {
       </div>
 
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: "1px solid #EEF1F6" }}>
-          <div>ID</div><div>Demand</div><div>Submitted</div><div>Status</div>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: "1px solid #EEF1F6" }}>
+          <div>ID</div><div>Demand</div><div>Submitted</div><div>Status</div><div></div>
         </div>
         {demands.length === 0 ? (
           <div style={{ padding: "48px 20px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
@@ -59,7 +63,7 @@ export default function MyDemands() {
         ) : demands.map((d) => {
           const sm = STAGE_META[d.stage] ?? STAGE_META.draft;
           return (
-            <div key={d.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={d.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #F2F4F9" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.id}</div>
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{d.title}</div>
@@ -69,6 +73,11 @@ export default function MyDemands() {
               <div>
                 <span style={{ display: "inline-flex", alignItems: "center", fontSize: 11.5, fontWeight: 600, color: sm.ink, background: sm.tint, padding: "3px 11px", borderRadius: 20 }}>{sm.label}</span>
               </div>
+              <button type="button" title="Delete this demand" aria-label={`Delete ${d.title}`} disabled={deleteDemand.isPending}
+                onClick={() => deleteDemand.mutate(d.id)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, marginLeft: 8, border: "none", background: "transparent", color: color.faint2, cursor: "pointer", borderRadius: 7 }}>
+                <Icon name="x" size={15} />
+              </button>
             </div>
           );
         })}

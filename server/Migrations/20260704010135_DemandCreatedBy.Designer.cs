@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Atlas.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Atlas.Api.Migrations
 {
     [DbContext(typeof(AtlasDbContext))]
-    partial class AtlasDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260704010135_DemandCreatedBy")]
+    partial class DemandCreatedBy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -123,23 +126,6 @@ namespace Atlas.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("BudgetSnapshots");
-                });
-
-            modelBuilder.Entity("Atlas.Api.Capability", b =>
-                {
-                    b.Property<string>("Key")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Sort")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Key");
-
-                    b.ToTable("Capabilities");
                 });
 
             modelBuilder.Entity("Atlas.Api.DashboardKpi", b =>
@@ -778,78 +764,6 @@ namespace Atlas.Api.Migrations
                     b.ToTable("Resources");
                 });
 
-            modelBuilder.Entity("Atlas.Api.RoleDef", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsSystem")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Short")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Sort")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Tint")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Who")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("RoleDefs");
-                });
-
-            modelBuilder.Entity("Atlas.Api.RolePermission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CapabilityKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Level")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("RoleId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RoleId", "CapabilityKey")
-                        .IsUnique();
-
-                    b.ToTable("RolePermissions");
-                });
-
             modelBuilder.Entity("Atlas.Api.Blocker", b =>
                 {
                     b.HasOne("Atlas.Api.Project", "Project")
@@ -897,15 +811,6 @@ namespace Atlas.Api.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Atlas.Api.RolePermission", b =>
-                {
-                    b.HasOne("Atlas.Api.RoleDef", null)
-                        .WithMany("Permissions")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Atlas.Api.Demand", b =>
                 {
                     b.Navigation("Attachments");
@@ -926,11 +831,6 @@ namespace Atlas.Api.Migrations
             modelBuilder.Entity("Atlas.Api.Project", b =>
                 {
                     b.Navigation("Blockers");
-                });
-
-            modelBuilder.Entity("Atlas.Api.RoleDef", b =>
-                {
-                    b.Navigation("Permissions");
                 });
 #pragma warning restore 612, 618
         }

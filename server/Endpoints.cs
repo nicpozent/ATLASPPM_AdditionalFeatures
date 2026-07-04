@@ -13,6 +13,7 @@ public static class Endpoints
             api.RequireAuthorization();
 
         api.MapAtlasWriteEndpoints();
+        api.MapRoleEndpoints();
 
         api.MapGet("/projects", async (AtlasDbContext db) =>
             await db.Projects.OrderBy(p => p.Id).Select(p => new ProjectDto(

@@ -46,6 +46,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
     db.Database.Migrate();
+    // Roles & capabilities are structural reference data (the permission matrix
+    // chrome) — always seeded, idempotent, independent of the demo portfolio.
+    await Rbac.SeedAsync(db);
     if (cfg.GetValue("Seed:Enabled", false))
         await Seed.RunAsync(db);
 }

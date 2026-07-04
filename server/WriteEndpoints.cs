@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -25,12 +26,18 @@ public static class WriteEndpoints
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
     static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved" };
 
+    // Who may delete a demand: anyone when auth is off (single-user dev), else the
+    // creator or a Platform Administrator. Identity/role helpers live in Rbac.
+    static bool CanDelete(Demand d, ClaimsPrincipal u, bool authEnabled) =>
+        !authEnabled || Rbac.IsPlatformAdmin(u) || (!string.IsNullOrEmpty(d.CreatedBy) && d.CreatedBy == Rbac.CallerId(u));
+
     public static void MapAtlasWriteEndpoints(this RouteGroupBuilder api)
     {
         // ---- Demands -------------------------------------------------------
-        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db) =>
+        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
         {
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var authEnabled = cfg.GetValue("Auth:Enabled", false);
             var criticality = req.Criticality is >= 1 and <= 5 ? req.Criticality.Value : 0;
             // Priority follows criticality when the intake form supplied it, else the explicit priority.
             var priority = criticality > 0
@@ -62,6 +69,7 @@ public static class WriteEndpoints
                 BenefitValue = req.BenefitValue is >= 1 and <= 5 ? req.BenefitValue.Value : 0,
                 Stakeholders = req.Stakeholders ?? new(),
                 AllStakeholders = req.AllStakeholders ?? false,
+                CreatedBy = authEnabled ? Rbac.CallerId(user) : "",
             };
             db.Demands.Add(d);
             await db.SaveChangesAsync();
@@ -70,15 +78,18 @@ public static class WriteEndpoints
         });
 
         // Full demand incl. intake fields + attachment metadata.
-        api.MapGet("/demands/{id}", async (string id, AtlasDbContext db) =>
+        api.MapGet("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
         {
             var d = await db.Demands.Include(x => x.Attachments).FirstOrDefaultAsync(x => x.Id == id);
-            return d is null ? Results.NotFound() : Results.Ok(new DemandDetailDto(
+            if (d is null) return Results.NotFound();
+            var authEnabled = cfg.GetValue("Auth:Enabled", false);
+            return Results.Ok(new DemandDetailDto(
                 d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date,
                 d.Description, d.Source, d.GeoImpact, d.HasDeadline, d.Deadline, d.BusinessProblem,
                 d.ImprovementExisting, d.Criticality, d.Risk, d.ExpectedBenefits, d.BenefitValue,
                 d.Stakeholders, d.AllStakeholders,
-                d.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.Size)).ToList()));
+                d.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.Size)).ToList(),
+                CanDelete(d, user, authEnabled)));
         });
 
         // Upload one or more attachments (multipart) to a demand.
@@ -126,10 +137,12 @@ public static class WriteEndpoints
             return Results.Ok(new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
 
-        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db) =>
+        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
         {
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
+            // You can delete your own initiatives; Platform Admins can delete any.
+            if (!CanDelete(d, user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             db.Demands.Remove(d);
             await db.SaveChangesAsync();
             return Results.NoContent();
