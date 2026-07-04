@@ -27,6 +27,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<Gate> Gates => Set<Gate>();
     public DbSet<GateCriterion> GateCriteria => Set<GateCriterion>();
+    public DbSet<Decision> Decisions => Set<Decision>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -100,6 +101,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Gate>().HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
         b.Entity<Gate>().HasMany(x => x.Criteria).WithOne().HasForeignKey(x => x.GateId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<GateCriterion>().HasKey(x => x.Id);
+        b.Entity<Decision>().HasKey(x => x.Id);
+        b.Entity<Decision>().HasIndex(x => x.ProjectId);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

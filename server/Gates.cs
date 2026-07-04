@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Atlas.Api;
 
 public record ToggleCriterionReq(bool Met);
+public record CreateDecisionReq(string Title, string? Context, string? Decision, string? Owner, string? Status);
 
 // ============================================================================
 //  Stage gates (G0–G5). Every project carries the standard six-gate rail; the
@@ -65,6 +66,38 @@ public static class Gates
             DecideAsync(gateId, "Approved", db, cfg, http));
         api.MapPost("/gates/{gateId:int}/reject", (int gateId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
             DecideAsync(gateId, "Rejected", db, cfg, http));
+
+        // ---- Decision log (ADR) -------------------------------------------
+        api.MapGet("/projects/{id}/decisions", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            var decisions = await db.Decisions.Where(d => d.ProjectId == id).OrderBy(d => d.Ord).ToListAsync();
+            var canGovern = await Permissions.Allows(http, db, cfg, "cap-approve", "F");
+            return Results.Ok(new DecisionsDto(canGovern,
+                decisions.Select(d => new DecisionDto(d.Code, d.Title, d.Context, d.DecisionText, d.Owner, d.Date, d.Status)).ToList()));
+        });
+
+        api.MapPost("/projects/{id}/decisions", async (string id, CreateDecisionReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var existing = await db.Decisions.Where(d => d.ProjectId == id).Select(d => d.Ord).ToListAsync();
+            var next = (existing.DefaultIfEmpty(0).Max()) + 1;
+            var status = new[] { "Proposed", "Approved", "Rejected" }.Contains(req.Status) ? req.Status! : "Proposed";
+            var dec = new Decision
+            {
+                ProjectId = id, Ord = next, Code = $"DEC-{next:00}",
+                Title = req.Title.Trim(), Context = req.Context?.Trim() ?? "", DecisionText = req.Decision?.Trim() ?? "",
+                Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner!.Trim(),
+                Date = DateTime.UtcNow.ToString("dd MMM yyyy"), Status = status,
+            };
+            db.Decisions.Add(dec);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Decisions", "Logged decision", $"{id} · {dec.Code} {dec.Title}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/projects/{id}/decisions/{dec.Code}",
+                new DecisionDto(dec.Code, dec.Title, dec.Context, dec.DecisionText, dec.Owner, dec.Date, dec.Status));
+        });
     }
 
     static async Task<IResult> DecideAsync(int gateId, string status, AtlasDbContext db, IConfiguration cfg, HttpContext http)

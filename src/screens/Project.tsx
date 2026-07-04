@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, EmptyBlock, ProgressBar, Button } from "@/components/ui";
+import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { SCREENS } from "@/nav";
 
 // ---- data (empty until API exists) -----------------------------------------
@@ -262,16 +262,104 @@ function Governance({ projectId }: { projectId: string | null }) {
         <EmptyBlock message="No review checkpoints scheduled yet." minHeight={120} />
       </Card>
 
-      {/* decision log (structural) */}
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 22px 13px", fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Decision log</div>
-        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1.6fr 2fr 1fr 0.8fr 0.9fr", padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-          <div>ID</div><div>Decision</div><div>Rationale</div><div>Owner</div><div>Date</div><div>Status</div>
-        </div>
-        <EmptyBlock message="No decisions logged yet." minHeight={120} />
-      </Card>
+      {/* decision log (ADR) */}
+      <DecisionLog projectId={projectId} canGovern={canGovern} />
     </div>
   );
+}
+
+interface Decision { code: string; title: string; context: string; decision: string; owner: string; date: string; status: string; }
+const DEC_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved: { ink: "#0B6B37", tint: "#E7F4EC" },
+  Proposed: { ink: "#0C5798", tint: "#E6EFFB" },
+  Rejected: { ink: "#A1282B", tint: "#FBE7E8" },
+};
+const DEC_COLS = "0.7fr 1.6fr 2fr 1fr 0.8fr 0.9fr";
+
+function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGovern: boolean }) {
+  const [modal, setModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["decisions", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<Decision[]> => (await api<{ decisions: Decision[] }>(`/projects/${projectId}/decisions`))?.decisions ?? [],
+  });
+  const decisions = data ?? [];
+
+  return (
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
+        <span style={{ flex: 1, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Decision log</span>
+        {canGovern && (
+          <button onClick={() => setModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FC", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontFamily: "inherit" }}>+ Log decision</button>
+        )}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: DEC_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+        <div>ID</div><div>Decision</div><div>Rationale</div><div>Owner</div><div>Date</div><div>Status</div>
+      </div>
+      {decisions.length === 0 ? (
+        <EmptyBlock message="No decisions logged yet." minHeight={120} />
+      ) : decisions.map((d) => {
+        const sc = DEC_STATUS[d.status] ?? DEC_STATUS.Proposed;
+        return (
+          <div key={d.code} style={{ display: "grid", gridTemplateColumns: DEC_COLS, alignItems: "flex-start", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
+            <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{d.title}</div>
+            <div style={{ fontSize: 12, color: color.faint, lineHeight: 1.4 }}><span style={{ color: color.faint3 }}>{d.context}</span> {d.decision}</div>
+            <div style={{ fontSize: 12, color: color.subtle }}>{d.owner}</div>
+            <div style={{ fontSize: 11.5, color: color.faint3 }}>{d.date}</div>
+            <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{d.status}</span></div>
+          </div>
+        );
+      })}
+      {modal && <LogDecisionModal projectId={projectId!} onClose={() => setModal(false)} />}
+    </Card>
+  );
+}
+
+function LogDecisionModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [context, setContext] = useState("");
+  const [decision, setDecision] = useState("");
+  const [owner, setOwner] = useState("");
+  const [status, setStatus] = useState("Proposed");
+
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/decisions`, { method: "POST", body: JSON.stringify({ title: title.trim(), context: context.trim(), decision: decision.trim(), owner: owner.trim(), status }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["decisions", projectId] }); onClose(); },
+  });
+  const submit = () => { if (title.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={500} label="Log a decision">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Captured in the project decision log.</div>
+      <DecLabel>Decision title</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What was decided?" style={{ marginBottom: 14 }} />
+      <DecLabel>Context / problem</DecLabel>
+      <Textarea value={context} onChange={(e) => setContext(e.target.value)} placeholder="Why was a decision needed?" style={{ minHeight: 56, resize: "vertical", marginBottom: 14 }} />
+      <DecLabel>Decision &amp; rationale</DecLabel>
+      <Textarea value={decision} onChange={(e) => setDecision(e.target.value)} placeholder="What was chosen and why?" style={{ minHeight: 56, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Owner</DecLabel>
+          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Decision owner" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Status</DecLabel>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            {["Proposed", "Approved", "Rejected"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </Select>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !title.trim()}>{create.isPending ? "Logging…" : "Log decision"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function DecLabel({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
 }
 
 function Raid() {

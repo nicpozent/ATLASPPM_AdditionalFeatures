@@ -311,6 +311,21 @@ public class GateCriterion
     public int Ord { get; set; }
 }
 
+// ---- Decision log (ADR) ---------------------------------------------------
+public class Decision
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;       // "DEC-01"
+    public string Title { get; set; } = default!;
+    public string Context { get; set; } = "";
+    public string DecisionText { get; set; } = "";
+    public string Owner { get; set; } = "";
+    public string Date { get; set; } = "";
+    public string Status { get; set; } = "Proposed";    // Proposed | Approved | Rejected
+    public int Ord { get; set; }
+}
+
 // ---- Audit log ------------------------------------------------------------
 // Append-only record of governance-relevant actions (role & permission changes,
 // creates/deletes). Written from the write endpoints; read on Admin → Audit Log.
