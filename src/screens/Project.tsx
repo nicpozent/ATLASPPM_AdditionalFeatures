@@ -105,8 +105,9 @@ export default function Project() {
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
       {tab === "security" && <Security projectId={id} />}
+      {tab === "epics" && <Epics projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["epics", "requirements", "quality", "architecture", "dependencies", "vacations", "artifacts"].includes(tab) && (
+      {["requirements", "quality", "architecture", "dependencies", "vacations", "artifacts"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -850,6 +851,104 @@ function AddControlModal({ projectId, onClose }: { projectId: string; onClose: (
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={submit} disabled={create.isPending || !control.trim()}>{create.isPending ? "Adding…" : "Add control"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- Epics -----------------------------------------------------------------
+interface EpicItem { id: number; name: string; stories: number; done: number; pct: number; status: string; dependsOn: string; }
+const EPIC_STATUS: Record<string, { ink: string; tint: string; bar: string }> = {
+  Complete:      { ink: "#0B6B37", tint: "#E7F4EC", bar: "#15A34A" },
+  "In progress": { ink: "#0C5798", tint: "#E6EFFB", bar: "#0F6CBD" },
+  Upcoming:      { ink: "#56607A", tint: "#EEF1F6", bar: "#8A93A6" },
+  "At risk":     { ink: "#8A6300", tint: "#FBF2D7", bar: "#E0A100" },
+};
+const EPIC_STATUSES = ["Complete", "In progress", "Upcoming", "At risk"];
+
+function Epics({ projectId }: { projectId: string | null }) {
+  const [modal, setModal] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["epics", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; epics: EpicItem[] }> =>
+      (await api<{ canEdit: boolean; epics: EpicItem[] }>(`/projects/${projectId}/epics`)) ?? { canEdit: false, epics: [] },
+  });
+  const epics = data?.epics ?? [];
+  const canEdit = data?.canEdit ?? false;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its epics." /></Card>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Epics group the delivery stories for this project.</div>
+        <div style={{ flex: 1 }} />
+        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New epic</Button>}
+      </div>
+      {epics.length === 0 ? (
+        <Card><EmptyBlock minHeight={180} message="No epics yet." /></Card>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+          {epics.map((e) => {
+            const sc = EPIC_STATUS[e.status] ?? EPIC_STATUS.Upcoming;
+            return (
+              <div key={e.id} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: color.text }}>{e.name}</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}>{e.status}</span>
+                </div>
+                <div style={{ height: 9, background: color.bg, borderRadius: 5, overflow: "hidden", marginBottom: 9 }}>
+                  <div style={{ height: "100%", width: `${e.pct}%`, background: sc.bar, borderRadius: 5 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: color.faint }}>
+                  <span>{e.done} of {e.stories} stories done</span>
+                  <span style={{ fontFamily: font.head, fontWeight: 700, color: color.ink }}>{e.pct}%</span>
+                </div>
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #F2F4F9", display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "#7A6BB0" }}>
+                  <Icon name="link" size={14} /><span>{e.dependsOn ? `↳ after ${e.dependsOn}` : "No dependencies"}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {modal && <NewEpicModal projectId={projectId} onClose={() => setModal(false)} />}
+    </div>
+  );
+}
+
+function NewEpicModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [stories, setStories] = useState("");
+  const [done, setDone] = useState("");
+  const [status, setStatus] = useState("Upcoming");
+  const [dependsOn, setDependsOn] = useState("");
+
+  const create = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/epics`, { method: "POST", body: JSON.stringify({ name: name.trim(), stories: Number(stories) || 0, done: Number(done) || 0, status, dependsOn: dependsOn.trim() }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["epics", projectId] }); onClose(); },
+  });
+  const submit = () => { if (name.trim()) create.mutate(); };
+
+  return (
+    <Modal onClose={onClose} width={460} label="New epic">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Group a set of delivery stories under an epic.</div>
+      <DecLabel>Epic name</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Checkout & Payments" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Stories</DecLabel><Input type="number" value={stories} onChange={(e) => setStories(e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Done</DecLabel><Input type="number" value={done} onChange={(e) => setDone(e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Status</DecLabel>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>{EPIC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select>
+        </div>
+      </div>
+      <DecLabel>Depends on</DecLabel>
+      <Input value={dependsOn} onChange={(e) => setDependsOn(e.target.value)} placeholder="Another epic (optional)" />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Adding…" : "Add epic"}</Button>
       </div>
     </Modal>
   );

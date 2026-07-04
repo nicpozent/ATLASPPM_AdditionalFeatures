@@ -47,6 +47,9 @@ public record ProjectTaskDto(int Id, string Code, string Name, string Epic, stri
     string Status, string Sprint, string Baseline, string Priority);
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks);
 
+public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
+public record EpicsDto(bool CanEdit, List<EpicDto> Epics);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
