@@ -41,6 +41,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<AdmPhase> AdmPhases => Set<AdmPhase>();
     public DbSet<TestPlan> TestPlans => Set<TestPlan>();
     public DbSet<Defect> Defects => Set<Defect>();
+    public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -142,6 +143,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<TestPlan>().HasIndex(x => x.ProjectId);
         b.Entity<Defect>().HasKey(x => x.Id);
         b.Entity<Defect>().HasIndex(x => x.ProjectId);
+        b.Entity<ProjectDependency>().HasKey(x => x.Id);
+        b.Entity<ProjectDependency>().HasIndex(x => new { x.ProjectId, x.DependsOnId }).IsUnique();
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);
