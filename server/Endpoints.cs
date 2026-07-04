@@ -25,6 +25,22 @@ public static class Endpoints
             return Results.Ok(items);
         });
 
+        // Full audit log as CSV — same access as reading it. Requires View on
+        // "Pull / export reports" too, so export can be governed separately.
+        api.MapGet("/audit.csv", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-audit", "V") is { } d1) return d1;
+            if (await Permissions.Deny(http, db, cfg, "cap-export", "V") is { } d2) return d2;
+            var rows = await db.AuditEvents.OrderByDescending(e => e.At).Take(5000)
+                .Select(e => new { e.At, e.Actor, e.Role, e.Category, e.Action, e.Target }).ToListAsync();
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Timestamp,Actor,Role,Category,Action,Target");
+            static string Q(string s) => "\"" + s.Replace("\"", "\"\"") + "\"";
+            foreach (var r in rows)
+                sb.AppendLine(string.Join(",", Q(r.At.ToString("o")), Q(r.Actor), Q(r.Role), Q(r.Category), Q(r.Action), Q(r.Target)));
+            return Results.File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "atlas-audit-log.csv");
+        });
+
         api.MapGet("/projects", async (AtlasDbContext db) =>
             await db.Projects.OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,
