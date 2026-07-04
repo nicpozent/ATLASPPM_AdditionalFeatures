@@ -117,8 +117,14 @@ export default function Project() {
   );
 }
 
+interface SpilledTask { code: string; name: string; baseline: string; sprint: string; assignee: string }
+
 function Overview({ projectId }: { projectId: string | null }) {
   const [modal, setModal] = useState<null | "risks" | "report">(null);
+  const { data: spilled = [] } = useQuery({
+    queryKey: ["spillover", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<SpilledTask[]> => (await api<SpilledTask[]>(`/projects/${projectId}/spillover`)) ?? [],
+  });
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -143,6 +149,27 @@ function Overview({ projectId }: { projectId: string | null }) {
         <Card padding={22}><SectionTitle>Stakeholder matrix · power / interest</SectionTitle><EmptyBlock message="No stakeholders mapped yet." minHeight={120} /></Card>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <Card padding="18px 20px">
+          <SectionTitle>Schedule spillover</SectionTitle>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontFamily: font.head, fontSize: 30, fontWeight: 700, color: spilled.length ? "#8A6300" : color.ink }}>{spilled.length}</span>
+            <span style={{ fontSize: 12.5, color: color.faint2 }}>task{spilled.length === 1 ? "" : "s"} past baseline</span>
+          </div>
+          {spilled.length === 0 ? (
+            <div style={{ fontSize: 12, color: color.faint3, marginTop: 8 }}>No tasks have slipped their baselined sprint.</div>
+          ) : (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {spilled.slice(0, 4).map((t) => (
+                <div key={t.code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
+                  <span style={{ flex: 1, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                  <span style={{ fontFamily: font.mono, fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 4, padding: "1px 6px", flex: "none" }}>{t.baseline} → {t.sprint}</span>
+                </div>
+              ))}
+              {spilled.length > 4 && <div style={{ fontSize: 11.5, color: color.faint3 }}>+{spilled.length - 4} more · see Tasks</div>}
+            </div>
+          )}
+        </Card>
         <Card padding="18px 20px"><SectionTitle>Key dates</SectionTitle><EmptyBlock message="No milestones set." minHeight={70} /></Card>
         <Card padding="18px 20px"><SectionTitle>Change requests</SectionTitle><EmptyBlock message="No change requests." minHeight={70} /></Card>
       </div>
@@ -237,9 +264,21 @@ function Tasks({ projectId }: { projectId: string | null }) {
     mutationFn: (v: { id: number; status: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", projectId] }),
   });
+  const replan = useMutation({
+    mutationFn: (v: { id: number; sprint: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ sprint: v.sprint }) }),
+    onSuccess: () => {
+      // Re-planning changes spillover → refresh the board, the RAID log and the
+      // Overview / portfolio spillover figures that derive from it.
+      qc.invalidateQueries({ queryKey: ["tasks", projectId] });
+      qc.invalidateQueries({ queryKey: ["spillover", projectId] });
+      qc.invalidateQueries({ queryKey: ["raid", projectId] });
+      qc.invalidateQueries({ queryKey: ["spillover-summary"] });
+    },
+  });
 
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
+  const isSpilled = (t: Task) => !!t.sprint && !!t.baseline && t.sprint !== t.baseline;
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its tasks." /></Card>;
 
@@ -288,6 +327,11 @@ function Tasks({ projectId }: { projectId: string | null }) {
                           <span style={{ fontSize: 9.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "1px 6px", borderRadius: 20 }}>{t.priority}</span>
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: color.text, lineHeight: 1.35, marginBottom: 9 }}>{t.name}</div>
+                        {isSpilled(t) && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px", marginBottom: 8 }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
+                            <Icon name="alert" size={11} /> Spilled · {t.baseline} → {t.sprint}
+                          </div>
+                        )}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: color.faint }}>
                           <span style={{ fontFamily: font.mono }}>{t.sprint || "—"}</span>
                           <span style={{ flex: 1 }} />
@@ -319,8 +363,23 @@ function Tasks({ projectId }: { projectId: string | null }) {
                 </div>
                 <div style={{ fontSize: 12.5, color: color.subtle }}>{t.epic || "—"}</div>
                 <div style={{ fontSize: 13, color: color.textMuted }}>{t.assignee}</div>
-                <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono }}>{t.sprint || "—"}</div>
-                <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono }}>{t.baseline || "—"}</div>
+                <div>
+                  {canEdit ? (
+                    <input
+                      key={t.sprint} defaultValue={t.sprint}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v !== t.sprint) replan.mutate({ id: t.id, sprint: v }); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="—" title="Re-plan sprint — moving off the baseline flags it as spilled"
+                      style={{ width: 84, fontFamily: font.mono, fontSize: 12, fontWeight: isSpilled(t) ? 700 : 400, color: isSpilled(t) ? "#8A6300" : color.textMuted, background: isSpilled(t) ? "#FBF2D7" : "#fff", border: `1px solid ${isSpilled(t) ? "#F0E4B8" : color.border}`, borderRadius: 6, padding: "4px 7px" }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 12, fontFamily: font.mono, fontWeight: isSpilled(t) ? 700 : 400, color: isSpilled(t) ? "#8A6300" : color.faint }}>{t.sprint || "—"}</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono, display: "flex", alignItems: "center", gap: 6 }}>
+                  {t.baseline || "—"}
+                  {isSpilled(t) && <span title={`Baselined in ${t.baseline}`} style={{ fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 4, padding: "0 5px" }}>SPILLED</span>}
+                </div>
                 <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: col.ink, background: col.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color }} />{t.status}</span></div>
               </div>
             );
@@ -564,7 +623,7 @@ function DecLabel({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
 }
 
-interface RaidItem { id: number; type: string; title: string; owner: string; status: string; }
+interface RaidItem { id: number; type: string; title: string; owner: string; status: string; auto?: boolean; }
 const RAID_TYPE_COLORS: Record<string, { ink: string; tint: string }> = {
   Risk:       { ink: "#8A6300", tint: "#FBF2D7" },
   Issue:      { ink: "#A1282B", tint: "#FBE7E8" },
@@ -614,7 +673,10 @@ function Raid({ projectId }: { projectId: string | null }) {
           return (
             <div key={r.id} style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: tc.ink, background: tc.tint, padding: "3px 10px", borderRadius: 6 }}>{r.type}</span></div>
-              <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500 }}>{r.title}</div>
+              <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {r.title}
+                {r.auto && <span title="Auto-raised by Atlas from live project data — clears automatically when resolved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", borderRadius: 5, padding: "1px 7px", letterSpacing: "0.03em" }}>✦ AUTO</span>}
+              </div>
               <div style={{ fontSize: 13, color: color.subtle }}>{r.owner}</div>
               <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />{r.status}</span></div>
             </div>

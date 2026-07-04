@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Atlas.Api;
 
 public record CreateTaskReq(string Name, string? Epic, string? Assignee, string? Status, string? Sprint, string? Baseline, string? Priority);
-public record UpdateTaskStatusReq(string Status);
+public record UpdateTaskStatusReq(string? Status, string? Sprint);
 public record CreateEpicReq(string Name, int? Stories, int? Done, string? Status, string? DependsOn);
 
 // ============================================================================
@@ -53,11 +53,24 @@ public static class Tasks
         api.MapPatch("/tasks/{taskId:int}", async (int taskId, UpdateTaskStatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
-            if (!Statuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var task = await db.ProjectTasks.FindAsync(taskId);
             if (task is null) return Results.NotFound();
-            task.Status = req.Status;
+            if (req.Status is not null)
+            {
+                if (!Statuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                task.Status = req.Status;
+            }
+            // Re-planning the sprint keeps the baseline fixed, so moving a task off
+            // its baselined sprint is exactly what marks it as spilled over.
+            if (req.Sprint is not null)
+            {
+                task.Sprint = req.Sprint.Trim();
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Tasks", "Re-planned sprint", $"{task.Code} → {task.Sprint} (baseline {task.Baseline})"));
+            }
             await db.SaveChangesAsync();
+            // Spillover may have changed → keep the auto RAID risk in sync.
+            if (req.Sprint is not null)
+                await Spillover.ReconcileRaidAsync(db, task.ProjectId, http, cfg);
             return Results.Ok(ToDto(task));
         });
 

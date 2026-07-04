@@ -545,6 +545,9 @@ public class RaidItem
     public string Owner { get; set; } = "";
     public string Status { get; set; } = "Open";
     public int Ord { get; set; }
+    // Auto-raised by the system (e.g. sprint spillover) — reconciled automatically,
+    // so it isn't hand-editable/deletable in the UI.
+    public bool Auto { get; set; }
 }
 
 // ---- Decision log (ADR) ---------------------------------------------------

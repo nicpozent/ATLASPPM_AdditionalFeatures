@@ -35,7 +35,7 @@ public record GatesDto(bool CanGovern, List<GateDto> Gates);
 public record DecisionDto(string Code, string Title, string Context, string Decision, string Owner, string Date, string Status);
 public record DecisionsDto(bool CanGovern, List<DecisionDto> Decisions);
 
-public record RaidItemDto(int Id, string Type, string Title, string Owner, string Status);
+public record RaidItemDto(int Id, string Type, string Title, string Owner, string Status, bool Auto = false);
 public record RaidDto(bool CanEdit, List<RaidItemDto> Items);
 
 public record SecurityProfileDto(string Classification, string Residency, string Subjects, string Retention,
@@ -81,6 +81,11 @@ public record CostLineDto(int Id, string Label, string Note, List<string> OwnerR
 public record CostsDto(bool CanManage, decimal Total, decimal Savings, List<CostLineDto> Lines);
 
 public record ScaffoldItemDto(string Type, string Title);
+
+// ---- Spillover (tasks carried past their baselined sprint) ------------------
+public record SpilledTaskDto(string Code, string Name, string Baseline, string Sprint, string Assignee);
+public record ProjectSpilloverDto(string Id, string Name, int Count);
+public record SpilloverSummaryDto(int Total, int Projects, List<ProjectSpilloverDto> ByProject);
 
 // ---- People & roles (project assignments) ----------------------------------
 public record RoleAssignmentDto(string Key, string Label, string Person);
