@@ -45,9 +45,45 @@ const ENTRA_TO_UI: Record<string, string> = {
 };
 const ROLE_PRIORITY = ["admin", "pmo", "pm", "teammgr", "stakeholder"];
 
+// App roles are assigned on the API app registration, so they arrive in the
+// API ACCESS token (audience = the API) — not the ID token (audience = the SPA
+// client). We decode them from the access token at boot; the ID token's `roles`
+// is only a fallback (populated when roles are also assigned on the client app).
+let apiRoles: string[] | null = null;
+
+function decodeJwtRoles(jwt: string): string[] {
+  try {
+    const part = jwt.split(".")[1];
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(part.length + (4 - (part.length % 4)) % 4, "=");
+    const claims = JSON.parse(decodeURIComponent(escape(atob(b64)))) as { roles?: string[] };
+    return claims.roles ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// Acquire the API access token once at boot and cache its app roles. Called
+// from main.tsx after the redirect completes, before the first render.
+export async function resolveApiRoles(): Promise<void> {
+  if (!msal) return;
+  const account = msal.getActiveAccount() ?? msal.getAllAccounts()[0];
+  if (!account) return;
+  try {
+    const res = await msal.acquireTokenSilent({ scopes: [API_SCOPE], account });
+    const roles = decodeJwtRoles(res.accessToken);
+    if (roles.length) apiRoles = roles;
+    if (import.meta.env.DEV) console.info("[auth] app roles from access token:", roles);
+  } catch (e) {
+    console.warn("[auth] could not resolve app roles from the access token:", e);
+  }
+}
+
 function roleFromClaims(a: AccountInfo): string {
-  const claims = a.idTokenClaims as { roles?: string[] } | undefined;
-  const mapped = (claims?.roles ?? []).map((r) => ENTRA_TO_UI[r]).filter(Boolean);
+  const idRoles = (a.idTokenClaims as { roles?: string[] } | undefined)?.roles ?? [];
+  // Prefer the access-token roles (where API app-role assignments live); the ID
+  // token's roles are only present if roles are also assigned on the client app.
+  const roles = apiRoles ?? idRoles;
+  const mapped = roles.map((r) => ENTRA_TO_UI[r]).filter(Boolean);
   // Highest-privilege wins when a user carries several app roles.
   return ROLE_PRIORITY.find((p) => mapped.includes(p)) ?? "";
 }

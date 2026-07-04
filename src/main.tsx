@@ -5,7 +5,7 @@ import App from "./App";
 import { RoleProvider } from "@/components/RoleContext";
 import { AuthProvider } from "@/components/AuthContext";
 import { Toaster, toast } from "@/components/Toast";
-import { msal, handleRedirect } from "./auth";
+import { msal, handleRedirect, resolveApiRoles } from "./auth";
 
 // Global resets (kept minimal; screens style inline to match the prototype).
 const reset = document.createElement("style");
@@ -32,7 +32,8 @@ const qc: QueryClient = new QueryClient({
 async function boot() {
   if (msal) {
     await msal.initialize();
-    await handleRedirect(); // completes a redirect sign-in and sets the active account
+    await handleRedirect();   // completes a redirect sign-in and sets the active account
+    await resolveApiRoles();  // decode app roles from the API access token before first render
   }
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

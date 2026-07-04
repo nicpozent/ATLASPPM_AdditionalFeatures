@@ -135,7 +135,7 @@ public record ResourceDto(string Name, string Role, string Dept, string Initials
 
 public record FinRowDto(string Id, string Name, decimal Budget, decimal Spent, decimal Capex,
     decimal Forecast, decimal Variance, decimal Roi, decimal LaborDev, decimal LaborArch, decimal LaborInfra,
-    int UsedPct, bool OnTrack);
+    int UsedPct, bool OnTrack, decimal Savings, decimal InfraCloud, decimal DevTooling, decimal Vendor);
 
 public record ReleaseDto(string Id, string Name, int Reqs, int Crs, string Owner, string Link,
     string Scope, string Date, string Env, int Progress, string Risk, string Status);

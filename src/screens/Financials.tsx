@@ -19,6 +19,7 @@ interface FinRow {
   budget: number; spent: number; capex: number; forecast: number; variance: number; roi: number;
   laborDev: number; laborArch: number; laborInfra: number; usedPct: number;
   onTrack?: boolean;
+  savings: number; infraCloud: number; devTooling: number; vendor: number;
 }
 
 function useFinancials() {
@@ -28,7 +29,8 @@ function useFinancials() {
   });
 }
 
-const fmt = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
+// Figures are in € thousands — show them as €…k (grouped), not millions.
+const fmt = (v: number) => "€" + Math.round(v).toLocaleString() + "k";
 const sum = (rows: FinRow[], k: keyof FinRow) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
 const pctOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
@@ -46,6 +48,13 @@ export default function Financials() {
   const roiPct = tBudget > 0 ? Math.round(((tSavings) / tBudget) * 100) : 0;
   const capexPct = pctOf(tCapex, tBudget);
   const opexPct = tBudget > 0 ? 100 - capexPct : 0;
+
+  // Cost composition by source — derived from the (editable) role-owned cost lines.
+  const cLaborDev = sum(rows, "laborDev"), cLaborArch = sum(rows, "laborArch"), cLaborInfra = sum(rows, "laborInfra");
+  const cLabor = cLaborDev + cLaborArch + cLaborInfra;
+  const cInfraCloud = sum(rows, "infraCloud"), cDevTooling = sum(rows, "devTooling"), cVendor = sum(rows, "vendor");
+  const cTotal = cLabor + cInfraCloud + cDevTooling + cVendor;
+  const cw = (v: number) => (cTotal > 0 ? (v / cTotal) * 100 : 0) + "%";
 
   const kpis: { label: string; value: string; ink: string }[] = [
     { label: "Total budget", value: fmt(tBudget), ink: color.navy },
@@ -97,12 +106,17 @@ export default function Financials() {
       {/* Cost composition by source */}
       <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 14 }}>Cost composition by source</div>
-        <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 9, background: color.bg }} />
+        <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 9, background: color.bg }}>
+          <div style={{ width: cw(cLabor), background: "#0F6CBD" }} />
+          <div style={{ width: cw(cInfraCloud), background: "#0E7C7B" }} />
+          <div style={{ width: cw(cDevTooling), background: "#7A3FB0" }} />
+          <div style={{ width: cw(cVendor), background: "#C98A00" }} />
+        </div>
         <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
-          <span style={legend}><span style={{ ...swatch, background: "#0F6CBD" }} />Internal labor {fmt(0)} <span style={{ color: color.faint3 }}>· Dev {fmt(0)} · Arch {fmt(0)} · Infra {fmt(0)}</span></span>
-          <span style={legend}><span style={{ ...swatch, background: "#0E7C7B" }} />Infra / Cloud (IaaS·PaaS·SaaS) {fmt(0)} <span style={{ color: color.faint3 }}>· Infra Mgr / Service Mgr</span></span>
-          <span style={legend}><span style={{ ...swatch, background: "#7A3FB0" }} />Dev tooling (Lic·PaaS·SaaS) {fmt(0)} <span style={{ color: color.faint3 }}>· Eng / Developers Mgr</span></span>
-          <span style={legend}><span style={{ ...swatch, background: "#C98A00" }} />Vendor {fmt(0)}</span>
+          <span style={legend}><span style={{ ...swatch, background: "#0F6CBD" }} />Internal labor {fmt(cLabor)} <span style={{ color: color.faint3 }}>· Dev {fmt(cLaborDev)} · Arch {fmt(cLaborArch)} · Infra {fmt(cLaborInfra)}</span></span>
+          <span style={legend}><span style={{ ...swatch, background: "#0E7C7B" }} />Infra / Cloud (IaaS·PaaS·SaaS) {fmt(cInfraCloud)} <span style={{ color: color.faint3 }}>· Infra Mgr / Service Mgr</span></span>
+          <span style={legend}><span style={{ ...swatch, background: "#7A3FB0" }} />Dev tooling (Lic·PaaS·SaaS) {fmt(cDevTooling)} <span style={{ color: color.faint3 }}>· Eng / Developers Mgr</span></span>
+          <span style={legend}><span style={{ ...swatch, background: "#C98A00" }} />Vendor {fmt(cVendor)}</span>
         </div>
       </div>
 
