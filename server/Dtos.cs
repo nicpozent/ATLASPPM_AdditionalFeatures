@@ -37,6 +37,12 @@ public record DecisionsDto(bool CanGovern, List<DecisionDto> Decisions);
 public record RaidItemDto(int Id, string Type, string Title, string Owner, string Status);
 public record RaidDto(bool CanEdit, List<RaidItemDto> Items);
 
+public record SecurityProfileDto(string Classification, string Residency, string Subjects, string Retention,
+    bool PersonalData, bool SpecialCategory, bool AutomatedDecisions, bool CardholderData,
+    bool Gdpr, bool Pci, bool Iso, bool AiAct, bool Soc2, bool Nis2);
+public record SecurityControlDto(int Id, string Code, string Control, string Framework, string Evidence, string Owner, string Status);
+public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

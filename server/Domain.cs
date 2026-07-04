@@ -311,6 +311,41 @@ public class GateCriterion
     public int Ord { get; set; }
 }
 
+// ---- Security, privacy & compliance ---------------------------------------
+// One profile per project; controls are a per-project evidence register.
+public class SecurityProfile
+{
+    public string ProjectId { get; set; } = default!;   // PK
+    public string Classification { get; set; } = "Internal";  // Public|Internal|Confidential|Restricted
+    public string Residency { get; set; } = "EU / EEA";       // EU / EEA | Global | On-prem only
+    public string Subjects { get; set; } = "";
+    public string Retention { get; set; } = "";
+    public bool PersonalData { get; set; }
+    public bool SpecialCategory { get; set; }
+    public bool AutomatedDecisions { get; set; }
+    public bool CardholderData { get; set; }
+    // Applicable frameworks/regulations
+    public bool Gdpr { get; set; }
+    public bool Pci { get; set; }
+    public bool Iso { get; set; }
+    public bool AiAct { get; set; }
+    public bool Soc2 { get; set; }
+    public bool Nis2 { get; set; }
+}
+
+public class SecurityControl
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;        // "CTL-01"
+    public string Control { get; set; } = default!;
+    public string Framework { get; set; } = "ISO 27001";
+    public string Evidence { get; set; } = "";
+    public string Owner { get; set; } = "";
+    public string Status { get; set; } = "Planned";     // Planned | Partial | Implemented
+    public int Ord { get; set; }
+}
+
 // ---- RAID register --------------------------------------------------------
 public class RaidItem
 {
