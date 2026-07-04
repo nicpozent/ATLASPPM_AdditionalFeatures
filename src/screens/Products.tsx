@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 
 type Source = "jira" | "ado";
 
@@ -34,10 +35,18 @@ function useProducts() {
 
 const pct = (done: number, total: number) => (total > 0 ? Math.round((done / total) * 100) : 0);
 
+interface NewProduct { name: string; owner: string; source: Source; projects: string[] }
+
 export default function Products() {
   const { data: products = [] } = useProducts();
+  const qc = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [modal, setModal] = useState(false);
   const selected = useMemo(() => products.find((p) => p.id === selectedId) ?? null, [products, selectedId]);
+  const createProduct = useMutation({
+    mutationFn: (body: NewProduct) => api<Product>("/products", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+  });
 
   if (selected) {
     return (
@@ -49,7 +58,10 @@ export default function Products() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ fontSize: 13.5, color: color.subtle, marginBottom: 16 }}>Products are durable containers; projects &amp; programs deliver against them. Tasks sync from Jira/ADO and are mapped to releases.</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ fontSize: 13.5, color: color.subtle, flex: 1 }}>Products are durable containers; projects &amp; programs deliver against them. Tasks sync from Jira/ADO and are mapped to releases.</div>
+        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New product</Button>
+      </div>
       {products.length === 0 ? (
         <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
           No products yet. Products appear here once synced from Jira or Azure DevOps.
@@ -80,7 +92,55 @@ export default function Products() {
           })}
         </div>
       )}
+      {modal && (
+        <NewProductModal
+          submitting={createProduct.isPending}
+          onClose={() => setModal(false)}
+          onCreate={(body) => createProduct.mutate(body, { onSuccess: () => setModal(false) })}
+        />
+      )}
     </div>
+  );
+}
+
+function Lbl({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+}
+
+function NewProductModal({ onClose, onCreate, submitting }: {
+  onClose: () => void; onCreate: (p: NewProduct) => void; submitting?: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
+  const [source, setSource] = useState<Source>("jira");
+  const [projects, setProjects] = useState("");
+  const submit = () => {
+    if (!name.trim()) return;
+    onCreate({
+      name: name.trim(), owner: owner.trim(), source,
+      projects: projects.split(",").map((s) => s.trim()).filter(Boolean),
+    });
+  };
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.navy, marginBottom: 4 }}>New product</div>
+      <div style={{ fontSize: 12.5, color: color.faint3, marginBottom: 16 }}>A durable product container. Tasks &amp; releases sync in from its source once connected.</div>
+      <Lbl>Name</Lbl>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Storefront Web" />
+      <Lbl>Owner</Lbl>
+      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Product owner" />
+      <Lbl>Source</Lbl>
+      <Select value={source} onChange={(e) => setSource(e.target.value as Source)}>
+        <option value="jira">Jira</option>
+        <option value="ado">Azure DevOps</option>
+      </Select>
+      <Lbl>Linked projects (comma-separated)</Lbl>
+      <Input value={projects} onChange={(e) => setProjects(e.target.value)} placeholder="PRJ-204, PRJ-176" />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={submitting || !name.trim()}>{submitting ? "Creating…" : "Create product"}</Button>
+      </div>
+    </Overlay>
   );
 }
 

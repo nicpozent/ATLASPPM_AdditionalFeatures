@@ -14,6 +14,7 @@ public record CreateBlockerReq(string Title, string ProjectId, string? Owner, st
 public record UpdateBlockerStatusReq(string Status);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
+public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
 public record CreateKrReq(string Title, string? Link, int? Progress);
 public record UpdateKrProgressReq(int Progress);
@@ -201,6 +202,24 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
                 pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health));
+        });
+
+        // ---- Products ------------------------------------------------------
+        api.MapPost("/products", async (CreateProductReq req, AtlasDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+            var p = new Product
+            {
+                Id = await NextId(db.Products.Select(x => x.Id), "PRD-", db),
+                Name = req.Name.Trim(),
+                Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
+                Source = req.Source == "ado" ? "ado" : "jira",
+                Projects = req.Projects ?? new(),
+            };
+            db.Products.Add(p);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
+                p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>()));
         });
 
         // ---- OKRs ----------------------------------------------------------
