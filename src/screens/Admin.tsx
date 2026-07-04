@@ -385,10 +385,48 @@ function ArchiveSection() {
 }
 
 // ---- AUDIT LOG ------------------------------------------------------------
+interface AuditEntry { at: string; actor: string; role: string; category: string; action: string; target: string; }
+const AUDIT_COLS = "1.1fr 1.2fr 1.4fr 0.9fr 1.5fr";
+
+function useAudit() {
+  return useQuery({
+    queryKey: ["audit"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<AuditEntry[]> => (await api<AuditEntry[]>("/audit")) ?? [],
+  });
+}
+
 function AuditSection() {
+  const { data: entries = [] } = useAudit();
   return (
-    <TableCard title="Audit log" subtitle="Immutable, hash-chained record of platform actions" cols="1.1fr 1.2fr 1.1fr 1fr 1.6fr" headers={["Timestamp", "Actor", "Action", "Subject", "Detail"]} empty="No audit entries yet." />
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
+        <div style={sectionTitle}>Audit log</div>
+        <div style={sectionSub}>Append-only record of role, permission &amp; portfolio changes</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: AUDIT_COLS, padding: "11px 22px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle }}>
+        {["Timestamp", "Actor", "Action", "Subject", "Detail"].map((h) => <div key={h}>{h}</div>)}
+      </div>
+      {entries.length === 0 ? (
+        <EmptyBlock message="No audit entries yet." />
+      ) : entries.map((e, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: AUDIT_COLS, alignItems: "center", padding: "11px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{fmtAudit(e.at)}</div>
+          <div style={{ color: color.text }}>
+            <span style={{ fontWeight: 600 }}>{e.actor}</span>
+            <span style={{ display: "block", fontSize: 11, color: color.faint3, textTransform: "capitalize" }}>{e.role}</span>
+          </div>
+          <div style={{ color: color.text }}>{e.action}</div>
+          <div><span style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, background: color.primaryTint, padding: "2px 9px", borderRadius: 20 }}>{e.category}</span></div>
+          <div style={{ color: color.subtle, fontFamily: font.mono, fontSize: 11.5 }}>{e.target}</div>
+        </div>
+      ))}
+    </Card>
   );
+}
+
+function fmtAudit(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 // ---- BACKUPS & RESTORE ----------------------------------------------------

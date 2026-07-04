@@ -23,6 +23,8 @@ public record DemandDetailDto(string Id, string Title, string Stage, string Prio
     int Risk, string ExpectedBenefits, int BenefitValue, List<string> Stakeholders, bool AllStakeholders,
     List<AttachmentDto> Attachments, bool CanDelete);
 
+public record AuditEventDto(string At, string Actor, string Role, string Category, string Action, string Target);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

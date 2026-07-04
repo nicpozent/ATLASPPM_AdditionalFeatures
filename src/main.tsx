@@ -21,9 +21,11 @@ document.head.appendChild(reset);
 
 // Surface failed writes (e.g. a permission-matrix 403) as a toast instead of
 // failing silently. Mutations may still opt into their own handling.
-const qc = new QueryClient({
+const qc: QueryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (err) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"),
+    // Any successful write may have produced an audit entry — keep the log fresh.
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["audit"] }); },
   }),
 });
 

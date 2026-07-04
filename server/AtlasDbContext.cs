@@ -24,6 +24,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<RoleDef> RoleDefs => Set<RoleDef>();
     public DbSet<Capability> Capabilities => Set<Capability>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -91,6 +92,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Capability>().Property(x => x.Key).ValueGeneratedNever();
         b.Entity<RolePermission>().HasKey(x => x.Id);
         b.Entity<RolePermission>().HasIndex(x => new { x.RoleId, x.CapabilityKey }).IsUnique();
+        b.Entity<AuditEvent>().HasKey(x => x.Id);
+        b.Entity<AuditEvent>().HasIndex(x => x.At);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

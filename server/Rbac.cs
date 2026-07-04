@@ -51,7 +51,7 @@ public static class Rbac
                 CanManage(user, authEnabled)));
         });
 
-        api.MapPost("/roles", async (CreateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapPost("/roles", async (CreateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
             if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
@@ -76,11 +76,12 @@ public static class Rbac
             var capKeys = await db.Capabilities.Select(c => c.Key).ToListAsync();
             role.Permissions = capKeys.Select(k => new RolePermission { RoleId = role.Id, CapabilityKey = k, Level = "N" }).ToList();
             db.RoleDefs.Add(role);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Roles", "Created role", $"{role.Name} ({role.Id})"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/roles/{role.Id}", ToDto(role));
         });
 
-        api.MapPatch("/roles/{id}", async (string id, UpdateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapPatch("/roles/{id}", async (string id, UpdateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
             if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             var role = await db.RoleDefs.Include(r => r.Permissions).FirstOrDefaultAsync(r => r.Id == id);
@@ -92,35 +93,38 @@ public static class Rbac
             if (!string.IsNullOrWhiteSpace(req.Icon)) role.Icon = req.Icon!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Color)) role.Color = req.Color!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Tint)) role.Tint = req.Tint!.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Roles", "Updated role", $"{role.Name} ({role.Id})"));
             await db.SaveChangesAsync();
             return Results.Ok(ToDto(role));
         });
 
-        api.MapDelete("/roles/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapDelete("/roles/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
             if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             var role = await db.RoleDefs.FindAsync(id);
             if (role is null) return Results.NotFound();
             if (role.IsSystem) return Results.BadRequest(new { error = "Canonical roles cannot be deleted." });
             db.RoleDefs.Remove(role);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Roles", "Deleted role", $"{role.Name} ({role.Id})"));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
 
         // Set a single matrix cell (role × capability) to F/E/V/N.
-        api.MapPut("/roles/{id}/permissions", async (string id, SetPermissionReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapPut("/roles/{id}/permissions", async (string id, SetPermissionReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
             if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             if (!Levels.Contains(req.Level)) return Results.BadRequest(new { error = "Level must be F, E, V or N." });
             var role = await db.RoleDefs.FindAsync(id);
             if (role is null) return Results.NotFound();
-            if (!await db.Capabilities.AnyAsync(c => c.Key == req.CapabilityKey))
-                return Results.BadRequest(new { error = "Unknown capability." });
+            var cap = await db.Capabilities.FindAsync(req.CapabilityKey);
+            if (cap is null) return Results.BadRequest(new { error = "Unknown capability." });
             var perm = await db.RolePermissions.FirstOrDefaultAsync(p => p.RoleId == id && p.CapabilityKey == req.CapabilityKey);
             if (perm is null)
                 db.RolePermissions.Add(new RolePermission { RoleId = id, CapabilityKey = req.CapabilityKey, Level = req.Level });
             else
                 perm.Level = req.Level;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Roles", $"Set “{cap.Label}” = {req.Level}", $"{role.Name} ({role.Id})"));
             await db.SaveChangesAsync();
             return Results.Ok(new { roleId = id, capabilityKey = req.CapabilityKey, level = req.Level });
         });

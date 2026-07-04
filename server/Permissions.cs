@@ -64,4 +64,20 @@ public static class Permissions
             new { error = $"Your role doesn’t have the access needed to “{label}”." },
             statusCode: StatusCodes.Status403Forbidden);
     }
+
+    // Builds an audit entry for the current caller. Add it to the DbContext just
+    // before SaveChangesAsync so it commits in the same transaction as the change.
+    public static AuditEvent Audit(HttpContext http, IConfiguration cfg, string category, string action, string target)
+    {
+        var authEnabled = cfg.GetValue("Auth:Enabled", false);
+        var role = ResolveRoleId(http.User, http.Request, authEnabled) ?? "dev";
+        var actor = authEnabled
+            ? (http.User.FindFirst("name")?.Value ?? http.User.FindFirst("preferred_username")?.Value ?? role)
+            : role;
+        return new AuditEvent
+        {
+            At = DateTime.UtcNow, Actor = actor, Role = role,
+            Category = category, Action = action, Target = target,
+        };
+    }
 }

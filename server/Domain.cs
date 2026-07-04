@@ -284,3 +284,17 @@ public class BudgetSnapshot
     public List<int> Actual { get; set; } = new();
     public int Max { get; set; }
 }
+
+// ---- Audit log ------------------------------------------------------------
+// Append-only record of governance-relevant actions (role & permission changes,
+// creates/deletes). Written from the write endpoints; read on Admin → Audit Log.
+public class AuditEvent
+{
+    public int Id { get; set; }
+    public DateTime At { get; set; }                    // UTC
+    public string Actor { get; set; } = "";             // signed-in user (or role in dev)
+    public string Role { get; set; } = "";              // resolved role id
+    public string Category { get; set; } = "";          // "Roles" | "Demands" | "Projects" | …
+    public string Action { get; set; } = "";            // "Created role", "Advanced demand", …
+    public string Target { get; set; } = "";            // affected object (id/name)
+}
