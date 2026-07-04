@@ -43,6 +43,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
     public DbSet<Absence> Absences => Set<Absence>();
+    public DbSet<CostLine> CostLines => Set<CostLine>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -148,6 +149,9 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<ProjectDependency>().HasIndex(x => new { x.ProjectId, x.DependsOnId }).IsUnique();
         b.Entity<Absence>().HasKey(x => x.Id);
         b.Entity<Absence>().HasIndex(x => x.ProjectId);
+        b.Entity<CostLine>().HasKey(x => x.Id);
+        b.Entity<CostLine>().HasIndex(x => x.ProjectId);
+        b.Entity<CostLine>().Property(x => x.OwnerRoles).HasDefaultValueSql("'{}'::text[]");
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

@@ -71,6 +71,18 @@ public static class Permissions
             statusCode: StatusCodes.Status403Forbidden);
     }
 
+    // The caller's fine-grained UI role for cosmetic, role-owned controls (e.g.
+    // financial cost lines). With auth off this is the raw X-Atlas-Role header
+    // (the 9 identities, so devmgr ≠ inframgr). With auth on only the six
+    // canonical app roles exist in the token, so it's necessarily coarser.
+    public static string EffectiveUiRole(HttpContext http, IConfiguration cfg)
+    {
+        var authEnabled = cfg.GetValue("Auth:Enabled", false);
+        return authEnabled
+            ? (ResolveRoleId(http.User, http.Request, true) ?? "")
+            : http.Request.Headers["X-Atlas-Role"].ToString();
+    }
+
     // Display name for the current caller (real name/UPN under auth, else role).
     public static string ActorName(HttpContext http, IConfiguration cfg)
     {
