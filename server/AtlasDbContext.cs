@@ -47,6 +47,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
     public DbSet<OperationalItem> OperationalItems => Set<OperationalItem>();
     public DbSet<DeletionRequest> DeletionRequests => Set<DeletionRequest>();
+    public DbSet<BackupRun> BackupRuns => Set<BackupRun>();
+    public DbSet<Setting> Settings => Set<Setting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -166,6 +168,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<OperationalItem>().HasIndex(x => x.ProjectId);
         b.Entity<DeletionRequest>().HasKey(x => x.Id);
         b.Entity<DeletionRequest>().HasIndex(x => x.ProjectId);
+        b.Entity<BackupRun>().HasKey(x => x.Id);
+        b.Entity<BackupRun>().HasIndex(x => x.At);
+        b.Entity<Setting>().HasKey(x => x.Key);
+        b.Entity<Setting>().Property(x => x.Key).ValueGeneratedNever();
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

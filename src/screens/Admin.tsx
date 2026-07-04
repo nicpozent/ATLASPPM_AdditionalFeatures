@@ -491,35 +491,82 @@ function fmtAudit(iso: string): string {
 }
 
 // ---- BACKUPS & RESTORE ----------------------------------------------------
+interface BackupComponent { name: string; schedule: string; retention: string; records: number; lastBackup: string; }
+interface BackupRun { at: string; actor: string; role: string; size: string; records: number; status: string; }
+interface BackupsData { canManage: boolean; autoBackups: boolean; lastBackup: string; lastSizeBytes: number; components: BackupComponent[]; runs: BackupRun[]; }
+
 function BackupsSection() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["backups"], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<BackupsData> => (await api<BackupsData>("/backups")) ?? { canManage: false, autoBackups: true, lastBackup: "Never", lastSizeBytes: 0, components: [], runs: [] },
+  });
+  const d = data ?? { canManage: false, autoBackups: true, lastBackup: "Never", lastSizeBytes: 0, components: [], runs: [] };
+  const runBackup = useMutation({
+    mutationFn: () => api("/backups/run", { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["backups"] }); apiDownload("/backups/snapshot.json", "atlas-backup.json"); },
+  });
+  const toggleAuto = useMutation({
+    mutationFn: (on: boolean) => api("/settings/backups.auto", { method: "PATCH", body: JSON.stringify({ value: on ? "true" : "false" }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["backups"] }),
+  });
+
   return (
     <>
       <div style={{ background: GRADIENT, borderRadius: radius.xxl, padding: "20px 24px", marginBottom: 18, color: "#fff", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600 }}>Backups & restore</div>
-          <div style={{ fontSize: 13, color: "#C9D6EE", marginTop: 3 }}>Automatic backups and restore points across platform components.</div>
+          <div style={{ fontSize: 13, color: "#C9D6EE", marginTop: 3 }}>Last backup: <b style={{ color: "#fff" }}>{d.lastBackup}</b>{d.runs.length ? ` · ${d.runs[0].size} · ${d.runs[0].records} records` : ""}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, background: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "8px 13px" }}>
+        <button onClick={() => d.canManage && toggleAuto.mutate(!d.autoBackups)} disabled={!d.canManage} title={d.canManage ? "Toggle automatic nightly backups" : "Platform Admin only"}
+          style={{ display: "flex", alignItems: "center", gap: 9, background: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "8px 13px", border: "none", cursor: d.canManage ? "pointer" : "default", fontFamily: "inherit" }}>
           <span style={{ fontSize: 12.5, color: "#fff" }}>Automatic backups</span>
           <span style={{ position: "relative", width: 40, height: 22, display: "inline-block" }}>
-            <span style={{ position: "absolute", inset: 0, background: "#3BD17A", borderRadius: 20 }} />
-            <span style={{ position: "absolute", top: 3, right: 3, width: 16, height: 16, background: "#fff", borderRadius: "50%" }} />
+            <span style={{ position: "absolute", inset: 0, background: d.autoBackups ? "#3BD17A" : "rgba(255,255,255,0.25)", borderRadius: 20 }} />
+            <span style={{ position: "absolute", top: 3, [d.autoBackups ? "right" : "left"]: 3, width: 16, height: 16, background: "#fff", borderRadius: "50%" } as React.CSSProperties} />
           </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#3BD17A" }}>ON</span>
-        </div>
-        <button style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={16} /> Back up all now</button>
+          <span style={{ fontSize: 12, fontWeight: 700, color: d.autoBackups ? "#3BD17A" : "#C9D6EE" }}>{d.autoBackups ? "ON" : "OFF"}</span>
+        </button>
+        {d.canManage && (
+          <button onClick={() => runBackup.mutate()} disabled={runBackup.isPending} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: runBackup.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: runBackup.isPending ? 0.7 : 1 }}>
+            <Icon name="download" size={16} /> {runBackup.isPending ? "Backing up…" : "Back up all now"}
+          </button>
+        )}
       </div>
       <div style={{ marginBottom: 18 }}>
         <Card padding={0} style={{ overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: BACKUP_COLS, padding: "13px 22px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle, letterSpacing: "0.04em" }}>
-            <div>Component</div><div>Schedule</div><div>Retention</div><div>Size</div><div>Last backup</div><div style={{ textAlign: "right" }}>Actions</div>
+            <div>Component</div><div>Schedule</div><div>Retention</div><div>Records</div><div>Last backup</div><div style={{ textAlign: "right" }}>Actions</div>
           </div>
-          <EmptyBlock message="No backup components configured yet." />
+          {d.components.length === 0 ? (
+            <EmptyBlock message="No backup components." />
+          ) : d.components.map((c) => (
+            <div key={c.name} style={{ display: "grid", gridTemplateColumns: BACKUP_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+              <div style={{ fontWeight: 600, color: color.text }}>{c.name}</div>
+              <div style={{ color: color.subtle }}>{c.schedule}</div>
+              <div style={{ color: color.subtle }}>{c.retention}</div>
+              <div style={{ fontFamily: font.mono, color: color.textMuted }}>{c.records.toLocaleString()}</div>
+              <div style={{ color: color.subtle }}>{c.lastBackup}</div>
+              <div style={{ textAlign: "right" }}>
+                {d.canManage && <button onClick={() => apiDownload("/backups/snapshot.json", "atlas-backup.json")} style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "none", borderRadius: 7, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit" }}>Download</button>}
+              </div>
+            </div>
+          ))}
         </Card>
       </div>
       <Card padding={0} style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, ...sectionTitle }}>Recent backup runs</div>
-        <EmptyBlock message="No backup runs recorded yet." />
+        {d.runs.length === 0 ? (
+          <EmptyBlock message="No backup runs recorded yet — click “Back up all now”." />
+        ) : d.runs.map((r, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+            <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3, minWidth: 168 }}>{r.at}</span>
+            <span style={{ flex: 1, color: color.text }}>{r.actor} <span style={{ color: color.faint3 }}>({r.role})</span></span>
+            <span style={{ fontFamily: font.mono, color: color.textMuted }}>{r.records.toLocaleString()} records</span>
+            <span style={{ fontFamily: font.mono, color: color.textMuted, minWidth: 70, textAlign: "right" }}>{r.size}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "3px 9px", borderRadius: 6 }}>{r.status}</span>
+          </div>
+        ))}
       </Card>
     </>
   );

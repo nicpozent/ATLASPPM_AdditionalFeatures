@@ -56,6 +56,26 @@ public class Blocker
     public string Status { get; set; } = "Active";    // Active|In progress|Resolved
 }
 
+// A recorded backup run — created by "Back up all now". Metadata only; the
+// downloadable snapshot is generated on demand from live data.
+public class BackupRun
+{
+    public int Id { get; set; }
+    public DateTime At { get; set; }
+    public string Actor { get; set; } = "";
+    public string Role { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public int Records { get; set; }
+    public string Status { get; set; } = "Completed";
+}
+
+// Simple operator settings (key → value), e.g. the integration/backup toggles.
+public class Setting
+{
+    public string Key { get; set; } = default!;
+    public string Value { get; set; } = "";
+}
+
 // A request to delete a project, routed to PMO/Admin for approval. Approving
 // archives the project (soft delete); rejecting drops the request. Lets roles
 // that can't archive directly still ask for a project to be removed.

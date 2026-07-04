@@ -87,6 +87,12 @@ public record SpilledTaskDto(string Code, string Name, string Baseline, string S
 public record ProjectSpilloverDto(string Id, string Name, int Count);
 public record SpilloverSummaryDto(int Total, int Projects, List<ProjectSpilloverDto> ByProject);
 
+// ---- Backups & settings ----------------------------------------------------
+public record BackupComponentDto(string Name, string Schedule, string Retention, int Records, string LastBackup);
+public record BackupRunDto(string At, string Actor, string Role, string Size, int Records, string Status);
+public record BackupsDto(bool CanManage, bool AutoBackups, string LastBackup, long LastSizeBytes,
+    List<BackupComponentDto> Components, List<BackupRunDto> Runs);
+
 public record DeletionRequestDto(int Id, string ProjectId, string ProjectName, string RequestedBy, string RequestedRole, string Date);
 public record ArchivedProjectDto(string Id, string Name, string Dept, string Owner, bool IsSystem);
 public record ArchiveAdminDto(bool CanGovern, bool CanDelete, List<DeletionRequestDto> Requests, List<ArchivedProjectDto> Archived);
