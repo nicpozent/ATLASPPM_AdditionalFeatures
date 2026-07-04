@@ -73,6 +73,9 @@ public record DepLinkDto(string Id, string Name, string Dept, string Status, str
 public record DependenciesDto(bool CanEdit, List<DepLinkDto> DependsOn, List<DepLinkDto> Blocks,
     bool InheritedRisk, string OwnHealth, string EffHealth, string DepRiskTitle);
 
+public record AbsenceDto(int Id, string Person, string From, string To, string Type);
+public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,

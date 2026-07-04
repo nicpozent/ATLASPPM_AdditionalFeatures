@@ -42,6 +42,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<TestPlan> TestPlans => Set<TestPlan>();
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
+    public DbSet<Absence> Absences => Set<Absence>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -145,6 +146,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Defect>().HasIndex(x => x.ProjectId);
         b.Entity<ProjectDependency>().HasKey(x => x.Id);
         b.Entity<ProjectDependency>().HasIndex(x => new { x.ProjectId, x.DependsOnId }).IsUnique();
+        b.Entity<Absence>().HasKey(x => x.Id);
+        b.Entity<Absence>().HasIndex(x => x.ProjectId);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

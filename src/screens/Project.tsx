@@ -111,10 +111,8 @@ export default function Project() {
       {tab === "architecture" && <Architecture projectId={id} />}
       {tab === "quality" && <Quality projectId={id} />}
       {tab === "dependencies" && <Dependencies projectId={id} />}
+      {tab === "vacations" && <Vacations projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["vacations"].includes(tab) && (
-        <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
-      )}
     </div>
   );
 }
@@ -1671,6 +1669,108 @@ function LinkProjectModal({ projectId, existing, onClose }: { projectId: string;
         <Button onClick={() => dependsOnId && link.mutate()} disabled={link.isPending || !dependsOnId}>{link.isPending ? "Linking…" : "Link project"}</Button>
       </div>
     </Modal>
+  );
+}
+
+// ---- Vacations (team absence calendar) -------------------------------------
+interface Absence { id: number; person: string; from: string; to: string; type: string; }
+const ABSENCE_TYPES: [string, string, string][] = [["vacation", "Vacation", "#0F6CBD"], ["sick", "Sick", "#D13438"], ["training", "Training", "#7A3FB0"]];
+const ABSENCE_COLOR: Record<string, string> = { vacation: "#0F6CBD", sick: "#D13438", training: "#7A3FB0" };
+const VAC_MONTHS = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WIN_START = Date.UTC(2026, 6, 1), WIN_END = Date.UTC(2026, 11, 31);
+const WIN_DAYS = Math.round((WIN_END - WIN_START) / 864e5) + 1;
+const vpct = (iso: string) => {
+  const t = Date.parse(iso);
+  return Math.max(0, Math.min(100, (t - WIN_START) / 864e5 / WIN_DAYS * 100));
+};
+
+function Vacations({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["vacations", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; absences: Absence[] }> =>
+      (await api<{ canEdit: boolean; absences: Absence[] }>(`/projects/${projectId}/vacations`)) ?? { canEdit: false, absences: [] },
+  });
+  const [person, setPerson] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [type, setType] = useState("vacation");
+  const add = useMutation({
+    mutationFn: () => api(`/projects/${projectId}/vacations`, { method: "POST", body: JSON.stringify({ person: person.trim(), from, to, type }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vacations", projectId] }); setPerson(""); setFrom(""); setTo(""); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/vacations/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["vacations", projectId] }),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its team vacations." /></Card>;
+  const absences = data?.absences ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const people = Array.from(new Set(absences.map((a) => a.person)));
+  const fmtRange = (a: Absence) => `${a.from} → ${a.to}`;
+
+  return (
+    <Card>
+      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Team vacations</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Jul–Dec 2026 · absences for resources assigned to this project. Plan allocations around these.</div>
+
+      {/* calendar */}
+      <div style={{ border: `1px solid ${color.border}`, borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1px solid #EEF1F6" }}>
+          <div style={{ padding: "8px 14px", fontSize: 10.5, color: color.faint3, textTransform: "uppercase", fontWeight: 600 }}>Resource</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)" }}>
+            {VAC_MONTHS.map((m) => <div key={m} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#7B849A", borderLeft: "1px solid #F4F6FA" }}>{m}</div>)}
+          </div>
+        </div>
+        {people.length === 0 ? (
+          <div style={{ padding: "26px 14px", textAlign: "center", fontSize: 12.5, color: color.faint3 }}>No absences logged for this project yet.</div>
+        ) : people.map((name) => (
+          <div key={name} style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1px solid #F4F6FA", alignItems: "center" }}>
+            <div style={{ padding: "7px 14px", fontSize: 12.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+            <div style={{ position: "relative", height: 30, backgroundImage: "linear-gradient(90deg,#F4F6FA 1px,transparent 1px)", backgroundSize: "16.666% 100%" }}>
+              {absences.filter((a) => a.person === name).map((a) => {
+                const left = vpct(a.from), w = Math.max(1.5, vpct(a.to) - left);
+                return <div key={a.id} title={`${name} · ${a.type} · ${a.from}→${a.to}`} style={{ position: "absolute", left: `${left}%`, width: `${w}%`, top: 7, height: 16, borderRadius: 5, background: ABSENCE_COLOR[a.type] ?? "#0F6CBD", opacity: 0.9 }} />;
+              })}
+            </div>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 14, padding: "10px 14px", flexWrap: "wrap" }}>
+          {ABSENCE_TYPES.map(([, label, c]) => (
+            <span key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: color.subtle }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: c }} />{label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* add absence */}
+      {canEdit && (
+        <div style={{ background: "#F8FAFD", border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add an absence</div>
+          <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
+            <Input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Resource name" style={{ width: 180 }} />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ border: `1px solid ${color.border2}`, borderRadius: 7, padding: "6px 9px", fontSize: 12, fontFamily: "inherit", color: color.textMuted }} />
+            <span style={{ fontSize: 12, color: color.faint3 }}>to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ border: `1px solid ${color.border2}`, borderRadius: 7, padding: "6px 9px", fontSize: 12, fontFamily: "inherit", color: color.textMuted }} />
+            <div style={{ width: 130 }}><Select value={type} onChange={(e) => setType(e.target.value)}>{ABSENCE_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
+            <Button onClick={() => { if (person.trim() && from && to) add.mutate(); }} disabled={add.isPending || !person.trim() || !from || !to}>Add</Button>
+          </div>
+          {absences.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+              {absences.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12, color: color.textMuted }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 3, background: ABSENCE_COLOR[a.type] ?? "#0F6CBD", flex: "none" }} />
+                  <span style={{ flex: 1 }}>{a.person} · {ABSENCE_TYPES.find((t) => t[0] === a.type)?.[1] ?? a.type} <span style={{ color: color.faint3 }}>({fmtRange(a)})</span></span>
+                  <button onClick={() => remove.mutate(a.id)} disabled={remove.isPending} style={{ fontSize: 11, fontWeight: 600, color: color.danger, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
