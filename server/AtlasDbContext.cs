@@ -37,6 +37,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<ArtifactVersion> ArtifactVersions => Set<ArtifactVersion>();
     public DbSet<Requirement> Requirements => Set<Requirement>();
     public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
+    public DbSet<ArchProfile> ArchProfiles => Set<ArchProfile>();
+    public DbSet<AdmPhase> AdmPhases => Set<AdmPhase>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -130,6 +132,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Requirement>().HasIndex(x => x.ProjectId);
         b.Entity<ChangeRequest>().HasKey(x => x.Id);
         b.Entity<ChangeRequest>().HasIndex(x => x.ProjectId);
+        b.Entity<ArchProfile>().HasKey(x => x.ProjectId);
+        b.Entity<ArchProfile>().Property(x => x.ProjectId).ValueGeneratedNever();
+        b.Entity<AdmPhase>().HasKey(x => x.Id);
+        b.Entity<AdmPhase>().HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

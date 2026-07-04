@@ -108,8 +108,9 @@ export default function Project() {
       {tab === "epics" && <Epics projectId={id} />}
       {tab === "artifacts" && <Artifacts projectId={id} />}
       {tab === "requirements" && <Requirements projectId={id} />}
+      {tab === "architecture" && <Architecture projectId={id} />}
       {tab === "comments" && <Comments />}
-      {["quality", "architecture", "dependencies", "vacations"].includes(tab) && (
+      {["quality", "dependencies", "vacations"].includes(tab) && (
         <Card><EmptyBlock minHeight={220} message={`${TABS.find((t) => t[0] === tab)?.[1]} will appear here once the project is loaded from the API.`} /></Card>
       )}
     </div>
@@ -1298,6 +1299,107 @@ function RaiseCrModal({ projectId, reqCodes, prefill, onClose }: { projectId: st
 }
 
 const sectionTitleS: React.CSSProperties = { fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink };
+
+// ---- Architecture (TOGAF ADM) ----------------------------------------------
+interface AdmPhase { id: number; code: string; phase: string; focus: string; owner: string; artefact: string; status: string; }
+interface ArchData { canEdit: boolean; changeType: string; phases: AdmPhase[]; }
+
+const CHANGE_TYPES: [string, string][] = [
+  ["", "— Select change type —"], ["config", "Configuration change"], ["small-enhancement", "Small enhancement"],
+  ["new-integration", "New integration"], ["new-saas", "New SaaS / vendor platform"], ["business-app", "New business application"],
+  ["new-product", "New product / platform"], ["core-replacement", "Core system replacement"], ["payment", "Payment / cardholder data impact"],
+  ["ai-solution", "AI solution"], ["cloud-platform", "Cloud landing zone / platform"],
+];
+const GOV_LEVEL: Record<string, string> = {
+  config: "No formal ADM", "small-enhancement": "ADM-lite (impact assessment)", "new-integration": "Architecture review required",
+  "new-saas": "Full multi-domain review (arch+security+data+vendor)", "business-app": "ADM-lite or full ADM (by criticality)",
+  "new-product": "Full ADM", "core-replacement": "Full ADM (strongly recommended)", payment: "Full ADM + mandatory PCI/security review",
+  "ai-solution": "Full ADM + AI/data/legal governance", "cloud-platform": "Full ADM (technology/security)",
+};
+const ADM_STATUSES = ["Not started", "Draft", "In progress", "In review", "Approved"];
+const ADM_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "In review": { ink: "#8A6300", tint: "#FBF2D7" },
+  "In progress": { ink: "#0C5798", tint: "#E6EFFB" }, Draft: { ink: "#5E2E89", tint: "#F0E8F7" }, "Not started": { ink: "#56607A", tint: "#EEF1F6" },
+};
+const ADM_COLS = "1.6fr 1.4fr 1.1fr 1.2fr 0.9fr";
+
+function Architecture({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["architecture", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<ArchData | null> => await api<ArchData>(`/projects/${projectId}/architecture`),
+  });
+  const setType = useMutation({
+    mutationFn: (changeType: string) => api(`/projects/${projectId}/architecture`, { method: "PATCH", body: JSON.stringify({ changeType }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["architecture", projectId] }),
+  });
+  const cycle = useMutation({
+    mutationFn: (v: { id: number; status: string }) => api(`/adm-phases/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["architecture", projectId] }),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its architecture governance." /></Card>;
+  if (!data) return <Card><EmptyBlock minHeight={220} message="Loading architecture governance…" /></Card>;
+
+  const { changeType, phases, canEdit } = data;
+  const level = GOV_LEVEL[changeType] ?? "Architecture triage required";
+  const full = level.startsWith("Full");
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Architecture triage, tailored TOGAF ADM &amp; phase governance.</div>
+        <div style={{ flex: 1 }} />
+        {canEdit && <span style={{ fontSize: 11, fontWeight: 600, color: "#5E2E89", background: "#F0E8F7", padding: "4px 10px", borderRadius: 6 }}>Chief Architect controls enabled</span>}
+      </div>
+
+      {/* triage / impact assessment */}
+      <Card style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={sectionTitleS}>Architecture impact assessment</div>
+            <div style={{ fontSize: 12, color: color.faint2 }}>Every initiative is triaged; governance depth is tailored to change type.</div>
+          </div>
+          <div style={{ minWidth: 240 }}>
+            <Select value={changeType} disabled={!canEdit} onChange={(e) => setType.mutate(e.target.value)}>
+              {CHANGE_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </Select>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F5F0FA", border: "1px solid #E4D7F0", borderRadius: 10, padding: "12px 15px" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", textTransform: "uppercase", letterSpacing: "0.04em" }}>Required governance</span>
+          <span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 700, color: "#3B1A5C" }}>{level}</span>
+          {full && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", padding: "3px 9px", borderRadius: 6 }}>Architecture-significant</span>}
+        </div>
+      </Card>
+
+      {/* ADM phase tracker */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px 13px", ...sectionTitleS }}>TOGAF ADM phase tracker</div>
+        <div style={{ display: "grid", gridTemplateColumns: ADM_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Phase</div><div>Focus</div><div>Owner</div><div>Key artefact</div><div>Status</div>
+        </div>
+        {phases.map((p) => {
+          const sc = ADM_STATUS[p.status] ?? ADM_STATUS["Not started"];
+          const next = ADM_STATUSES[(ADM_STATUSES.indexOf(p.status) + 1) % ADM_STATUSES.length];
+          return (
+            <div key={p.id} style={{ display: "grid", gridTemplateColumns: ADM_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{p.phase}</div>
+              <div style={{ fontSize: 12, color: color.faint }}>{p.focus}</div>
+              <div style={{ fontSize: 12, color: color.subtle }}>{p.owner}</div>
+              <div style={{ fontSize: 12, color: color.faint }}>{p.artefact}</div>
+              <div>
+                <button onClick={() => canEdit && cycle.mutate({ id: p.id, status: next })} disabled={!canEdit || cycle.isPending}
+                  title={canEdit ? "Click to advance status" : undefined}
+                  style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "4px 10px", borderRadius: 6, border: "none", cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{p.status}</button>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink, marginBottom: 12 }}>{children}</div>;
