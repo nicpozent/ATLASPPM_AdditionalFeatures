@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
-import { useRole } from "@/components/RoleContext";
 import { api } from "@/api";
 import { Button, Input } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 
 // ---------------------------------------------------------------------------
 // Data model + hook (empty by default until the API exists).
@@ -32,8 +32,8 @@ const objInk = (p: number) => (p >= 66 ? "#0B6B37" : p >= 33 ? "#8A6300" : "#A12
 const krFill = (p: number) => (p >= 66 ? "#15A34A" : p >= 33 ? "#E0A100" : "#D13438");
 
 export default function Okrs() {
-  const { role } = useRole();
-  const canEdit = role === "admin" || role === "pmo"; // cosmetic gate (API is authoritative)
+  const { can } = usePermissions();
+  const canEdit = can("cap-projects", "E"); // cosmetic gate, driven by the matrix (API is authoritative)
   const { data: objectives = [] } = useObjectives();
   const qc = useQueryClient();
 

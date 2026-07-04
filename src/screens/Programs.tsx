@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
@@ -52,6 +53,8 @@ function useProjectOpts() {
 export default function Programs() {
   const { data: programs = [] } = useProgramsData();
   const { data: projectOpts = [] } = useProjectOpts();
+  const { can } = usePermissions();
+  const mayCreate = can("cap-projects", "F");
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export default function Programs() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Group related projects under a program for aggregated health, budget &amp; progress.</div>
         <div style={{ flex: 1 }} />
-        <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New program</Button>
+        <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create programs"}><Icon name="plus" size={16} /> New program</Button>
       </div>
 
       {programs.length === 0 ? (

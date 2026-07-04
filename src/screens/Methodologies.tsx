@@ -4,6 +4,7 @@ import { color, font, radius } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 import { Overlay } from "./Demands";
 
 // ---- Methodology library (structural catalogue — these definitions ARE the content) ----
@@ -217,6 +218,8 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
   const [created, setCreated] = useState<Created | null>(null);
   const scaffold = scaffoldFor(tpl.methodology);
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const mayCreate = can("cap-projects", "F");
 
   const createProject = useMutation({
     mutationFn: (body: NewProject) => api<CreatedProject>("/projects", { method: "POST", body: JSON.stringify(body) }),
@@ -291,7 +294,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
           <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 7 }}>The first work item is pushed to the connector now; the rest sync on the next cycle.</div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 9, marginTop: 20 }}>
             <Button variant="secondary" onClick={() => setStep(1)} style={{ padding: "10px 16px" }}>Back</Button>
-            <Button onClick={create} disabled={createProject.isPending} style={{ padding: "10px 18px", background: color.success }}>{createProject.isPending ? "Creating…" : "Create project"}</Button>
+            <Button onClick={create} disabled={createProject.isPending || !mayCreate} title={mayCreate ? undefined : "Your role can't create projects"} style={{ padding: "10px 18px", background: color.success }}>{createProject.isPending ? "Creating…" : "Create project"}</Button>
           </div>
         </div>
       )}

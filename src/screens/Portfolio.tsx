@@ -5,6 +5,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textarea } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
 import { SCREENS } from "@/nav";
 import {
   STATUS_FILTERS, useProjects, useBlockers, type Blocker, type BlockerStatus,
@@ -26,6 +27,7 @@ export default function Portfolio() {
   const qc = useQueryClient();
   const { data: projects = [] } = useProjects();
   const { data: blockers = [] } = useBlockers();
+  const { can } = usePermissions();
 
   const raiseBlocker = useMutation({
     mutationFn: (body: RaiseBlocker) => api("/blockers", { method: "POST", body: JSON.stringify(body) }),
@@ -57,7 +59,7 @@ export default function Portfolio() {
         </div>
         <div style={{ flex: 1 }} />
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
-        <Button><Icon name="plus" size={16} /> New project</Button>
+        <Button disabled={!can("cap-projects", "F")} title={can("cap-projects", "F") ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
       </div>
 
       {tab === "projects" ? (
@@ -129,6 +131,7 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
   blockers: Blocker[]; counts: { active: number; inProgress: number; resolved: number };
   projects: { id: string; name: string }[]; onRaise: (b: RaiseBlocker) => void; submitting?: boolean;
 }) {
+  const { can } = usePermissions();
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
@@ -192,7 +195,9 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
             {(["Active", "In progress", "Resolved"] as BlockerStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
         </Field>
-        <button onClick={submit} disabled={submitting} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
+        {(() => { const may = can("cap-projects", "E"); const off = submitting || !may; return (
+        <button onClick={submit} disabled={off} title={may ? undefined : "Your role can't raise blockers"} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
+        ); })()}
       </Card>
     </div>
   );
