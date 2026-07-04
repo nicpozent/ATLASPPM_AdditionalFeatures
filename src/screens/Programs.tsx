@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
@@ -13,6 +13,7 @@ interface Program {
   id: string; name: string; owner: string; goal: string; status: string;
   projects: string[]; budget: number; spent: number; progress: number; health: Health;
 }
+interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[] }
 interface ProjOpt { id: string; name: string; dept?: string; health?: string; status?: Health; progress?: number; budget?: number }
 interface Stakeholder { id: string; user: string; role: string; power: PowInt; interest: PowInt }
 
@@ -49,12 +50,15 @@ function useProjectOpts() {
 }
 
 export default function Programs() {
-  const { data: fetched = [] } = useProgramsData();
+  const { data: programs = [] } = useProgramsData();
   const { data: projectOpts = [] } = useProjectOpts();
-  const [local, setLocal] = useState<Program[]>([]);
+  const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const programs = useMemo(() => [...local, ...fetched], [local, fetched]);
+  const createProgram = useMutation({
+    mutationFn: (body: NewProgram) => api<Program>("/programs", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
+  });
   const selected = programs.find((p) => p.id === selectedId) ?? null;
 
   if (selected) {
@@ -113,8 +117,9 @@ export default function Programs() {
       {modal && (
         <NewProgramModal
           projectOpts={projectOpts}
+          submitting={createProgram.isPending}
           onClose={() => setModal(false)}
-          onCreate={(p) => { setLocal((l) => [p, ...l]); setModal(false); }}
+          onCreate={(body) => createProgram.mutate(body, { onSuccess: () => setModal(false) })}
         />
       )}
     </div>
@@ -304,7 +309,7 @@ function StakeholderMatrix({ items }: { items: Stakeholder[] }) {
   );
 }
 
-function NewProgramModal({ projectOpts, onClose, onCreate }: { projectOpts: ProjOpt[]; onClose: () => void; onCreate: (p: Program) => void }) {
+function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { projectOpts: ProjOpt[]; onClose: () => void; onCreate: (p: NewProgram) => void; submitting?: boolean }) {
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("");
   const [goal, setGoal] = useState("");
@@ -314,9 +319,8 @@ function NewProgramModal({ projectOpts, onClose, onCreate }: { projectOpts: Proj
   const submit = () => {
     if (!name.trim()) return;
     onCreate({
-      id: "PGM-" + String(Math.floor(1 + Math.random() * 98)).padStart(2, "0"),
       name: name.trim(), owner: owner.trim() || "Unassigned", goal: goal.trim(), status,
-      projects: selected, budget: 0, spent: 0, progress: 0, health: "hold",
+      projects: selected,
     });
   };
   const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
@@ -356,7 +360,7 @@ function NewProgramModal({ projectOpts, onClose, onCreate }: { projectOpts: Proj
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
         <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-        <button onClick={submit} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 18px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Create program</button>
+        <button onClick={submit} disabled={submitting} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 18px", borderRadius: 9, cursor: submitting ? "default" : "pointer", fontFamily: "inherit", opacity: submitting ? 0.6 : 1 }}>{submitting ? "Creating…" : "Create program"}</button>
       </div>
     </Overlay>
   );

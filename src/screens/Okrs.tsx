@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { useRole } from "@/components/RoleContext";
@@ -12,9 +12,12 @@ import { Button, Input } from "@/components/ui";
 interface Kr { id: string; title: string; link: string; progress: number }
 interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[] }
 
+interface NewObjective { title: string; owner: string; horizon: string }
+interface NewKr { title: string; link: string; progress: number }
+
 function useObjectives() {
   return useQuery({
-    queryKey: ["objectives"], retry: false, staleTime: 60_000,
+    queryKey: ["okrs"], retry: false, staleTime: 60_000,
     queryFn: async (): Promise<Objective[]> => {
       try { return (await api<Objective[]>("/okrs")) ?? []; } catch { return []; }
     },
@@ -27,28 +30,30 @@ const objProgress = (o: Objective) =>
 // Progress → ink colour, lifted verbatim from the prototype's OKR builder.
 const objInk = (p: number) => (p >= 66 ? "#0B6B37" : p >= 33 ? "#8A6300" : "#A1282B");
 const krFill = (p: number) => (p >= 66 ? "#15A34A" : p >= 33 ? "#E0A100" : "#D13438");
-const uid = (pfx: string) => pfx + "-" + Math.floor(1000 + Math.random() * 9000);
 
 export default function Okrs() {
   const { role } = useRole();
   const canEdit = role === "admin" || role === "pmo"; // cosmetic gate (API is authoritative)
-  const { data: fetched = [] } = useObjectives();
-
-  // Locally-created objectives (user input, never seed data) merged with fetched.
-  const [local, setLocal] = useState<Objective[]>([]);
-  const objectives = useMemo(() => [...local, ...fetched], [local, fetched]);
+  const { data: objectives = [] } = useObjectives();
+  const qc = useQueryClient();
 
   // Modal state: obj = new objective, { objId } = add key result to objId.
   const [modal, setModal] = useState<null | { kind: "obj" } | { kind: "kr"; objId: string }>(null);
 
-  const addObjective = (o: Objective) => setLocal((l) => [o, ...l]);
-  const addKr = (objId: string, kr: Kr) =>
-    setLocal((l) => l.map((o) => (o.id === objId ? { ...o, krs: [...o.krs, kr] } : o)));
-  // KR progress edits only apply to locally-created objectives.
-  const setKrProgress = (objId: string, krId: string, pct: number) =>
-    setLocal((l) => l.map((o) => (o.id === objId
-      ? { ...o, krs: o.krs.map((k) => (k.id === krId ? { ...k, progress: pct } : k)) } : o)));
-  const isLocal = (objId: string) => local.some((o) => o.id === objId);
+  const createObjective = useMutation({
+    mutationFn: (body: NewObjective) => api<Objective>("/okrs", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+  const createKr = useMutation({
+    mutationFn: ({ objId, body }: { objId: string; body: NewKr }) =>
+      api<Kr>(`/okrs/${objId}/krs`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+  const updateKrProgress = useMutation({
+    mutationFn: ({ krId, progress }: { krId: string; progress: number }) =>
+      api<Kr>(`/krs/${krId}`, { method: "PATCH", body: JSON.stringify({ progress }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -112,9 +117,9 @@ export default function Okrs() {
                             <Icon name="link" size={14} /> {k.link}
                           </span>
                         )}
-                        {canEdit && isLocal(o.id) ? (
+                        {canEdit ? (
                           <input type="number" min={0} max={100} value={k.progress}
-                            onChange={(e) => setKrProgress(o.id, k.id, clampPct(e.target.value))}
+                            onChange={(e) => updateKrProgress.mutate({ krId: k.id, progress: clampPct(e.target.value) })}
                             style={{ width: 52, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 0", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
                         ) : (
                           <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: color.textMuted, width: 38, textAlign: "right" }}>{k.progress}%</span>
@@ -125,7 +130,7 @@ export default function Okrs() {
                       </div>
                     </div>
                   ))}
-                  {canEdit && isLocal(o.id) && (
+                  {canEdit && (
                     <button onClick={() => setModal({ kind: "kr", objId: o.id })} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
                       <Icon name="plus" size={14} /> Add key result
                     </button>
@@ -138,10 +143,18 @@ export default function Okrs() {
       )}
 
       {modal?.kind === "obj" && (
-        <ObjectiveModal onClose={() => setModal(null)} onSave={(o) => { addObjective(o); setModal(null); }} />
+        <ObjectiveModal
+          submitting={createObjective.isPending}
+          onClose={() => setModal(null)}
+          onSave={(body) => createObjective.mutate(body, { onSuccess: () => setModal(null) })}
+        />
       )}
       {modal?.kind === "kr" && (
-        <KrModal onClose={() => setModal(null)} onSave={(k) => { addKr(modal.objId, k); setModal(null); }} />
+        <KrModal
+          submitting={createKr.isPending}
+          onClose={() => setModal(null)}
+          onSave={(body) => createKr.mutate({ objId: modal.objId, body }, { onSuccess: () => setModal(null) })}
+        />
       )}
     </div>
   );
@@ -150,13 +163,13 @@ export default function Okrs() {
 const clampPct = (v: string | number) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 
 // --- New objective modal --------------------------------------------------
-function ObjectiveModal({ onClose, onSave }: { onClose: () => void; onSave: (o: Objective) => void }) {
+function ObjectiveModal({ onClose, onSave, submitting }: { onClose: () => void; onSave: (o: NewObjective) => void; submitting?: boolean }) {
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
   const [horizon, setHorizon] = useState("");
   const save = () => {
     if (!title.trim()) return;
-    onSave({ id: uid("OBJ"), title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026", krs: [] });
+    onSave({ title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026" });
   };
   return (
     <ModalShell title="New objective" onClose={onClose} width={480}>
@@ -174,19 +187,19 @@ function ObjectiveModal({ onClose, onSave }: { onClose: () => void; onSave: (o: 
           </div>
         </div>
       </div>
-      <ModalActions onClose={onClose} onSave={save} saveLabel="Create objective" />
+      <ModalActions onClose={onClose} onSave={save} saveLabel={submitting ? "Creating…" : "Create objective"} disabled={submitting} />
     </ModalShell>
   );
 }
 
 // --- Add key result modal -------------------------------------------------
-function KrModal({ onClose, onSave }: { onClose: () => void; onSave: (k: Kr) => void }) {
+function KrModal({ onClose, onSave, submitting }: { onClose: () => void; onSave: (k: NewKr) => void; submitting?: boolean }) {
   const [title, setTitle] = useState("");
   const [link, setLink] = useState("");
   const [progress, setProgress] = useState(0);
   const save = () => {
     if (!title.trim()) return;
-    onSave({ id: uid("KR"), title: title.trim(), link: link.trim(), progress: clampPct(progress) });
+    onSave({ title: title.trim(), link: link.trim(), progress: clampPct(progress) });
   };
   return (
     <ModalShell title="Add key result" onClose={onClose} width={480}>
@@ -198,7 +211,7 @@ function KrModal({ onClose, onSave }: { onClose: () => void; onSave: (k: Kr) => 
         <Label>Starting progress %</Label>
         <Input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(clampPct(e.target.value))} style={{ fontSize: 13.5, width: 90, fontFamily: font.mono }} />
       </div>
-      <ModalActions onClose={onClose} onSave={save} saveLabel="Add key result" />
+      <ModalActions onClose={onClose} onSave={save} saveLabel={submitting ? "Adding…" : "Add key result"} disabled={submitting} />
     </ModalShell>
   );
 }
@@ -215,11 +228,11 @@ function ModalShell({ title, width, onClose, children }: { title: string; width:
     </div>
   );
 }
-function ModalActions({ onClose, onSave, saveLabel }: { onClose: () => void; onSave: () => void; saveLabel: string }) {
+function ModalActions({ onClose, onSave, saveLabel, disabled }: { onClose: () => void; onSave: () => void; saveLabel: string; disabled?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
       <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-      <button onClick={onSave} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>{saveLabel}</button>
+      <button onClick={onSave} disabled={disabled} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 16px", borderRadius: 9, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit" }}>{saveLabel}</button>
     </div>
   );
 }
