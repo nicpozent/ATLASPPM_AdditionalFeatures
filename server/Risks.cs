@@ -50,6 +50,14 @@ public static class Risks
                 "Operational work is linked to this project; monitor for delivery impact.",
                 "ITIL / PMO governance", "Incident & change management"));
 
+        // ---- Resource capacity (assigned team over-allocated) --------------
+        var over = await Capacity.OverAllocatedAsync(db, id);
+        if (over.Count > 0)
+            f.Add(new(over.Count >= 2 ? "High" : "Medium", "Resource",
+                $"{over.Count} assigned team member{(over.Count > 1 ? "s" : "")} over-allocated",
+                $"{string.Join(", ", over)} {(over.Count > 1 ? "are" : "is")} over 100% allocated (operations + project + product); delivery capacity is at risk.",
+                "PMO governance", "Resource capacity management"));
+
         // Inherited dependency risk
         var deps = await db.ProjectDependencies.Where(d => d.ProjectId == id).Select(d => d.DependsOnId).ToListAsync();
         if (deps.Count > 0)

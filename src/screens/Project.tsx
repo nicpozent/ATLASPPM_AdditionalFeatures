@@ -129,6 +129,7 @@ function Overview({ projectId }: { projectId: string | null }) {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <PeopleRoles projectId={projectId} />
+        <TeamCapacity projectId={projectId} />
         {/* AI assist (structural chrome) */}
         <div style={{ background: "linear-gradient(120deg,#0F1B3D,#123B7A)", border: "1px solid #14264F", borderRadius: 16, padding: "20px 22px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
@@ -198,7 +199,11 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
   const assign = useMutation({
     mutationFn: (v: { key: string; person: string }) =>
       api(`/projects/${projectId}/assignments/${v.key}`, { method: "PUT", body: JSON.stringify({ person: v.person }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["assignments", projectId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assignments", projectId] });
+      qc.invalidateQueries({ queryKey: ["capacity", projectId] }); // assigned team changed
+      qc.invalidateQueries({ queryKey: ["risks", projectId] });    // capacity feeds the risk engine
+    },
   });
 
   const options = data?.options ?? [];
@@ -242,6 +247,60 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", letterSpacing: "0.05em", textTransform: "uppercase", margin: "16px 0 2px" }}>Architecture roles</div>
           {(data?.archRoles ?? []).map((r) => data?.canAssignArch ? selRow(r.key, r.label, r.person) : roRow(r.label, r.person))}
         </>
+      )}
+    </Card>
+  );
+}
+
+// Team capacity — the people assigned to this project (People & roles) checked
+// against their allocation on Resources. Over-allocation is flagged and feeds
+// the risk engine as a resource risk.
+interface CapacityRow { name: string; role: string; initials: string; color: string; opsPct: number; projectPct: number; productPct: number; util: number; over: boolean; highOps: boolean; }
+interface Capacity { assigned: number; overCount: number; highOps: number; people: CapacityRow[]; unknown: string[]; }
+
+function TeamCapacity({ projectId }: { projectId: string | null }) {
+  const { data } = useQuery({
+    queryKey: ["capacity", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<Capacity | null> => (await api<Capacity>(`/projects/${projectId}/capacity`)) ?? null,
+  });
+  const seg = (pct: number, bg: string) => pct > 0 ? <div style={{ width: `${Math.min(pct, 100)}%`, background: bg, height: "100%" }} /> : null;
+  return (
+    <Card padding="18px 22px">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <SectionTitle>Team capacity</SectionTitle>
+        {(data?.overCount ?? 0) > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{data!.overCount} over-allocated</span>}
+      </div>
+      <div style={{ fontSize: 12, color: color.faint2, marginTop: -6, marginBottom: 14 }}>Assigned people vs their allocation. Utilisation = ops + project + product; over 100% flags a resource risk.</div>
+      {!data || data.assigned === 0 ? (
+        <EmptyBlock message="No people assigned yet — assign roles in People & roles." minHeight={56} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {data.people.map((p) => (
+            <div key={p.name}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 5 }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: p.color, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>{p.initials}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{p.name}</span>
+                <span style={{ fontSize: 11.5, color: color.faint3 }}>{p.role}</span>
+                <div style={{ flex: 1 }} />
+                {p.highOps && !p.over && <span title="Heavy operational load" style={{ fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 5, padding: "1px 6px" }}>HIGH OPS</span>}
+                <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: p.over ? "#A1282B" : color.textMuted }}>{p.util}%</span>
+              </div>
+              <div style={{ display: "flex", height: 8, borderRadius: 5, overflow: "hidden", background: "#EEF1F6", boxShadow: p.over ? "0 0 0 1.5px #D13438" : "none" }}>
+                {seg(p.opsPct, "#E0A100")}
+                {seg(p.projectPct, color.primary)}
+                {seg(p.productPct, "#0E7C7B")}
+              </div>
+            </div>
+          ))}
+          {data.unknown.length > 0 && (
+            <div style={{ fontSize: 11.5, color: color.faint3 }}>{data.unknown.join(", ")} — not on the Resources sheet (capacity unknown).</div>
+          )}
+          <div style={{ display: "flex", gap: 14, marginTop: 2, fontSize: 10.5, color: color.faint3 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#E0A100" }} /> Ops</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: color.primary }} /> Project</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#0E7C7B" }} /> Product</span>
+          </div>
+        </div>
       )}
     </Card>
   );

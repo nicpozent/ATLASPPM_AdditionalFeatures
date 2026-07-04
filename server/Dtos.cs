@@ -87,6 +87,11 @@ public record SpilledTaskDto(string Code, string Name, string Baseline, string S
 public record ProjectSpilloverDto(string Id, string Name, int Count);
 public record SpilloverSummaryDto(int Total, int Projects, List<ProjectSpilloverDto> ByProject);
 
+// ---- Team capacity (assigned people vs their allocation) --------------------
+public record CapacityRowDto(string Name, string Role, string Initials, string Color,
+    int OpsPct, int ProjectPct, int ProductPct, int Util, bool Over, bool HighOps);
+public record CapacityDto(int Assigned, int OverCount, int HighOps, List<CapacityRowDto> People, List<string> Unknown);
+
 // ---- Operational items (ops work that can affect a project) -----------------
 public record OperationalItemDto(int Id, string Ref, string Title, string Type, string Severity,
     string Status, string Source, string? ProjectId, string? ProjectName, string Owner, string Date);
