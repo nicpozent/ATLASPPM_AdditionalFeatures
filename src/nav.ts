@@ -27,7 +27,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
   programs:      { id: "programs",      path: "/programs",      label: "Programs",         title: "Programs",                     subtitle: "Aggregate projects under strategic programs",        icon: "folders" },
   products:      { id: "products",      path: "/products",      label: "Products",         title: "Products",                     subtitle: "Product portfolio · Jira/ADO tasks mapped to releases", icon: "box" },
   okrs:          { id: "okrs",          path: "/okrs",          label: "OKRs",             title: "OKRs & Strategic Alignment",   subtitle: "Objectives linked to projects, programs & products", icon: "target" },
-  demands:       { id: "demands",       path: "/demands",       label: "Demand Pipeline",  title: "Demand Pipeline",              subtitle: "18 open demands awaiting triage & approval",         icon: "inbox", badge: "18" },
+  demands:       { id: "demands",       path: "/demands",       label: "Demand Pipeline",  title: "Demand Pipeline",              subtitle: "Open demands awaiting triage & approval",            icon: "inbox" },
   gantt:         { id: "gantt",         path: "/timeline",      label: "Timeline / Gantt", title: "Timeline / Gantt",             subtitle: "Schedule, phases, milestones & dependencies",        icon: "gantt" },
   project:       { id: "project",       path: "/project",       label: "Project Detail",   title: "Project Detail",               subtitle: "Tasks, epics, artifacts, RAID & collaboration",      icon: "folder" },
   resources:     { id: "resources",     path: "/resources",     label: "Resources",        title: "Resources & Capacity",         subtitle: "People synced from Entra ID · allocation vs availability", icon: "users" },
