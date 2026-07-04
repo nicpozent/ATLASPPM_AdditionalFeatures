@@ -327,6 +327,26 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Architecture governance (TOGAF ADM) ----------------------------------
+public class ArchProfile
+{
+    public string ProjectId { get; set; } = default!;    // PK
+    public string ChangeType { get; set; } = "";          // drives required governance level
+}
+
+public class AdmPhase
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Code { get; set; } = default!;          // P, A, B, C, D, E, F, G, H
+    public string Phase { get; set; } = default!;          // "A · Architecture Vision"
+    public string Focus { get; set; } = "";
+    public string Owner { get; set; } = "";
+    public string Artefact { get; set; } = "";
+    public string Status { get; set; } = "Not started";   // Not started | Draft | In progress | In review | Approved
+    public int Ord { get; set; }
+}
+
 // ---- Requirements & traceability ------------------------------------------
 public class Requirement
 {

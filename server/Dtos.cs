@@ -61,6 +61,9 @@ public record ChangeRequestDto(int Id, string Code, string Title, string ReqCode
 public record ReqStatsDto(int Total, int Approved, int Coverage, int Verified);
 public record RequirementsDto(bool CanEdit, ReqStatsDto Stats, List<RequirementDto> Requirements, List<ChangeRequestDto> ChangeRequests);
 
+public record AdmPhaseDto(int Id, string Code, string Phase, string Focus, string Owner, string Artefact, string Status);
+public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
