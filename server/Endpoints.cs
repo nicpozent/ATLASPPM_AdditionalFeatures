@@ -31,6 +31,7 @@ public static class Endpoints
         api.MapOperationalEndpoints();
         api.MapCapacityEndpoints();
         api.MapDeletionEndpoints();
+        api.MapLifecycleEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -58,11 +59,18 @@ public static class Endpoints
             return Results.File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "atlas-audit-log.csv");
         });
 
-        api.MapGet("/projects", async (AtlasDbContext db, bool? archived) =>
-            await db.Projects.Where(p => (archived ?? false) ? p.Archived : !p.Archived)
-                .OrderBy(p => p.Id).Select(p => new ProjectDto(
+        // Buckets: archived (soft-deleted), completed (terminal, kept visible), or
+        // active (the default working set — neither archived nor completed).
+        api.MapGet("/projects", async (AtlasDbContext db, bool? archived, bool? completed) =>
+        {
+            var q = db.Projects.AsQueryable();
+            q = (archived ?? false) ? q.Where(p => p.Archived)
+              : (completed ?? false) ? q.Where(p => !p.Archived && p.Status == "completed")
+              : q.Where(p => !p.Archived && p.Status != "completed");
+            return await q.OrderBy(p => p.Id).Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,
-                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem)).ToListAsync());
+                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem)).ToListAsync();
+        });
 
         api.MapGet("/projects/my", async (AtlasDbContext db) =>
             await db.Projects.Where(p => p.StakeholderVisible && !p.Archived).OrderBy(p => p.Id).Select(p =>
@@ -100,12 +108,12 @@ public static class Endpoints
                 .Select(x => new ProductDto(x.Id, x.Name, x.Owner, x.Source, x.Projects,
                     x.Tasks.OrderBy(t => t.Id).Select(t => new TaskDto(t.TaskId, t.Title, t.Status, t.Points, t.DateIso, t.MappedRelease)).ToList(),
                     x.Members.OrderBy(m => m.Id).Select(m => new MemberDto(m.Name, m.Alloc)).ToList(),
-                    x.Releases)).ToListAsync());
+                    x.Releases, x.Status)).ToListAsync());
 
         api.MapGet("/okrs", async (AtlasDbContext db) =>
             await db.Objectives.OrderBy(o => o.Id)
                 .Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
-                    o.Krs.OrderBy(k => k.Id).Select(k => new KrDto(k.Id, k.Title, k.Link, k.Progress)).ToList()))
+                    o.Krs.OrderBy(k => k.Id).Select(k => new KrDto(k.Id, k.Title, k.Link, k.Progress)).ToList(), o.Status))
                 .ToListAsync());
 
         api.MapGet("/resources", async (AtlasDbContext db) =>

@@ -10,7 +10,8 @@ import { usePermissions } from "@/components/usePermissions";
 // Data model + hook (empty by default until the API exists).
 // ---------------------------------------------------------------------------
 interface Kr { id: string; title: string; link: string; progress: number }
-interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[] }
+interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[]; status?: string }
+type OkrStatus = "Active" | "Completed";
 
 interface NewObjective { title: string; owner: string; horizon: string }
 interface NewKr { title: string; link: string; progress: number }
@@ -54,6 +55,15 @@ export default function Okrs() {
       api<Kr>(`/krs/${krId}`, { method: "PATCH", body: JSON.stringify({ progress }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
   });
+  const setStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api(`/okrs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+
+  const [okrStatus, setOkrStatus] = useState<OkrStatus>("Active");
+  const shown = objectives.filter((o) => (o.status ?? "Active") === okrStatus);
+  const countBy = (s: OkrStatus) => objectives.filter((o) => (o.status ?? "Active") === s).length;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -68,7 +78,16 @@ export default function Okrs() {
         )}
       </div>
 
-      {objectives.length === 0 ? (
+      {/* Objectives aren't deleted — a completed objective moves to Completed. */}
+      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+        {(["Active", "Completed"] as OkrStatus[]).map((s) => (
+          <button key={s} onClick={() => setOkrStatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: okrStatus === s ? "#fff" : "transparent", color: okrStatus === s ? color.primary : "#6A7488", boxShadow: okrStatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+            {s} · {countBy(s)}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
         <div style={{
           background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16,
           padding: "56px 24px", textAlign: "center",
@@ -77,15 +96,16 @@ export default function Okrs() {
             width: 46, height: 46, borderRadius: 12, background: "#EEF3FB", color: color.primary,
             display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px",
           }}><Icon name="target" size={22} /></div>
-          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>No objectives yet</div>
+          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{okrStatus === "Completed" ? "No completed objectives yet" : "No objectives yet"}</div>
           <div style={{ fontSize: 13, color: color.faint2, marginTop: 4 }}>
-            {canEdit ? "Create an objective and link key results to the work that delivers them."
+            {okrStatus === "Completed" ? "Objectives you mark complete will appear here."
+              : canEdit ? "Create an objective and link key results to the work that delivers them."
               : "Objectives will appear here once the PMO defines them."}
           </div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {objectives.map((o) => {
+          {shown.map((o) => {
             const p = objProgress(o);
             return (
               <div key={o.id} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -101,6 +121,11 @@ export default function Okrs() {
                     <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: objInk(p) }}>{p}%</div>
                     <div style={{ fontSize: 10.5, color: color.faint3 }}>objective</div>
                   </div>
+                  {canEdit && (
+                    (o.status ?? "Active") === "Completed"
+                      ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
+                      : <button onClick={() => setStatus.mutate({ id: o.id, status: "Completed" })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", border: "1px solid #BFE6CE", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="check" size={14} /> Mark complete</button>
+                  )}
                 </div>
                 <div style={{ padding: "8px 22px 16px" }}>
                   {o.krs.length === 0 && (

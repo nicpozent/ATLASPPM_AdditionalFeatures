@@ -90,11 +90,13 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
 
         b.Entity<Product>().HasKey(x => x.Id);
         b.Entity<Product>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<Product>().Property(x => x.Status).HasDefaultValue("Active");
         b.Entity<Product>().HasMany(x => x.Tasks).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<Product>().HasMany(x => x.Members).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<Objective>().HasKey(x => x.Id);
         b.Entity<Objective>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<Objective>().Property(x => x.Status).HasDefaultValue("Active");
         b.Entity<Objective>().HasMany(x => x.Krs).WithOne().HasForeignKey(x => x.ObjectiveId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<KeyResult>().HasKey(x => x.Id);
         b.Entity<KeyResult>().Property(x => x.Id).ValueGeneratedNever();

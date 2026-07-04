@@ -4,10 +4,11 @@ import { api } from "@/api";
 
 export interface Project {
   id: string; name: string; dept: string; owner: string; methodology: string;
-  status: "green" | "amber" | "red" | "hold"; health: string; progress: number;
+  status: "green" | "amber" | "red" | "hold" | "completed"; health: string; progress: number;
   budget: number; spent: number; target: string; blockerCount: number;
   archived?: boolean; isSystem?: boolean;
 }
+export type ProjectBucket = "active" | "completed" | "archived";
 export type BlockerStatus = "Active" | "In progress" | "Resolved";
 export interface Blocker {
   id: string; title: string; projectId: string; projectName: string; owner: string; status: BlockerStatus;
@@ -22,11 +23,12 @@ export const STATUS_FILTERS: StatusFilter[] = [
   { key: "hold",  label: "On hold",  match: (p: Project) => p.status === "hold",  ink: "#566077", tint: "#EEF0F4" },
 ];
 
-export function useProjects(archived = false) {
+export function useProjects(bucket: ProjectBucket = "active") {
+  const qs = bucket === "archived" ? "?archived=true" : bucket === "completed" ? "?completed=true" : "";
   return useQuery({
-    queryKey: ["projects", archived ? "archived" : "active"], retry: false, staleTime: 60_000,
+    queryKey: ["projects", bucket], retry: false, staleTime: 60_000,
     queryFn: async (): Promise<Project[]> => {
-      try { return (await api<Project[]>(`/projects${archived ? "?archived=true" : ""}`)) ?? []; } catch { return []; }
+      try { return (await api<Project[]>(`/projects${qs}`)) ?? []; } catch { return []; }
     },
   });
 }

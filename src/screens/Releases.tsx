@@ -7,8 +7,9 @@ import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 
 // ---- data ----------------------------------------------------------------
-type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back";
+type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed";
 type ReleaseScope = "Product" | "Project" | "Program";
+const RELEASE_STATUSES: ReleaseStatus[] = ["Planned", "In progress", "Deployed", "Rolled back", "Completed"];
 
 type Release = {
   id: string; name: string; reqs: number; crs: number; owner: string;
@@ -37,6 +38,7 @@ const STATUS_OPTS = [
   { value: "Planned", label: "Planned" },
   { value: "In progress", label: "In progress" },
   { value: "Deployed", label: "Deployed" },
+  { value: "Completed", label: "Completed" },
 ];
 
 const STATUS_COLORS: Record<string, { ink: string; tint: string }> = {
@@ -44,6 +46,7 @@ const STATUS_COLORS: Record<string, { ink: string; tint: string }> = {
   "In progress": { ink: "#0C5798", tint: "#E6EFFB" },
   Deployed: { ink: "#0B6B37", tint: "#E7F4EC" },
   "Rolled back": { ink: "#A1282B", tint: "#FBE7E8" },
+  Completed: { ink: "#0C5798", tint: "#E6EFFB" },
 };
 const RISK_COLORS: Record<string, { ink: string; tint: string }> = {
   Low: { ink: "#0B6B37", tint: "#E7F4EC" },
@@ -83,6 +86,11 @@ export default function Releases() {
   const mayCreate = can("cap-projects", "E");
   const createRelease = useMutation({
     mutationFn: (body: NewRelease) => api<Release>("/releases", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
+  });
+  const changeStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api(`/releases/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["releases"] }),
   });
 
@@ -175,7 +183,16 @@ export default function Releases() {
                   </div>
                 </div>
                 <div><span style={{ fontSize: 11, fontWeight: 700, color: rc.ink, background: rc.tint, padding: "3px 9px", borderRadius: 6 }}>{r.risk}</span></div>
-                <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 7px", borderRadius: 6 }}>{r.status}</span></div>
+                <div>
+                  {mayCreate ? (
+                    <select value={r.status} onChange={(e) => changeStatus.mutate({ id: r.id, status: e.target.value })}
+                      style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, border: "none", borderRadius: 6, padding: "3px 6px", cursor: "pointer", fontFamily: "inherit" }}>
+                      {RELEASE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 7px", borderRadius: 6 }}>{r.status}</span>
+                  )}
+                </div>
               </div>
             );
           })}

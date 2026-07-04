@@ -125,10 +125,10 @@ public record ProgramDto(string Id, string Name, string Owner, string Goal, stri
 public record TaskDto(string Id, string Title, string Status, int Points, string DateISO, string MappedRelease);
 public record MemberDto(string Name, int Alloc);
 public record ProductDto(string Id, string Name, string Owner, string Source, List<string> Projects,
-    List<TaskDto> Tasks, List<MemberDto> Members, List<string> Releases);
+    List<TaskDto> Tasks, List<MemberDto> Members, List<string> Releases, string Status = "Active");
 
 public record KrDto(string Id, string Title, string Link, int Progress);
-public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs);
+public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active");
 
 public record ResourceDto(string Name, string Role, string Dept, string Initials, string Color,
     int OpsPct, int ProjectPct, int ProductPct, bool Over);

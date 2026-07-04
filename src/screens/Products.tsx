@@ -13,8 +13,12 @@ interface Task { id: string; title: string; status: string; points: number; date
 interface Member { name: string; alloc: number }
 interface Product {
   id: string; name: string; owner: string; source: Source; projects: string[];
-  tasks: Task[]; members?: Member[]; releases?: string[];
+  tasks: Task[]; members?: Member[]; releases?: string[]; status?: string;
 }
+type ProductStatus = "Active" | "Retired" | "Replaced";
+const PRODUCT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
+  Active: { ink: "#0B6B37", tint: "#E7F4EC" }, Retired: { ink: "#566077", tint: "#EEF0F4" }, Replaced: { ink: "#8A6300", tint: "#FBF2D7" },
+};
 
 const SOURCE_META: Record<Source, { label: string; c: string }> = {
   jira: { label: "Jira", c: "#2684FF" },
@@ -46,7 +50,10 @@ export default function Products() {
   const mayCreate = can("cap-projects", "F");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
+  const [pstatus, setPstatus] = useState<ProductStatus>("Active");
   const selected = useMemo(() => products.find((p) => p.id === selectedId) ?? null, [products, selectedId]);
+  const shown = products.filter((p) => (p.status ?? "Active") === pstatus);
+  const countBy = (s: ProductStatus) => products.filter((p) => (p.status ?? "Active") === s).length;
   const createProduct = useMutation({
     mutationFn: (body: NewProduct) => api<Product>("/products", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
@@ -66,13 +73,21 @@ export default function Products() {
         <div style={{ fontSize: 13.5, color: color.subtle, flex: 1 }}>Products are durable containers; projects &amp; programs deliver against them. Tasks sync from Jira/ADO and are mapped to releases.</div>
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create products"}><Icon name="plus" size={16} /> New product</Button>
       </div>
-      {products.length === 0 ? (
+      {/* Products aren't deleted — they move through Active / Retired / Replaced. */}
+      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+        {(["Active", "Retired", "Replaced"] as ProductStatus[]).map((s) => (
+          <button key={s} onClick={() => setPstatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: pstatus === s ? "#fff" : "transparent", color: pstatus === s ? color.primary : "#6A7488", boxShadow: pstatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+            {s} · {countBy(s)}
+          </button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
         <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
-          No products yet. Products appear here once synced from Jira or Azure DevOps.
+          {products.length === 0 ? "No products yet. Products appear here once synced from Jira or Azure DevOps." : `No ${pstatus.toLowerCase()} products.`}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
-          {products.map((p) => {
+          {shown.map((p) => {
             const done = p.tasks.filter((t) => t.status === "Done").length;
             const pts = p.tasks.reduce((s, t) => s + (t.points || 0), 0);
             const src = SOURCE_META[p.source];
@@ -150,7 +165,14 @@ function NewProductModal({ onClose, onCreate, submitting }: {
 
 function ProductDetail({ product, onClose }: { product: Product; onClose: () => void }) {
   const src = SOURCE_META[product.source];
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const mayManage = can("cap-projects", "E");
   const [costsOpen, setCostsOpen] = useState(false);
+  const setStatus = useMutation({
+    mutationFn: (status: string) => api(`/products/${product.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+  });
   const [tasks, setTasks] = useState<Task[]>(product.tasks);
   const [members, setMembers] = useState<Member[]>(product.members ?? []);
   const relOpts = useMemo(() => {
@@ -176,6 +198,15 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
             <div style={{ fontSize: 12.5, color: color.faint2 }}>Owner {product.owner} · Projects: {product.projects.join(", ") || "—"}</div>
           </div>
           <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#fff", background: src.c, padding: "6px 12px", borderRadius: 8 }}><Icon name="sync" size={16} /> Synced from {src.label}</span>
+          {(() => { const c = PRODUCT_STATUS_COLOR[product.status ?? "Active"] ?? PRODUCT_STATUS_COLOR.Active; return (
+            <span style={{ fontSize: 12, fontWeight: 700, color: c.ink, background: c.tint, padding: "5px 11px", borderRadius: 20 }}>{product.status ?? "Active"}</span>
+          ); })()}
+          {mayManage && (
+            <select value={product.status ?? "Active"} onChange={(e) => setStatus.mutate(e.target.value)} title="Lifecycle status — products aren't deleted"
+              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+              {["Active", "Retired", "Replaced"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
         </div>
       </div>

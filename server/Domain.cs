@@ -196,6 +196,7 @@ public class Product
     public string Name { get; set; } = default!;
     public string Owner { get; set; } = default!;
     public string Source { get; set; } = "jira";       // jira|ado
+    public string Status { get; set; } = "Active";     // Active|Retired|Replaced (products aren't deleted)
     public List<string> Projects { get; set; } = new();
     public List<string> Releases { get; set; } = new();
     public List<ProductTask> Tasks { get; set; } = new();
@@ -228,6 +229,7 @@ public class Objective
     public string Title { get; set; } = default!;
     public string Owner { get; set; } = default!;
     public string Horizon { get; set; } = default!;
+    public string Status { get; set; } = "Active";     // Active|Completed (objectives aren't deleted)
     public List<KeyResult> Krs { get; set; } = new();
 }
 
