@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
@@ -30,10 +30,6 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number][0];
 
-const GATES = [
-  "G0 · Concept / Mandate", "G1 · Initiation", "G2 · Plan & Design",
-  "G3 · Build ready", "G4 · Release readiness", "G5 · Close & benefits",
-];
 const BOARD_COLS = [
   { label: "To Do", color: "#8A93A6" }, { label: "In Progress", color: "#0F6CBD" },
   { label: "In Review", color: "#E0A100" }, { label: "Done", color: "#15A34A" }, { label: "Blocked", color: "#D13438" },
@@ -97,7 +93,7 @@ export default function Project() {
 
       {tab === "overview" && <Overview />}
       {tab === "tasks" && <Tasks />}
-      {tab === "governance" && <Governance />}
+      {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid />}
       {tab === "comments" && <Comments />}
       {["epics", "requirements", "quality", "architecture", "security", "dependencies", "vacations", "artifacts"].includes(tab) && (
@@ -178,23 +174,103 @@ function Tasks() {
   );
 }
 
-function Governance() {
+interface GateCriterion { id: number; label: string; met: boolean; }
+interface Gate { id: number; code: string; name: string; approver: string; status: string; date: string; pct: number; metLabel: string; criteria: GateCriterion[]; }
+interface GatesData { canGovern: boolean; gates: Gate[]; }
+
+const GATE_STATUS: Record<string, { ink: string; tint: string }> = {
+  Approved:      { ink: "#0B6B37", tint: "#E7F4EC" },
+  Pending:       { ink: "#8A6300", tint: "#FBF2D7" },
+  Rejected:      { ink: "#A1282B", tint: "#FBE7E8" },
+  "Not started": { ink: "#8A92A6", tint: "#EEF1F6" },
+};
+
+function Governance({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["gates", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<GatesData> => (await api<GatesData>(`/projects/${projectId}/gates`)) ?? { canGovern: false, gates: [] },
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["gates", projectId] });
+  const toggle = useMutation({
+    mutationFn: (v: { critId: number; met: boolean }) => api(`/gates/criteria/${v.critId}`, { method: "PATCH", body: JSON.stringify({ met: v.met }) }),
+    onSuccess: invalidate,
+  });
+  const decide = useMutation({
+    mutationFn: (v: { gateId: number; action: "approve" | "reject" }) => api(`/gates/${v.gateId}/${v.action}`, { method: "POST" }),
+    onSuccess: invalidate,
+  });
+
+  const gates = data?.gates ?? [];
+  const canGovern = data?.canGovern ?? false;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its governance." /></Card>;
+
   return (
-    <Card padding={22}>
-      <SectionTitle>Stage gates · G0–G5</SectionTitle>
-      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Phase-gate governance across the project lifecycle.</div>
-      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
-        {GATES.map((g, i) => (
-          <div key={g} style={{ flex: "1 0 180px", border: `1px solid ${color.border}`, borderRadius: 12, padding: "14px 15px", background: color.surfaceAlt }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ width: 26, height: 26, borderRadius: 8, background: color.bg, color: color.faint, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.head, fontWeight: 700, fontSize: 12 }}>{`G${i}`}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: color.text }}>{g.split(" · ")[1]}</span>
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: color.faint3, background: color.bg, padding: "2px 9px", borderRadius: 20 }}>Not started</span>
-          </div>
-        ))}
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Stage-gate approvals, review checkpoints &amp; decision log.</div>
+        <div style={{ flex: 1 }} />
+        {canGovern && <span style={{ fontSize: 11, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 10px", borderRadius: 6 }}>You can approve gates</span>}
       </div>
-    </Card>
+
+      {/* gate rail */}
+      <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, marginBottom: 20 }}>
+        {gates.map((g) => {
+          const sc = GATE_STATUS[g.status] ?? GATE_STATUS["Not started"];
+          const canAct = canGovern && g.status !== "Approved";
+          return (
+            <div key={g.id} style={{ flex: "0 0 224px", background: color.surface, border: `1px solid ${color.border}`, borderRadius: 14, padding: "15px 16px", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ flex: 1, fontFamily: font.head, fontSize: 13.5, fontWeight: 600, color: color.ink }}>{g.name}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>{g.status}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: color.faint3, marginBottom: 10 }}>
+                <span>{g.approver}</span><span>·</span><span>{g.date || "—"}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 4, background: color.bg, overflow: "hidden", marginBottom: 8 }}><div style={{ height: "100%", width: `${g.pct}%`, background: color.primary }} /></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 12 }}>
+                {g.criteria.map((c) => (
+                  <button key={c.id} onClick={() => canGovern && toggle.mutate({ critId: c.id, met: !c.met })} disabled={!canGovern || toggle.isPending}
+                    style={{ display: "flex", alignItems: "flex-start", gap: 7, textAlign: "left", background: "none", border: "none", padding: 0, cursor: canGovern ? "pointer" : "default", fontFamily: "inherit" }}>
+                    <span style={{ flex: "none", width: 14, height: 14, borderRadius: 4, marginTop: 1, background: c.met ? "#15A34A" : "transparent", border: c.met ? "none" : `1.5px solid ${color.border2}`, color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.met ? "✓" : ""}</span>
+                    <span style={{ fontSize: 11.5, color: color.text, lineHeight: 1.35 }}>{c.label}</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{ flex: 1 }} />
+              <div style={{ fontSize: 10.5, color: color.faint3, marginBottom: 8 }}>{g.metLabel}</div>
+              {canAct && (
+                <div style={{ display: "flex", gap: 7 }}>
+                  <button onClick={() => decide.mutate({ gateId: g.id, action: "approve" })} disabled={decide.isPending}
+                    style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "#fff", background: "#0B6B37", border: "none", borderRadius: 8, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>Approve</button>
+                  <button onClick={() => decide.mutate({ gateId: g.id, action: "reject" })} disabled={decide.isPending}
+                    style={{ flex: "none", fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* review checkpoints (structural; populated from architecture/security reviews) */}
+      <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
+        <div style={{ padding: "16px 22px 13px", fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Architecture &amp; security review checkpoints</div>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1fr 1.2fr 0.9fr 0.8fr 2.2fr", padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Gate</div><div>Type</div><div>Reviewer</div><div>Status</div><div>Date</div><div>Note</div>
+        </div>
+        <EmptyBlock message="No review checkpoints scheduled yet." minHeight={120} />
+      </Card>
+
+      {/* decision log (structural) */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px 13px", fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Decision log</div>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1.6fr 2fr 1fr 0.8fr 0.9fr", padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>ID</div><div>Decision</div><div>Rationale</div><div>Owner</div><div>Date</div><div>Status</div>
+        </div>
+        <EmptyBlock message="No decisions logged yet." minHeight={120} />
+      </Card>
+    </div>
   );
 }
 

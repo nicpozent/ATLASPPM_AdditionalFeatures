@@ -25,6 +25,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Capability> Capabilities => Set<Capability>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Gate> Gates => Set<Gate>();
+    public DbSet<GateCriterion> GateCriteria => Set<GateCriterion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -94,6 +96,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<RolePermission>().HasIndex(x => new { x.RoleId, x.CapabilityKey }).IsUnique();
         b.Entity<AuditEvent>().HasKey(x => x.Id);
         b.Entity<AuditEvent>().HasIndex(x => x.At);
+        b.Entity<Gate>().HasKey(x => x.Id);
+        b.Entity<Gate>().HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
+        b.Entity<Gate>().HasMany(x => x.Criteria).WithOne().HasForeignKey(x => x.GateId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<GateCriterion>().HasKey(x => x.Id);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

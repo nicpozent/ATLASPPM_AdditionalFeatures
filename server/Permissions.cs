@@ -52,13 +52,19 @@ public static class Permissions
     static async Task<string> LevelAsync(string roleId, AtlasDbContext db, string cap) =>
         (await db.RolePermissions.FirstOrDefaultAsync(p => p.RoleId == roleId && p.CapabilityKey == cap))?.Level ?? "N";
 
+    // True when the caller's effective role has at least `min` on `cap`.
+    public static async Task<bool> Allows(HttpContext http, AtlasDbContext db, IConfiguration cfg, string cap, string min)
+    {
+        var roleId = ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false));
+        if (roleId is null) return true;                       // dev, no impersonation → allow
+        return Rank(await LevelAsync(roleId, db, cap)) >= Rank(min);
+    }
+
     // Returns a 403 result when the caller's role lacks `min` access to `cap`,
     // or null when the action is allowed (call at the top of a write handler).
     public static async Task<IResult?> Deny(HttpContext http, AtlasDbContext db, IConfiguration cfg, string cap, string min)
     {
-        var roleId = ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false));
-        if (roleId is null) return null;                       // dev, no impersonation → allow
-        if (Rank(await LevelAsync(roleId, db, cap)) >= Rank(min)) return null;
+        if (await Allows(http, db, cfg, cap, min)) return null;
         var label = (await db.Capabilities.FindAsync(cap))?.Label ?? cap;
         return Results.Json(
             new { error = $"Your role doesn’t have the access needed to “{label}”." },

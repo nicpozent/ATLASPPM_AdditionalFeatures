@@ -25,6 +25,12 @@ public record DemandDetailDto(string Id, string Title, string Stage, string Prio
 
 public record AuditEventDto(string At, string Actor, string Role, string Category, string Action, string Target);
 
+// ---- Stage gates -----------------------------------------------------------
+public record GateCriterionDto(int Id, string Label, bool Met);
+public record GateDto(int Id, string Code, string Name, string Approver, string Status, string Date,
+    int Pct, string MetLabel, List<GateCriterionDto> Criteria);
+public record GatesDto(bool CanGovern, List<GateDto> Gates);
+
 // ---- Roles & permissions ---------------------------------------------------
 public record CapabilityDto(string Key, string Label);
 public record RoleDto(string Id, string Name, string Short, string Who, string Description,
