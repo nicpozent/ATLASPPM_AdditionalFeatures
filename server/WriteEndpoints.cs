@@ -15,8 +15,9 @@ public record CreateBlockerReq(string Title, string ProjectId, string? Owner, st
 public record UpdateBlockerStatusReq(string Status);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
-    string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast);
-public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects);
+    string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
+    string? StartDate);
+public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
@@ -247,6 +248,7 @@ public static class WriteEndpoints
             if (req.Progress is int pr) p.Progress = Math.Clamp(pr, 0, 100);
             if (!string.IsNullOrWhiteSpace(req.Phase)) p.Phase = req.Phase!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Target)) { p.Target = req.Target!.Trim(); p.Due = p.Target; }
+            if (req.StartDate is not null) p.StartDate = req.StartDate.Trim();
             if (req.Budget is decimal b && b >= 0) p.Budget = b;
             if (req.Spent is decimal s && s >= 0) p.Spent = s;
             if (req.Forecast is decimal fc && fc >= 0) p.Forecast = fc;
@@ -254,7 +256,7 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Updated project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.Ok(new ProjectDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
-                p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem));
+                p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate));
         });
 
         // Archive / restore a project (soft delete). Archived projects drop out of
@@ -343,12 +345,13 @@ public static class WriteEndpoints
                 Status = string.IsNullOrWhiteSpace(req.Status) ? "On track" : req.Status!.Trim(),
                 Projects = req.Projects ?? new(),
                 Health = "green",
+                StartDate = req.StartDate?.Trim() ?? "",
             };
             db.Programs.Add(pg);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
-                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health));
+                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate));
         });
 
         // ---- Products ------------------------------------------------------
@@ -361,7 +364,8 @@ public static class WriteEndpoints
                 Id = await NextId(db.Products.Select(x => x.Id), "PRD-", db),
                 Name = req.Name.Trim(),
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
-                Source = req.Source == "ado" ? "ado" : "jira",
+                // Manually-created products are tagged "manual", not a tracker.
+                Source = req.Source is "ado" or "jira" ? req.Source! : "manual",
                 Projects = req.Projects ?? new(),
             };
             db.Products.Add(p);

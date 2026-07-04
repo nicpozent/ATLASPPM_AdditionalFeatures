@@ -20,6 +20,7 @@ public class Project
     public string Target { get; set; } = default!;    // display date, e.g. "12 Sep 2026"
     public string Phase { get; set; } = default!;
     public string Due { get; set; } = default!;
+    public string StartDate { get; set; } = "";        // display date, project start
 
     // Financials breakdown (feeds /financials).
     public decimal Capex { get; set; }
@@ -188,6 +189,7 @@ public class Program
     public decimal Spent { get; set; }
     public int Progress { get; set; }
     public string Health { get; set; } = "green";
+    public string StartDate { get; set; } = "";        // display date, program start
 }
 
 public class Product

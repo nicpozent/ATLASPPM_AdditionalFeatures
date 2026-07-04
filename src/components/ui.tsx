@@ -184,6 +184,13 @@ export function Modal({ children, onClose, width = 460, label }: {
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Keep the latest onClose without re-running the focus-trap effect: if the
+  // trap re-ran on every render (e.g. a caller whose form state lives in a
+  // parent, so each keystroke re-renders and passes a new onClose), it would
+  // steal focus back to the first control on every keypress. Update the ref in
+  // an effect (never during render).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -195,11 +202,11 @@ export function Modal({ children, onClose, width = 460, label }: {
         'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
       ) ?? []).filter((el) => el.offsetParent !== null);
 
-    // Move focus into the dialog.
+    // Move focus into the dialog once, on open.
     (focusables()[0] ?? panelRef.current)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); return; }
+      if (e.key === "Escape") { e.stopPropagation(); onCloseRef.current(); return; }
       if (e.key === "Tab") {
         const els = focusables();
         if (els.length === 0) { e.preventDefault(); return; }
@@ -214,7 +221,7 @@ export function Modal({ children, onClose, width = 460, label }: {
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

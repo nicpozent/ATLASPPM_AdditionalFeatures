@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Button, Modal, Input } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { CostsModal } from "@/components/CostsModal";
 
 const FIN_SOURCES = [

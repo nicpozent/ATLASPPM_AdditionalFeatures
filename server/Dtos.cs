@@ -8,7 +8,7 @@ namespace Atlas.Api;
 
 public record ProjectDto(string Id, string Name, string Dept, string Owner, string Methodology,
     string Status, string Health, int Progress, decimal Budget, decimal Spent, string Target, int BlockerCount,
-    bool Archived = false, bool IsSystem = false);
+    bool Archived = false, bool IsSystem = false, string StartDate = "");
 
 public record BlockerDto(string Id, string Title, string ProjectId, string ProjectName, string Owner, string Status);
 
@@ -120,7 +120,7 @@ public record RoleDto(string Id, string Name, string Short, string Who, string D
 public record RolesMatrixDto(List<CapabilityDto> Capabilities, List<RoleDto> Roles, bool CanManage);
 
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
-    List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health);
+    List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health, string StartDate = "");
 
 public record TaskDto(string Id, string Title, string Status, int Points, string DateISO, string MappedRelease);
 public record MemberDto(string Name, int Alloc);
@@ -148,7 +148,8 @@ public record StakeholderProjectDto(string Id, string Name, string Dept, string 
     int Progress, string Target, string Phase);
 
 public record ProjectDetailDto(string Id, string Name, string Dept, string Owner, string Methodology,
-    string Status, string Health, int Progress, string Phase, decimal Budget, decimal Spent, string Due);
+    string Status, string Health, int Progress, string Phase, decimal Budget, decimal Spent, string Due,
+    string StartDate = "", string Target = "");
 
 // ---- Dashboard -------------------------------------------------------------
 public record KpiValueDto(string Value, string Delta, bool Good, List<int> Spark);
