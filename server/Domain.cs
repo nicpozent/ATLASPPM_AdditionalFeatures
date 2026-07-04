@@ -55,6 +55,24 @@ public class Blocker
     public string Status { get; set; } = "Active";    // Active|In progress|Resolved
 }
 
+// Operational work (incidents, maintenance, service requests, on-call, changes)
+// that can affect a project's delivery. Linked to the project it impacts; active
+// high-severity items surface as deterministic risks. Source is Manual today but
+// the field is connector-ready (ServiceNow / ManageEngine SDP / Jira / ADO).
+public class OperationalItem
+{
+    public int Id { get; set; }
+    public string Ref { get; set; } = default!;       // "OPS-001" or an external key
+    public string Title { get; set; } = default!;
+    public string Type { get; set; } = "Incident";    // Incident | Maintenance | Service request | On-call | Change
+    public string Severity { get; set; } = "Medium";  // Critical | High | Medium | Low
+    public string Status { get; set; } = "Open";       // Open | In progress | Resolved | Closed
+    public string Source { get; set; } = "Manual";     // Manual | ServiceNow | ManageEngine SDP | Jira | Azure DevOps
+    public string? ProjectId { get; set; }             // affected project (null = unlinked)
+    public string Owner { get; set; } = "";
+    public string Date { get; set; } = "";             // raised, display date
+}
+
 // A person assigned to a project role. RoleKey is "pm" (the project lead, set by
 // PMO) or one of the architecture role keys (set by the Chief Architect). One
 // row per (project, role). Person "" = unassigned, "N/A" = not applicable.

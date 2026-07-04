@@ -28,6 +28,7 @@ public static class Endpoints
         api.MapAssignmentEndpoints();
         api.MapTemplateEndpoints();
         api.MapSpilloverEndpoints();
+        api.MapOperationalEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

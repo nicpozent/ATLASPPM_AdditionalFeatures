@@ -45,6 +45,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Absence> Absences => Set<Absence>();
     public DbSet<CostLine> CostLines => Set<CostLine>();
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+    public DbSet<OperationalItem> OperationalItems => Set<OperationalItem>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -155,6 +156,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<CostLine>().Property(x => x.OwnerRoles).HasDefaultValueSql("'{}'::text[]");
         b.Entity<RoleAssignment>().HasKey(x => x.Id);
         b.Entity<RoleAssignment>().HasIndex(x => new { x.ProjectId, x.RoleKey }).IsUnique();
+        b.Entity<OperationalItem>().HasKey(x => x.Id);
+        b.Entity<OperationalItem>().HasIndex(x => x.ProjectId);
 
         b.Entity<DeliveryReport>().HasKey(x => x.Period);
         b.Entity<DashboardKpi>().HasKey(x => x.Key);

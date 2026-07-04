@@ -35,6 +35,15 @@ function useSpillover() {
   });
 }
 
+type OpItem = { id: number; severity: string; status: string; type: string; projectId: string | null; projectName: string | null };
+function useOperational() {
+  return useQuery({
+    queryKey: ["operational-all"], retry: false, staleTime: 30000,
+    queryFn: async (): Promise<OpItem[]> => (await api<OpItem[]>("/operational")) ?? [],
+  });
+}
+const opActive = (s: string) => s === "Open" || s === "In progress";
+
 const PERIODS: { key: Period; label: string; report: string }[] = [
   { key: "weekly", label: "Weekly", report: "This week" },
   { key: "monthly", label: "Monthly", report: "This month" },
@@ -84,6 +93,10 @@ export default function Delivery() {
   const [view, setView] = useState<"delivery" | "cfo">("delivery");
   const { data = {} } = useDelivery();
   const { data: spill } = useSpillover();
+  const { data: ops = [] } = useOperational();
+  const opsActiveItems = ops.filter((o) => opActive(o.status));
+  const opsHigh = opsActiveItems.filter((o) => o.severity === "Critical" || o.severity === "High").length;
+  const opsProjects = new Set(opsActiveItems.map((o) => o.projectId).filter(Boolean)).size;
 
   const meta = PERIODS.find((p) => p.key === period)!;
   const dd = data[period];
@@ -175,6 +188,22 @@ export default function Delivery() {
                 </span>
               ))}
               {(!spill || spill.total === 0) && <span style={{ fontSize: 12, color: color.faint3 }}>No tasks are past their baselined sprint.</span>}
+            </div>
+          </div>
+
+          {/* Operational deviations — active ops work impacting delivery, portfolio-wide. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: opsHigh > 0 ? "#FDEEEF" : color.surface, border: `1px solid ${opsHigh > 0 ? "#F3C9CB" : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 9, flex: "none" }}>
+              <span style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: opsHigh > 0 ? "#A1282B" : color.ink }}>{opsActiveItems.length}</span>
+              <span style={{ fontSize: 12.5, color: color.faint }}>active operational item{opsActiveItems.length === 1 ? "" : "s"}{opsProjects > 0 ? ` · ${opsProjects} project${opsProjects === 1 ? "" : "s"}` : ""}</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 200, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {opsHigh > 0 && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3C9CB", borderRadius: 20, padding: "3px 11px" }}>{opsHigh} high / critical</span>}
+              {["Incident", "Change", "Maintenance"].map((t) => {
+                const n = opsActiveItems.filter((o) => o.type === t).length;
+                return n > 0 ? <span key={t} style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, borderRadius: 20, padding: "3px 11px" }}>{t} <span style={{ fontFamily: font.mono, fontWeight: 700 }}>{n}</span></span> : null;
+              })}
+              {opsActiveItems.length === 0 && <span style={{ fontSize: 12, color: color.faint3 }}>No active operational items affecting delivery.</span>}
             </div>
           </div>
 

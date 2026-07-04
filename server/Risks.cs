@@ -37,6 +37,19 @@ public static class Risks
             f.Add(new("Medium", "Schedule", $"{spill} task{(spill > 1 ? "s" : "")} slipped the baseline sprint",
                 "Scope has carried over from its baselined sprint (spillover).", "PMO governance", "Schedule baseline"));
 
+        // ---- Operational impact (ITIL / change & incident management) ------
+        var ops = await db.OperationalItems.Where(o => o.ProjectId == id && (o.Status == "Open" || o.Status == "In progress")).ToListAsync();
+        var opsCrit = ops.Count(o => o.Severity is "Critical" or "High");
+        if (opsCrit > 0)
+            f.Add(new(ops.Any(o => o.Severity == "Critical") ? "High" : "Medium", "Operational",
+                $"{opsCrit} operational item{(opsCrit > 1 ? "s" : "")} impacting delivery",
+                "Active incidents/changes/maintenance affecting this project can cause delivery deviations.",
+                "ITIL / PMO governance", "Incident & change management"));
+        else if (ops.Count > 0)
+            f.Add(new("Low", "Operational", $"{ops.Count} open operational item{(ops.Count > 1 ? "s" : "")}",
+                "Operational work is linked to this project; monitor for delivery impact.",
+                "ITIL / PMO governance", "Incident & change management"));
+
         // Inherited dependency risk
         var deps = await db.ProjectDependencies.Where(d => d.ProjectId == id).Select(d => d.DependsOnId).ToListAsync();
         if (deps.Count > 0)
