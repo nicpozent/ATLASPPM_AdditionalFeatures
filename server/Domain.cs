@@ -327,6 +327,19 @@ public class ProjectTask
     public int Ord { get; set; }
 }
 
+// ---- Epics ----------------------------------------------------------------
+public class Epic
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public int Stories { get; set; }
+    public int Done { get; set; }
+    public string Status { get; set; } = "Upcoming";     // Complete | In progress | Upcoming | At risk
+    public string DependsOn { get; set; } = "";
+    public int Ord { get; set; }
+}
+
 // ---- Security, privacy & compliance ---------------------------------------
 // One profile per project; controls are a per-project evidence register.
 public class SecurityProfile

@@ -4,6 +4,7 @@ namespace Atlas.Api;
 
 public record CreateTaskReq(string Name, string? Epic, string? Assignee, string? Status, string? Sprint, string? Baseline, string? Priority);
 public record UpdateTaskStatusReq(string Status);
+public record CreateEpicReq(string Name, int? Stories, int? Done, string? Status, string? DependsOn);
 
 // ============================================================================
 //  Project tasks — the board (Kanban) & table on Project → Tasks. Creating and
@@ -14,6 +15,7 @@ public static class Tasks
 {
     static readonly string[] Statuses = { "To Do", "In Progress", "In Review", "Done", "Blocked" };
     static readonly string[] Priorities = { "Critical", "High", "Medium", "Low" };
+    static readonly string[] EpicStatuses = { "Complete", "In progress", "Upcoming", "At risk" };
 
     public static void MapTaskEndpoints(this RouteGroupBuilder api)
     {
@@ -58,6 +60,41 @@ public static class Tasks
             await db.SaveChangesAsync();
             return Results.Ok(ToDto(task));
         });
+
+        // ---- Epics --------------------------------------------------------
+        api.MapGet("/projects/{id}/epics", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            var epics = await db.Epics.Where(e => e.ProjectId == id).OrderBy(e => e.Ord).ToListAsync();
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            return Results.Ok(new EpicsDto(canEdit, epics.Select(ToEpicDto).ToList()));
+        });
+
+        api.MapPost("/projects/{id}/epics", async (string id, CreateEpicReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+            var stories = Math.Max(0, req.Stories ?? 0);
+            var done = Math.Clamp(req.Done ?? 0, 0, stories);
+            var ord = (await db.Epics.Where(e => e.ProjectId == id).Select(e => (int?)e.Ord).MaxAsync() ?? 0) + 1;
+            var epic = new Epic
+            {
+                ProjectId = id, Ord = ord, Name = req.Name.Trim(), Stories = stories, Done = done,
+                Status = EpicStatuses.Contains(req.Status) ? req.Status! : "Upcoming",
+                DependsOn = req.DependsOn?.Trim() ?? "",
+            };
+            db.Epics.Add(epic);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Epics", "Created epic", $"{id} · {epic.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/projects/{id}/epics/{epic.Id}", ToEpicDto(epic));
+        });
+    }
+
+    static EpicDto ToEpicDto(Epic e)
+    {
+        var pct = e.Stories == 0 ? 0 : (int)Math.Round(100.0 * e.Done / e.Stories);
+        return new EpicDto(e.Id, e.Name, e.Stories, e.Done, pct, e.Status, e.DependsOn);
     }
 
     static ProjectTaskDto ToDto(ProjectTask t) =>
