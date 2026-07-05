@@ -81,6 +81,13 @@ public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
 public record CommEntryDto(int Id, string Stakeholder, string Channel, string CommType, string Schedule, string Owner, string Notes);
 public record CommPlanDto(bool CanEdit, List<CommEntryDto> Entries);
 
+// ---- Timeline / Gantt ------------------------------------------------------
+public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);
+public record MilestoneDto(int Id, string Label, int Month, string Date);
+public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones);
+public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<PhaseDto> Phases);
+public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> Milestones);
+
 // ---- Ways of working (methodology-specific ceremonies & artifacts) ---------
 public record WowItemDto(string Label, string Detail);
 public record WaysOfWorkingDto(string Methodology, string Cadence, string Summary,

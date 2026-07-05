@@ -167,6 +167,27 @@ public static class Templates
                     Status = "To Do", Priority = "Medium", Assignee = "Unassigned", Ord = taskOrd++,
                 });
         }
+
+        // Lay the delivery stages out on the timeline as sequential phases across
+        // the 12-month planning year, so the Gantt is coherent with the chosen
+        // methodology from day one. Progress starts at 0 (all planned) — no
+        // fabricated completion.
+        // Prefer genuine delivery stages; but agile scaffolds are mostly tasks with
+        // one epic, so if there are too few stages, lay every scaffold item out as a
+        // sequential phase — a coherent starting timeline rather than one giant bar.
+        var stages = items.Where(i => i.Type is "phase" or "epic" or "gate" or "iter").Select(i => i.Title).ToList();
+        if (stages.Count < 2) stages = items.Select(i => i.Title).ToList();
+        for (int i = 0; i < stages.Count; i++)
+        {
+            int start = i * 12 / stages.Count;
+            int end = Math.Max(start, (i + 1) * 12 / stages.Count - 1);
+            db.Phases.Add(new Phase
+            {
+                ProjectId = projectId, Name = stages[i],
+                StartMonth = Math.Clamp(start, 0, 11), EndMonth = Math.Clamp(end, 0, 11),
+                Progress = 0, Ord = i,
+            });
+        }
     }
 
     // Exposes a scaffold to the frontend so the wizard preview and what actually

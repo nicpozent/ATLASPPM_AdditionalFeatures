@@ -297,6 +297,30 @@ public class Resource
     public bool Over { get; set; }
 }
 
+// A scheduled delivery phase / workstream on a project's timeline (Gantt).
+// Months are 0-11 within the planning year; Progress drives the complete vs
+// planned fill. Seeded from the methodology scaffold, then editable.
+public class Phase
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = "";
+    public int StartMonth { get; set; }     // 0-11
+    public int EndMonth { get; set; }        // 0-11 inclusive
+    public int Progress { get; set; }        // 0-100
+    public int Ord { get; set; }
+}
+
+// A key date pinned on a project's timeline.
+public class Milestone
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Label { get; set; } = "";
+    public int Month { get; set; }           // 0-11
+    public string Date { get; set; } = "";   // display label (e.g. "Aug")
+}
+
 // A row in a project's stakeholder communication plan — which stakeholder is
 // reached, through which channel, what kind of communication and on what cadence.
 public class CommunicationEntry

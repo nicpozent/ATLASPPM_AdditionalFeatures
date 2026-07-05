@@ -328,6 +328,8 @@ public static class WriteEndpoints
             await db.RoleAssignments.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.DeletionRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.CommunicationEntries.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Phases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.Milestones.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             db.Projects.Remove(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
