@@ -5,6 +5,8 @@ import { color, font } from "@/theme";
 import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
+import { usePermissions } from "@/components/usePermissions";
+import { toast } from "@/components/Toast";
 import { SCREENS } from "@/nav";
 
 // ---- data (empty until API exists) -----------------------------------------
@@ -50,7 +52,10 @@ export default function Project() {
   const id = params.get("id");
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>("overview");
+  const [editing, setEditing] = useState(false);
   const { data: p } = useProject(id);
+  const { can } = usePermissions();
+  const mayEdit = can("cap-projects", "E");
 
   const dash = (v?: string | number) => (v == null || v === "" ? "—" : v);
   const fmt = (v?: number) => (v == null ? "—" : "€" + (v / 1000).toFixed(1) + "M");
@@ -70,6 +75,7 @@ export default function Project() {
             <div style={{ fontSize: 13, color: color.faint }}>{p ? `${p.dept} · Sponsor ${p.owner} · ${p.methodology}` : "Select a project from the Portfolio to view its detail."}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            {p && mayEdit && <Button variant="secondary" onClick={() => setEditing(true)}><Icon name="edit" size={16} /> Edit</Button>}
             <Button variant="secondary"><Icon name="download" size={16} /> Status PPTX</Button>
             <Button onClick={() => navigate(SCREENS.gantt.path)}><Icon name="gantt" size={16} /> Timeline</Button>
           </div>
@@ -114,6 +120,87 @@ export default function Project() {
       {tab === "dependencies" && <Dependencies projectId={id} />}
       {tab === "vacations" && <Vacations projectId={id} />}
       {tab === "comments" && <Comments />}
+
+      {editing && p && <EditProjectDetailModal project={p} onClose={() => setEditing(false)} />}
+    </div>
+  );
+}
+
+const PD_METHODOLOGIES = ["Scrum", "Kanban", "Scrumban", "SAFe", "Extreme Programming", "Disciplined Agile", "Waterfall", "V-Model", "Stage-Gate", "Iterative & Incremental", "Spiral", "RAD", "DevOps"];
+const PD_STATUSES: { key: string; label: string }[] = [
+  { key: "green", label: "On track" }, { key: "amber", label: "At risk" }, { key: "red", label: "Critical" },
+  { key: "hold", label: "On hold" }, { key: "completed", label: "Completed" },
+];
+const PD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const pdToIso = (display?: string) => { if (!display) return ""; const d = new Date(display); return isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const pdToDisplay = (iso: string) => { if (!iso) return ""; const [y, m, dd] = iso.split("-").map(Number); return y && m && dd ? `${dd} ${PD_MONTHS[m - 1]} ${y}` : ""; };
+
+function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(project.name);
+  const [dept, setDept] = useState(project.dept);
+  const [owner, setOwner] = useState(project.owner);
+  const [methodology, setMethodology] = useState(project.methodology);
+  const [status, setStatus] = useState(project.status);
+  const [progress, setProgress] = useState(String(project.progress));
+  const [startDate, setStartDate] = useState(project.startDate ?? "");
+  const [target, setTarget] = useState(project.target ?? project.due ?? "");
+  const [budget, setBudget] = useState(String(project.budget));
+  const [spent, setSpent] = useState(String(project.spent));
+
+  const save = useMutation({
+    mutationFn: () => api(`/projects/${project.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: name.trim(), dept: dept.trim(), owner: owner.trim(), methodology, status,
+        progress: Math.max(0, Math.min(100, Number(progress) || 0)),
+        startDate: startDate.trim(), target: target.trim(),
+        budget: Number(budget) || 0, spent: Number(spent) || 0,
+      }),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project", project.id] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["gantt"] });
+      onClose();
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
+  return (
+    <Modal onClose={onClose} width={520} label={`Edit ${project.id}`}>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Update the project's details. Health follows the status you pick.</div>
+      <PdField label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} /></PdField>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <PdField label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} /></PdField>
+        <PdField label="Project manager"><Input value={owner} onChange={(e) => setOwner(e.target.value)} /></PdField>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <PdField label="Methodology"><Select value={methodology} onChange={(e) => setMethodology(e.target.value)}>{PD_METHODOLOGIES.map((m) => <option key={m} value={m}>{m}</option>)}</Select></PdField>
+        <PdField label="Status"><Select value={status} onChange={(e) => setStatus(e.target.value)}>{PD_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></PdField>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <PdField label="Progress %"><Input type="number" value={progress} onChange={(e) => setProgress(e.target.value)} /></PdField>
+        <PdField label="Start date"><Input type="date" value={pdToIso(startDate)} onChange={(e) => setStartDate(pdToDisplay(e.target.value))} /></PdField>
+        <PdField label="Target date"><Input type="date" value={pdToIso(target)} onChange={(e) => setTarget(pdToDisplay(e.target.value))} /></PdField>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <PdField label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></PdField>
+        <PdField label="Spent (€k)"><Input type="number" value={spent} onChange={(e) => setSpent(e.target.value)} /></PdField>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => name.trim() && save.mutate()} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function PdField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 13 }}>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{label}</label>
+      {children}
     </div>
   );
 }
@@ -1299,7 +1386,7 @@ function Artifacts({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div style={{ fontSize: 13.5, color: color.faint }}>Waterfall &amp; agile artifacts — each carries its own file versions.</div>
         <div style={{ flex: 1 }} />
-        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New artifact</Button>}
+        <Button onClick={() => setModal(true)} disabled={!canEdit} title={canEdit ? undefined : "Your role can't add artifacts (needs Edit on “Comments & artifacts”)"}><Icon name="plus" size={16} /> New artifact</Button>
       </div>
       <Card padding={0} style={{ overflow: "hidden" }}>
         {artifacts.length === 0 ? (
