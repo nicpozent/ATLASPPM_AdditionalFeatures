@@ -31,9 +31,20 @@ const BLK_COLORS: Record<BlockerStatus, { dot: string; ink: string; tint: string
   Active:        { dot: "#D13438", ink: "#A1282B", tint: "#FBE7E8" },
   "In progress": { dot: "#E0A100", ink: "#8A6300", tint: "#FBF2D7" },
   Resolved:      { dot: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
+  Cancelled:     { dot: "#8A93A6", ink: "#56607A", tint: "#EEF1F6" },
+  Archived:      { dot: "#7A6BB0", ink: "#5E2E89", tint: "#F0E8F7" },
 };
+const BLK_STATUSES: BlockerStatus[] = ["Active", "In progress", "Resolved", "Cancelled", "Archived"];
+// Views group the lifecycle: Open = actionable, then one view per closed state.
+const BLK_VIEWS: { key: string; label: string; match: (s: BlockerStatus) => boolean }[] = [
+  { key: "open", label: "Open", match: (s) => s === "Active" || s === "In progress" },
+  { key: "resolved", label: "Resolved", match: (s) => s === "Resolved" },
+  { key: "cancelled", label: "Cancelled", match: (s) => s === "Cancelled" },
+  { key: "archived", label: "Archived", match: (s) => s === "Archived" },
+  { key: "all", label: "All", match: () => true },
+];
 
-interface RaiseBlocker { title: string; projectId: string; owner: string; status: BlockerStatus; }
+interface RaiseBlocker { title: string; projectId: string; owner: string; status: BlockerStatus; description: string; }
 
 export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
@@ -390,14 +401,21 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
   const { can } = usePermissions();
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [owner, setOwner] = useState("");
   const [status, setStatus] = useState<BlockerStatus>("Active");
+  const [view, setView] = useState("open");
+  const [projFilter, setProjFilter] = useState("");
+  const [openBlocker, setOpenBlocker] = useState<Blocker | null>(null);
 
   const submit = () => {
     if (!title.trim() || !projectId) return;
-    onRaise({ title: title.trim(), projectId, owner: owner.trim(), status });
-    setTitle(""); setOwner("");
+    onRaise({ title: title.trim(), description: description.trim(), projectId, owner: owner.trim(), status });
+    setTitle(""); setDescription(""); setOwner("");
   };
+
+  const viewMatch = BLK_VIEWS.find((v) => v.key === view)!.match;
+  const shown = blockers.filter((b) => viewMatch(b.status) && (!projFilter || b.projectId === projFilter));
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18, alignItems: "start" }}>
@@ -410,18 +428,39 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
             </div>
           ))}
         </div>
+
+        {/* view + project filters */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+            {BLK_VIEWS.map((v) => (
+              <button key={v.key} onClick={() => setView(v.key)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: view === v.key ? "#fff" : "transparent", color: view === v.key ? color.primary : "#6A7488", boxShadow: view === v.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v.label}</button>
+            ))}
+          </div>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 11.5, color: color.faint3 }}>Project</span>
+          <div style={{ minWidth: 190 }}>
+            <Select value={projFilter} onChange={(e) => setProjFilter(e.target.value)}>
+              <option value="">All projects</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </div>
+        </div>
+
         <Card padding={0} style={{ overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "0.6fr 2.4fr 1.1fr 0.9fr 0.9fr", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
             <div>ID</div><div>Blocker</div><div>Project</div><div>Owner</div><div>Status</div>
           </div>
-          {blockers.length === 0 ? (
-            <div style={{ padding: "48px 20px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>No blockers logged. Raise one on the right when something impedes progress.</div>
-          ) : blockers.map((b) => {
+          {shown.length === 0 ? (
+            <div style={{ padding: "48px 20px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>{blockers.length === 0 ? "No blockers logged. Raise one on the right when something impedes progress." : "No blockers match this view."}</div>
+          ) : shown.map((b) => {
             const bc = BLK_COLORS[b.status];
             return (
-              <div key={b.id} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.4fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid #F2F4F9" }}>
+              <div key={b.id} onClick={() => setOpenBlocker(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.4fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
                 <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{b.id}</div>
-                <div style={{ fontSize: 13.5, fontWeight: 500, color: color.text, paddingRight: 12 }}>{b.title}</div>
+                <div style={{ paddingRight: 12, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, color: color.text }}>{b.title}</div>
+                  {b.description && <div style={{ fontSize: 11.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>{b.description}</div>}
+                </div>
                 <div style={{ fontSize: 12, color: color.subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 8 }}>{b.projectName}</div>
                 <div style={{ fontSize: 12.5, color: color.textMuted }}>{b.owner}</div>
                 <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: bc.ink, background: bc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: bc.dot }} />{b.status}</span></div>
@@ -440,22 +479,76 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </Field>
+        <Field label="Title">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary" />
+        </Field>
         <Field label="Description">
-          <Textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is blocking progress?" style={{ minHeight: 64 }} />
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is blocking progress?" style={{ minHeight: 64 }} />
         </Field>
         <Field label="Owner">
           <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Assignee name" />
         </Field>
         <Field label="Status">
           <Select value={status} onChange={(e) => setStatus(e.target.value as BlockerStatus)}>
-            {(["Active", "In progress", "Resolved"] as BlockerStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+            {BLK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
         </Field>
         {(() => { const may = can("cap-projects", "E"); const off = submitting || !may; return (
         <button onClick={submit} disabled={off} title={may ? undefined : "Your role can't raise blockers"} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
         ); })()}
       </Card>
+
+      {openBlocker && <BlockerModal blocker={openBlocker} canEdit={can("cap-projects", "E")} onClose={() => setOpenBlocker(null)} />}
     </div>
+  );
+}
+
+function BlockerModal({ blocker, canEdit, onClose }: { blocker: Blocker; canEdit: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(blocker.title);
+  const [description, setDescription] = useState(blocker.description);
+  const [owner, setOwner] = useState(blocker.owner);
+  const [status, setStatus] = useState<BlockerStatus>(blocker.status);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["blockers"] }); qc.invalidateQueries({ queryKey: ["projects"] }); };
+
+  const save = useMutation({
+    mutationFn: () => api(`/blockers/${blocker.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim(), description: description.trim(), owner: owner.trim(), status }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/blockers/${blocker.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+  });
+
+  return (
+    <Modal onClose={onClose} width={480} label={`${blocker.id} · Blocker`}>
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>{blocker.projectName}</div>
+      <Field label="Title">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} placeholder="Short summary" />
+      </Field>
+      <Field label="Description">
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit} placeholder="What is blocking progress?" style={{ minHeight: 72 }} />
+      </Field>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><Field label="Owner"><Input value={owner} onChange={(e) => setOwner(e.target.value)} disabled={!canEdit} placeholder="Owner" /></Field></div>
+        <div style={{ flex: 1 }}><Field label="Status"><Select value={status} onChange={(e) => setStatus(e.target.value as BlockerStatus)} disabled={!canEdit}>{BLK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></Field></div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}>
+        {canEdit && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this blocker?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>{canEdit ? "Cancel" : "Close"}</Button>
+        {canEdit && <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>}
+      </div>
+    </Modal>
   );
 }
 

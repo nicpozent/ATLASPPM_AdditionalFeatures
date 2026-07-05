@@ -11,8 +11,8 @@ public record CreateDemandReq(
     string? BusinessProblem, bool? ImprovementExisting, int? Criticality, int? Risk,
     string? ExpectedBenefits, int? BenefitValue, List<string>? Stakeholders, bool? AllStakeholders);
 public record UpdateDemandStageReq(string Stage);
-public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status);
-public record UpdateBlockerStatusReq(string Status);
+public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status, string? Description);
+public record UpdateBlockerReq(string? Title, string? Owner, string? Status, string? Description);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate,
     string? StartDate, string? Target);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
@@ -28,7 +28,7 @@ public record UpdateKrReq(int? Progress, string? LinkType, string? LinkId);
 public static class WriteEndpoints
 {
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
-    static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved" };
+    static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved", "Cancelled", "Archived" };
     static readonly string[] Statuses = { "green", "amber", "red", "hold", "completed" };
 
     // Keep the display Health string consistent with the traffic-light Status.
@@ -186,6 +186,7 @@ public static class WriteEndpoints
             {
                 Id = await NextId(db.Blockers.Select(x => x.Id), "BLK-", db),
                 Title = req.Title.Trim(),
+                Description = req.Description?.Trim() ?? "",
                 ProjectId = req.ProjectId,
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? project.Owner : req.Owner!.Trim(),
                 Status = Clamp(req.Status, BlockerStatuses, "Active"),
@@ -194,18 +195,40 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Blockers", "Raised blocker", $"{b.Id} ({project.Name})"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/blockers/{b.Id}",
-                new BlockerDto(b.Id, b.Title, b.ProjectId, project.Name, b.Owner, b.Status));
+                new BlockerDto(b.Id, b.Title, b.ProjectId, project.Name, b.Owner, b.Status, b.Description));
         });
 
-        api.MapPatch("/blockers/{id}", async (string id, UpdateBlockerStatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/blockers/{id}", async (string id, UpdateBlockerReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
-            if (!BlockerStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var b = await db.Blockers.Include(x => x.Project).FirstOrDefaultAsync(x => x.Id == id);
             if (b is null) return Results.NotFound();
-            b.Status = req.Status;
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                b.Title = req.Title.Trim();
+            }
+            if (req.Description is not null) b.Description = req.Description.Trim();
+            if (req.Owner is not null) b.Owner = string.IsNullOrWhiteSpace(req.Owner) ? (b.Project?.Owner ?? "") : req.Owner.Trim();
+            if (req.Status is not null)
+            {
+                if (!BlockerStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                b.Status = req.Status;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Blockers", "Updated blocker", $"{b.Id} → {b.Status}"));
             await db.SaveChangesAsync();
-            return Results.Ok(new BlockerDto(b.Id, b.Title, b.ProjectId, b.Project!.Name, b.Owner, b.Status));
+            return Results.Ok(new BlockerDto(b.Id, b.Title, b.ProjectId, b.Project!.Name, b.Owner, b.Status, b.Description));
+        });
+
+        api.MapDelete("/blockers/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var b = await db.Blockers.FindAsync(id);
+            if (b is null) return Results.NotFound();
+            db.Blockers.Remove(b);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Blockers", "Deleted blocker", b.Id));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // ---- Projects ------------------------------------------------------

@@ -10,7 +10,8 @@ public record ProjectDto(string Id, string Name, string Dept, string Owner, stri
     string Status, string Health, int Progress, decimal Budget, decimal Spent, string Target, int BlockerCount,
     bool Archived = false, bool IsSystem = false, string StartDate = "");
 
-public record BlockerDto(string Id, string Title, string ProjectId, string ProjectName, string Owner, string Status);
+public record BlockerDto(string Id, string Title, string ProjectId, string ProjectName, string Owner, string Status, string Description = "");
+public record ProjectBlockersDto(bool CanEdit, List<BlockerDto> Blockers);
 
 public record DemandDto(string Id, string Title, string Stage, string Priority, int Value, int Effort,
     string Requester, string Dept, string Date);

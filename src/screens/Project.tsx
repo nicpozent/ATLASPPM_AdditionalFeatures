@@ -30,7 +30,7 @@ function useProject(id: string | null) {
 const TABS = [
   ["overview", "Overview"], ["tasks", "Tasks"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
   ["quality", "Quality"], ["governance", "Governance"], ["architecture", "Architecture"],
-  ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["vacations", "Vacations"],
+  ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["blockers", "Blockers"], ["vacations", "Vacations"],
   ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"],
 ] as const;
 type TabId = (typeof TABS)[number][0];
@@ -129,6 +129,7 @@ export default function Project() {
       {tab === "architecture" && <Architecture projectId={id} />}
       {tab === "quality" && <Quality projectId={id} />}
       {tab === "dependencies" && <Dependencies projectId={id} />}
+      {tab === "blockers" && <ProjectBlockers projectId={id} />}
       {tab === "vacations" && <Vacations projectId={id} />}
       {tab === "comments" && <Comments projectId={id} />}
 
@@ -3079,6 +3080,119 @@ function LinkProjectModal({ projectId, existing, onClose }: { projectId: string;
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => dependsOnId && link.mutate()} disabled={link.isPending || !dependsOnId}>{link.isPending ? "Linking…" : "Link project"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- Blockers (per-project view of the portfolio blocker register) ---------
+interface ProjBlocker { id: string; title: string; projectId: string; projectName: string; owner: string; status: string; description: string; }
+const BLK_STATUSES = ["Active", "In progress", "Resolved", "Cancelled", "Archived"];
+const BLK_STATUS_COLOR: Record<string, { ink: string; tint: string; dot: string }> = {
+  Active:        { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
+  "In progress": { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
+  Resolved:      { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  Cancelled:     { ink: "#56607A", tint: "#EEF1F6", dot: "#8A93A6" },
+  Archived:      { ink: "#5E2E89", tint: "#F0E8F7", dot: "#7A6BB0" },
+};
+
+function ProjectBlockers({ projectId }: { projectId: string | null }) {
+  const [modal, setModal] = useState(false);
+  const [open, setOpen] = useState<ProjBlocker | null>(null);
+  const { data } = useQuery({
+    queryKey: ["project-blockers", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; blockers: ProjBlocker[] }> =>
+      (await api<{ canEdit: boolean; blockers: ProjBlocker[] }>(`/projects/${projectId}/blockers`)) ?? { canEdit: false, blockers: [] },
+  });
+  const blockers = data?.blockers ?? [];
+  const canEdit = data?.canEdit ?? false;
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its blockers." /></Card>;
+
+  const openCount = blockers.filter((b) => b.status === "Active" || b.status === "In progress").length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Impediments raised against this project{openCount > 0 ? ` · ${openCount} open` : ""}.</div>
+        <div style={{ flex: 1 }} />
+        <Button onClick={() => setModal(true)} disabled={!canEdit} title={canEdit ? undefined : "Your role can't raise blockers (needs Edit on “Projects & tasks”)"}><Icon name="plus" size={16} /> Raise blocker</Button>
+      </div>
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.6fr 2.6fr 0.9fr 0.9fr", padding: "13px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>ID</div><div>Blocker</div><div>Owner</div><div>Status</div>
+        </div>
+        {blockers.length === 0 ? (
+          <EmptyBlock message="No blockers on this project." minHeight={130} />
+        ) : blockers.map((b) => {
+          const sc = BLK_STATUS_COLOR[b.status] ?? BLK_STATUS_COLOR.Active;
+          return (
+            <div key={b.id} onClick={() => canEdit && setOpen(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.6fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{b.id}</div>
+              <div style={{ paddingRight: 12, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 500, color: color.text }}>{b.title}</div>
+                {b.description && <div style={{ fontSize: 11.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>{b.description}</div>}
+              </div>
+              <div style={{ fontSize: 12.5, color: color.textMuted }}>{b.owner}</div>
+              <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />{b.status}</span></div>
+            </div>
+          );
+        })}
+      </Card>
+      {modal && <ProjectBlockerModal projectId={projectId} onClose={() => setModal(false)} />}
+      {open && <ProjectBlockerModal projectId={projectId} blocker={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function ProjectBlockerModal({ projectId, blocker, onClose }: { projectId: string; blocker?: ProjBlocker; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(blocker?.title ?? "");
+  const [description, setDescription] = useState(blocker?.description ?? "");
+  const [owner, setOwner] = useState(blocker?.owner ?? "");
+  const [status, setStatus] = useState(blocker?.status ?? "Active");
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["project-blockers", projectId] });
+    qc.invalidateQueries({ queryKey: ["blockers"] });
+    qc.invalidateQueries({ queryKey: ["projects"] });
+  };
+  const save = useMutation({
+    mutationFn: () => blocker
+      ? api(`/blockers/${blocker.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim(), description: description.trim(), owner: owner.trim(), status }) })
+      : api(`/blockers`, { method: "POST", body: JSON.stringify({ title: title.trim(), description: description.trim(), owner: owner.trim(), status, projectId }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/blockers/${blocker!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+
+  return (
+    <Modal onClose={onClose} width={480} label={blocker ? `${blocker.id} · Blocker` : "Raise a blocker"}>
+      <DecLabel>Title</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary" style={{ marginBottom: 14 }} />
+      <DecLabel>Description</DecLabel>
+      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is blocking progress?" style={{ minHeight: 72, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Owner</DecLabel><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{BLK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {blocker && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this blocker?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : blocker ? "Save changes" : "Raise blocker"}</Button>
       </div>
     </Modal>
   );

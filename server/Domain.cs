@@ -75,10 +75,11 @@ public class Blocker
 {
     public string Id { get; set; } = default!;
     public string Title { get; set; } = default!;
+    public string Description { get; set; } = "";
     public string ProjectId { get; set; } = default!;
     public Project? Project { get; set; }
     public string Owner { get; set; } = default!;
-    public string Status { get; set; } = "Active";    // Active|In progress|Resolved
+    public string Status { get; set; } = "Active";    // Active|In progress|Resolved|Cancelled|Archived
 }
 
 // A recorded backup run — created by "Back up all now". Metadata only; the

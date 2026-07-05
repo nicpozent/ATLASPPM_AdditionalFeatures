@@ -102,7 +102,18 @@ public static class Endpoints
 
         api.MapGet("/blockers", async (AtlasDbContext db) =>
             await db.Blockers.OrderBy(x => x.Id).Select(x => new BlockerDto(
-                x.Id, x.Title, x.ProjectId, x.Project!.Name, x.Owner, x.Status)).ToListAsync());
+                x.Id, x.Title, x.ProjectId, x.Project!.Name, x.Owner, x.Status, x.Description)).ToListAsync());
+
+        // Blockers for one project (drives the project's Blockers tab), with a
+        // can-edit flag so the tab can gate create/edit/delete.
+        api.MapGet("/projects/{id}/blockers", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            var items = await db.Blockers.Where(x => x.ProjectId == id).OrderBy(x => x.Id)
+                .Select(x => new BlockerDto(x.Id, x.Title, x.ProjectId, x.Project!.Name, x.Owner, x.Status, x.Description)).ToListAsync();
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            return Results.Ok(new ProjectBlockersDto(canEdit, items));
+        });
 
         api.MapGet("/demands", async (AtlasDbContext db) =>
             await db.Demands.OrderBy(d => d.Id).Select(d => new DemandDto(
