@@ -4,11 +4,14 @@ import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
 import { NotificationCenter } from "./NotificationCenter";
+import { LanguagePicker } from "./LanguagePicker";
+import { useT } from "@/i18n";
 import { ROLES, SCREENS } from "@/nav";
 
 export function Topbar() {
   const { role, setRole } = useRole();
   const { enabled, user } = useAuth();
+  const t = useT();
   // Who may switch roles is decided by the REAL identity, not the currently
   // selected view — so a Platform Administrator can move through every role and
   // back again. In the demo (auth off) all identities are switchable, as in the
@@ -26,9 +29,9 @@ export function Topbar() {
     }}>
       <div style={{ lineHeight: 1.15 }}>
         <div style={{ fontFamily: font.head, fontSize: 19, fontWeight: 600, color: color.ink, letterSpacing: "-0.01em" }}>
-          {screen.title}
+          {t(`screen.${screen.id}.title`, t(`screen.${screen.id}.label`, screen.title))}
         </div>
-        <div style={{ fontSize: 12.5, color: color.faint }}>{screen.subtitle}</div>
+        <div style={{ fontSize: 12.5, color: color.faint }}>{t(`screen.${screen.id}.subtitle`, screen.subtitle)}</div>
       </div>
 
       <div style={{ flex: 1 }} />
@@ -40,7 +43,7 @@ export function Topbar() {
         borderRadius: 9, padding: "8px 12px",
       }}>
         <span style={{ color: color.primary, display: "flex" }}><Icon name="userCheck" size={16} /></span>
-        <span style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</span>
+        <span style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("common.role", "Role")}</span>
         {/* Only Platform Administrator may view/switch other roles (for support);
             every other role is locked to its own view. */}
         <select
@@ -56,6 +59,9 @@ export function Topbar() {
         </select>
       </div>
 
+      {/* Language */}
+      <LanguagePicker />
+
       {/* Notifications */}
       <NotificationCenter />
 
@@ -66,7 +72,7 @@ export function Topbar() {
         fontFamily: "inherit", cursor: "pointer",
       }}>
         <span style={{ display: "flex" }}><Icon name="download" size={16} /></span>
-        Export
+        {t("common.export", "Export")}
         <span style={{ display: "flex", opacity: 0.8 }}><Icon name="chevronDown" size={14} /></span>
       </button>
     </header>
