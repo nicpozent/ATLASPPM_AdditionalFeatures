@@ -76,12 +76,14 @@ export default function Financials() {
   const cw = (v: number) => (cTotal > 0 ? (v / cTotal) * 100 : 0) + "%";
 
   const roiLabel = scope === "project" ? "Portfolio ROI" : scope === "program" ? "Programs ROI" : "Products ROI";
+  // With no benefit recorded yet ROI isn't meaningful — show a dash, not −100%.
+  const roiText = tBenefit > 0 ? roiPct + "%" : "—";
   const kpis: { label: string; value: string; ink: string }[] = [
     { label: "Total budget", value: fmt(tBudget), ink: color.navy },
     { label: "Spent to date", value: fmt(tSpent), ink: color.primary },
     { label: "Forecast at completion", value: fmt(tForecast), ink: color.navy },
     { label: "Benefit", value: fmt(tBenefit), ink: color.successInk },
-    { label: roiLabel, value: roiPct + "%", ink: roiPct >= 0 ? color.successInk : color.dangerInk },
+    { label: roiLabel, value: roiText, ink: tBenefit > 0 && roiPct < 0 ? color.dangerInk : color.successInk },
   ];
 
   return (
@@ -181,7 +183,9 @@ export default function Financials() {
                 onClick={(e) => { if (data?.canEditRoi) { e.stopPropagation(); setEditRoi(f); } }}
                 title={data?.canEditRoi ? "Set / clear a manual ROI" : undefined}>
                 {f.roiManual && <span style={{ fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>Manual</span>}
-                <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: f.roi >= 0 ? color.successInk : color.dangerInk, cursor: data?.canEditRoi ? "pointer" : "default" }}>{f.roi}%</span>
+                {(() => { const show = f.roiManual || f.savings > 0; return (
+                  <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: !show ? color.faint3 : f.roi >= 0 ? color.successInk : color.dangerInk, cursor: data?.canEditRoi ? "pointer" : "default" }}>{show ? `${f.roi}%` : "—"}</span>
+                ); })()}
               </div>
             </div>
           );
