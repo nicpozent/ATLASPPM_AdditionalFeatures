@@ -241,10 +241,27 @@ public class Product
     public string Status { get; set; } = "Active";     // Active|Retired|Replaced (products aren't deleted)
     public string StartDate { get; set; } = "";        // display date
     public string EndDate { get; set; } = "";          // display date, end-of-life / target
+    public string TeamKey { get; set; } = "";          // owning team-manager slot (teammgr/devmgr/…); "" = unassigned
     public List<string> Projects { get; set; } = new();
     public List<string> Releases { get; set; } = new();
     public List<ProductTask> Tasks { get; set; } = new();
     public List<ProductMember> Members { get; set; } = new();
+    public List<ProductAllocation> Allocations { get; set; } = new();
+}
+
+// A person from an Entra team allocated to a product's delivery team. The
+// member's identity is captured from the team roster at allocation time; the
+// allocating manager (or Platform Admin) owns the row. Roles with access to
+// products can see the allocated team — allocation itself is manager-only.
+public class ProductAllocation
+{
+    public int Id { get; set; }
+    public string ProductId { get; set; } = default!;
+    public string MemberName { get; set; } = default!;
+    public string MemberEmail { get; set; } = "";
+    public string MemberTitle { get; set; } = "";
+    public string SourceTeamKey { get; set; } = "";    // manager slot the member came from (for scope checks)
+    public int Alloc { get; set; }                      // allocation % on this product
 }
 
 public class ProductTask
