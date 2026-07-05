@@ -683,6 +683,18 @@ public class TestPlan
     public int Failed { get; set; }
     public int Blocked { get; set; }
     public int Ord { get; set; }
+    public List<TestPlanTask> Tasks { get; set; } = new();
+}
+
+// An individual test-case / task tracked under a test plan.
+public class TestPlanTask
+{
+    public int Id { get; set; }
+    public int TestPlanId { get; set; }
+    public string Title { get; set; } = default!;
+    public string Status { get; set; } = "Not run";      // Not run | In test | Passed | Failed | Blocked
+    public string Assignee { get; set; } = "";
+    public int Ord { get; set; }
 }
 
 public class Defect

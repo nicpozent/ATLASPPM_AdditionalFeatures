@@ -3056,7 +3056,13 @@ function StatusReportModal({ projectId, onClose }: { projectId: string; onClose:
 }
 
 // ---- Quality (test plans & defects) ----------------------------------------
-interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; }
+interface PlanTask { id: number; title: string; status: string; assignee: string; }
+interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; tasks: PlanTask[]; }
+const PLAN_TASK_STATUSES = ["Not run", "In test", "Passed", "Failed", "Blocked"];
+const PLAN_TASK_COLOR: Record<string, { ink: string; tint: string }> = {
+  Passed: { ink: "#0B6B37", tint: "#E7F4EC" }, "In test": { ink: "#0C5798", tint: "#E6EFFB" },
+  Failed: { ink: "#A1282B", tint: "#FBE7E8" }, Blocked: { ink: "#8A6300", tint: "#FBF2D7" }, "Not run": { ink: "#56607A", tint: "#EEF1F6" },
+};
 interface Defect { id: number; code: string; title: string; severity: string; owner: string; status: string; test: string; }
 interface QualityData { canEdit: boolean; totals: { cases: number; coverage: number; passRate: number; failed: number; openDefects: number }; plans: TestPlan[]; defects: Defect[]; }
 
@@ -3078,6 +3084,8 @@ function Quality({ projectId }: { projectId: string | null }) {
   const [defectModal, setDefectModal] = useState(false);
   const [openPlan, setOpenPlan] = useState<TestPlan | null>(null);
   const [openDefect, setOpenDefect] = useState<Defect | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const toggleExpand = (id: number) => setExpanded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const { data } = useQuery({
     queryKey: ["quality", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<QualityData | null> => await api<QualityData>(`/projects/${projectId}/quality`),
@@ -3121,11 +3129,12 @@ function Quality({ projectId }: { projectId: string | null }) {
         ) : plans.map((p) => {
           const pct = (n: number) => p.cases === 0 ? "0%" : `${(100 * n / p.cases).toFixed(1)}%`;
           return (
-            <div key={p.id} onClick={() => canEdit && setOpenPlan(p)} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
+            <div key={p.id} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: "#5E2E89", background: "#F0E8F7", padding: "2px 9px", borderRadius: 20 }}>{p.stage}</span>
-                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.name}</span>
+                <button onClick={() => canEdit && setOpenPlan(p)} style={{ flex: 1, textAlign: "left", fontSize: 13.5, fontWeight: 600, color: canEdit ? color.primary : color.text, background: "none", border: "none", padding: 0, cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{p.name}</button>
                 <span style={{ fontSize: 11.5, color: color.faint }}>{p.cases} cases · {p.execPct}% executed</span>
+                <button onClick={() => toggleExpand(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>{expanded.has(p.id) ? "▾" : "▸"} {p.tasks.length} task{p.tasks.length === 1 ? "" : "s"}</button>
               </div>
               <div style={{ display: "flex", height: 9, borderRadius: 5, overflow: "hidden", background: color.bg }}>
                 <div style={{ width: pct(p.passed), background: "#15A34A" }} />
@@ -3138,6 +3147,7 @@ function Quality({ projectId }: { projectId: string | null }) {
                 <span style={{ fontSize: 11, color: "#8A6300" }}>● {p.blocked} blocked</span>
                 <span style={{ fontSize: 11, color: color.faint3 }}>○ {p.notRun} not run</span>
               </div>
+              {expanded.has(p.id) && <PlanTasks projectId={projectId} plan={p} canEdit={canEdit} />}
             </div>
           );
         })}
@@ -3174,6 +3184,59 @@ function Quality({ projectId }: { projectId: string | null }) {
       {openPlan && <PlanModal projectId={projectId} plan={openPlan} onClose={() => setOpenPlan(null)} />}
       {defectModal && <DefectModal projectId={projectId} onClose={() => setDefectModal(false)} />}
       {openDefect && <DefectModal projectId={projectId} defect={openDefect} onClose={() => setOpenDefect(null)} />}
+    </div>
+  );
+}
+
+function PlanTasks({ projectId, plan, canEdit }: { projectId: string; plan: TestPlan; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
+  const add = useMutation({
+    mutationFn: () => api(`/test-plans/${plan.id}/tasks`, { method: "POST", body: JSON.stringify({ title: title.trim() }) }),
+    onSuccess: () => { setTitle(""); invalidate(); },
+    onError: (e) => toastError(e),
+  });
+  const setStatus = useMutation({
+    mutationFn: (v: { id: number; status: string }) => api(`/test-plan-tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
+    onSuccess: invalidate, onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: (id: number) => api(`/test-plan-tasks/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate, onError: (e) => toastError(e),
+  });
+
+  return (
+    <div style={{ marginTop: 11, paddingTop: 11, borderTop: "1px dashed #E4E8F1" }}>
+      {plan.tasks.length === 0 ? (
+        <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: canEdit ? 9 : 0 }}>No test cases on this plan yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: canEdit ? 10 : 0 }}>
+          {plan.tasks.map((t) => {
+            const sc = PLAN_TASK_COLOR[t.status] ?? PLAN_TASK_COLOR["Not run"];
+            return (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12.5 }}>
+                <span style={{ flex: 1, color: color.text }}>{t.title}{t.assignee && <span style={{ color: color.faint3 }}> · {t.assignee}</span>}</span>
+                {canEdit ? (
+                  <select value={t.status} onChange={(e) => setStatus.mutate({ id: t.id, status: e.target.value })}
+                    style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, border: "none", borderRadius: 20, padding: "3px 8px", fontFamily: "inherit", cursor: "pointer" }}>
+                    {PLAN_TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 8px", borderRadius: 20 }}>{t.status}</span>
+                )}
+                {canEdit && <button onClick={() => del.mutate(t.id)} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", color: "#A1282B", display: "inline-flex" }}><Icon name="trash" size={13} /></button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {canEdit && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a test case…" onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) add.mutate(); }} style={{ flex: 1, fontSize: 12.5, padding: "6px 10px" }} />
+          <Button variant="secondary" onClick={() => title.trim() && add.mutate()} disabled={add.isPending || !title.trim()}>Add</Button>
+        </div>
+      )}
     </div>
   );
 }

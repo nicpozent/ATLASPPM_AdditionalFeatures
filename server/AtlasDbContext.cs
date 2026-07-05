@@ -59,6 +59,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<ArchApproval> ArchApprovals => Set<ArchApproval>();
     public DbSet<HelpArticle> HelpArticles => Set<HelpArticle>();
     public DbSet<TestPlan> TestPlans => Set<TestPlan>();
+    public DbSet<TestPlanTask> TestPlanTasks => Set<TestPlanTask>();
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
     public DbSet<Absence> Absences => Set<Absence>();
