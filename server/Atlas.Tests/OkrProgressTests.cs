@@ -62,6 +62,23 @@ public class OkrProgressTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Kr_with_only_a_legacy_link_string_still_derives()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Legacy link project" }));
+        await c.PatchAsJsonAsync($"/api/v1/projects/{projId}", new { progress = 47 });
+        var objId = await Id(await c.PostAsJsonAsync("/api/v1/okrs", new { title = "Legacy objective" }));
+        // No linkType/linkId — only the legacy free-text Link holding the project id,
+        // exactly like seeded/older KRs.
+        await c.PostAsJsonAsync($"/api/v1/okrs/{objId}/krs", new { title = "KR", link = projId, progress = 10 });
+
+        var okrs = await c.GetFromJsonAsync<JsonElement>("/api/v1/okrs");
+        var kr = Kr(okrs, objId);
+        Assert.Equal(47, kr.GetProperty("progress").GetInt32());
+        Assert.True(kr.GetProperty("auto").GetBoolean());
+    }
+
+    [Fact]
     public async Task Unlinked_kr_keeps_its_manual_progress()
     {
         var c = Admin();

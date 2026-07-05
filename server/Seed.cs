@@ -69,16 +69,16 @@ public static class Seed
         db.Objectives.AddRange(
             new Objective { Id = "OKR-01", Title = "Grow digital revenue share to 35%", Owner = "Astrid Holmqvist", Horizon = "FY26",
                 Krs = new() {
-                    new KeyResult { Id = "KR-1", Title = "Increase online conversion to 3.2%", Link = "PRJ-204", Progress = 62 },
-                    new KeyResult { Id = "KR-2", Title = "Launch app 3.0 with < 0.5% crash rate", Link = "PRJ-176", Progress = 34 }
+                    new KeyResult { Id = "KR-1", Title = "Increase online conversion to 3.2%", Link = "PRJ-204", LinkType = "project", LinkId = "PRJ-204", Progress = 62 },
+                    new KeyResult { Id = "KR-2", Title = "Launch app 3.0 with < 0.5% crash rate", Link = "PRJ-176", LinkType = "project", LinkId = "PRJ-176", Progress = 34 }
                 } },
             new Objective { Id = "OKR-02", Title = "Cut fulfilment cost per order by 12%", Owner = "Lars Bergström", Horizon = "FY26",
                 Krs = new() {
-                    new KeyResult { Id = "KR-3", Title = "Automate 60% of Nässjö picking", Link = "PRJ-198", Progress = 41 },
-                    new KeyResult { Id = "KR-4", Title = "Onboard 200 suppliers to the portal", Link = "PRJ-220", Progress = 55 }
+                    new KeyResult { Id = "KR-3", Title = "Automate 60% of Nässjö picking", Link = "PRJ-198", LinkType = "project", LinkId = "PRJ-198", Progress = 41 },
+                    new KeyResult { Id = "KR-4", Title = "Onboard 200 suppliers to the portal", Link = "PRJ-220", LinkType = "project", LinkId = "PRJ-220", Progress = 55 }
                 } },
             new Objective { Id = "OKR-03", Title = "Establish a governed data platform", Owner = "Erik Lindqvist", Horizon = "FY26",
-                Krs = new() { new KeyResult { Id = "KR-5", Title = "Migrate 100% of core datasets", Link = "PRJ-165", Progress = 60 } } }
+                Krs = new() { new KeyResult { Id = "KR-5", Title = "Migrate 100% of core datasets", Link = "PRJ-165", LinkType = "project", LinkId = "PRJ-165", Progress = 60 } } }
         );
 
         db.Resources.AddRange(

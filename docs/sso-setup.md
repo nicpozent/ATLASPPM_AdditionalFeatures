@@ -81,10 +81,15 @@ what syncs by assigning groups (see step 4 below).
 On the **API** registration:
 1. **Certificates & secrets → New client secret** — copy the secret **Value**
    (not the Secret ID).
-2. **API permissions → Microsoft Graph → Application permissions**, add both,
+2. **API permissions → Microsoft Graph → Application permissions**, add these,
    then **Grant admin consent** (they must be **Application**, not Delegated):
    - **`Application.Read.All`** — lets Atlas read its own assigned groups.
    - **`GroupMember.Read.All`** — lets Atlas read those groups' members.
+   - **`User.Read.All`** — lets Atlas read each member's **profile** (display
+     name, email, job title). **Without it, Graph returns only the object id and
+     members show as "(unknown)" in Teams / My Team.** If you've already synced
+     once with names missing, just grant this and re-run "Sync now" — the sync
+     upserts by object id, so it fills in the names without losing anything.
    - (Add **`Mail.Send`** too if you enable email notifications.)
 3. **App roles → Create app role** — a *marker* role to tag groups for sync
    (it grants no Atlas permissions):

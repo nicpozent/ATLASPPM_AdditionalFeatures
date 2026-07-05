@@ -88,6 +88,19 @@ public static class Teams
             return Results.Ok(new TeamsAdminDto(canManage, GraphConfigured(cfg), managers, groupDtos));
         });
 
+        // Flattened provisioned-users view for Admin → Users & Groups: every synced
+        // member with its group and the role it derives from the group's mapped manager.
+        api.MapGet("/teams/directory", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-users-roles", "V") is { } denied) return denied;
+            var canManage = await Permissions.Allows(http, db, cfg, "cap-users-roles", "E");
+            var groups = await db.EntraGroups.Include(g => g.Members).OrderBy(g => g.DisplayName).ToListAsync();
+            var users = groups.SelectMany(g => g.Members.OrderBy(m => m.DisplayName).Select(m =>
+                new ProvisionedUserDto(m.DisplayName, m.Email, g.DisplayName,
+                    g.ManagerKey.Length > 0 ? Label(g.ManagerKey) : "Unmapped", "Active"))).ToList();
+            return Results.Ok(new DirectoryDto(canManage, users));
+        });
+
         api.MapPost("/teams/groups/sync", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-users-roles", "E") is { } denied) return denied;
@@ -386,15 +399,44 @@ public static class Teams
                 g.DisplayName = name; g.Manual = false; g.LastSynced = stamp;
                 await db.SaveChangesAsync();
 
-                await db.TeamMembers.Where(m => m.GroupId == gid).ExecuteDeleteAsync();
-                var mUrl = $"https://graph.microsoft.com/v1.0/groups/{gid}/members/microsoft.graph.user?$select=id,displayName,mail,jobTitle&$top=999";
+                // Upsert members by Entra object id rather than wipe-and-reinsert, so a
+                // permission-limited run (Graph returns no profile fields) can't clobber
+                // names captured by an earlier, fully-permissioned sync.
+                var existing = await db.TeamMembers.Where(m => m.GroupId == gid).ToListAsync();
+                var byUid = existing.Where(m => m.Uid.Length > 0).ToDictionary(m => m.Uid);
+                var seen = new HashSet<string>();
+                var mUrl = $"https://graph.microsoft.com/v1.0/groups/{gid}/members/microsoft.graph.user?$select=id,displayName,mail,jobTitle,userPrincipalName&$top=999";
                 while (mUrl is not null && DateTime.UtcNow < deadline)
                 {
                     var mp = await http.GetFromJsonAsync<GraphList<GraphUser>>(mUrl);
                     foreach (var u in mp?.Value ?? new())
-                        db.TeamMembers.Add(new TeamMemberRow { GroupId = gid, DisplayName = u.DisplayName ?? "(unknown)", Email = u.Mail ?? "", JobTitle = u.JobTitle ?? "" });
+                    {
+                        if (u.Id.Length > 0) seen.Add(u.Id);
+                        // Prefer a real name; fall back to UPN/mail; never downgrade a
+                        // previously-known name to "(unknown)" on a degraded run.
+                        var name2 = u.DisplayName ?? u.UserPrincipalName ?? u.Mail;
+                        var prior = u.Id.Length > 0 && byUid.TryGetValue(u.Id, out var ex) ? ex : null;
+                        if (prior is not null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(name2)) prior.DisplayName = name2!;
+                            if (!string.IsNullOrWhiteSpace(u.Mail)) prior.Email = u.Mail!;
+                            if (!string.IsNullOrWhiteSpace(u.JobTitle)) prior.JobTitle = u.JobTitle!;
+                        }
+                        else
+                        {
+                            db.TeamMembers.Add(new TeamMemberRow { GroupId = gid, Uid = u.Id,
+                                DisplayName = string.IsNullOrWhiteSpace(name2) ? "(unknown)" : name2!,
+                                Email = u.Mail ?? "", JobTitle = u.JobTitle ?? "" });
+                        }
+                    }
                     mUrl = mp?.NextLink;
                 }
+                // Drop members who genuinely left the group (present before, absent now),
+                // plus any legacy rows with no Uid (they've just been re-added with one).
+                // Only prune when Graph returned at least one member — a fully-empty
+                // response is treated as a failed page, not "everyone left".
+                if (seen.Count > 0)
+                    db.TeamMembers.RemoveRange(existing.Where(m => m.Uid.Length == 0 || !seen.Contains(m.Uid)));
                 await db.SaveChangesAsync();
             }
             catch (Exception ex) { _log?.LogWarning(ex, "Graph member sync failed for group {GroupId}: {Message}", gid, ex.Message); }
@@ -422,7 +464,7 @@ public static class Teams
 
     class GraphList<T> { [System.Text.Json.Serialization.JsonPropertyName("value")] public List<T> Value { get; set; } = new(); [System.Text.Json.Serialization.JsonPropertyName("@odata.nextLink")] public string? NextLink { get; set; } }
     class GraphGroup { public string Id { get; set; } = ""; public string? DisplayName { get; set; } }
-    class GraphUser { public string Id { get; set; } = ""; public string? DisplayName { get; set; } public string? Mail { get; set; } public string? JobTitle { get; set; } }
+    class GraphUser { public string Id { get; set; } = ""; public string? DisplayName { get; set; } public string? Mail { get; set; } public string? JobTitle { get; set; } public string? UserPrincipalName { get; set; } }
     class SpRef { public string Id { get; set; } = ""; }
     class AppRoleAssignment { public string PrincipalId { get; set; } = ""; public string? PrincipalType { get; set; } public string? PrincipalDisplayName { get; set; } public string AppRoleId { get; set; } = ""; }
     class TokenResponse { [System.Text.Json.Serialization.JsonPropertyName("access_token")] public string? AccessToken { get; set; } }
