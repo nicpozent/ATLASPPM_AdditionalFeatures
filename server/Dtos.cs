@@ -63,8 +63,10 @@ public record ArtifactVersionDto(int Id, int Version, string FileName, long Size
 public record ArtifactDto(int Id, string Name, string Type, string Owner, string Status, List<ArtifactVersionDto> Versions);
 public record ArtifactsDto(bool CanEdit, List<ArtifactDto> Artifacts);
 
+public record RequirementAttachmentDto(int Id, string FileName, long Size, string UploadedAt);
 public record RequirementDto(int Id, string Code, string Title, string Type, string Priority, string Status,
-    string Epic, string Story, string Test, string TestStatus, string Release, bool Verified);
+    string Epic, string Story, string Test, string TestStatus, string Release, bool Verified,
+    string Description, List<RequirementAttachmentDto> Attachments);
 public record ChangeRequestDto(int Id, string Code, string Title, string ReqCode, string Impact, string Sdp,
     string Status, string RaisedBy, string Date);
 public record ReqStatsDto(int Total, int Approved, int Coverage, int Verified);

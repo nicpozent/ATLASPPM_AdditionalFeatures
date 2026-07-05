@@ -754,7 +754,9 @@ public class Requirement
     public string Title { get; set; } = default!;
     public string Type { get; set; } = "Functional";     // Functional | Non-functional | Compliance
     public string Priority { get; set; } = "Medium";      // Critical | High | Medium | Low
-    public string Status { get; set; } = "Draft";         // Draft | In review | Approved
+    // Draft | In review | Approved | Replaced | Archived | Retired (Requester|PM|Team)
+    public string Status { get; set; } = "Draft";
+    public string Description { get; set; } = "";
     public string Epic { get; set; } = "";
     public string Story { get; set; } = "";
     public string Test { get; set; } = "—";
@@ -762,6 +764,19 @@ public class Requirement
     public string Release { get; set; } = "Backlog";
     public bool Verified { get; set; }
     public int Ord { get; set; }
+    public List<RequirementAttachment> Attachments { get; set; } = new();
+}
+
+// A file attached to a requirement (spec doc, mockup, acceptance evidence).
+public class RequirementAttachment
+{
+    public int Id { get; set; }
+    public int RequirementId { get; set; }
+    public string FileName { get; set; } = default!;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long Size { get; set; }
+    public string UploadedAt { get; set; } = "";
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
 }
 
 public class ChangeRequest
