@@ -19,7 +19,7 @@ public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
     string? StartDate);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate);
-public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate);
+public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
 public record CreateKrReq(string Title, string? Link, int? Progress);
@@ -410,6 +410,7 @@ public static class WriteEndpoints
                 Source = req.Source is "ado" or "jira" ? req.Source! : "manual",
                 StartDate = req.StartDate?.Trim() ?? "",
                 EndDate = req.EndDate?.Trim() ?? "",
+                TeamKey = Teams.IsValidSlot(req.TeamKey) ? req.TeamKey! : "",
                 Projects = req.Projects ?? new(),
             };
             db.Products.Add(p);
@@ -417,7 +418,7 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
                 p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>(),
-                p.Status, p.StartDate, p.EndDate, true));
+                p.Status, p.StartDate, p.EndDate, true, p.TeamKey, Teams.SlotLabel(p.TeamKey), 0));
         });
 
         // ---- Releases ------------------------------------------------------

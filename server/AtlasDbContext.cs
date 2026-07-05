@@ -12,6 +12,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductTask> ProductTasks => Set<ProductTask>();
     public DbSet<ProductMember> ProductMembers => Set<ProductMember>();
+    public DbSet<ProductAllocation> ProductAllocations => Set<ProductAllocation>();
     public DbSet<Objective> Objectives => Set<Objective>();
     public DbSet<KeyResult> KeyResults => Set<KeyResult>();
     public DbSet<Resource> Resources => Set<Resource>();
@@ -105,6 +106,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Product>().Property(x => x.Status).HasDefaultValue("Active");
         b.Entity<Product>().HasMany(x => x.Tasks).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<Product>().HasMany(x => x.Members).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<Product>().HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ProductAllocation>().HasKey(x => x.Id);
 
         b.Entity<Objective>().HasKey(x => x.Id);
         b.Entity<Objective>().Property(x => x.Id).ValueGeneratedNever();

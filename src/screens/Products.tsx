@@ -15,6 +15,15 @@ interface Product {
   id: string; name: string; owner: string; source: Source; projects: string[];
   tasks: Task[]; members?: Member[]; releases?: string[]; status?: string;
   startDate?: string; endDate?: string; canManage?: boolean;
+  teamKey?: string; teamLabel?: string; teamSize?: number;
+}
+interface TeamOption { key: string; label: string }
+interface Allocation { id: number; name: string; email: string; title: string; teamKey: string; teamLabel: string; alloc: number }
+interface Assignable { name: string; email: string; jobTitle: string; teamKey: string; teamLabel: string }
+interface ProductTeam {
+  productId: string; teamKey: string; teamLabel: string;
+  canAssignTeam: boolean; canAllocate: boolean;
+  allocations: Allocation[]; assignable: Assignable[]; teamOptions: TeamOption[];
 }
 const PRD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const prdToDisplay = (iso: string): string => { if (!iso) return ""; const [y, m, dd] = iso.split("-").map(Number); return y && m && dd ? `${dd} ${PRD_MONTHS[m - 1]} ${y}` : ""; };
@@ -45,7 +54,7 @@ function useProducts() {
 
 const pct = (done: number, total: number) => (total > 0 ? Math.round((done / total) * 100) : 0);
 
-interface NewProduct { name: string; owner: string; source: Source; projects: string[]; startDate: string; endDate: string }
+interface NewProduct { name: string; owner: string; source: Source; projects: string[]; startDate: string; endDate: string; teamKey: string }
 
 export default function Products() {
   const { data: products = [] } = useProducts();
@@ -110,6 +119,12 @@ export default function Products() {
                   <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: color.subtle }}>{done}/{p.tasks.length}</span>
                 </div>
                 <div style={{ fontSize: 12, color: color.subtle }}>{p.tasks.length} tasks · {pts} pts · projects: {p.projects.join(", ") || "—"}</div>
+                {(p.teamLabel || (p.teamSize ?? 0) > 0) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 11.5, color: color.faint3 }}>
+                    <Icon name="users" size={13} />
+                    <span>{p.teamLabel || "Team"}{(p.teamSize ?? 0) > 0 ? ` · ${p.teamSize} member${p.teamSize === 1 ? "" : "s"}` : ""}</span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -139,12 +154,17 @@ function NewProductModal({ onClose, onCreate, submitting }: {
   const [projects, setProjects] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [teamKey, setTeamKey] = useState("");
+  const { data: teamOptions = [] } = useQuery({
+    queryKey: ["team-slots"], retry: false, staleTime: 300_000,
+    queryFn: async (): Promise<TeamOption[]> => { try { return (await api<TeamOption[]>("/teams/slots")) ?? []; } catch { return []; } },
+  });
   const submit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(), owner: owner.trim(), source,
       projects: projects.split(",").map((s) => s.trim()).filter(Boolean),
-      startDate: prdToDisplay(startDate), endDate: prdToDisplay(endDate),
+      startDate: prdToDisplay(startDate), endDate: prdToDisplay(endDate), teamKey,
     });
   };
   return (
@@ -165,6 +185,11 @@ function NewProductModal({ onClose, onCreate, submitting }: {
         <div><Lbl>Start date</Lbl><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
         <div><Lbl>End date</Lbl><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
       </div>
+      <Lbl>Delivery team</Lbl>
+      <Select value={teamKey} onChange={(e) => setTeamKey(e.target.value)}>
+        <option value="">Unassigned — assign a team later</option>
+        {teamOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+      </Select>
       <Lbl>Linked projects (comma-separated)</Lbl>
       <Input value={projects} onChange={(e) => setProjects(e.target.value)} placeholder="PRJ-204, PRJ-176" />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -186,7 +211,6 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
   const [tasks, setTasks] = useState<Task[]>(product.tasks);
-  const [members, setMembers] = useState<Member[]>(product.members ?? []);
   const relOpts = useMemo(() => {
     const set = new Set<string>(product.releases ?? []);
     tasks.forEach((t) => t.mappedRelease && set.add(t.mappedRelease));
@@ -237,24 +261,9 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         <div style={{ padding: "0 22px 20px", minHeight: 80, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No releases scheduled yet.</div>
       </div>
 
-      {/* team & allocation */}
-      <div style={sectionCard}>
-        <div style={sectionTitle}>Product team &amp; allocation</div>
-        <div style={{ padding: "0 22px 16px" }}>
-          {members.length === 0 ? (
-            <div style={{ padding: "16px 0", textAlign: "center", color: color.faint3, fontSize: 13 }}>No team members allocated yet.</div>
-          ) : members.map((m, i) => (
-            <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: "1px solid #F4F6FA" }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: color.text }}>{m.name}</span>
-              <div style={{ width: 160, height: 7, background: color.bg, borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.min(100, m.alloc)}%`, background: color.primary }} /></div>
-              <input type="number" min={0} max={100} value={m.alloc}
-                onChange={(e) => { const v = Math.max(0, Math.min(100, +e.target.value)); setMembers((l) => l.map((x, xi) => (xi === i ? { ...x, alloc: v } : x))); }}
-                style={{ width: 58, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 0", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
-            </div>
-          ))}
-          <div style={{ fontSize: 11, color: color.faint3, marginTop: 10 }}>Editable by the product owner · feeds resource planning (by person / project / product).</div>
-        </div>
-      </div>
+      {/* team & allocation — members come from the Entra teams mapped in Admin → Teams */}
+      <ProductTeamSection productId={product.id} />
+
 
       {/* tasks → release mapping */}
       <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -294,6 +303,112 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         <div style={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No absences recorded.</div>
       </div>
       {costsOpen && <CostsModal scope="products" id={product.id} name={product.name} onClose={() => setCostsOpen(false)} />}
+    </div>
+  );
+}
+
+const AVATAR_COLORS = ["#0F6CBD", "#7A3FB0", "#0E7C7B", "#C98A00", "#15A34A", "#A1282B"];
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+const avatarColor = (name: string) => AVATAR_COLORS[[...name].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+
+// Product delivery team. Members are allocated from the Entra teams a manager
+// owns (Admin → Teams); anyone with product access sees the roster read-only.
+function ProductTeamSection({ productId }: { productId: string }) {
+  const qc = useQueryClient();
+  const [pick, setPick] = useState("");     // "email|name|teamKey" of the assignable member to add
+  const [alloc, setAlloc] = useState(50);
+  const { data } = useQuery({
+    queryKey: ["product-team", productId], retry: false,
+    queryFn: async (): Promise<ProductTeam | null> => { try { return await api<ProductTeam>(`/products/${productId}/team`); } catch { return null; } },
+  });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["product-team", productId] }); qc.invalidateQueries({ queryKey: ["products"] }); };
+  const setTeam = useMutation({
+    mutationFn: (teamKey: string) => api(`/products/${productId}/team`, { method: "PATCH", body: JSON.stringify({ teamKey }) }),
+    onSuccess: refresh,
+  });
+  const addAlloc = useMutation({
+    mutationFn: (m: Assignable) => api(`/products/${productId}/allocations`, { method: "POST", body: JSON.stringify({ name: m.name, email: m.email, title: m.jobTitle, sourceTeamKey: m.teamKey, alloc }) }),
+    onSuccess: () => { setPick(""); setAlloc(50); refresh(); },
+  });
+  const setAllocPct = useMutation({
+    mutationFn: ({ id, v }: { id: number; v: number }) => api(`/products/allocations/${id}`, { method: "PATCH", body: JSON.stringify({ alloc: v }) }),
+    onSuccess: refresh,
+  });
+  const removeAlloc = useMutation({
+    mutationFn: (id: number) => api(`/products/allocations/${id}`, { method: "DELETE" }),
+    onSuccess: refresh,
+  });
+
+  const sectionCard: React.CSSProperties = { background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
+  const t = data;
+  const canEdit = !!(t?.canAllocate || t?.canAssignTeam);
+  const assignKey = (m: Assignable) => `${m.email}|${m.name}|${m.teamKey}`;
+  const picked = t?.assignable.find((m) => assignKey(m) === pick) ?? null;
+
+  return (
+    <div style={sectionCard}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 22px 13px" }}>
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, flex: 1 }}>Product team &amp; allocation</div>
+        {t && (t.canAssignTeam ? (
+          <select value={t.teamKey} onChange={(e) => setTeam.mutate(e.target.value)} title="Owning delivery team"
+            style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+            <option value="">No team assigned</option>
+            {t.teamOptions.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        ) : t.teamLabel ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: "#EEF3FB", borderRadius: 8, padding: "5px 11px" }}><Icon name="users" size={14} /> {t.teamLabel}</span>
+        ) : null)}
+      </div>
+
+      <div style={{ padding: "0 22px 16px" }}>
+        {!t ? (
+          <div style={{ padding: "16px 0", textAlign: "center", color: color.faint3, fontSize: 13 }}>Loading team…</div>
+        ) : (
+          <>
+            {t.allocations.length === 0 ? (
+              <div style={{ padding: "18px 0", textAlign: "center", color: color.faint3, fontSize: 13 }}>
+                No team members allocated yet.{canEdit ? "" : " A team manager allocates members from their Entra teams."}
+              </div>
+            ) : t.allocations.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid #F4F6FA" }}>
+                <span style={{ width: 34, height: 34, borderRadius: "50%", background: avatarColor(a.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flex: "none" }}>{initials(a.name)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{a.name}</div>
+                  <div style={{ fontSize: 11.5, color: color.faint3 }}>{a.title || a.email || "—"}{a.teamLabel ? ` · ${a.teamLabel}` : ""}</div>
+                </div>
+                <div style={{ width: 140, height: 7, background: color.bg, borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.min(100, a.alloc)}%`, background: color.primary }} /></div>
+                {canEdit ? (
+                  <input type="number" min={0} max={100} defaultValue={a.alloc}
+                    onBlur={(e) => { const v = Math.max(0, Math.min(100, +e.target.value)); if (v !== a.alloc) setAllocPct.mutate({ id: a.id, v }); }}
+                    style={{ width: 58, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 0", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
+                ) : (
+                  <span style={{ width: 44, textAlign: "right", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.textMuted }}>{a.alloc}%</span>
+                )}
+                {canEdit && (
+                  <button onClick={() => removeAlloc.mutate(a.id)} title="Remove from team"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 4 }}><Icon name="trash" size={15} /></button>
+                )}
+              </div>
+            ))}
+
+            {t.canAllocate && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}`, flexWrap: "wrap" }}>
+                <select value={pick} onChange={(e) => setPick(e.target.value)}
+                  style={{ flex: 1, minWidth: 200, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 12.5, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+                  <option value="">{t.assignable.length ? "Add a member from your teams…" : "No unallocated members in your teams"}</option>
+                  {t.assignable.map((m) => <option key={assignKey(m)} value={assignKey(m)}>{m.name}{m.jobTitle ? ` — ${m.jobTitle}` : ""} · {m.teamLabel}</option>)}
+                </select>
+                <input type="number" min={0} max={100} value={alloc} onChange={(e) => setAlloc(Math.max(0, Math.min(100, +e.target.value)))} title="Allocation %"
+                  style={{ width: 66, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "8px 0", fontSize: 12.5, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
+                <Button onClick={() => picked && addAlloc.mutate(picked)} disabled={!picked || addAlloc.isPending}><Icon name="plus" size={15} /> Allocate</Button>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: color.faint3, marginTop: 12 }}>
+              {t.canAllocate ? "You can allocate members from the Entra teams you manage." : "Managed by the team's manager · feeds resource planning."}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

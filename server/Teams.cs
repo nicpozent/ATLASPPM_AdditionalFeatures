@@ -31,7 +31,19 @@ public static class Teams
         ("pmlead",    "PM Lead"),
     };
     static string Label(string key) => Slots.FirstOrDefault(s => s.Key == key).Label ?? key;
+    public static string SlotLabel(string key) => string.IsNullOrEmpty(key) ? "" : Label(key);
     static bool IsSlot(string? key) => key is not null && Slots.Any(s => s.Key == key);
+    public static bool IsValidSlot(string? key) => IsSlot(key);
+
+    // The manager slots in the caller's scope: Platform Admin → all; a manager →
+    // self + every team beneath them in the roll-up. Empty for anyone else.
+    public static async Task<HashSet<string>> ScopeAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    {
+        if (Permissions.IsPlatformAdmin(http, cfg)) return Slots.Select(s => s.Key).ToHashSet();
+        var mgr = Permissions.ManagerKey(http, cfg);
+        if (mgr is null) return new HashSet<string>();
+        return DescendantsOf(mgr, await ParentMapAsync(db));
+    }
 
     static bool GraphConfigured(IConfiguration cfg) =>
         !string.IsNullOrWhiteSpace(cfg["Graph:TenantId"]) &&
@@ -199,6 +211,128 @@ public static class Teams
 
             return Results.Ok(new MyTeamDto(isAdmin, mgr ?? "", mgr is null ? "" : Label(mgr), teams));
         });
+
+        // The team-manager slots as pickable options (for the create-product form).
+        api.MapGet("/teams/slots", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-products", "V") is { } denied) return denied;
+            return Results.Ok(Slots.Select(s => new TeamOptionDto(s.Key, s.Label)).ToList());
+        });
+
+        // ---- Product teams: assign an owning team, allocate members --------
+        // Everyone with View on Products can see the allocated team; assigning a
+        // team needs Edit on Products; allocating members is manager/admin only
+        // (you can only allocate people you manage — their team is in your scope).
+        api.MapGet("/products/{id}/team", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // The roster is visible to anyone who can reach a product (the product
+            // list is open). Assigning the team and allocating members are gated below.
+            var p = await db.Products.Include(x => x.Allocations).FirstOrDefaultAsync(x => x.Id == id);
+            if (p is null) return Results.NotFound();
+
+            var canAssignTeam = await Permissions.Allows(http, db, cfg, "cap-products", "E");
+            var scope = await ScopeAsync(db, cfg, http);
+            var canAllocate = scope.Count > 0;
+
+            var allocations = p.Allocations.OrderBy(a => a.MemberName)
+                .Select(a => new ProductAllocationDto(a.Id, a.MemberName, a.MemberEmail, a.MemberTitle, a.SourceTeamKey, SlotLabel(a.SourceTeamKey), a.Alloc))
+                .ToList();
+
+            // Assignable pool = members of the caller's in-scope teams, minus those
+            // already allocated (matched by email when present, else by name).
+            var taken = p.Allocations.Select(a => (string.IsNullOrEmpty(a.MemberEmail) ? a.MemberName : a.MemberEmail).ToLowerInvariant()).ToHashSet();
+            var assignable = new List<AllocatableDto>();
+            if (canAllocate)
+            {
+                var groups = await db.EntraGroups.Include(g => g.Members).Where(g => g.ManagerKey != "" && scope.Contains(g.ManagerKey)).ToListAsync();
+                foreach (var g in groups)
+                    foreach (var m in g.Members)
+                    {
+                        var key = (string.IsNullOrEmpty(m.Email) ? m.DisplayName : m.Email).ToLowerInvariant();
+                        if (taken.Contains(key)) continue;
+                        assignable.Add(new AllocatableDto(m.DisplayName, m.Email, m.JobTitle, g.ManagerKey, SlotLabel(g.ManagerKey)));
+                    }
+                assignable = assignable.GroupBy(a => (string.IsNullOrEmpty(a.Email) ? a.Name : a.Email).ToLowerInvariant())
+                    .Select(gr => gr.First()).OrderBy(a => a.Name).ToList();
+            }
+
+            var teamOptions = Slots.Select(s => new TeamOptionDto(s.Key, s.Label)).ToList();
+            return Results.Ok(new ProductTeamDto(p.Id, p.TeamKey, SlotLabel(p.TeamKey), canAssignTeam, canAllocate, allocations, assignable, teamOptions));
+        });
+
+        api.MapPatch("/products/{id}/team", async (string id, SetProductTeamReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-products", "E") is { } denied) return denied;
+            var p = await db.Products.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            if (!string.IsNullOrEmpty(req.TeamKey) && !IsSlot(req.TeamKey)) return Results.BadRequest(new { error = "Unknown team." });
+            p.TeamKey = req.TeamKey ?? "";
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Assigned product team", $"{p.Name} → {(string.IsNullOrEmpty(p.TeamKey) ? "unassigned" : Label(p.TeamKey))}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        api.MapPost("/products/{id}/allocations", async (string id, AddAllocationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var p = await db.Products.Include(x => x.Allocations).FirstOrDefaultAsync(x => x.Id == id);
+            if (p is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Member name is required." });
+
+            // You may only allocate people you manage: their source team must be in your scope.
+            var scope = await ScopeAsync(db, cfg, http);
+            var source = req.SourceTeamKey ?? "";
+            if (scope.Count == 0) return Results.Json(new { error = "Only a team manager or Platform Admin can allocate members." }, statusCode: StatusCodes.Status403Forbidden);
+            if (!string.IsNullOrEmpty(source) && !scope.Contains(source)) return Results.Json(new { error = "That member isn’t in a team you manage." }, statusCode: StatusCodes.Status403Forbidden);
+
+            var email = req.Email?.Trim() ?? "";
+            var matchKey = (string.IsNullOrEmpty(email) ? req.Name.Trim() : email).ToLowerInvariant();
+            if (p.Allocations.Any(a => (string.IsNullOrEmpty(a.MemberEmail) ? a.MemberName : a.MemberEmail).ToLowerInvariant() == matchKey))
+                return Results.BadRequest(new { error = "That member is already on this product team." });
+
+            var a = new ProductAllocation
+            {
+                ProductId = id, MemberName = req.Name.Trim(), MemberEmail = email,
+                MemberTitle = req.Title?.Trim() ?? "", SourceTeamKey = source,
+                Alloc = Math.Clamp(req.Alloc, 0, 100),
+            };
+            db.ProductAllocations.Add(a);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Allocated member", $"{a.MemberName} → {p.Name} ({a.Alloc}%)"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/products/allocations/{a.Id}",
+                new ProductAllocationDto(a.Id, a.MemberName, a.MemberEmail, a.MemberTitle, a.SourceTeamKey, SlotLabel(a.SourceTeamKey), a.Alloc));
+        });
+
+        api.MapPatch("/products/allocations/{allocId:int}", async (int allocId, SetAllocationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var a = await db.ProductAllocations.FindAsync(allocId);
+            if (a is null) return Results.NotFound();
+            if (await CanEditAllocation(a, db, cfg, http) is { } forbidden) return forbidden;
+            a.Alloc = Math.Clamp(req.Alloc, 0, 100);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        api.MapDelete("/products/allocations/{allocId:int}", async (int allocId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var a = await db.ProductAllocations.FindAsync(allocId);
+            if (a is null) return Results.NotFound();
+            if (await CanEditAllocation(a, db, cfg, http) is { } forbidden) return forbidden;
+            db.ProductAllocations.Remove(a);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Removed allocation", $"{a.MemberName} · {SlotLabel(a.SourceTeamKey)}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+    }
+
+    // Editing/removing an allocation is allowed for the managing chain (admin, or a
+    // manager whose scope contains the member's source team) or a product manager
+    // (Edit on Products) — the product owner curates their own delivery roster.
+    static async Task<IResult?> CanEditAllocation(ProductAllocation a, AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    {
+        var scope = await ScopeAsync(db, cfg, http);
+        var inScope = scope.Count > 0 && (string.IsNullOrEmpty(a.SourceTeamKey) || scope.Contains(a.SourceTeamKey));
+        if (inScope || await Permissions.Allows(http, db, cfg, "cap-products", "E")) return null;
+        return Results.Json(new { error = "You can’t change this allocation." }, statusCode: StatusCodes.Status403Forbidden);
     }
 
     // ---- Microsoft Graph sync (client credentials) ------------------------
