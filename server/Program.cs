@@ -32,6 +32,11 @@ if (openApiEnabled)
 // configured (see Observability.cs and docs/observability.md).
 builder.AddAtlasObservability();
 
+// Daily data-retention pass (anonymises records past the window; default 10y).
+// On by default; nothing is touched until records actually age out.
+if (cfg.GetValue("Retention:Enabled", true))
+    builder.Services.AddHostedService<RetentionHostedService>();
+
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
 var corsOrigins = Hardening.CorsOrigins(cfg);
