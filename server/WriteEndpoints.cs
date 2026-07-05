@@ -17,7 +17,7 @@ public record CreateProjectReq(string Name, string? Dept, string? Owner, string?
     string? StartDate, string? Target);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
-    string? StartDate);
+    string? StartDate, string? Summary);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate, string? Dept);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
@@ -263,6 +263,7 @@ public static class WriteEndpoints
             if (!string.IsNullOrWhiteSpace(req.Phase)) p.Phase = req.Phase!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Target)) { p.Target = req.Target!.Trim(); p.Due = p.Target; }
             if (req.StartDate is not null) p.StartDate = req.StartDate.Trim();
+            if (req.Summary is not null) p.Summary = req.Summary.Trim();
             if (req.Budget is decimal b && b >= 0) p.Budget = b;
             if (req.Spent is decimal s && s >= 0) p.Spent = s;
             if (req.Forecast is decimal fc && fc >= 0) p.Forecast = fc;

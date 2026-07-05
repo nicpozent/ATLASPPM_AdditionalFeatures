@@ -43,6 +43,7 @@ public static class Endpoints
         api.MapGdprEndpoints();
         api.MapRetentionEndpoints();
         api.MapSecretRotationEndpoints();
+        api.MapCommentEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -94,7 +95,7 @@ public static class Endpoints
             return p is null
                 ? Results.NotFound()
                 : Results.Ok(new ProjectDetailDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology,
-                    p.Status, p.Health, p.Progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target));
+                    p.Status, p.Health, p.Progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target, p.Summary));
         });
 
         api.MapGet("/blockers", async (AtlasDbContext db) =>

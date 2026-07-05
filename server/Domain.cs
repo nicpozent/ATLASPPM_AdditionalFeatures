@@ -21,6 +21,7 @@ public class Project
     public string Phase { get; set; } = default!;
     public string Due { get; set; } = default!;
     public string StartDate { get; set; } = "";        // display date, project start
+    public string Summary { get; set; } = "";           // editable Overview summary
 
     // Financials breakdown (feeds /financials).
     public decimal Capex { get; set; }
@@ -44,6 +45,18 @@ public class Project
     public bool Archived { get; set; }
 
     public List<Blocker> Blockers { get; set; } = new();
+}
+
+// A comment on a project's collaboration thread. Author/initials captured at
+// post time from the caller's identity.
+public class ProjectComment
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Author { get; set; } = "";
+    public string Initials { get; set; } = "";
+    public string Body { get; set; } = "";
+    public DateTime At { get; set; }
 }
 
 public class Blocker

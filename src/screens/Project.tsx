@@ -15,7 +15,7 @@ import { SCREENS } from "@/nav";
 interface ProjectDetail {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: string; health: string; progress: number; phase: string;
-  budget: number; spent: number; due: string; startDate?: string; target?: string;
+  budget: number; spent: number; due: string; startDate?: string; target?: string; summary?: string;
 }
 function useProject(id: string | null) {
   return useQuery({
@@ -122,7 +122,7 @@ export default function Project() {
       {tab === "quality" && <Quality projectId={id} />}
       {tab === "dependencies" && <Dependencies projectId={id} />}
       {tab === "vacations" && <Vacations projectId={id} />}
-      {tab === "comments" && <Comments />}
+      {tab === "comments" && <Comments projectId={id} />}
 
       {editing && p && <EditProjectDetailModal project={p} onClose={() => setEditing(false)} />}
     </div>
@@ -230,6 +230,47 @@ function PdField({ label, children }: { label: string; children: React.ReactNode
 
 interface SpilledTask { code: string; name: string; baseline: string; sprint: string; assignee: string }
 
+function SummaryCard({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const canEdit = can("cap-projects", "E");
+  const { data } = useProject(projectId);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const summary = data?.summary ?? "";
+  const save = useMutation({
+    mutationFn: (text: string) => api(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ summary: text }) }),
+    onSuccess: () => { setEditing(false); qc.invalidateQueries({ queryKey: ["project", projectId] }); },
+  });
+
+  return (
+    <Card padding={22}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <SectionTitle>Summary</SectionTitle>
+        <div style={{ flex: 1 }} />
+        {canEdit && !editing && (
+          <button onClick={() => { setDraft(summary); setEditing(true); }} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            {summary ? "Edit" : "Add summary"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div style={{ marginTop: 10 }}>
+          <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} placeholder="Describe the project's purpose, scope and current focus…" style={{ width: "100%" }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 10 }}>
+            <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={() => save.mutate(draft.trim())} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
+          </div>
+        </div>
+      ) : summary ? (
+        <div style={{ fontSize: 13.5, color: color.subtle, lineHeight: 1.55, whiteSpace: "pre-wrap", marginTop: 8 }}>{summary}</div>
+      ) : (
+        <EmptyBlock message="No project summary yet." minHeight={70} />
+      )}
+    </Card>
+  );
+}
+
 function Overview({ projectId }: { projectId: string | null }) {
   const [modal, setModal] = useState<null | "risks" | "report">(null);
   const { data: spilled = [] } = useQuery({
@@ -259,7 +300,7 @@ function Overview({ projectId }: { projectId: string | null }) {
         {modal === "risks" && projectId && <RisksModal projectId={projectId} onClose={() => setModal(null)} />}
         {modal === "report" && projectId && <StatusReportModal projectId={projectId} onClose={() => setModal(null)} />}
         <OperationalImpact projectId={projectId} />
-        <Card padding={22}><SectionTitle>Summary</SectionTitle><EmptyBlock message="No project summary yet." minHeight={70} /></Card>
+        <SummaryCard projectId={projectId} />
         <Card padding={22}><SectionTitle>Epic progress</SectionTitle><EmptyBlock message="No epics tracked yet." minHeight={80} /></Card>
         <Card padding={22}><SectionTitle>Stakeholder matrix · power / interest</SectionTitle><EmptyBlock message="No stakeholders mapped yet." minHeight={120} /></Card>
       </div>
@@ -1020,15 +1061,62 @@ function RaidModal({ projectId, onClose }: { projectId: string; onClose: () => v
   );
 }
 
-function Comments() {
+interface CommentItem { id: number; author: string; initials: string; body: string; at: string; }
+
+function fmtCommentTime(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function Comments({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
   const [text, setText] = useState("");
+  const { data } = useQuery({
+    queryKey: ["comments", projectId], enabled: !!projectId, retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<{ canPost: boolean; comments: CommentItem[] }> =>
+      (await api<{ canPost: boolean; comments: CommentItem[] }>(`/projects/${projectId}/comments`)) ?? { canPost: false, comments: [] },
+  });
+  const comments = data?.comments ?? [];
+  const canPost = data?.canPost ?? false;
+  const post = useMutation({
+    mutationFn: (body: string) => api(`/projects/${projectId}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+    onSuccess: () => { setText(""); qc.invalidateQueries({ queryKey: ["comments", projectId] }); },
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={160} message="Select a project from the Portfolio to view its discussion." /></Card>;
+
   return (
     <Card padding={22}>
       <SectionTitle>Discussion</SectionTitle>
-      <EmptyBlock message="No comments yet. Start the conversation below." minHeight={90} />
+      {comments.length === 0 ? (
+        <EmptyBlock message="No comments yet. Start the conversation below." minHeight={90} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, margin: "14px 0 4px" }}>
+          {comments.map((c) => (
+            <div key={c.id} style={{ display: "flex", gap: 11 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", flex: "none", background: "linear-gradient(135deg,#0F6CBD,#1E2C7C)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>{c.initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{c.author}</span>
+                  <span style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{fmtCommentTime(c.at)}</span>
+                </div>
+                <div style={{ fontSize: 13, color: color.subtle, whiteSpace: "pre-wrap", marginTop: 2 }}>{c.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, marginTop: 12, borderTop: `1px solid ${color.bg}`, paddingTop: 16 }}>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a comment…" style={{ flex: 1, minHeight: 44, resize: "vertical", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", color: color.text, outline: "none" }} />
-        <Button style={{ alignSelf: "flex-end" }} onClick={() => setText("")}>Comment</Button>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={canPost ? "Write a comment…" : "Your role can't post comments (needs Edit on “Comments & artifacts”)"}
+          disabled={!canPost || post.isPending}
+          style={{ flex: 1, minHeight: 44, resize: "vertical", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", color: color.text, outline: "none" }}
+        />
+        <Button style={{ alignSelf: "flex-end" }} disabled={!canPost || post.isPending || !text.trim()} onClick={() => post.mutate(text.trim())}>
+          {post.isPending ? "Posting…" : "Comment"}
+        </Button>
       </div>
     </Card>
   );
