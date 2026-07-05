@@ -9,9 +9,13 @@ var cfg = builder.Configuration;
 // Vault — before anything reads a connection string. Inert unless configured.
 builder.AddAtlasSecrets();
 
+// Enforce TLS in transit when configured (Database:SslMode, e.g. Require on
+// Azure). Non-breaking: unset ⇒ Npgsql's opportunistic default.
+var pgConnString = Db.ApplySslMode(
+    cfg.GetConnectionString("Postgres") ?? "Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas",
+    cfg["Database:SslMode"]);
 builder.Services.AddDbContext<AtlasDbContext>(o =>
-    o.UseNpgsql(cfg.GetConnectionString("Postgres")
-        ?? "Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas",
+    o.UseNpgsql(pgConnString,
         npg =>
         {
             // Survive transient Postgres drops (failover, restarts, brief network
