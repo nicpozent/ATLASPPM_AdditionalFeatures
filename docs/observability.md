@@ -14,8 +14,11 @@ environment without any code change.
 | Signal | Source |
 | ------ | ------ |
 | **Traces** | Incoming HTTP requests (ASP.NET Core), outbound `HttpClient` calls (e.g. Microsoft Graph), EF Core database queries. Exceptions are recorded on the request span. |
-| **Metrics** | ASP.NET Core server metrics, `HttpClient` metrics, and .NET runtime metrics (GC, heap, thread-pool, exceptions). |
+| **Metrics** | ASP.NET Core server metrics, `HttpClient` metrics, .NET runtime metrics (GC, heap, thread-pool, exceptions), **plus the Atlas domain meter `Atlas.Api`** — e.g. `atlas.audit.events` (a counter of audited domain writes, tagged by `area`/`action`) for activity dashboards. |
 | **Logs** | The application's structured logs, including the `SRV-…` / `INT-…` correlation codes attached to 5xx responses, exported alongside the matching trace. |
+
+> A custom `ActivitySource` named `Atlas.Api` is also registered for manual
+> domain spans (ready to wrap any operation via `AtlasTelemetry.Source`).
 
 > EF Core spans do **not** capture SQL statement text by default
 > (`SetDbStatementForText = false`) to avoid leaking data values into your

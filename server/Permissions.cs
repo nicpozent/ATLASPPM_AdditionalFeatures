@@ -163,6 +163,7 @@ public static class Permissions
     {
         var authEnabled = cfg.GetValue("Auth:Enabled", false);
         var role = ResolveRoleId(http.User, http.Request, authEnabled) ?? "dev";
+        AtlasTelemetry.RecordAudit(category, action);   // domain-write metric (no-op unless OTel is on)
         return new AuditEvent
         {
             At = DateTime.UtcNow, Actor = ActorName(http, cfg), Role = role,
