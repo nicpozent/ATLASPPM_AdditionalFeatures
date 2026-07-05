@@ -219,6 +219,10 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
     mutationFn: (dept: string) => api(`/programs/${program.id}`, { method: "PATCH", body: JSON.stringify({ dept }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
   });
+  const setProjects = useMutation({
+    mutationFn: (projects: string[]) => api(`/programs/${program.id}`, { method: "PATCH", body: JSON.stringify({ projects }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
+  });
   const [costsOpen, setCostsOpen] = useState(false);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [skName, setSkName] = useState("");
@@ -300,13 +304,28 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
 
       {/* projects in this program */}
       <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy }}>Projects in this program</div>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy }}>Projects in this program</div>
+          <div style={{ flex: 1 }} />
+          {mayEdit && (
+            <Select
+              value=""
+              disabled={setProjects.isPending}
+              onChange={(e) => { const id = e.target.value; if (id) setProjects.mutate([...program.projects, id]); }}
+              title="Link a project to this program"
+              style={{ width: "auto", minWidth: 190 }}
+            >
+              <option value="">+ Link a project…</option>
+              {projectOpts.filter((p) => !program.projects.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          )}
+        </div>
         {projectRows.length === 0 ? (
           <div style={{ padding: "40px 22px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No projects linked to this program yet.</div>
         ) : projectRows.map((p) => {
           const ph = HEALTH[p.status ?? "hold"] ?? HEALTH.hold;
           return (
-            <div key={p.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 0.9fr 1fr 0.8fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={p.id} style={{ display: "grid", gridTemplateColumns: mayEdit ? "2fr 1fr 0.9fr 1fr 0.8fr 40px" : "2fr 1fr 0.9fr 1fr 0.8fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: ph.dot, flex: "none" }} />
                 <div><div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.name}</div><div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{p.id}</div></div>
@@ -318,6 +337,17 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
                 <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.textMuted }}>{p.progress ?? 0}%</span>
               </div>
               <div style={{ textAlign: "right", fontFamily: font.mono, fontSize: 12.5, color: color.textMuted }}>{fmt(p.budget ?? 0)}</div>
+              {mayEdit && (
+                <div style={{ textAlign: "right" }}>
+                  <button
+                    onClick={() => setProjects.mutate(program.projects.filter((x) => x !== p.id))}
+                    disabled={setProjects.isPending}
+                    title="Unlink from this program"
+                    aria-label={`Unlink ${p.name}`}
+                    style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 14, lineHeight: 1 }}
+                  >×</button>
+                </div>
+              )}
             </div>
           );
         })}

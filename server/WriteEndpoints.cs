@@ -401,6 +401,12 @@ public static class WriteEndpoints
             if (req.Goal is not null) pg.Goal = req.Goal.Trim();
             if (req.StartDate is not null) pg.StartDate = req.StartDate.Trim();
             if (req.EndDate is not null) pg.EndDate = req.EndDate.Trim();
+            // Link/unlink projects after creation: only keep ids that exist.
+            if (req.Projects is not null)
+            {
+                var valid = await db.Projects.Where(p => req.Projects.Contains(p.Id)).Select(p => p.Id).ToListAsync();
+                pg.Projects = req.Projects.Where(valid.Contains).Distinct().ToList();
+            }
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Updated program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             return Results.NoContent();

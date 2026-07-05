@@ -1482,13 +1482,28 @@ function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: 
     mutationFn: async (file: File) => { const fd = new FormData(); fd.append("file", file); await apiUpload(`/artifacts/${artifact.id}/versions`, fd); },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["artifacts", projectId] }),
   });
+  const changeStatus = useMutation({
+    mutationFn: (status: string) => api(`/artifacts/${artifact.id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["artifacts", projectId] }),
+  });
 
   return (
     <Modal onClose={onClose} width={560} label={artifact.name}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <span style={{ fontSize: 12, color: color.faint3 }}>{artifact.type} · Owner {artifact.owner}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{artifact.status}</span>
+        {canEdit ? (
+          <Select
+            value={artifact.status}
+            disabled={changeStatus.isPending}
+            onChange={(e) => changeStatus.mutate(e.target.value)}
+            style={{ width: "auto", fontSize: 12, fontWeight: 600, color: sc.ink, background: sc.tint, borderColor: "transparent", padding: "4px 8px" }}
+          >
+            {ARTIFACT_STATUSES.map((s) => <option key={s} value={s} style={{ color: color.ink, background: "#fff" }}>{s}</option>)}
+          </Select>
+        ) : (
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{artifact.status}</span>
+        )}
       </div>
       <div style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.ink, margin: "18px 0 10px" }}>Versions</div>
       {artifact.versions.length === 0 ? (
