@@ -187,6 +187,9 @@ public sealed class RetentionHostedService(IServiceProvider services, IConfigura
                 var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
                 var count = await Retention.AnonymizeExpiredAsync(db, Retention.CutoffFromConfig(cfg));
                 if (count > 0) log.LogInformation("Retention pass anonymised {Count} expired record(s).", count);
+                // Same daily cadence: nudge the admin if the DB password is due for rotation.
+                if (await SecretRotation.CheckAndNotifyAsync(db, cfg))
+                    log.LogInformation("Raised a database-password rotation alert.");
             }
             catch (Exception ex)
             {
