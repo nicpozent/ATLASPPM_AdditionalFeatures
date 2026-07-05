@@ -6,6 +6,7 @@ import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { SubscribeButton } from "@/components/SubscribeButton";
 import { toast } from "@/components/Toast";
 import { SCREENS } from "@/nav";
 
@@ -75,6 +76,7 @@ export default function Project() {
             <div style={{ fontSize: 13, color: color.faint }}>{p ? `${p.dept} · Sponsor ${p.owner} · ${p.methodology}` : "Select a project from the Portfolio to view its detail."}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            {p && <SubscribeButton targetType="project" targetId={p.id} />}
             {p && mayEdit && <Button variant="secondary" onClick={() => setEditing(true)}><Icon name="edit" size={16} /> Edit</Button>}
             <Button variant="secondary"><Icon name="download" size={16} /> Status PPTX</Button>
             <Button onClick={() => navigate(SCREENS.gantt.path)}><Icon name="gantt" size={16} /> Timeline</Button>

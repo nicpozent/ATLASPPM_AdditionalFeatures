@@ -24,9 +24,12 @@ public static class Lifecycle
             if (!ProductStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var p = await db.Products.FindAsync(id);
             if (p is null) return Results.NotFound();
+            var oldStatus = p.Status;
             p.Status = req.Status;
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", $"Set status {req.Status}", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
+            if (req.Status != oldStatus)
+                await Notifications.EmitToEntityAsync(db, cfg, Notifications.Status, "product", p.Id, $"{p.Name} status changed", $"{p.Id} · status is now “{p.Status}”.", Permissions.CallerKey(http, cfg));
             return Results.NoContent();
         });
 

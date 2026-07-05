@@ -22,6 +22,9 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<EntraGroup> EntraGroups => Set<EntraGroup>();
     public DbSet<TeamMemberRow> TeamMembers => Set<TeamMemberRow>();
     public DbSet<ManagerNode> ManagerNodes => Set<ManagerNode>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<NotificationPref> NotificationPrefs => Set<NotificationPref>();
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<CommunicationEntry> CommunicationEntries => Set<CommunicationEntry>();
     public DbSet<Release> Releases => Set<Release>();
     public DbSet<DeliveryReport> DeliveryReports => Set<DeliveryReport>();
@@ -125,6 +128,12 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<EntraGroup>().HasMany(x => x.Members).WithOne().HasForeignKey(m => m.GroupId);
         b.Entity<TeamMemberRow>().HasKey(x => x.Id);
         b.Entity<ManagerNode>().HasKey(x => x.Key);
+        b.Entity<Subscription>().HasKey(x => x.Id);
+        b.Entity<Subscription>().HasIndex(x => new { x.UserKey, x.TargetType, x.TargetId }).IsUnique();
+        b.Entity<NotificationPref>().HasKey(x => x.Id);
+        b.Entity<NotificationPref>().HasIndex(x => new { x.UserKey, x.EventType }).IsUnique();
+        b.Entity<Notification>().HasKey(x => x.Id);
+        b.Entity<Notification>().HasIndex(x => new { x.UserKey, x.Read });
         b.Entity<CommunicationEntry>().HasKey(x => x.Id);
         b.Entity<Release>().HasKey(x => x.Id);
         b.Entity<Release>().Property(x => x.Id).ValueGeneratedNever();

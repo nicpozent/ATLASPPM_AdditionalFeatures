@@ -91,6 +91,15 @@ public record MyTeamGroupDto(string Id, string DisplayName, List<TeamMemberDto> 
 public record MyTeamManagerDto(string Key, string Label, bool IsSelf, List<MyTeamGroupDto> Groups, int MemberCount);
 public record MyTeamDto(bool IsAdmin, string ManagerKey, string ManagerLabel, List<MyTeamManagerDto> Teams);
 
+// ---- Notifications, subscriptions & preferences ----------------------------
+public record NotificationDto(int Id, string EventType, string Title, string Body, string TargetType, string TargetId, bool Read, string At);
+public record InboxDto(int UnreadCount, List<NotificationDto> Items);
+public record SubscriptionDto(int Id, string TargetType, string TargetId);
+public record NotifPrefDto(string EventType, string Label, string Detail, bool EntityScoped, bool InApp, bool Email);
+public record MarkReadReq(List<int>? Ids, bool All);
+public record SubscribeReq(string TargetType, string TargetId);
+public record SetPrefReq(bool InApp, bool Email);
+
 // ---- Timeline / Gantt ------------------------------------------------------
 public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);
 public record MilestoneDto(int Id, string Label, int Month, string Date);
