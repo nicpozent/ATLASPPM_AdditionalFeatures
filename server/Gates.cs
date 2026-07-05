@@ -2,7 +2,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
-public record ToggleCriterionReq(bool Met);
+public record ToggleCriterionReq(bool? Met, string? Label);
+public record AddCriterionReq(string Label);
 public record CreateDecisionReq(string Title, string? Context, string? Decision, string? Owner, string? Status);
 public record CreateRaidReq(string Type, string Title, string? Owner, string? Status);
 public record UpdateRaidReq(string? Type, string? Title, string? Owner, string? Status);
@@ -59,9 +60,41 @@ public static class Gates
             if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
             var crit = await db.GateCriteria.FindAsync(critId);
             if (crit is null) return Results.NotFound();
-            crit.Met = req.Met;
+            if (req.Met is { } m) crit.Met = m;
+            if (req.Label is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
+                crit.Label = req.Label.Trim();
+            }
             await db.SaveChangesAsync();
-            return Results.Ok(new { crit.Id, crit.Met });
+            return Results.Ok(new { crit.Id, crit.Label, crit.Met });
+        });
+
+        // Add a criterion to a gate — makes the security/architecture review
+        // gates configurable rather than a fixed checklist.
+        api.MapPost("/gates/{gateId:int}/criteria", async (int gateId, AddCriterionReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
+            var gate = await db.Gates.Include(g => g.Criteria).FirstOrDefaultAsync(g => g.Id == gateId);
+            if (gate is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
+            var ord = (gate.Criteria.Count == 0 ? -1 : gate.Criteria.Max(c => c.Ord)) + 1;
+            var crit = new GateCriterion { GateId = gateId, Label = req.Label.Trim(), Met = false, Ord = ord };
+            db.GateCriteria.Add(crit);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Gates", "Added gate criterion", $"{gate.ProjectId} · {gate.Code} · {crit.Label}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new { crit.Id, crit.Label, crit.Met });
+        });
+
+        api.MapDelete("/gates/criteria/{critId:int}", async (int critId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
+            var crit = await db.GateCriteria.FindAsync(critId);
+            if (crit is null) return Results.NotFound();
+            db.GateCriteria.Remove(crit);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Gates", "Removed gate criterion", crit.Label));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         api.MapPost("/gates/{gateId:int}/approve", (int gateId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

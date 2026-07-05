@@ -1146,6 +1146,16 @@ function Governance({ projectId }: { projectId: string | null }) {
     mutationFn: (v: { critId: number; met: boolean }) => api(`/gates/criteria/${v.critId}`, { method: "PATCH", body: JSON.stringify({ met: v.met }) }),
     onSuccess: invalidate,
   });
+  const addCrit = useMutation({
+    mutationFn: (v: { gateId: number; label: string }) => api(`/gates/${v.gateId}/criteria`, { method: "POST", body: JSON.stringify({ label: v.label }) }),
+    onSuccess: invalidate,
+    onError: (e) => toastError(e),
+  });
+  const delCrit = useMutation({
+    mutationFn: (critId: number) => api(`/gates/criteria/${critId}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+    onError: (e) => toastError(e),
+  });
   const decide = useMutation({
     mutationFn: (v: { gateId: number; action: "approve" | "reject" }) => api(`/gates/${v.gateId}/${v.action}`, { method: "POST" }),
     onSuccess: invalidate,
@@ -1181,12 +1191,22 @@ function Governance({ projectId }: { projectId: string | null }) {
               <div style={{ height: 6, borderRadius: 4, background: color.bg, overflow: "hidden", marginBottom: 8 }}><div style={{ height: "100%", width: `${g.pct}%`, background: color.primary }} /></div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 12 }}>
                 {g.criteria.map((c) => (
-                  <button key={c.id} onClick={() => canGovern && toggle.mutate({ critId: c.id, met: !c.met })} disabled={!canGovern || toggle.isPending}
-                    style={{ display: "flex", alignItems: "flex-start", gap: 7, textAlign: "left", background: "none", border: "none", padding: 0, cursor: canGovern ? "pointer" : "default", fontFamily: "inherit" }}>
-                    <span style={{ flex: "none", width: 14, height: 14, borderRadius: 4, marginTop: 1, background: c.met ? "#15A34A" : "transparent", border: c.met ? "none" : `1.5px solid ${color.border2}`, color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.met ? "✓" : ""}</span>
-                    <span style={{ fontSize: 11.5, color: color.text, lineHeight: 1.35 }}>{c.label}</span>
-                  </button>
+                  <div key={c.id} style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+                    <button onClick={() => canGovern && toggle.mutate({ critId: c.id, met: !c.met })} disabled={!canGovern || toggle.isPending}
+                      style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 7, textAlign: "left", background: "none", border: "none", padding: 0, cursor: canGovern ? "pointer" : "default", fontFamily: "inherit" }}>
+                      <span style={{ flex: "none", width: 14, height: 14, borderRadius: 4, marginTop: 1, background: c.met ? "#15A34A" : "transparent", border: c.met ? "none" : `1.5px solid ${color.border2}`, color: "#fff", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.met ? "✓" : ""}</span>
+                      <span style={{ fontSize: 11.5, color: color.text, lineHeight: 1.35 }}>{c.label}</span>
+                    </button>
+                    {canGovern && (
+                      <button onClick={() => { if (confirm(`Remove criterion “${c.label}”?`)) delCrit.mutate(c.id); }} title="Remove criterion"
+                        style={{ flex: "none", background: "none", border: "none", cursor: "pointer", color: color.faint3, padding: 0, marginTop: 1, lineHeight: 1 }}>×</button>
+                    )}
+                  </div>
                 ))}
+                {canGovern && (
+                  <button onClick={() => { const l = prompt("New criterion")?.trim(); if (l) addCrit.mutate({ gateId: g.id, label: l }); }} disabled={addCrit.isPending}
+                    style={{ alignSelf: "flex-start", fontSize: 11, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: "2px 0", cursor: "pointer", fontFamily: "inherit" }}>+ Add criterion</button>
+                )}
               </div>
               <div style={{ flex: 1 }} />
               <div style={{ fontSize: 10.5, color: color.faint3, marginBottom: 8 }}>{g.metLabel}</div>
@@ -1516,17 +1536,18 @@ interface SecProfile {
   personalData: boolean; specialCategory: boolean; automatedDecisions: boolean; cardholderData: boolean;
   gdpr: boolean; pci: boolean; iso: boolean; aiAct: boolean; soc2: boolean; nis2: boolean;
 }
-interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; }
+interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
 interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; }
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
 const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
 const FRAMEWORK_OPTS = ["ISO 27001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "EU AI Act"];
-const CTL_STATUSES = ["Planned", "Partial", "Implemented"];
+const CTL_STATUSES = ["Planned", "Partial", "Implemented", "Archived"];
 const CTL_STATUS: Record<string, { ink: string; tint: string }> = {
   Implemented: { ink: "#0B6B37", tint: "#E7F4EC" },
   Partial:     { ink: "#8A6300", tint: "#FBF2D7" },
   Planned:     { ink: "#56607A", tint: "#EEF1F6" },
+  Archived:    { ink: "#5E2E89", tint: "#F0E8F7" },
 };
 const SEC_FLAGS: { key: keyof SecProfile; label: string; desc: string }[] = [
   { key: "gdpr", label: "GDPR", desc: "Personal data of EU/EEA data subjects" },
@@ -1553,6 +1574,7 @@ const SEC_COLS = "0.6fr 1.9fr 0.9fr 1.9fr 1.1fr 0.9fr";
 function Security({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [openCtl, setOpenCtl] = useState<SecControl | null>(null);
   const { data } = useQuery({
     queryKey: ["security", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<SecData | null> => await api<SecData>(`/projects/${projectId}/security`),
@@ -1661,15 +1683,22 @@ function Security({ projectId }: { projectId: string | null }) {
           const sc = CTL_STATUS[c.status] ?? CTL_STATUS.Planned;
           const nextStatus = CTL_STATUSES[(CTL_STATUSES.indexOf(c.status) + 1) % CTL_STATUSES.length];
           return (
-            <div key={c.id} style={{ display: "grid", gridTemplateColumns: SEC_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA" }}>
+            <div key={c.id} style={{ display: "grid", gridTemplateColumns: SEC_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA", opacity: c.status === "Archived" ? 0.6 : 1 }}>
               <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
-              <div style={{ fontSize: 12.5, color: color.text, fontWeight: 600 }}>{c.control}</div>
+              <div style={{ minWidth: 0 }}>
+                {canEdit ? (
+                  <button onClick={() => setOpenCtl(c)} style={{ fontSize: 12.5, color: color.primary, fontWeight: 600, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{c.control}</button>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: color.text, fontWeight: 600 }}>{c.control}</span>
+                )}
+                {c.reason && <div style={{ fontSize: 10.5, color: color.faint3, fontStyle: "italic", marginTop: 2 }}>{c.reason}</div>}
+              </div>
               <div style={{ fontSize: 11.5, color: color.subtle }}>{c.framework}</div>
               <div style={{ fontSize: 11.5, color: "#7B849A", lineHeight: 1.4 }}>{c.evidence}</div>
               <div style={{ fontSize: 11.5, color: color.subtle }}>{c.owner}</div>
               <div>
                 <button onClick={() => canEdit && cycle.mutate({ id: c.id, status: nextStatus })} disabled={!canEdit || cycle.isPending}
-                  title={canEdit ? "Click to change status" : undefined}
+                  title={canEdit ? "Click to cycle status" : undefined}
                   style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "5px 10px", borderRadius: 20, border: "none", cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{c.status}</button>
               </div>
             </div>
@@ -1678,7 +1707,69 @@ function Security({ projectId }: { projectId: string | null }) {
       </Card>
 
       {addOpen && <AddControlModal projectId={projectId} onClose={() => setAddOpen(false)} />}
+      {openCtl && <EditControlModal projectId={projectId} ctl={openCtl} onClose={() => setOpenCtl(null)} />}
     </div>
+  );
+}
+
+function EditControlModal({ projectId, ctl, onClose }: { projectId: string; ctl: SecControl; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [control, setControl] = useState(ctl.control);
+  const [framework, setFramework] = useState(ctl.framework);
+  const [evidence, setEvidence] = useState(ctl.evidence === "—" ? "" : ctl.evidence);
+  const [owner, setOwner] = useState(ctl.owner === "—" ? "" : ctl.owner);
+  const [status, setStatus] = useState(ctl.status);
+  const [description, setDescription] = useState(ctl.description);
+  const [reason, setReason] = useState(ctl.reason);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["security", projectId] });
+
+  const save = useMutation({
+    mutationFn: () => api(`/security/controls/${ctl.id}`, { method: "PATCH", body: JSON.stringify({
+      control: control.trim(), framework, evidence: evidence.trim(), owner: owner.trim(), status,
+      description: description.trim(), reason: reason.trim(),
+    }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/security/controls/${ctl.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+
+  return (
+    <Modal onClose={onClose} width={520} label={`${ctl.code} · Control`}>
+      <DecLabel>Control</DecLabel>
+      <Input value={control} onChange={(e) => setControl(e.target.value)} placeholder="e.g. A.8.24 Use of cryptography" style={{ marginBottom: 14 }} />
+      <DecLabel>Description</DecLabel>
+      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What the control does and how it's met" style={{ minHeight: 60, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Framework</DecLabel><Select value={framework} onChange={(e) => setFramework(e.target.value)}>{FRAMEWORK_OPTS.map((f) => <option key={f} value={f}>{f}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{CTL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Owner</DecLabel><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Evidence</DecLabel><Input value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Link / reference" /></div>
+      </div>
+      <DecLabel>Reason for change (e.g. why archived / modified)</DecLabel>
+      <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional rationale" />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Remove this control?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Removing…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Remove control</button>
+        )}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (control.trim()) save.mutate(); }} disabled={save.isPending || !control.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1718,9 +1809,10 @@ function AddControlModal({ projectId, onClose }: { projectId: string; onClose: (
   const [evidence, setEvidence] = useState("");
   const [owner, setOwner] = useState("");
   const [status, setStatus] = useState(CTL_STATUSES[0]);
+  const [description, setDescription] = useState("");
 
   const create = useMutation({
-    mutationFn: () => api(`/projects/${projectId}/security/controls`, { method: "POST", body: JSON.stringify({ control: control.trim(), framework, evidence: evidence.trim(), owner: owner.trim(), status }) }),
+    mutationFn: () => api(`/projects/${projectId}/security/controls`, { method: "POST", body: JSON.stringify({ control: control.trim(), framework, evidence: evidence.trim(), owner: owner.trim(), status, description: description.trim() }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["security", projectId] }); onClose(); },
   });
   const submit = () => { if (control.trim()) create.mutate(); };
@@ -1730,6 +1822,8 @@ function AddControlModal({ projectId, onClose }: { projectId: string; onClose: (
       <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Record a control and its evidence in the register.</div>
       <DecLabel>Control</DecLabel>
       <Input value={control} onChange={(e) => setControl(e.target.value)} placeholder="e.g. A.8.24 Use of cryptography" style={{ marginBottom: 14 }} />
+      <DecLabel>Description</DecLabel>
+      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What the control does and how it's met" style={{ minHeight: 52, resize: "vertical", marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}>
           <DecLabel>Framework</DecLabel>

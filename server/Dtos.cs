@@ -41,7 +41,8 @@ public record RaidDto(bool CanEdit, List<RaidItemDto> Items);
 public record SecurityProfileDto(string Classification, string Residency, string Subjects, string Retention,
     bool PersonalData, bool SpecialCategory, bool AutomatedDecisions, bool CardholderData,
     bool Gdpr, bool Pci, bool Iso, bool AiAct, bool Soc2, bool Nis2);
-public record SecurityControlDto(int Id, string Code, string Control, string Framework, string Evidence, string Owner, string Status);
+public record SecurityControlDto(int Id, string Code, string Control, string Framework, string Evidence, string Owner, string Status,
+    string Description = "", string Reason = "");
 public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls);
 
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
