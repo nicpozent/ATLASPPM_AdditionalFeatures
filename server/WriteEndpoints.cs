@@ -18,8 +18,8 @@ public record CreateProjectReq(string Name, string? Dept, string? Owner, string?
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
     string? StartDate);
-public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate);
-public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey);
+public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate, string? Dept);
+public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
 public record CreateKrReq(string Title, string? Link, int? Progress);
@@ -380,13 +380,30 @@ public static class WriteEndpoints
                 Health = "green",
                 StartDate = req.StartDate?.Trim() ?? "",
                 EndDate = req.EndDate?.Trim() ?? "",
+                Dept = Departments.Normalize(req.Dept),
             };
             db.Programs.Add(pg);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New program: {pg.Name}", $"{pg.Id} · {pg.Name} was created.", "program", pg.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
-                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived, pg.EndDate));
+                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived, pg.EndDate, pg.Dept));
+        });
+
+        // Edit a program's owner, department, goal and dates. Requires Edit on projects.
+        api.MapPatch("/programs/{id}", async (string id, UpdateProgramReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var pg = await db.Programs.FindAsync(id);
+            if (pg is null) return Results.NotFound();
+            if (!string.IsNullOrWhiteSpace(req.Owner)) pg.Owner = req.Owner!.Trim();
+            if (req.Dept is not null) pg.Dept = Departments.Normalize(req.Dept);
+            if (req.Goal is not null) pg.Goal = req.Goal.Trim();
+            if (req.StartDate is not null) pg.StartDate = req.StartDate.Trim();
+            if (req.EndDate is not null) pg.EndDate = req.EndDate.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Updated program", $"{pg.Id} · {pg.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // Archive / restore a program (soft delete — kept, just hidden from the
@@ -438,6 +455,7 @@ public static class WriteEndpoints
                 StartDate = req.StartDate?.Trim() ?? "",
                 EndDate = req.EndDate?.Trim() ?? "",
                 TeamKey = Teams.IsValidSlot(req.TeamKey) ? req.TeamKey! : "",
+                Dept = Departments.Normalize(req.Dept),
                 Projects = req.Projects ?? new(),
             };
             db.Products.Add(p);
@@ -446,7 +464,7 @@ public static class WriteEndpoints
             await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New product: {p.Name}", $"{p.Id} · {p.Name} was created.", "product", p.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
                 p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>(),
-                p.Status, p.StartDate, p.EndDate, true, p.TeamKey, Teams.SlotLabel(p.TeamKey), 0));
+                p.Status, p.StartDate, p.EndDate, true, p.TeamKey, Teams.SlotLabel(p.TeamKey), 0, p.Dept));
         });
 
         // Update a product's linked projects/releases and its start/end dates.
@@ -460,6 +478,8 @@ public static class WriteEndpoints
             if (req.Releases is not null) p.Releases = req.Releases.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().ToList();
             if (req.StartDate is not null) p.StartDate = req.StartDate.Trim();
             if (req.EndDate is not null) p.EndDate = req.EndDate.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Owner)) p.Owner = req.Owner!.Trim();
+            if (req.Dept is not null) p.Dept = Departments.Normalize(req.Dept);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Updated product", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.NoContent();

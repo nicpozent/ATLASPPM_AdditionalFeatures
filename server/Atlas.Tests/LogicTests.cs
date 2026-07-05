@@ -121,6 +121,29 @@ public class NotificationPrefTests
     }
 }
 
+public class DepartmentTests
+{
+    [Theory]
+    [InlineData("Development", "Development")]
+    [InlineData("development", "Development")]   // case-insensitive
+    [InlineData("  PMO  ", "PMO")]               // trimmed
+    [InlineData("D365", "D365")]
+    public void Normalizes_known_departments(string input, string expected) =>
+        Assert.Equal(expected, Departments.Normalize(input));
+
+    [Theory]
+    [InlineData("Marketing")]
+    [InlineData("")]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public void Rejects_unknown_to_empty(string? input) =>
+        Assert.Equal("", Departments.Normalize(input));
+
+    [Fact]
+    public void Has_the_seven_expected_departments() =>
+        Assert.Equal(new[] { "Infrastructure", "Development", "Security", "D365", "Architecture", "PMO", "PO" }, Departments.All);
+}
+
 public class UploadValidationTests
 {
     [Theory]

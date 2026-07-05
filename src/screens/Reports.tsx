@@ -3,6 +3,7 @@ import { color, font, radius } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { api } from "@/api";
 import { toast } from "@/components/Toast";
+import { DEPARTMENTS } from "@/departments";
 
 // ============================================================================
 //  Reports — branded (Birgma · Biltema) exports built from live portfolio data.
@@ -17,6 +18,7 @@ const REPORT_TYPES: ReportType[] = [
   { key: "demand", name: "Demand funnel report", desc: "Intake, scoring & stage conversion", icon: "inbox" },
   { key: "blocker", name: "Blocker & risk report", desc: "Active impediments and RAID exposure", icon: "alert" },
   { key: "resource", name: "Resource & capacity report", desc: "Allocation & utilisation by team", icon: "users" },
+  { key: "deptspend", name: "Allocation & expenditure by department", desc: "Headcount, utilisation & spend per owning department", icon: "building" },
   { key: "audit", name: "Audit & compliance report", desc: "Access, changes & sign-offs", icon: "shield" },
 ];
 
@@ -38,6 +40,7 @@ interface RProject { id: string; name: string; dept: string; owner: string; meth
 interface RDemand { id: string; title: string; stage: string; priority: string; value: number; effort: number; requester: string; dept: string; date: string }
 interface RBlocker { id: string; title: string; projectName: string; owner: string; status: string }
 interface RResource { name: string; role: string; dept: string; opsPct: number; projectPct: number; productPct: number; over: boolean }
+interface RProgram { id: string; dept: string; spent: number }
 interface RAudit { at: string; actor: string; role: string; category: string; action: string; target: string }
 
 // Compose a report from live API data. Errors bubble to the caller's toast.
@@ -78,6 +81,33 @@ async function buildReport(type: string): Promise<Report> {
         columns: ["Name", "Role", "Department", "Operations %", "Project %", "Product %", "Utilisation %", "Over-allocated"],
         rows: rs.map((r) => [r.name, r.role, r.dept, String(r.opsPct), String(r.projectPct), String(r.productPct), String(r.opsPct + r.projectPct + r.productPct), r.over ? "Yes" : "No"]),
         summary: `${rs.length} people · ${rs.filter((r) => r.over).length} over 100% allocated`,
+      };
+    }
+    case "deptspend": {
+      const [rs, ps, pgs] = await Promise.all([
+        api<RResource[]>("/resources").then((x) => x ?? []),
+        api<RProject[]>("/projects").then((x) => x ?? []),
+        api<RProgram[]>("/programs").then((x) => x ?? []),
+      ]);
+      // Union of departments seen across resources, projects and programs.
+      const depts = Array.from(new Set([
+        ...DEPARTMENTS,
+        ...rs.map((r) => r.dept), ...ps.map((p) => p.dept), ...pgs.map((p) => p.dept),
+      ].map((d) => (d || "").trim()).filter(Boolean)));
+      const rows = depts.map((d) => {
+        const people = rs.filter((r) => r.dept === d);
+        const avgUtil = people.length ? Math.round(people.reduce((s, r) => s + r.opsPct + r.projectPct + r.productPct, 0) / people.length) : 0;
+        const projSpend = ps.filter((p) => p.dept === d).reduce((s, p) => s + (p.spent || 0), 0);
+        const pgmSpend = pgs.filter((p) => p.dept === d).reduce((s, p) => s + (p.spent || 0), 0);
+        return { d, people: people.length, avgUtil, projSpend, pgmSpend, total: projSpend + pgmSpend };
+      }).filter((r) => r.people > 0 || r.total > 0);
+      const totalSpend = rows.reduce((s, r) => s + r.total, 0);
+      const totalPeople = rows.reduce((s, r) => s + r.people, 0);
+      return {
+        title: "Allocation & expenditure by department",
+        columns: ["Department", "People", "Avg utilisation %", "Project spend (€k)", "Program spend (€k)", "Total expenditure (€k)"],
+        rows: rows.map((r) => [r.d, String(r.people), String(r.avgUtil), r.projSpend.toLocaleString(), r.pgmSpend.toLocaleString(), r.total.toLocaleString()]),
+        summary: `${rows.length} departments · ${totalPeople} people · €${totalSpend.toLocaleString()}k total expenditure`,
       };
     }
     case "audit": {

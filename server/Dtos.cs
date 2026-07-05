@@ -176,11 +176,12 @@ public record RolesMatrixDto(List<CapabilityDto> Capabilities, List<RoleDto> Rol
 
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
     List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health, string StartDate = "",
-    bool Archived = false, string EndDate = "");
+    bool Archived = false, string EndDate = "", string Dept = "");
+public record UpdateProgramReq(string? Owner, string? Dept, string? Goal, string? StartDate, string? EndDate);
 
 public record TaskDto(string Id, string Title, string Status, int Points, string DateISO, string MappedRelease);
 public record MemberDto(string Name, int Alloc);
-public record UpdateProductReq(List<string>? Projects, List<string>? Releases, string? StartDate, string? EndDate);
+public record UpdateProductReq(List<string>? Projects, List<string>? Releases, string? StartDate, string? EndDate, string? Owner, string? Dept);
 // ---- Product team (Entra members allocated to a product) -------------------
 public record TeamOptionDto(string Key, string Label);
 public record ProductAllocationDto(int Id, string Name, string Email, string Title, string TeamKey, string TeamLabel, int Alloc);
@@ -193,7 +194,7 @@ public record SetAllocationReq(int Alloc);
 public record ProductDto(string Id, string Name, string Owner, string Source, List<string> Projects,
     List<TaskDto> Tasks, List<MemberDto> Members, List<string> Releases, string Status = "Active",
     string StartDate = "", string EndDate = "", bool CanManage = false,
-    string TeamKey = "", string TeamLabel = "", int TeamSize = 0);
+    string TeamKey = "", string TeamLabel = "", int TeamSize = 0, string Dept = "");
 
 public record KrDto(string Id, string Title, string Link, int Progress);
 public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active");

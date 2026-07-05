@@ -220,6 +220,7 @@ public class Program
     public string Id { get; set; } = default!;
     public string Name { get; set; } = default!;
     public string Owner { get; set; } = default!;
+    public string Dept { get; set; } = "";              // owning department
     public string Goal { get; set; } = default!;
     public string Status { get; set; } = default!;
     public List<string> Projects { get; set; } = new();
@@ -237,6 +238,7 @@ public class Product
     public string Id { get; set; } = default!;
     public string Name { get; set; } = default!;
     public string Owner { get; set; } = default!;
+    public string Dept { get; set; } = "";              // owning department
     public string Source { get; set; } = "jira";       // jira|ado
     public string Status { get; set; } = "Active";     // Active|Retired|Replaced (products aren't deleted)
     public string StartDate { get; set; } = "";        // display date

@@ -8,6 +8,7 @@ import { Card, HealthPill, ProgressBar, statusDot, Button, Input, Select, Textar
 import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { SCREENS } from "@/nav";
+import { DEPARTMENTS } from "@/departments";
 import {
   STATUS_FILTERS, useProjects, useBlockers, type Project, type ProjectBucket, type Blocker, type BlockerStatus,
 } from "./portfolio/data";
@@ -37,6 +38,7 @@ interface RaiseBlocker { title: string; projectId: string; owner: string; status
 export default function Portfolio() {
   const [tab, setTab] = useState<"projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
+  const [deptFilter, setDeptFilter] = useState<string>("all");
   const [newProject, setNewProject] = useState(false);
   const [bucket, setBucket] = useState<ProjectBucket>("active");
   const [editProject, setEditProject] = useState<Project | null>(null);
@@ -85,7 +87,9 @@ export default function Portfolio() {
     inProgress: blockers.filter((b) => b.status === "In progress").length,
     resolved: blockers.filter((b) => b.status === "Resolved").length,
   };
-  const filtered = projects.filter((p) => STATUS_FILTERS.find((f) => f.key === filter)?.match(p) ?? true);
+  const filtered = projects
+    .filter((p) => STATUS_FILTERS.find((f) => f.key === filter)?.match(p) ?? true)
+    .filter((p) => deptFilter === "all" || (p.dept || "") === deptFilter);
   const openProject = (id: string) => navigate(`${SCREENS.project.path}?id=${id}`);
 
   return (
@@ -110,7 +114,12 @@ export default function Portfolio() {
             ))}
           </div>
         )}
-        <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
+        {tab === "projects" && (
+          <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} title="Filter by owning department" style={{ width: "auto", minWidth: 150 }}>
+            <option value="all">All departments</option>
+            {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select>
+        )}
         <Button onClick={() => setNewProject(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
       </div>
 

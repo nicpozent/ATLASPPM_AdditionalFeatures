@@ -7,6 +7,7 @@ import { Button, Input, Select, RowMenu, MenuItem, MenuDivider } from "@/compone
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { DEPARTMENTS } from "@/departments";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
@@ -14,9 +15,9 @@ type PowInt = "High" | "Low";
 
 interface Program {
   id: string; name: string; owner: string; goal: string; status: string;
-  projects: string[]; budget: number; spent: number; progress: number; health: Health; startDate?: string; endDate?: string; archived?: boolean;
+  projects: string[]; budget: number; spent: number; progress: number; health: Health; startDate?: string; endDate?: string; archived?: boolean; dept?: string;
 }
-interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[]; startDate: string; endDate: string }
+interface NewProgram { name: string; owner: string; goal: string; status: string; projects: string[]; startDate: string; endDate: string; dept: string }
 interface ProjOpt { id: string; name: string; dept?: string; health?: string; status?: Health; progress?: number; budget?: number }
 
 const PG_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -70,6 +71,7 @@ export default function Programs() {
   const [modal, setModal] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [deptFilter, setDeptFilter] = useState("all");
   const [confirmDel, setConfirmDel] = useState<Program | null>(null);
   const createProgram = useMutation({
     mutationFn: (body: NewProgram) => api<Program>("/programs", { method: "POST", body: JSON.stringify(body) }),
@@ -86,7 +88,9 @@ export default function Programs() {
   const selected = programs.find((p) => p.id === selectedId) ?? null;
   const activeCount = programs.filter((p) => !p.archived).length;
   const archivedCount = programs.filter((p) => p.archived).length;
-  const shown = programs.filter((p) => (showArchived ? p.archived : !p.archived));
+  const shown = programs
+    .filter((p) => (showArchived ? p.archived : !p.archived))
+    .filter((p) => deptFilter === "all" || (p.dept || "") === deptFilter);
 
   if (selected) {
     return (
@@ -101,6 +105,10 @@ export default function Programs() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Group related projects under a program for aggregated health, budget &amp; progress.</div>
         <div style={{ flex: 1 }} />
+        <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} title="Filter by owning department" style={{ width: "auto", minWidth: 150 }}>
+          <option value="all">All departments</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </Select>
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create programs"}><Icon name="plus" size={16} /> New program</Button>
       </div>
 
@@ -204,6 +212,13 @@ function Stat({ n, label }: { n: React.ReactNode; label: string }) {
 
 function ProgramDetail({ program, projectOpts, onClose }: { program: Program; projectOpts: ProjOpt[]; onClose: () => void }) {
   const h = HEALTH[program.health] ?? HEALTH.hold;
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const mayEdit = can("cap-projects", "E");
+  const setDept = useMutation({
+    mutationFn: (dept: string) => api(`/programs/${program.id}`, { method: "PATCH", body: JSON.stringify({ dept }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
+  });
   const [costsOpen, setCostsOpen] = useState(false);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [skName, setSkName] = useState("");
@@ -240,9 +255,15 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           <div style={{ flex: 1, minWidth: 240 }}>
             <h2 style={{ fontFamily: font.head, fontSize: 22, fontWeight: 600, color: color.navy, margin: "0 0 4px" }}>{program.name}</h2>
             <div style={{ fontSize: 13, color: color.faint2 }}>{program.goal}</div>
-            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}{program.startDate ? ` · Start ${program.startDate}` : ""}{program.endDate ? ` · End ${program.endDate}` : ""}</div>
+            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}{program.dept ? ` · ${program.dept}` : ""}{program.startDate ? ` · Start ${program.startDate}` : ""}{program.endDate ? ` · End ${program.endDate}` : ""}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {mayEdit ? (
+              <Select value={program.dept ?? ""} onChange={(e) => setDept.mutate(e.target.value)} title="Owning department" style={{ width: "auto", minWidth: 130 }}>
+                <option value="">Dept: none</option>
+                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </Select>
+            ) : program.dept ? <span style={{ fontSize: 12, fontWeight: 600, color: color.subtle, background: color.bg, padding: "5px 11px", borderRadius: 20 }}>{program.dept}</span> : null}
             <span style={{ fontSize: 12, fontWeight: 700, color: h.ink, background: h.tint, padding: "4px 12px", borderRadius: 20 }}>{HEALTH[program.health]?.label ?? program.status}</span>
             <SubscribeButton targetType="program" targetId={program.id} />
             <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
@@ -389,13 +410,14 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
   const [status, setStatus] = useState<string>("Planning");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [dept, setDept] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const submit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(), owner: owner.trim() || "Unassigned", goal: goal.trim(), status,
-      projects: selected, startDate: pgToDisplay(startDate), endDate: pgToDisplay(endDate),
+      projects: selected, startDate: pgToDisplay(startDate), endDate: pgToDisplay(endDate), dept,
     });
   };
   const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
@@ -429,7 +451,12 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
         <div><label style={lbl}>End date</label>
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
-        <div />
+        <div><label style={lbl}>Department</label>
+          <Select value={dept} onChange={(e) => setDept(e.target.value)}>
+            <option value="">— Select —</option>
+            {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select>
+        </div>
       </div>
       <label style={{ ...lbl, marginBottom: 7 }}>Projects to include</label>
       <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, maxHeight: 220, overflowY: "auto" }}>
