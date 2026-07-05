@@ -9,7 +9,7 @@ import { usePermissions } from "@/components/usePermissions";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { DEPARTMENTS } from "@/departments";
-import { toast } from "@/components/Toast";
+import { toast, toastError } from "@/components/Toast";
 import { SCREENS } from "@/nav";
 
 // ---- data (empty until API exists) -----------------------------------------
@@ -49,6 +49,8 @@ const TASK_PRIORITY: Record<string, { ink: string; tint: string }> = {
   Low:      { ink: "#56607A", tint: "#EEF1F6" },
 };
 const TASK_PRIORITIES = ["Critical", "High", "Medium", "Low"];
+const TASK_STATUSES = ["To Do", "In Progress", "In Review", "Done", "Blocked"];
+const TASK_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 export default function Project() {
   const [params] = useSearchParams();
@@ -577,14 +579,31 @@ function OperationalModal({ projectId, onClose, onSaved }: { projectId: string; 
   );
 }
 
-interface Task { id: number; code: string; name: string; epic: string; assignee: string; status: string; sprint: string; baseline: string; priority: string; }
+interface Task {
+  id: number; code: string; name: string; epic: string; assignee: string; status: string;
+  sprint: string; baseline: string; priority: string;
+  startDate: string; targetDate: string; points: number; size: string; estimateHours: number;
+  assigneeOnLeave: boolean;
+}
+
+function useAssigneeOptions(projectId: string | null): string[] {
+  const { data } = useQuery({
+    queryKey: ["assignments", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<Assignments | null> => {
+      try { return await api<Assignments>(`/projects/${projectId}/assignments`); } catch { return null; }
+    },
+  });
+  return data?.options ?? [];
+}
 
 function Tasks({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [view, setView] = useState<"board" | "table">("board");
   const [modal, setModal] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
   const dragId = useRef<number | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  const assigneeOptions = useAssigneeOptions(projectId);
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
@@ -652,20 +671,32 @@ function Tasks({ projectId }: { projectId: string | null }) {
                     const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
                     return (
                       <div key={t.id} draggable={canEdit} onDragStart={() => { dragId.current = t.id; }}
-                        style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: canEdit ? "grab" : "default", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
+                        onClick={() => setOpenId(t.id)}
+                        style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: "pointer", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                           <span style={{ fontFamily: font.mono, fontSize: 10, color: color.faint3 }}>{t.code}</span>
                           <span style={{ flex: 1 }} />
                           <span style={{ fontSize: 9.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "1px 6px", borderRadius: 20 }}>{t.priority}</span>
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: color.text, lineHeight: 1.35, marginBottom: 9 }}>{t.name}</div>
-                        {isSpilled(t) && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px", marginBottom: 8 }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
-                            <Icon name="alert" size={11} /> Spilled · {t.baseline} → {t.sprint}
+                        {(isSpilled(t) || t.assigneeOnLeave) && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                            {isSpilled(t) && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
+                                <Icon name="alert" size={11} /> Spilled · {t.baseline} → {t.sprint}
+                              </span>
+                            )}
+                            {t.assigneeOnLeave && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} is on leave during this task's scheduled window`}>
+                                <Icon name="alert" size={11} /> Assignee on leave
+                              </span>
+                            )}
                           </div>
                         )}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: color.faint }}>
                           <span style={{ fontFamily: font.mono }}>{t.sprint || "—"}</span>
+                          {t.points > 0 && <span style={{ fontWeight: 700, color: color.faint2 }}>{t.points} pt</span>}
+                          {t.size && <span style={{ fontWeight: 700, color: color.faint2 }}>{t.size}</span>}
                           <span style={{ flex: 1 }} />
                           <span>{t.assignee}</span>
                         </div>
@@ -691,7 +722,8 @@ function Tasks({ projectId }: { projectId: string | null }) {
               <div key={t.id} style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                  <button onClick={() => setOpenId(t.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{t.name}</button>
+                  {t.assigneeOnLeave && <span title={`${t.assignee} is on leave during this task's scheduled window`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 4, padding: "0 5px" }}>ON LEAVE</span>}
                 </div>
                 <div style={{ fontSize: 12.5, color: color.subtle }}>{t.epic || "—"}</div>
                 <div style={{ fontSize: 13, color: color.textMuted }}>{t.assignee}</div>
@@ -719,12 +751,160 @@ function Tasks({ projectId }: { projectId: string | null }) {
         </Card>
       )}
 
-      {modal && <NewTaskModal projectId={projectId} onClose={() => setModal(false)} />}
+      {modal && <NewTaskModal projectId={projectId} assigneeOptions={assigneeOptions} onClose={() => setModal(false)} />}
+      {openId !== null && (() => {
+        const t = tasks.find((x) => x.id === openId);
+        if (!t) return null;
+        return <TaskDetailModal projectId={projectId} task={t} canEdit={canEdit} assigneeOptions={assigneeOptions} onClose={() => setOpenId(null)} />;
+      })()}
     </div>
   );
 }
 
-function NewTaskModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, onClose }: { projectId: string; task: Task; canEdit: boolean; assigneeOptions: string[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(task.name);
+  const [epic, setEpic] = useState(task.epic);
+  const [assignee, setAssignee] = useState(task.assignee);
+  const [status, setStatus] = useState(task.status);
+  const [priority, setPriority] = useState(task.priority);
+  const [sprint, setSprint] = useState(task.sprint);
+  const [startDate, setStartDate] = useState(task.startDate);
+  const [targetDate, setTargetDate] = useState(task.targetDate);
+  const [points, setPoints] = useState(String(task.points || ""));
+  const [size, setSize] = useState(task.size);
+  const [estimate, setEstimate] = useState(String(task.estimateHours || ""));
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [text, setText] = useState("");
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["tasks", projectId] });
+    qc.invalidateQueries({ queryKey: ["spillover", projectId] });
+    qc.invalidateQueries({ queryKey: ["raid", projectId] });
+    qc.invalidateQueries({ queryKey: ["spillover-summary"] });
+  };
+
+  const save = useMutation({
+    mutationFn: () => api(`/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({
+      name: name.trim(), epic: epic.trim(), assignee: assignee.trim(), status, priority,
+      sprint: sprint.trim(), startDate: startDate.trim(), targetDate: targetDate.trim(),
+      points: Number(points) || 0, size, estimateHours: Number(estimate) || 0,
+    }) }),
+    onSuccess: () => { invalidateAll(); toast("Task saved"); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/tasks/${task.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidateAll(); toast("Task deleted"); onClose(); },
+    onError: (e) => toastError(e),
+  });
+
+  const { data: cData } = useQuery({
+    queryKey: ["task-comments", task.id], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<{ canPost: boolean; comments: CommentItem[] }> =>
+      (await api<{ canPost: boolean; comments: CommentItem[] }>(`/tasks/${task.id}/comments`)) ?? { canPost: false, comments: [] },
+  });
+  const comments = cData?.comments ?? [];
+  const canPost = cData?.canPost ?? false;
+  const post = useMutation({
+    mutationFn: (body: string) => api(`/tasks/${task.id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+    onSuccess: () => { setText(""); qc.invalidateQueries({ queryKey: ["task-comments", task.id] }); },
+  });
+
+  const onLeave = task.assigneeOnLeave;
+
+  return (
+    <Modal onClose={onClose} width={620} label={`${task.code} · Task`}>
+      {onLeave && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 9, padding: "9px 12px", marginBottom: 16 }}>
+          <Icon name="alert" size={15} /> {task.assignee} is on leave during this task's scheduled window ({startDate || "—"} → {targetDate || startDate || "—"}).
+        </div>
+      )}
+      <DecLabel>Task</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} placeholder="What needs doing?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} disabled={!canEdit} placeholder="Epic / feature" /></div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Assignee</DecLabel>
+          {assigneeOptions.length > 0 ? (
+            <Select value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canEdit}>
+              <option value="">Unassigned</option>
+              {assigneeOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+              {assignee && !assigneeOptions.includes(assignee) && <option value={assignee}>{assignee}</option>}
+            </Select>
+          ) : (
+            <Input value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!canEdit} placeholder="Assignee" />
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!canEdit}>{TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Priority</DecLabel><Select value={priority} onChange={(e) => setPriority(e.target.value)} disabled={!canEdit}>{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><Input value={sprint} onChange={(e) => setSprint(e.target.value)} disabled={!canEdit} placeholder="e.g. PI2 · S5" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Start date</DecLabel><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={!canEdit} /></div>
+        <div style={{ flex: 1 }}><DecLabel>Target date</DecLabel><Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} disabled={!canEdit} /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
+        <div style={{ flex: 1 }}><DecLabel>Story points</DecLabel><Input type="number" min={0} value={points} onChange={(e) => setPoints(e.target.value)} disabled={!canEdit} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>T-shirt size</DecLabel><Select value={size} onChange={(e) => setSize(e.target.value)} disabled={!canEdit}><option value="">—</option>{TASK_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Estimate (h)</DecLabel><Input type="number" min={0} value={estimate} onChange={(e) => setEstimate(e.target.value)} disabled={!canEdit} placeholder="0" /></div>
+      </div>
+
+      {/* Comments */}
+      <div style={{ borderTop: `1px solid ${color.bg}`, marginTop: 20, paddingTop: 16 }}>
+        <SectionTitle>Comments</SectionTitle>
+        {comments.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: color.faint3, padding: "8px 0" }}>No comments yet.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, margin: "12px 0 4px" }}>
+            {comments.map((c) => (
+              <div key={c.id} style={{ display: "flex", gap: 10 }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", flex: "none", background: "linear-gradient(135deg,#0F6CBD,#1E2C7C)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11 }}>{c.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: color.text }}>{c.author}</span>
+                    <span style={{ fontSize: 10.5, color: color.faint3, fontFamily: font.mono }}>{fmtCommentTime(c.at)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: color.subtle, whiteSpace: "pre-wrap", marginTop: 2 }}>{c.body}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
+          <textarea
+            value={text} onChange={(e) => setText(e.target.value)}
+            placeholder={canPost ? "Write a comment…" : "Your role can't post comments (needs Edit on “Projects & tasks”)"}
+            disabled={!canPost || post.isPending}
+            style={{ flex: 1, minHeight: 40, resize: "vertical", border: `1px solid ${color.border2}`, borderRadius: 9, padding: "9px 11px", fontSize: 12.5, fontFamily: "inherit", color: color.text, outline: "none" }}
+          />
+          <Button style={{ alignSelf: "flex-end" }} disabled={!canPost || post.isPending || !text.trim()} onClick={() => post.mutate(text.trim())}>{post.isPending ? "Posting…" : "Comment"}</Button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 22 }}>
+        {canEdit && (
+          confirmDel ? (
+            <>
+              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this task?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm delete"}</Button>
+              <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete task</button>
+          )
+        )}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Close</Button>
+        {canEdit && <Button onClick={() => { if (name.trim()) save.mutate(); }} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>}
+      </div>
+    </Modal>
+  );
+}
+
+function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: string; assigneeOptions: string[]; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [epic, setEpic] = useState("");
@@ -732,23 +912,42 @@ function NewTaskModal({ projectId, onClose }: { projectId: string; onClose: () =
   const [sprint, setSprint] = useState("");
   const [priority, setPriority] = useState("Medium");
   const [status, setStatus] = useState("To Do");
+  const [startDate, setStartDate] = useState("");
+  const [targetDate, setTargetDate] = useState("");
+  const [points, setPoints] = useState("");
+  const [size, setSize] = useState("");
+  const [estimate, setEstimate] = useState("");
 
   const create = useMutation({
-    mutationFn: () => api(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify({ name: name.trim(), epic: epic.trim(), assignee: assignee.trim(), sprint: sprint.trim(), baseline: sprint.trim(), priority, status }) }),
+    mutationFn: () => api(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify({
+      name: name.trim(), epic: epic.trim(), assignee: assignee.trim(), sprint: sprint.trim(),
+      baseline: sprint.trim(), priority, status, startDate: startDate.trim(), targetDate: targetDate.trim(),
+      points: Number(points) || 0, size, estimateHours: Number(estimate) || 0,
+    }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks", projectId] }); onClose(); },
   });
   const submit = () => { if (name.trim()) create.mutate(); };
 
   return (
-    <Modal onClose={onClose} width={480} label="New task">
+    <Modal onClose={onClose} width={520} label="New task">
       <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Add a task to this project's board.</div>
       <DecLabel>Task</DecLabel>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="What needs doing?" style={{ marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} placeholder="Epic / feature" /></div>
-        <div style={{ flex: 1 }}><DecLabel>Assignee</DecLabel><Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Assignee" /></div>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Assignee</DecLabel>
+          {assigneeOptions.length > 0 ? (
+            <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+              <option value="">Unassigned</option>
+              {assigneeOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </Select>
+          ) : (
+            <Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Assignee" />
+          )}
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 12 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><Input value={sprint} onChange={(e) => setSprint(e.target.value)} placeholder="e.g. PI2 · S5" /></div>
         <div style={{ flex: 1 }}>
           <DecLabel>Priority</DecLabel>
@@ -758,6 +957,15 @@ function NewTaskModal({ projectId, onClose }: { projectId: string; onClose: () =
           <DecLabel>Status</DecLabel>
           <Select value={status} onChange={(e) => setStatus(e.target.value)}>{BOARD_COLS.map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}</Select>
         </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Start date</DecLabel><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+        <div style={{ flex: 1 }}><DecLabel>Target date</DecLabel><Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Story points</DecLabel><Input type="number" min={0} value={points} onChange={(e) => setPoints(e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>T-shirt size</DecLabel><Select value={size} onChange={(e) => setSize(e.target.value)}><option value="">—</option>{TASK_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Estimate (h)</DecLabel><Input type="number" min={0} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="0" /></div>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
