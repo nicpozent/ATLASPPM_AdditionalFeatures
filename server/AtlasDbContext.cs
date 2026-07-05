@@ -6,6 +6,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
 {
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Blocker> Blockers => Set<Blocker>();
+    public DbSet<ProjectComment> ProjectComments => Set<ProjectComment>();
     public DbSet<Demand> Demands => Set<Demand>();
     public DbSet<DemandAttachment> DemandAttachments => Set<DemandAttachment>();
     public DbSet<Program> Programs => Set<Program>();

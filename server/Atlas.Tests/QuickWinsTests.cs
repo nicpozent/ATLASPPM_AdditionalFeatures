@@ -93,4 +93,50 @@ public class QuickWinsTests : IClassFixture<AtlasApiFactory>
         var res = await c.PatchAsJsonAsync("/api/v1/artifacts/999", new { status = "Approved" });
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
+
+    [Fact]
+    public async Task Posted_comment_is_listed_back()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Comment project" }));
+
+        var post = await c.PostAsJsonAsync($"/api/v1/projects/{projId}/comments", new { body = "First comment" });
+        Assert.Equal(HttpStatusCode.Created, post.StatusCode);
+
+        var listed = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/comments");
+        var arr = listed.GetProperty("comments").EnumerateArray().ToList();
+        Assert.Single(arr);
+        Assert.Equal("First comment", arr[0].GetProperty("body").GetString());
+        Assert.False(string.IsNullOrEmpty(arr[0].GetProperty("author").GetString()));
+    }
+
+    [Fact]
+    public async Task Empty_comment_is_rejected()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "P" }));
+        var res = await c.PostAsJsonAsync($"/api/v1/projects/{projId}/comments", new { body = "  " });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Posting_a_comment_needs_edit_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");   // lacks cap-artifacts Edit
+        var res = await c.PostAsJsonAsync("/api/v1/projects/PRJ-x/comments", new { body = "hi" });
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Project_summary_can_be_edited()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Summary project" }));
+        var patch = await c.PatchAsJsonAsync($"/api/v1/projects/{projId}", new { summary = "Delivers the new billing platform." });
+        Assert.True(patch.IsSuccessStatusCode);
+
+        var detail = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}");
+        Assert.Equal("Delivers the new billing platform.", detail.GetProperty("summary").GetString());
+    }
 }

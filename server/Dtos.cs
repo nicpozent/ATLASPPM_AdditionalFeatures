@@ -226,7 +226,7 @@ public record StakeholderProjectDto(string Id, string Name, string Dept, string 
 
 public record ProjectDetailDto(string Id, string Name, string Dept, string Owner, string Methodology,
     string Status, string Health, int Progress, string Phase, decimal Budget, decimal Spent, string Due,
-    string StartDate = "", string Target = "");
+    string StartDate = "", string Target = "", string Summary = "");
 
 // ---- Dashboard -------------------------------------------------------------
 public record KpiValueDto(string Value, string Delta, bool Good, List<int> Spark);
