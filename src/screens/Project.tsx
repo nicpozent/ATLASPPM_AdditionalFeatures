@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { DEPARTMENTS } from "@/departments";
 import { toast } from "@/components/Toast";
 import { SCREENS } from "@/nav";
@@ -302,7 +303,7 @@ function Overview({ projectId }: { projectId: string | null }) {
         <OperationalImpact projectId={projectId} />
         <SummaryCard projectId={projectId} />
         <Card padding={22}><SectionTitle>Epic progress</SectionTitle><EmptyBlock message="No epics tracked yet." minHeight={80} /></Card>
-        <Card padding={22}><SectionTitle>Stakeholder matrix · power / interest</SectionTitle><EmptyBlock message="No stakeholders mapped yet." minHeight={120} /></Card>
+        <StakeholderMatrixCard scopeType="project" scopeId={projectId} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <Card padding="18px 20px">

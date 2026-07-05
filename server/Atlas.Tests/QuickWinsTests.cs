@@ -139,4 +139,45 @@ public class QuickWinsTests : IClassFixture<AtlasApiFactory>
         var detail = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}");
         Assert.Equal("Delivers the new billing platform.", detail.GetProperty("summary").GetString());
     }
+
+    [Fact]
+    public async Task Stakeholder_can_be_added_listed_and_removed()
+    {
+        var c = Admin();
+        var add = await c.PostAsJsonAsync("/api/v1/stakeholder-matrix/project/PRJ-1", new { name = "Jane", role = "Sponsor", power = "High", interest = "Low" });
+        Assert.Equal(HttpStatusCode.Created, add.StatusCode);
+        using var addDoc = JsonDocument.Parse(await add.Content.ReadAsStringAsync());
+        var sid = addDoc.RootElement.GetProperty("id").GetInt32();
+
+        var listed = await c.GetFromJsonAsync<JsonElement>("/api/v1/stakeholder-matrix/project/PRJ-1");
+        var arr = listed.GetProperty("stakeholders").EnumerateArray().ToList();
+        Assert.Single(arr);
+        Assert.Equal("High", arr[0].GetProperty("power").GetString());
+
+        var del = await c.DeleteAsync($"/api/v1/stakeholder-matrix/{sid}");
+        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+        var after = await c.GetFromJsonAsync<JsonElement>("/api/v1/stakeholder-matrix/project/PRJ-1");
+        Assert.Empty(after.GetProperty("stakeholders").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Stakeholder_scopes_are_isolated_and_validated()
+    {
+        var c = Admin();
+        await c.PostAsJsonAsync("/api/v1/stakeholder-matrix/program/PGM-9", new { name = "Bob" });
+        var proj = await c.GetFromJsonAsync<JsonElement>("/api/v1/stakeholder-matrix/project/PGM-9");
+        Assert.Empty(proj.GetProperty("stakeholders").EnumerateArray());   // program entry not seen under project scope
+
+        var bad = await c.PostAsJsonAsync("/api/v1/stakeholder-matrix/nonsense/X", new { name = "Z" });
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+    }
+
+    [Fact]
+    public async Task Adding_a_stakeholder_needs_edit_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");   // no cap-projects Edit
+        var res = await c.PostAsJsonAsync("/api/v1/stakeholder-matrix/project/PRJ-1", new { name = "X" });
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
 }
