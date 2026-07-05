@@ -22,6 +22,12 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
+      # Supply-chain gate — fail only on high/critical advisories in
+      # dependencies that actually ship. Dev-only toolchain advisories
+      # (vite/esbuild/vitest) don't reach production and are handled by
+      # Dependabot PRs, so they don't block the build.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm test
       - run: npm run build
@@ -38,5 +44,15 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - run: dotnet restore Atlas.sln
+      # Supply-chain gate — fail if any referenced NuGet package (including
+      # transitive) has a known vulnerability. `dotnet list` exits 0 either
+      # way, so detect the finding in its output and fail explicitly.
+      - name: Check for vulnerable NuGet packages
+        run: |
+          dotnet list Atlas.Api.csproj package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then
+            echo "::error::Vulnerable NuGet packages detected — see the list above."
+            exit 1
+          fi
       - run: dotnet build Atlas.sln -c Release --no-restore
       - run: dotnet test Atlas.sln -c Release --no-build --verbosity normal
