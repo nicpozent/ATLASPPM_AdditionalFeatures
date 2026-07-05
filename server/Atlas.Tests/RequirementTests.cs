@@ -123,4 +123,30 @@ public class RequirementTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PatchAsJsonAsync("/api/v1/requirements/999", new { title = "X" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/requirements/999")).StatusCode);
     }
+
+    [Fact]
+    public async Task Change_request_can_be_edited_and_deleted()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "CR project" }));
+        var crId = await IntId(await c.PostAsJsonAsync($"/api/v1/projects/{projId}/change-requests", new { title = "Add SSO", impact = "Medium" }));
+
+        var patch = await c.PatchAsJsonAsync($"/api/v1/change-requests/{crId}", new { status = "Approved", impact = "High", title = "Add SSO (SAML)" });
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        using var doc = JsonDocument.Parse(await patch.Content.ReadAsStringAsync());
+        Assert.Equal("Approved", doc.RootElement.GetProperty("status").GetString());
+        Assert.Equal("High", doc.RootElement.GetProperty("impact").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PatchAsJsonAsync($"/api/v1/change-requests/{crId}", new { status = "Maybe" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/change-requests/{crId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Editing_a_change_request_needs_edit_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PatchAsJsonAsync("/api/v1/change-requests/999", new { status = "Approved" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/change-requests/999")).StatusCode);
+    }
 }
