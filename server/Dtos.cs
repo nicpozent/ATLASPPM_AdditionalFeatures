@@ -197,7 +197,9 @@ public record ProductDto(string Id, string Name, string Owner, string Source, Li
     string TeamKey = "", string TeamLabel = "", int TeamSize = 0, string Dept = "");
 
 public record KrDto(string Id, string Title, string Link, int Progress);
-public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active");
+public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active",
+    string Health = "green", string StartDate = "", string TargetDate = "");
+public record UpdateObjectiveReq(string? Title, string? Owner, string? Horizon, string? StartDate, string? TargetDate, string? Health);
 
 public record ResourceDto(string Name, string Role, string Dept, string Initials, string Color,
     int OpsPct, int ProjectPct, int ProductPct, bool Over);

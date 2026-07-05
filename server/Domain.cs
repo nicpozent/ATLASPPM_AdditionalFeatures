@@ -293,6 +293,9 @@ public class Objective
     public string Owner { get; set; } = default!;
     public string Horizon { get; set; } = default!;
     public string Status { get; set; } = "Active";     // Active|Completed (objectives aren't deleted)
+    public string Health { get; set; } = "green";      // manual RAG: green|amber|red (PMO / Platform Admin)
+    public string StartDate { get; set; } = "";        // display date, objective start
+    public string TargetDate { get; set; } = "";       // display date, horizon target (drives timeline + warnings)
     public List<KeyResult> Krs { get; set; } = new();
 }
 

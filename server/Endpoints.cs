@@ -130,7 +130,8 @@ public static class Endpoints
         api.MapGet("/okrs", async (AtlasDbContext db) =>
             await db.Objectives.OrderBy(o => o.Id)
                 .Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
-                    o.Krs.OrderBy(k => k.Id).Select(k => new KrDto(k.Id, k.Title, k.Link, k.Progress)).ToList(), o.Status))
+                    o.Krs.OrderBy(k => k.Id).Select(k => new KrDto(k.Id, k.Title, k.Link, k.Progress)).ToList(), o.Status,
+                    o.Health, o.StartDate, o.TargetDate))
                 .ToListAsync());
 
         api.MapGet("/resources", async (AtlasDbContext db) =>
