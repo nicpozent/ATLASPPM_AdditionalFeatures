@@ -68,18 +68,38 @@ permissions and the Service team view** at the same time.
 ## 3. Microsoft Graph (Teams → directory sync)
 
 The Teams admin screen's "Sync from Entra" reads groups + members via Graph. It
-stays in manual-add mode until all three are set:
+stays in manual-add mode until all three are set.
 
-| Setting | Value |
-| ------- | ----- |
-| `Graph__TenantId` | tenant GUID |
-| `Graph__ClientId` | app registration client id |
-| `Graph__ClientSecret` | client secret (store as a Docker/Key Vault secret, not in `.env`) |
+**Use the ATLAS PPM _API_ app registration — not the Web SPA.** Graph sync uses
+the **client-credentials (app-only)** flow, which needs a **confidential client
+with a client secret**. The Web registration is a public SPA and can't do this.
 
-**Graph application permission required:** `GroupMember.Read.All` (with **admin
-consent**). If you also enable email notifications, add `Mail.Send`. Atlas uses
-the client-credentials flow, so these are *application* permissions, not
-delegated.
+On the **API** registration:
+1. **Certificates & secrets → New client secret** — copy the secret **Value**
+   (not the Secret ID).
+2. **API permissions → Microsoft Graph → Application permissions →
+   `GroupMember.Read.All`**, then **Grant admin consent**. (Add `Mail.Send` too
+   if you enable email notifications.) It must be an **Application** permission,
+   not Delegated.
+
+Then set (the compose forwards these to the API container):
+
+| `.env` key | Container setting | Value |
+| ---------- | ----------------- | ----- |
+| `GRAPH_TENANT_ID` | `Graph__TenantId` | tenant GUID |
+| `GRAPH_CLIENT_ID` | `Graph__ClientId` | the **ATLAS PPM API** app (client) id |
+| `GRAPH_CLIENT_SECRET` | `Graph__ClientSecret` | the client secret **Value** |
+
+> **`.env` alone is not enough unless the compose forwards it.** Docker Compose
+> uses `.env` only to fill `${…}` placeholders in the compose file — it does not
+> inject arbitrary vars into containers. The `api` service now maps
+> `GRAPH_*` → `Graph__*`, so setting them in `.env` works. Restart with
+> `docker compose up -d` to apply. In production, put `GRAPH_CLIENT_SECRET` in a
+> Docker secret (see `docs/secrets.md`) rather than `.env`.
+
+Common failures: permission added as **Delegated** not Application; **admin
+consent** not granted; using the secret **ID** instead of its **Value**; an
+**expired** secret.
 
 Without these, the screen shows *"Microsoft Graph isn't configured — add groups
 manually, or set Graph credentials to sync,"* and you map groups to manager

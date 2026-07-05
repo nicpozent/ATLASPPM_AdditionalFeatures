@@ -37,6 +37,14 @@ services:
       Auth__Audience: ${VITE_API_AUDIENCE:-api://atlas-ppm}
       # Demo portfolio seed — off by default; set SEED_DEMO_DATA=true to preload it.
       Seed__Enabled: ${SEED_DEMO_DATA:-false}
+      # Microsoft Graph (Teams → directory sync). Use the ATLAS PPM *API* app
+      # registration (confidential client) with a client secret and the
+      # GroupMember.Read.All APPLICATION permission (admin-consented). Empty ⇒
+      # sync stays in manual-add mode. Prefer a Docker secret for the secret
+      # in production (see docs/secrets.md); env is fine to get started.
+      Graph__TenantId: ${GRAPH_TENANT_ID:-}
+      Graph__ClientId: ${GRAPH_CLIENT_ID:-}
+      Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
