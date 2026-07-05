@@ -165,11 +165,19 @@ public static class Endpoints
                 "product" => productProjects.TryGetValue(id, out var pd) ? Avg(pd) : null,
                 _ => null,
             };
+            // Older KRs (incl. seeded ones) only carry the legacy free-text `Link`
+            // holding an entity id — resolve that too so they measure automatically
+            // without needing to be re-linked through the modal.
+            int? DeriveLegacy(string link) =>
+                projProgress.ContainsKey(link) ? Derive("project", link)
+                : programProjects.ContainsKey(link) ? Derive("program", link)
+                : productProjects.ContainsKey(link) ? Derive("product", link)
+                : null;
 
             return objectives.Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
                 o.Krs.OrderBy(k => k.Id).Select(k =>
                 {
-                    var derived = k.LinkType.Length > 0 ? Derive(k.LinkType, k.LinkId) : null;
+                    var derived = k.LinkType.Length > 0 ? Derive(k.LinkType, k.LinkId) : DeriveLegacy(k.Link);
                     return new KrDto(k.Id, k.Title, k.Link, derived ?? k.Progress, k.LinkType, k.LinkId, derived is not null);
                 }).ToList(), o.Status, o.Health, o.StartDate, o.TargetDate)).ToList();
         });

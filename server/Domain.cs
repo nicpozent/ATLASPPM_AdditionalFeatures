@@ -367,6 +367,7 @@ public class TeamMemberRow
 {
     public int Id { get; set; }
     public string GroupId { get; set; } = default!;
+    public string Uid { get; set; } = "";                 // Entra object id — lets a re-sync upsert (not clobber) known names
     public string DisplayName { get; set; } = default!;
     public string Email { get; set; } = "";
     public string JobTitle { get; set; } = "";

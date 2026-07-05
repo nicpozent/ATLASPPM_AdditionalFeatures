@@ -122,8 +122,8 @@ const sectionTitle: React.CSSProperties = { fontFamily: font.head, fontSize: 15,
 const sectionSub: React.CSSProperties = { fontSize: 12, color: color.faint2, marginTop: 2 };
 const colHeadStyle: React.CSSProperties = { fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600 };
 
-function TableCard({ title, subtitle, cols, headers, empty }: {
-  title: string; subtitle?: string; cols: string; headers: string[]; empty: string;
+function TableCard({ title, subtitle, cols, headers, empty, rows }: {
+  title: string; subtitle?: string; cols: string; headers: string[]; empty: string; rows?: (string | number)[][];
 }) {
   return (
     <Card padding={0} style={{ overflow: "hidden" }}>
@@ -134,7 +134,13 @@ function TableCard({ title, subtitle, cols, headers, empty }: {
       <div style={{ display: "grid", gridTemplateColumns: cols, padding: "11px 22px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle }}>
         {headers.map((h, i) => <div key={i} style={i === headers.length - 1 && headers.length > 3 ? {} : undefined}>{h}</div>)}
       </div>
-      <EmptyBlock message={empty} />
+      {!rows || rows.length === 0 ? (
+        <EmptyBlock message={empty} />
+      ) : rows.map((r, ri) => (
+        <div key={ri} style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5, color: color.text, alignItems: "center" }}>
+          {r.map((cell, ci) => <div key={ci} style={{ color: ci === 0 ? color.text : color.subtle, fontWeight: ci === 0 ? 600 : 400 }}>{cell}</div>)}
+        </div>
+      ))}
     </Card>
   );
 }
@@ -303,21 +309,55 @@ function NewRoleModal({ onClose }: { onClose: () => void }) {
 }
 
 // ---- USERS & GROUPS -------------------------------------------------------
+interface DirTeamManager { key: string; label: string; }
+interface DirTeamGroup { id: string; displayName: string; managerKey: string; lastSynced: string; memberCount: number; }
+interface DirTeamsAdmin { canManage: boolean; graphConfigured: boolean; managers: DirTeamManager[]; groups: DirTeamGroup[]; }
+interface ProvisionedUser { name: string; email: string; group: string; role: string; status: string; }
+
 function UsersSection() {
+  const qc = useQueryClient();
+  const { data: admin } = useQuery({
+    queryKey: ["teams-admin"], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<DirTeamsAdmin> => (await api<DirTeamsAdmin>("/teams/admin")) ?? { canManage: false, graphConfigured: false, managers: [], groups: [] },
+  });
+  const { data: dir } = useQuery({
+    queryKey: ["teams-directory"], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<{ canManage: boolean; users: ProvisionedUser[] }> => (await api<{ canManage: boolean; users: ProvisionedUser[] }>("/teams/directory")) ?? { canManage: false, users: [] },
+  });
+  const sync = useMutation({
+    mutationFn: () => api<{ configured: boolean; synced: number; message?: string; error?: string }>("/teams/groups/sync", { method: "POST" }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["teams-admin"] });
+      qc.invalidateQueries({ queryKey: ["teams-directory"] });
+      toast(r?.error ?? r?.message ?? `Synced ${r?.synced ?? 0} group(s) from Entra.`, r?.error ? "error" : "info");
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
+  const managerLabel = (k: string) => admin?.managers.find((m) => m.key === k)?.label ?? "Unmapped";
+  const groupRows = (admin?.groups ?? []).map((g) => [g.displayName, g.memberCount, managerLabel(g.managerKey), g.lastSynced || "—"]);
+  const userRows = (dir?.users ?? []).map((u) => [u.name, u.email || "—", u.group, u.role, u.status]);
+  const connected = !!admin?.graphConfigured;
+
   return (
     <>
       <div style={{ background: GRADIENT, borderRadius: radius.xl, padding: "16px 20px", marginBottom: 16, color: "#fff", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <span style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="users" size={18} /></span>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600 }}>Microsoft Entra ID — directory sync</div>
-          <div style={{ fontSize: 12.5, color: "#C9D6EE", marginTop: 2 }}>SCIM provisioning · roles derive from group membership · not yet connected</div>
+          <div style={{ fontSize: 12.5, color: "#C9D6EE", marginTop: 2 }}>SCIM provisioning · roles derive from group membership · {connected ? "connected to Microsoft Graph" : "Graph not configured — see Integration Setup"}</div>
         </div>
-        <button style={{ display: "flex", alignItems: "center", gap: 7, background: "#fff", color: color.primary, border: "none", borderRadius: 9, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}><Icon name="sync" size={16} /> Sync now</button>
+        {admin?.canManage && (
+          <button onClick={() => sync.mutate()} disabled={sync.isPending} title={connected ? "Sync groups & members from Entra" : "Graph not configured — this will report how to enable it"}
+            style={{ display: "flex", alignItems: "center", gap: 7, background: "#fff", color: color.primary, border: "none", borderRadius: 9, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", opacity: sync.isPending ? 0.7 : 1, fontFamily: "inherit" }}>
+            <Icon name="sync" size={16} /> {sync.isPending ? "Syncing…" : "Sync now"}
+          </button>
+        )}
       </div>
       <div style={{ marginBottom: 18 }}>
-        <TableCard title="AD group → role mapping" subtitle="Map Entra security groups to Atlas role-groups. Membership & access follow automatically." cols="1.4fr 0.6fr 1.4fr 0.8fr" headers={["Entra group", "Members", "Mapped role", "Synced"]} empty="No group mappings yet — connect Entra ID to sync." />
+        <TableCard title="AD group → role mapping" subtitle="Map Entra security groups to Atlas role-groups. Membership & access follow automatically." cols="1.4fr 0.6fr 1.4fr 0.8fr" headers={["Entra group", "Members", "Mapped role", "Synced"]} empty="No group mappings yet — connect Entra ID and sync, then map groups under Teams." rows={groupRows} />
       </div>
-      <TableCard title="Provisioned users" subtitle="Synced from Entra ID · role derived from group membership" cols="1.3fr 1.6fr 1.2fr 1fr 0.7fr" headers={["User", "Email", "Group", "Role", "Status"]} empty="No users provisioned yet." />
+      <TableCard title="Provisioned users" subtitle="Synced from Entra ID · role derived from group membership" cols="1.3fr 1.6fr 1.2fr 1fr 0.7fr" headers={["User", "Email", "Group", "Role", "Status"]} empty="No users provisioned yet — run a sync above." rows={userRows} />
     </>
   );
 }

@@ -99,6 +99,8 @@ public record CommPlanDto(bool CanEdit, List<CommEntryDto> Entries);
 
 // ---- Teams (Entra groups → manager slots, roll-up hierarchy) ---------------
 public record TeamMemberDto(int Id, string DisplayName, string Email, string JobTitle);
+public record ProvisionedUserDto(string Name, string Email, string Group, string Role, string Status);
+public record DirectoryDto(bool CanManage, List<ProvisionedUserDto> Users);
 public record TeamGroupDto(string Id, string DisplayName, string ManagerKey, bool Manual, string LastSynced, int MemberCount);
 public record TeamManagerDto(string Key, string Label, string ParentKey, List<string> GroupIds, int MemberCount);
 public record TeamsAdminDto(bool CanManage, bool GraphConfigured, List<TeamManagerDto> Managers, List<TeamGroupDto> Groups);
