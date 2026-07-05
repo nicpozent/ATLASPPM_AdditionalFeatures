@@ -9,9 +9,9 @@ export interface Project {
   archived?: boolean; isSystem?: boolean; startDate?: string;
 }
 export type ProjectBucket = "active" | "completed" | "archived";
-export type BlockerStatus = "Active" | "In progress" | "Resolved";
+export type BlockerStatus = "Active" | "In progress" | "Resolved" | "Cancelled" | "Archived";
 export interface Blocker {
-  id: string; title: string; projectId: string; projectName: string; owner: string; status: BlockerStatus;
+  id: string; title: string; projectId: string; projectName: string; owner: string; status: BlockerStatus; description: string;
 }
 
 export interface StatusFilter { key: string; label: string; match: (p: Project) => boolean; ink: string; tint: string; }
