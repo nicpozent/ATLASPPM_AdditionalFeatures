@@ -1,74 +1,94 @@
-import { useState } from "react";
-import { color, font, radius } from "@/theme";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { color, font } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card } from "@/components/ui";
+import { Card, Button, Modal, Input, Textarea, Select } from "@/components/ui";
+import { toast } from "@/components/Toast";
 
 // ---------------------------------------------------------------------------
-// Help & Support — built 1:1 from the prototype (design/Atlas PPM.dc.html,
-// lines 2431-2479). The role-based guide topics and popular-article lists are
-// STRUCTURAL chrome (a fixed help catalogue, not backend data) and render in
-// full; only live search / ticketing are wired to the API later.
+// Help & Support — data-driven. Role-based guides and error-category
+// troubleshooting are served from /help (seeded baseline, editable by a Platform
+// Admin). The error UI deep-links here with ?code=SRV-… to surface the matching
+// troubleshooting entry.
 // ---------------------------------------------------------------------------
+interface Article { id: number; kind: string; audience: string; code: string; title: string; summary: string; body: string; ord: number; }
+interface HelpData { canManage: boolean; guides: Article[]; troubleshooting: Article[]; }
 
-type HelpRole = "admin" | "pmo" | "pm" | "team" | "exec";
-
-const ROLE_TABS: { id: HelpRole; label: string }[] = [
-  { id: "admin", label: "Platform Admin" },
-  { id: "pmo", label: "PMO" },
-  { id: "pm", label: "Project Manager" },
-  { id: "team", label: "Team Member" },
-  { id: "exec", label: "Executive" },
+const ROLE_TABS: { id: string; label: string }[] = [
+  { id: "admin", label: "Platform Admin" }, { id: "pmo", label: "PMO" }, { id: "pm", label: "Project Manager" },
+  { id: "team", label: "Team Member" }, { id: "exec", label: "Executive" },
 ];
-
-type RoleHelp = { intro: string; topics: [string, string, number][]; articles: string[] };
-
-const HELP_DATA: Record<HelpRole, RoleHelp> = {
-  admin: {
-    intro: "Install, configure and operate the platform.",
-    topics: [["Installation & deployment", "server", 9], ["SSO & identity (Entra ID)", "key", 7], ["Email via Exchange Online", "mail", 5], ["AD users & groups sync", "users", 6], ["Integrations setup", "plug", 12], ["Connector write-back (Jira/ADO)", "plug", 4], ["Backups & restore", "database", 8], ["Roles & permissions", "shieldUser", 7], ["Stakeholder assignment", "userCheck", 3], ["Audit & security", "lock", 5]],
-    articles: ["Step-by-step: install the application tier", "Configure Entra ID SSO and enforce MFA", "Schedule and test platform backups", "Map AD groups to Atlas roles", "Connecting Jira & Azure DevOps (2-way + write-back)", "Assign people as project stakeholders", "Pull branded reports in PPTX/PDF/Excel/HTML"],
-  },
-  pmo: {
-    intro: "Govern the portfolio and demand pipeline.",
-    topics: [["Portfolio dashboards", "grid", 8], ["Build a custom dashboard", "barChart", 6], ["Demand intake, scoring & editing", "inbox", 8], ["Approvals & stage gates", "check", 5], ["Methodology templates", "template", 6], ["Risk → control mapping", "shield", 5], ["Delivery status (weekly→yearly)", "trendUp", 5], ["Weekly Updates / News Wall", "megaphone", 5], ["Branded exports & reporting", "download", 6], ["Monthly project reports", "barChart", 4], ["Resource capacity & allocation", "users", 5]],
-    articles: ["How traffic-light health is calculated (incl. dependency rollup)", "Build your own dashboard with 25 drag-and-drop widgets", "Run a portfolio review export (PPTX/PDF/Excel/HTML)", "Configure the demand scoring model & edit demand fields", "Map a risk to a control (framework → control → sub-control)", "Build the Weekly Updates news wall (themes, widgets, uploads)", "Generate a monthly project report"],
-  },
-  pm: {
-    intro: "Plan and deliver your projects.",
-    topics: [["Gantt: schedule, resources & sprints", "gantt", 10], ["Project & sprint Gantt filters", "filter", 4], ["Build a custom dashboard", "barChart", 6], ["Tasks, epics & sprints", "list", 8], ["Create project from template", "template", 5], ["Push a task to Jira / Azure DevOps", "plug", 4], ["Velocity, capacity & backlog health", "trendUp", 5], ["Managing artifacts", "sheet", 6], ["Dependencies & aggregated status", "link", 5], ["RAID, blockers & control mapping", "alert", 6], ["Comments & collaboration", "message", 3]],
-    articles: ["Create a project from a methodology template (auto-scaffold tasks)", "Push a scaffolded task to Jira or Azure DevOps", "Read velocity/capacity/backlog by source (Jira/ADO/SDP/API)", "Use Resource & Sprint Gantt views and filters", "Track dependencies; how dependency risk rolls up to status", "Raise and resolve a blocker; map it to a control"],
-  },
-  team: {
-    intro: "Get your day-to-day work done.",
-    topics: [["My tasks & sprint board", "grid", 6], ["Build a custom dashboard", "barChart", 6], ["Delivery status dashboard", "trendUp", 4], ["Weekly Updates wall", "megaphone", 3], ["Updating progress", "check", 4], ["Commenting & mentions", "message", 4], ["Raising a blocker", "alert", 3], ["Notifications", "bell", 3]],
-    articles: ["Update task status and log progress", "Build your own dashboard with drag-and-drop widgets", "Read the delivery status dashboard for your period", "@mention a teammate in a comment", "Raise a blocker on your task"],
-  },
-  exec: {
-    intro: "Oversight, approvals and board reporting.",
-    topics: [["Executive dashboard", "trendUp", 5], ["Build a custom dashboard", "barChart", 6], ["Delivery status (weekly→yearly)", "trendUp", 5], ["Weekly Updates wall", "megaphone", 3], ["Approving demands & gates", "check", 4], ["Reading portfolio & aggregated health", "shield", 4], ["Board-ready exports", "building", 4]],
-    articles: ["Read the executive dashboard", "Read delivery status across reporting periods", "Approve a demand or stage gate", "How dependency risk affects portfolio health", "Export an organisation status deck (branded)"],
-  },
+const CAT_TINT: Record<string, { ink: string; tint: string; icon: string }> = {
+  NET: { ink: "#0C5798", tint: "#E6EFFB", icon: "cloud" }, AUTH: { ink: "#5E2E89", tint: "#F0E8F7", icon: "key" },
+  VAL: { ink: "#8A6300", tint: "#FBF2D7", icon: "edit" }, SRV: { ink: "#A1282B", tint: "#FBE7E8", icon: "server" },
+  INT: { ink: "#0B6B37", tint: "#E7F4EC", icon: "plug" }, APP: { ink: "#A1282B", tint: "#FBE7E8", icon: "alert" },
 };
 
 export default function Help() {
-  const [role, setRole] = useState<HelpRole>("admin");
-  const hd = HELP_DATA[role];
+  const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const codePrefix = (params.get("code") ?? "").split("-")[0].toUpperCase();
+  const [role, setRole] = useState<string>("admin");
+  const [editing, setEditing] = useState<Article | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["help"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<HelpData> => (await api<HelpData>("/help")) ?? { canManage: false, guides: [], troubleshooting: [] },
+  });
+  const canManage = data?.canManage ?? false;
+  const guides = useMemo(() => (data?.guides ?? []).filter((g) => g.audience === role), [data, role]);
+  const troubleshooting = data?.troubleshooting ?? [];
+
+  const del = useMutation({
+    mutationFn: (id: number) => api(`/help/articles/${id}`, { method: "DELETE" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["help"] }); toast("Article removed.", "info"); },
+  });
 
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto" }}>
       {/* hero */}
       <div style={{ background: "linear-gradient(115deg,#11163A,#0F6CBD)", borderRadius: 18, padding: "34px 32px", marginBottom: 24, color: "#fff", textAlign: "center" }}>
         <div style={{ fontFamily: font.head, fontSize: 25, fontWeight: 600, marginBottom: 7 }}>How can we help?</div>
-        <div style={{ fontSize: 14, color: "#C9D6EE", marginBottom: 20 }}>Search guides, articles and release notes — or reach the PMO support team.</div>
+        <div style={{ fontSize: 14, color: "#C9D6EE", marginBottom: 20 }}>Role guides, troubleshooting and release notes — or reach the PMO support team.</div>
         <div style={{ maxWidth: 540, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 11, padding: "12px 16px" }}>
           <span style={{ color: color.faint3, display: "flex" }}><Icon name="search" size={18} /></span>
           <span style={{ fontSize: 14, color: color.faint3 }}>Search the help centre…</span>
         </div>
       </div>
 
-      {/* role selector */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: "#56607A" }}>Help for my role:</span>
+      {/* Troubleshooting — surfaced first when arriving from an error link */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, flex: 1 }}>Troubleshooting</span>
+        {codePrefix && <span style={{ fontSize: 11.5, color: color.faint3 }}>Showing help for code <b style={{ color: color.text }}>{params.get("code")}</b></span>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14, marginBottom: 28 }}>
+        {troubleshooting.map((t) => {
+          const c = CAT_TINT[t.code] ?? CAT_TINT.SRV;
+          const highlight = codePrefix && (t.code === codePrefix || (codePrefix === "APP" && t.code === "SRV"));
+          return (
+            <Card key={t.id} style={{ border: `1px solid ${highlight ? c.ink : color.border}`, boxShadow: highlight ? `0 0 0 3px ${c.tint}` : undefined }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ width: 32, height: 32, borderRadius: 8, background: c.tint, color: c.ink, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={c.icon} size={16} /></span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: color.ink }}>{t.title}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: c.ink }}>{t.code}-…</div>
+                </div>
+                {canManage && <button onClick={() => setEditing(t)} title="Edit" style={iconBtn}><Icon name="edit" size={14} /></button>}
+              </div>
+              <div style={{ fontSize: 12.5, color: color.faint, marginBottom: 8 }}>{t.summary}</div>
+              <div style={{ fontSize: 12.5, color: color.subtle, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{t.body}</div>
+            </Card>
+          );
+        })}
+        {troubleshooting.length === 0 && <div style={{ color: color.faint3, fontSize: 13 }}>No troubleshooting entries yet.</div>}
+      </div>
+
+      {/* role selector for guides */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>Guides</span>
         <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
           {ROLE_TABS.map((rt) => {
             const active = role === rt.id;
@@ -81,31 +101,29 @@ export default function Help() {
             );
           })}
         </div>
-      </div>
-      <div style={{ fontSize: 13.5, color: color.faint, marginBottom: 18 }}>{hd.intro}</div>
-
-      {/* topic categories */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 28 }}>
-        {hd.topics.map(([name, icon, count]) => (
-          <div key={name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 19, cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 42, height: 42, borderRadius: radius.lg, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={icon} size={20} /></div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: color.ink, lineHeight: 1.25 }}>{name}</div>
-              <div style={{ fontSize: 12, color: color.faint3 }}>{count} articles</div>
-            </div>
-          </div>
-        ))}
+        <div style={{ flex: 1 }} />
+        {canManage && <Button variant="secondary" onClick={() => setAdding(true)}><Icon name="plus" size={15} /> Add guide</Button>}
       </div>
 
-      {/* popular articles + contact */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18, alignItems: "start" }}>
         <Card padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Popular articles</div>
-          {hd.articles.map((art) => (
-            <div key={art} style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
-              <span style={{ color: color.primary, display: "flex" }}><Icon name="book" size={18} /></span>
-              <span style={{ flex: 1, fontSize: 14, color: color.text }}>{art}</span>
-              <span style={{ color: "#C2C8D4", display: "flex" }}><Icon name="chevronRight" size={16} /></span>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>{ROLE_TABS.find((r) => r.id === role)?.label} guides</div>
+          {guides.length === 0 ? (
+            <div style={{ padding: "28px 22px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No guides for this role yet.</div>
+          ) : guides.map((art) => (
+            <div key={art.id} style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <span style={{ color: color.primary, display: "flex", marginTop: 2 }}><Icon name="book" size={18} /></span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{art.title}</div>
+                {art.summary && <div style={{ fontSize: 12.5, color: color.faint2, marginTop: 2 }}>{art.summary}</div>}
+                {art.body && art.body !== art.summary && <div style={{ fontSize: 12.5, color: color.subtle, marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{art.body}</div>}
+              </div>
+              {canManage && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => setEditing(art)} title="Edit" style={iconBtn}><Icon name="edit" size={14} /></button>
+                  <button onClick={() => del.mutate(art.id)} title="Delete" style={iconBtn}><Icon name="trash" size={14} /></button>
+                </div>
+              )}
             </div>
           ))}
         </Card>
@@ -117,6 +135,58 @@ export default function Help() {
           <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Chat with us</button>
         </Card>
       </div>
+
+      {(editing || adding) && (
+        <EditArticleModal article={editing} defaultAudience={role} onClose={() => { setEditing(null); setAdding(false); }} />
+      )}
     </div>
   );
+}
+
+const iconBtn: React.CSSProperties = { background: "none", border: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 4 };
+
+function EditArticleModal({ article, defaultAudience, onClose }: { article: Article | null; defaultAudience: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const isTrouble = article?.kind === "troubleshooting";
+  const [title, setTitle] = useState(article?.title ?? "");
+  const [audience, setAudience] = useState(article?.audience || defaultAudience);
+  const [summary, setSummary] = useState(article?.summary ?? "");
+  const [body, setBody] = useState(article?.body ?? "");
+
+  const save = useMutation({
+    mutationFn: () => article
+      ? api(`/help/articles/${article.id}`, { method: "PATCH", body: JSON.stringify({ kind: article.kind, title, summary, body, audience }) })
+      : api("/help/articles", { method: "POST", body: JSON.stringify({ kind: "guide", audience, title, summary, body }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["help"] }); toast("Saved.", "info"); onClose(); },
+  });
+
+  return (
+    <Modal onClose={onClose} width={560} label={article ? "Edit article" : "Add guide"}>
+      <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.navy, marginBottom: 14 }}>
+        {article ? (isTrouble ? `Edit troubleshooting · ${article.code}` : "Edit guide") : "Add guide"}
+      </div>
+      <Lbl>Title</Lbl>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Article title" />
+      {!isTrouble && (
+        <>
+          <Lbl>Audience</Lbl>
+          <Select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            {ROLE_TABS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </Select>
+        </>
+      )}
+      <Lbl>{isTrouble ? "Symptom" : "Summary"}</Lbl>
+      <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={isTrouble ? "What the user sees" : "One-line summary"} />
+      <Lbl>{isTrouble ? "Resolution steps" : "Body"}</Lbl>
+      <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Full content — line breaks are preserved." />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => title.trim() && save.mutate()} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : "Save"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function Lbl({ children }: { children: React.ReactNode }) {
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
 }

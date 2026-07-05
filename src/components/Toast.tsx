@@ -9,14 +9,21 @@ import { Icon } from "./Icon";
 //  permission-matrix 403 — which would otherwise fail silently.
 // ============================================================================
 export type ToastKind = "error" | "info";
-interface ToastItem { id: number; message: string; kind: ToastKind; }
+interface ToastItem { id: number; message: string; kind: ToastKind; code?: string; }
 
 let seq = 0;
 const listeners = new Set<(t: ToastItem) => void>();
 
-export function toast(message: string, kind: ToastKind = "info") {
-  const item: ToastItem = { id: ++seq, message, kind };
+export function toast(message: string, kind: ToastKind = "info", code?: string) {
+  const item: ToastItem = { id: ++seq, message, kind, code };
   listeners.forEach((l) => l(item));
+}
+
+// Surface any thrown error as a friendly toast. When it's an unexpected (5xx)
+// failure carrying a correlation code, show the code with copy + troubleshooting.
+export function toastError(err: unknown) {
+  const anyErr = err as { message?: string; errorId?: string };
+  toast(anyErr?.message || "Something went wrong.", "error", anyErr?.errorId);
 }
 
 export function Toaster() {
@@ -47,7 +54,19 @@ export function Toaster() {
             <span style={{ color: bad ? color.danger : color.primary, flex: "none", marginTop: 1 }}>
               <Icon name={bad ? "alert" : "bell"} size={17} />
             </span>
-            <div style={{ fontSize: 13, lineHeight: 1.4, color: color.text }}>{t.message}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, lineHeight: 1.4, color: color.text }}>{t.message}</div>
+              {t.code && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
+                  <button type="button" title="Copy code" onClick={() => navigator.clipboard?.writeText(t.code!)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: color.textMuted, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}>
+                    {t.code} <Icon name="sheet" size={12} />
+                  </button>
+                  <a href={`/help?code=${encodeURIComponent(t.code)}`}
+                    style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, textDecoration: "none" }}>Troubleshooting →</a>
+                </div>
+              )}
+            </div>
             <button type="button" aria-label="Dismiss" onClick={() => setItems((cur) => cur.filter((x) => x.id !== t.id))}
               style={{ border: "none", background: "transparent", color: color.faint2, cursor: "pointer", padding: 0, marginLeft: 4, flex: "none" }}>
               <Icon name="x" size={14} />

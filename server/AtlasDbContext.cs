@@ -51,6 +51,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<ArchProfile> ArchProfiles => Set<ArchProfile>();
     public DbSet<AdmPhase> AdmPhases => Set<AdmPhase>();
     public DbSet<ArchApproval> ArchApprovals => Set<ArchApproval>();
+    public DbSet<HelpArticle> HelpArticles => Set<HelpArticle>();
     public DbSet<TestPlan> TestPlans => Set<TestPlan>();
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
@@ -182,6 +183,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<AdmPhase>().HasIndex(x => new { x.ProjectId, x.Code }).IsUnique();
         b.Entity<ArchApproval>().HasKey(x => x.Id);
         b.Entity<ArchApproval>().HasIndex(x => new { x.ProjectId, x.Role }).IsUnique();
+        b.Entity<HelpArticle>().HasKey(x => x.Id);
         b.Entity<TestPlan>().HasKey(x => x.Id);
         b.Entity<TestPlan>().HasIndex(x => x.ProjectId);
         b.Entity<Defect>().HasKey(x => x.Id);
