@@ -28,7 +28,7 @@ function useProject(id: string | null) {
 }
 
 const TABS = [
-  ["overview", "Overview"], ["tasks", "Tasks"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
+  ["overview", "Overview"], ["tasks", "Tasks"], ["backlog", "Backlog"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
   ["quality", "Quality"], ["governance", "Governance"], ["architecture", "Architecture"],
   ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["blockers", "Blockers"], ["vacations", "Vacations"],
   ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"],
@@ -119,6 +119,7 @@ export default function Project() {
 
       {tab === "overview" && <Overview projectId={id} />}
       {tab === "tasks" && <Tasks projectId={id} />}
+      {tab === "backlog" && <Backlog projectId={id} />}
       {tab === "sprints" && (isAgileWithSprints(p?.methodology) ? <Sprints projectId={id} /> : <Overview projectId={id} />)}
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
@@ -602,6 +603,40 @@ function useAssigneeOptions(projectId: string | null): string[] {
   return data?.options ?? [];
 }
 
+// Epic names for the task epic dropdown (tasks tie to an epic by name).
+function useEpicOptions(projectId: string | null): string[] {
+  const { data } = useQuery({
+    queryKey: ["epics", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ epics: { name: string }[] } | null> => {
+      try { return await api(`/projects/${projectId}/epics`); } catch { return null; }
+    },
+  });
+  return (data?.epics ?? []).map((e) => e.name);
+}
+
+// Sprint names for the task sprint dropdown (tasks tie to a sprint by name).
+function useSprintOptions(projectId: string | null): string[] {
+  const { data } = useQuery({
+    queryKey: ["sprints", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ sprints: { name: string }[] } | null> => {
+      try { return await api(`/projects/${projectId}/sprints`); } catch { return null; }
+    },
+  });
+  return (data?.sprints ?? []).map((s) => s.name);
+}
+
+// A dropdown over known names that still accepts a legacy/free value (kept as an
+// extra option) and offers a blank. Used for task → epic / sprint linking.
+function LinkSelect({ value, options, placeholder, disabled, onChange }: { value: string; options: string[]; placeholder: string; disabled?: boolean; onChange: (v: string) => void }) {
+  return (
+    <Select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+      <option value="">{placeholder}</option>
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      {value && !options.includes(value) && <option value={value}>{value}</option>}
+    </Select>
+  );
+}
+
 function Tasks({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [view, setView] = useState<"board" | "table">("board");
@@ -610,6 +645,8 @@ function Tasks({ projectId }: { projectId: string | null }) {
   const dragId = useRef<number | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const assigneeOptions = useAssigneeOptions(projectId);
+  const epicOptions = useEpicOptions(projectId);
+  const sprintOptions = useSprintOptions(projectId);
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
@@ -757,17 +794,17 @@ function Tasks({ projectId }: { projectId: string | null }) {
         </Card>
       )}
 
-      {modal && <NewTaskModal projectId={projectId} assigneeOptions={assigneeOptions} onClose={() => setModal(false)} />}
+      {modal && <NewTaskModal projectId={projectId} assigneeOptions={assigneeOptions} epicOptions={epicOptions} sprintOptions={sprintOptions} onClose={() => setModal(false)} />}
       {openId !== null && (() => {
         const t = tasks.find((x) => x.id === openId);
         if (!t) return null;
-        return <TaskDetailModal projectId={projectId} task={t} canEdit={canEdit} assigneeOptions={assigneeOptions} onClose={() => setOpenId(null)} />;
+        return <TaskDetailModal projectId={projectId} task={t} canEdit={canEdit} assigneeOptions={assigneeOptions} epicOptions={epicOptions} sprintOptions={sprintOptions} onClose={() => setOpenId(null)} />;
       })()}
     </div>
   );
 }
 
-function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, onClose }: { projectId: string; task: Task; canEdit: boolean; assigneeOptions: string[]; onClose: () => void }) {
+function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, epicOptions, sprintOptions, onClose }: { projectId: string; task: Task; canEdit: boolean; assigneeOptions: string[]; epicOptions: string[]; sprintOptions: string[]; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState(task.name);
   const [epic, setEpic] = useState(task.epic);
@@ -829,7 +866,7 @@ function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, onClose }:
       <DecLabel>Task</DecLabel>
       <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} placeholder="What needs doing?" style={{ marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} disabled={!canEdit} placeholder="Epic / feature" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><LinkSelect value={epic} options={epicOptions} placeholder="No epic" disabled={!canEdit} onChange={setEpic} /></div>
         <div style={{ flex: 1 }}>
           <DecLabel>Assignee</DecLabel>
           {assigneeOptions.length > 0 ? (
@@ -846,7 +883,7 @@ function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, onClose }:
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!canEdit}>{TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
         <div style={{ flex: 1 }}><DecLabel>Priority</DecLabel><Select value={priority} onChange={(e) => setPriority(e.target.value)} disabled={!canEdit}>{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</Select></div>
-        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><Input value={sprint} onChange={(e) => setSprint(e.target.value)} disabled={!canEdit} placeholder="e.g. PI2 · S5" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><LinkSelect value={sprint} options={sprintOptions} placeholder="Backlog (no sprint)" disabled={!canEdit} onChange={setSprint} /></div>
       </div>
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Start date</DecLabel><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={!canEdit} /></div>
@@ -910,12 +947,12 @@ function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, onClose }:
   );
 }
 
-function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: string; assigneeOptions: string[]; onClose: () => void }) {
+function NewTaskModal({ projectId, assigneeOptions, epicOptions, sprintOptions, defaultSprint, onClose }: { projectId: string; assigneeOptions: string[]; epicOptions: string[]; sprintOptions: string[]; defaultSprint?: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [epic, setEpic] = useState("");
   const [assignee, setAssignee] = useState("");
-  const [sprint, setSprint] = useState("");
+  const [sprint, setSprint] = useState(defaultSprint ?? "");
   const [priority, setPriority] = useState("Medium");
   const [status, setStatus] = useState("To Do");
   const [startDate, setStartDate] = useState("");
@@ -940,7 +977,7 @@ function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: stri
       <DecLabel>Task</DecLabel>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="What needs doing?" style={{ marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} placeholder="Epic / feature" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><LinkSelect value={epic} options={epicOptions} placeholder="No epic" onChange={setEpic} /></div>
         <div style={{ flex: 1 }}>
           <DecLabel>Assignee</DecLabel>
           {assigneeOptions.length > 0 ? (
@@ -954,7 +991,7 @@ function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: stri
         </div>
       </div>
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><Input value={sprint} onChange={(e) => setSprint(e.target.value)} placeholder="e.g. PI2 · S5" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Sprint</DecLabel><LinkSelect value={sprint} options={sprintOptions} placeholder="Backlog (no sprint)" onChange={setSprint} /></div>
         <div style={{ flex: 1 }}>
           <DecLabel>Priority</DecLabel>
           <Select value={priority} onChange={(e) => setPriority(e.target.value)}>{TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</Select>
@@ -978,6 +1015,82 @@ function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: stri
         <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Adding…" : "Add task"}</Button>
       </div>
     </Modal>
+  );
+}
+
+// ---- Backlog (un-sprinted tasks; create, edit, assign to a sprint) ---------
+function Backlog({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [modal, setModal] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const assigneeOptions = useAssigneeOptions(projectId);
+  const epicOptions = useEpicOptions(projectId);
+  const sprintOptions = useSprintOptions(projectId);
+
+  const { data } = useQuery({
+    queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }> =>
+      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+  });
+  const assign = useMutation({
+    mutationFn: (v: { id: number; sprint: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ sprint: v.sprint, baseline: v.sprint }) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks", projectId] });
+      qc.invalidateQueries({ queryKey: ["spillover", projectId] });
+      qc.invalidateQueries({ queryKey: ["spillover-summary"] });
+    },
+    onError: (e) => toastError(e),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its backlog." /></Card>;
+  const tasks = data?.tasks ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const canCreate = data?.canCreate ?? false;
+  const backlog = tasks.filter((t) => !t.sprint);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 13.5, color: color.faint }}>Un-sprinted work. Assign a sprint to pull an item into an iteration.</div>
+        <div style={{ flex: 1 }} />
+        <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create tasks (needs the Project schedule right)"}><Icon name="plus" size={16} /> New backlog item</Button>
+      </div>
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 1fr 0.7fr 0.7fr 1.1fr", padding: "13px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Code</div><div>Task</div><div>Epic</div><div>Points</div><div>Priority</div><div>Assign sprint</div>
+        </div>
+        {backlog.length === 0 ? (
+          <EmptyBlock message="Backlog is empty — every task is assigned to a sprint." minHeight={140} />
+        ) : backlog.map((t) => {
+          const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
+          return (
+            <div key={t.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 1fr 0.7fr 0.7fr 1.1fr", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3 }}>{t.code}</div>
+              <button onClick={() => setOpenId(t.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</button>
+              <div style={{ fontSize: 12, color: color.subtle }}>{t.epic || "—"}</div>
+              <div style={{ fontSize: 12.5, color: color.faint2, fontWeight: 700 }}>{t.points || "—"}</div>
+              <div><span style={{ fontSize: 10, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "2px 8px", borderRadius: 20 }}>{t.priority}</span></div>
+              <div onClick={(e) => e.stopPropagation()}>
+                {canEdit && sprintOptions.length > 0 ? (
+                  <Select value="" onChange={(e) => { if (e.target.value) assign.mutate({ id: t.id, sprint: e.target.value }); }} style={{ fontSize: 12, padding: "5px 8px" }}>
+                    <option value="">→ Sprint…</option>
+                    {sprintOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </Select>
+                ) : (
+                  <span style={{ fontSize: 11.5, color: color.faint3 }}>{sprintOptions.length === 0 ? "No sprints yet" : "—"}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+      {modal && <NewTaskModal projectId={projectId} assigneeOptions={assigneeOptions} epicOptions={epicOptions} sprintOptions={sprintOptions} onClose={() => setModal(false)} />}
+      {openId !== null && (() => {
+        const t = tasks.find((x) => x.id === openId);
+        if (!t) return null;
+        return <TaskDetailModal projectId={projectId} task={t} canEdit={canEdit} assigneeOptions={assigneeOptions} epicOptions={epicOptions} sprintOptions={sprintOptions} onClose={() => setOpenId(null)} />;
+      })()}
+    </div>
   );
 }
 
