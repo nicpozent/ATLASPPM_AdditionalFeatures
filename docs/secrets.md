@@ -116,6 +116,47 @@ dev password.
 
 ---
 
+## Changing / rotating the database password
+
+Because Postgres only sets its password on **first initialisation** of the data
+volume, changing the password is always two moves: **update the credential the
+app uses**, and **change the role's password in the database itself**. Then
+record it in the app so the rotation clock resets.
+
+### If you deploy with environment variables (base compose)
+
+```bash
+# 1. Change the password on the running database role:
+docker compose exec db psql -U atlas -c "ALTER USER atlas PASSWORD 'NEW_STRONG_PASSWORD';"
+
+# 2. Update the app's copy — set POSTGRES_PASSWORD in your .env (git-ignored):
+#    POSTGRES_PASSWORD=NEW_STRONG_PASSWORD
+
+# 3. Recreate the api container so it picks up the new value:
+docker compose up -d
+```
+
+### If you deploy with Docker secrets (overlay)
+
+```bash
+# 1. Regenerate the secret files with the new password:
+sh deploy/gen-secrets.sh 'NEW_STRONG_PASSWORD'
+
+# 2. Change it on the database role:
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml \
+  exec db psql -U atlas -c "ALTER USER atlas PASSWORD 'NEW_STRONG_PASSWORD';"
+
+# 3. Restart with the overlay so the new secret is mounted:
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up -d
+```
+
+### Then record it (resets the age clock)
+In **Administration → Backups → Database password rotation**, click
+**Mark as rotated today**. The age counter (which starts at first deploy) resets,
+and the 90-day / 180-day alerts re-arm from that date.
+
+---
+
 ## Later — Azure (containers + Azure Database for PostgreSQL)
 
 When you move to Azure, two upgrades make most stored secrets disappear:

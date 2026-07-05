@@ -40,6 +40,21 @@ public class SecretRotationLogicTests
     }
 
     [Fact]
+    public async Task Anchor_sets_todays_date_once_then_leaves_it_alone()
+    {
+        using var db = NewDb();
+        await SecretRotation.EnsureAnchorAsync(db);
+        var anchored = db.Settings.Single(s => s.Key == "security.rotation.db.rotatedAt").Value;
+        Assert.Equal(DateTime.UtcNow.ToString("yyyy-MM-dd"), anchored);
+
+        // A second run must not overwrite an existing (e.g. later-recorded) date.
+        db.Settings.Single(s => s.Key == "security.rotation.db.rotatedAt").Value = "2000-01-01";
+        await db.SaveChangesAsync();
+        await SecretRotation.EnsureAnchorAsync(db);
+        Assert.Equal("2000-01-01", db.Settings.Single(s => s.Key == "security.rotation.db.rotatedAt").Value);
+    }
+
+    [Fact]
     public async Task Notification_escalates_once_per_level()
     {
         using var db = NewDb();
