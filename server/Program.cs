@@ -7,7 +7,22 @@ var cfg = builder.Configuration;
 
 builder.Services.AddDbContext<AtlasDbContext>(o =>
     o.UseNpgsql(cfg.GetConnectionString("Postgres")
-        ?? "Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas"));
+        ?? "Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas",
+        npg =>
+        {
+            // Survive transient Postgres drops (failover, restarts, brief network
+            // blips) instead of failing the request outright.
+            npg.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
+            npg.CommandTimeout(30);
+        }));
+
+// A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
+builder.Services.AddAtlasRateLimiter();
+var corsOrigins = Hardening.CorsOrigins(cfg);
+builder.Services.AddCors(o => o.AddPolicy(Hardening.CorsPolicy, p =>
+{
+    if (corsOrigins.Length > 0) p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+}));
 
 // Entra ID bearer validation — enabled only when Auth:Enabled=true (parity with
 // the frontend's VITE_AUTH_ENABLED). When off, the API is anonymous for local runs.
@@ -78,6 +93,9 @@ using (var scope = app.Services.CreateScope())
 
 // Log & handle every failing request centrally before routing to endpoints.
 app.UseAtlasRequestLogging();
+app.UseSecurityHeaders();
+app.UseCors(Hardening.CorsPolicy);
+app.UseRateLimiter();
 
 if (authEnabled)
 {
@@ -85,7 +103,13 @@ if (authEnabled)
     app.UseAuthorization();
 }
 
+// Liveness — the process is up. Readiness — the database is actually reachable
+// (returns 503 when not, so orchestrators don't route traffic to a broken pod).
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/readyz", async (AtlasDbContext db) =>
+    await db.Database.CanConnectAsync()
+        ? Results.Ok(new { status = "ready" })
+        : Results.Json(new { status = "unavailable", error = "Database is not reachable." }, statusCode: StatusCodes.Status503ServiceUnavailable));
 app.MapAtlasEndpoints();
 
 startupLog.LogInformation("Atlas API ready.");

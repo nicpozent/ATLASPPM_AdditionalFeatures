@@ -119,6 +119,7 @@ public static class WriteEndpoints
             foreach (var file in form.Files)
             {
                 if (file.Length <= 0) continue;
+                if (Hardening.ValidateUpload(file.FileName, file.Length) is { } reason) return Results.BadRequest(new { error = reason });
                 using var ms = new MemoryStream();
                 await file.CopyToAsync(ms);
                 var att = new DemandAttachment
@@ -319,40 +320,47 @@ public static class WriteEndpoints
                 return Results.Json(new { error = "Seeded projects cannot be deleted — archive them instead." },
                     statusCode: StatusCodes.Status400BadRequest);
 
-            await using var tx = await db.Database.BeginTransactionAsync();
-            var artifactIds = await db.Artifacts.Where(a => a.ProjectId == id).Select(a => a.Id).ToListAsync();
-            var gateIds = await db.Gates.Where(g => g.ProjectId == id).Select(g => g.Id).ToListAsync();
-            await db.ArtifactVersions.Where(v => artifactIds.Contains(v.ArtifactId)).ExecuteDeleteAsync();
-            await db.GateCriteria.Where(c => gateIds.Contains(c.GateId)).ExecuteDeleteAsync();
-            await db.Blockers.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.ProjectTasks.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Epics.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Artifacts.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Requirements.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.ChangeRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Gates.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Decisions.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.RaidItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.SecurityControls.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.SecurityProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.ArchProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.AdmPhases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.TestPlans.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Defects.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.ProjectDependencies.Where(x => x.ProjectId == id || x.DependsOnId == id).ExecuteDeleteAsync();
-            await db.Absences.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.CostLines.Where(x => x.Scope == "project" && x.OwnerId == id).ExecuteDeleteAsync();
-            await db.OperationalItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.RoleAssignments.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.DeletionRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.CommunicationEntries.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Phases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.Milestones.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            await db.WowOverrides.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
-            db.Projects.Remove(p);
-            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
-            await db.SaveChangesAsync();
-            await tx.CommitAsync();
+            // With EnableRetryOnFailure the retrying execution strategy owns the
+            // transaction boundary, so a user-initiated transaction must run inside
+            // strategy.ExecuteAsync (the whole purge retries atomically on a blip).
+            var strategy = db.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await db.Database.BeginTransactionAsync();
+                var artifactIds = await db.Artifacts.Where(a => a.ProjectId == id).Select(a => a.Id).ToListAsync();
+                var gateIds = await db.Gates.Where(g => g.ProjectId == id).Select(g => g.Id).ToListAsync();
+                await db.ArtifactVersions.Where(v => artifactIds.Contains(v.ArtifactId)).ExecuteDeleteAsync();
+                await db.GateCriteria.Where(c => gateIds.Contains(c.GateId)).ExecuteDeleteAsync();
+                await db.Blockers.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.ProjectTasks.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Epics.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Artifacts.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Requirements.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.ChangeRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Gates.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Decisions.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.RaidItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.SecurityControls.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.SecurityProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.ArchProfiles.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.AdmPhases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.TestPlans.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Defects.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.ProjectDependencies.Where(x => x.ProjectId == id || x.DependsOnId == id).ExecuteDeleteAsync();
+                await db.Absences.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.CostLines.Where(x => x.Scope == "project" && x.OwnerId == id).ExecuteDeleteAsync();
+                await db.OperationalItems.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.RoleAssignments.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.DeletionRequests.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.CommunicationEntries.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Phases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.Milestones.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                await db.WowOverrides.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+                db.Projects.Remove(p);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
+                await db.SaveChangesAsync();
+                await tx.CommitAsync();
+            });
             return Results.NoContent();
         });
 

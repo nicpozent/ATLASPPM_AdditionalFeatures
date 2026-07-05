@@ -121,6 +121,30 @@ public class NotificationPrefTests
     }
 }
 
+public class UploadValidationTests
+{
+    [Theory]
+    [InlineData("plan.pdf", 1024)]
+    [InlineData("sheet.xlsx", 5_000_000)]
+    [InlineData("diagram.drawio", 2048)]
+    [InlineData("photo.PNG", 4096)]   // extension check is case-insensitive
+    public void Accepts_allowed_types_within_size(string name, long size) =>
+        Assert.Null(Hardening.ValidateUpload(name, size));
+
+    [Fact] public void Rejects_empty() => Assert.NotNull(Hardening.ValidateUpload("x.pdf", 0));
+
+    [Fact] public void Rejects_oversize() =>
+        Assert.Contains("limit", Hardening.ValidateUpload("big.pdf", Hardening.MaxUploadBytes + 1)!);
+
+    [Theory]
+    [InlineData("evil.exe")]
+    [InlineData("run.sh")]
+    [InlineData("macro.docm")]
+    [InlineData("noextension")]
+    public void Rejects_disallowed_or_missing_extension(string name) =>
+        Assert.NotNull(Hardening.ValidateUpload(name, 1024));
+}
+
 public class CorrelationCodeTests
 {
     [Theory]
