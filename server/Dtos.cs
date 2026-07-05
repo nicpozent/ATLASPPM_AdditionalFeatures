@@ -54,7 +54,9 @@ public record SprintDto(int Id, string Name, string Goal, string StartDate, stri
     int CommittedPoints, int TaskCount, int DoneCount, int Points, int DonePoints, int SpilledCount);
 public record SprintsDto(bool CanEdit, bool CanCreate, List<SprintDto> Sprints);
 
-public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
+public record EpicRefDto(int Id, string Name);
+public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn,
+    List<EpicRefDto> Deps);
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics, bool CanCreate = false);
 
 public record ArtifactVersionDto(int Id, int Version, string FileName, long Size, string UploadedAt);

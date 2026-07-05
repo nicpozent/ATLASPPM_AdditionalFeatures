@@ -6,7 +6,8 @@ public record CreateTaskReq(string Name, string? Epic, string? Assignee, string?
     string? StartDate, string? TargetDate, int? Points, string? Size, int? EstimateHours);
 public record UpdateTaskReq(string? Name, string? Epic, string? Assignee, string? Status, string? Sprint, string? Baseline, string? Priority,
     string? StartDate, string? TargetDate, int? Points, string? Size, int? EstimateHours);
-public record CreateEpicReq(string Name, int? Stories, int? Done, string? Status, string? DependsOn);
+public record CreateEpicReq(string Name, int? Stories, int? Done, string? Status, string? DependsOn, List<int>? DependsOnIds);
+public record UpdateEpicReq(string? Name, int? Stories, int? Done, string? Status, string? DependsOn, List<int>? DependsOnIds);
 
 // ============================================================================
 //  Project tasks — the board (Kanban) & table on Project → Tasks. Creating and
@@ -149,7 +150,7 @@ public static class Tasks
             var epics = await db.Epics.Where(e => e.ProjectId == id).OrderBy(e => e.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
-            return Results.Ok(new EpicsDto(canEdit, epics.Select(ToEpicDto).ToList(), canCreate));
+            return Results.Ok(new EpicsDto(canEdit, epics.Select(e => ToEpicDto(e, epics)).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/epics", async (string id, CreateEpicReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -160,23 +161,76 @@ public static class Tasks
             var stories = Math.Max(0, req.Stories ?? 0);
             var done = Math.Clamp(req.Done ?? 0, 0, stories);
             var ord = (await db.Epics.Where(e => e.ProjectId == id).Select(e => (int?)e.Ord).MaxAsync() ?? 0) + 1;
+            var validIds = await db.Epics.Where(x => x.ProjectId == id).Select(x => x.Id).ToListAsync();
             var epic = new Epic
             {
                 ProjectId = id, Ord = ord, Name = req.Name.Trim(), Stories = stories, Done = done,
                 Status = EpicStatuses.Contains(req.Status) ? req.Status! : "Upcoming",
                 DependsOn = req.DependsOn?.Trim() ?? "",
+                DependsOnIds = (req.DependsOnIds ?? new()).Where(validIds.Contains).Distinct().ToList(),
             };
             db.Epics.Add(epic);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Epics", "Created epic", $"{id} · {epic.Name}"));
             await db.SaveChangesAsync();
-            return Results.Created($"/api/v1/projects/{id}/epics/{epic.Id}", ToEpicDto(epic));
+            var all = await db.Epics.Where(x => x.ProjectId == id).ToListAsync();
+            return Results.Created($"/api/v1/projects/{id}/epics/{epic.Id}", ToEpicDto(epic, all));
+        });
+
+        api.MapPatch("/epics/{epicId:int}", async (int epicId, UpdateEpicReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var epic = await db.Epics.FindAsync(epicId);
+            if (epic is null) return Results.NotFound();
+            if (req.Name is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+                epic.Name = req.Name.Trim();
+            }
+            if (req.Stories is not null) epic.Stories = Math.Max(0, req.Stories.Value);
+            if (req.Done is not null) epic.Done = Math.Max(0, req.Done.Value);
+            epic.Done = Math.Clamp(epic.Done, 0, epic.Stories);
+            if (req.Status is not null)
+            {
+                if (!EpicStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                epic.Status = req.Status;
+            }
+            if (req.DependsOn is not null) epic.DependsOn = req.DependsOn.Trim();
+            if (req.DependsOnIds is not null)
+            {
+                var validIds = await db.Epics.Where(x => x.ProjectId == epic.ProjectId && x.Id != epic.Id).Select(x => x.Id).ToListAsync();
+                epic.DependsOnIds = req.DependsOnIds.Where(validIds.Contains).Distinct().ToList();
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Epics", "Updated epic", $"{epic.ProjectId} · {epic.Name}"));
+            await db.SaveChangesAsync();
+            var all = await db.Epics.Where(x => x.ProjectId == epic.ProjectId).ToListAsync();
+            return Results.Ok(ToEpicDto(epic, all));
+        });
+
+        api.MapDelete("/epics/{epicId:int}", async (int epicId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var epic = await db.Epics.FindAsync(epicId);
+            if (epic is null) return Results.NotFound();
+            // Clear this epic from any other epic's dependency list.
+            var dependents = await db.Epics.Where(x => x.ProjectId == epic.ProjectId).ToListAsync();
+            foreach (var d in dependents.Where(d => d.DependsOnIds.Contains(epicId)))
+                d.DependsOnIds = d.DependsOnIds.Where(x => x != epicId).ToList();
+            db.Epics.Remove(epic);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Epics", "Deleted epic", $"{epic.ProjectId} · {epic.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
     }
 
-    static EpicDto ToEpicDto(Epic e)
+    static EpicDto ToEpicDto(Epic e, List<Epic> all)
     {
         var pct = e.Stories == 0 ? 0 : (int)Math.Round(100.0 * e.Done / e.Stories);
-        return new EpicDto(e.Id, e.Name, e.Stories, e.Done, pct, e.Status, e.DependsOn);
+        var deps = e.DependsOnIds
+            .Select(depId => all.FirstOrDefault(x => x.Id == depId))
+            .Where(x => x is not null)
+            .Select(x => new EpicRefDto(x!.Id, x.Name))
+            .ToList();
+        return new EpicDto(e.Id, e.Name, e.Stories, e.Done, pct, e.Status, e.DependsOn, deps);
     }
 
     static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences)
