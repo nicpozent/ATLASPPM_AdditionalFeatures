@@ -5,6 +5,10 @@ using Atlas.Api;
 var builder = WebApplication.CreateBuilder(args);
 var cfg = builder.Configuration;
 
+// Layer in file-mounted (Docker/K8s) secrets and, when configured, Azure Key
+// Vault — before anything reads a connection string. Inert unless configured.
+builder.AddAtlasSecrets();
+
 builder.Services.AddDbContext<AtlasDbContext>(o =>
     o.UseNpgsql(cfg.GetConnectionString("Postgres")
         ?? "Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas",
