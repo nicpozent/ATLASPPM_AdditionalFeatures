@@ -75,6 +75,64 @@ way, so this changes nothing until you choose it.
 Override the mount directory with `Secrets:Directory` (env `Secrets__Directory`)
 if you mount elsewhere.
 
+### What stays in `.env` once you're on Docker secrets
+
+The DB password moves into the secret files; everything else stays. In
+particular, **remove `POSTGRES_PASSWORD` from `.env`** — the Postgres image
+errors if both it *and* `POSTGRES_PASSWORD_FILE` (set by the overlay) are
+present.
+
+| Variable | Keep in `.env`? | Used for |
+| -------- | --------------- | -------- |
+| `POSTGRES_PASSWORD` | **Remove** | Now in `secrets/db_password.txt` + `secrets/pg_conn.txt` |
+| `POSTGRES_USER`, `POSTGRES_DB` | Keep | The `db` service + healthcheck still read them; the secret's connection string must match |
+| `VITE_AUTH_ENABLED`, `VITE_AUTH_TENANT_ID`, `VITE_AUTH_CLIENT_ID`, `VITE_API_AUDIENCE` | Keep | Frontend **build args** (public config baked into the bundle) — read at `build`, not secrets |
+
+- **`docker compose build`** reads `.env` only for the `VITE_*` build args — the
+  DB password/secret files play no part in a build.
+- **`docker compose … up`** with the overlay reads the password from the secret
+  files, not `.env`.
+
+Sample `.env` on the secrets path:
+
+```dotenv
+POSTGRES_USER=atlas
+POSTGRES_DB=atlas
+VITE_AUTH_ENABLED=true
+VITE_AUTH_TENANT_ID=<your-tenant-guid>
+VITE_AUTH_CLIENT_ID=<your-app-client-id>
+VITE_API_AUDIENCE=api://atlas-ppm
+```
+
+### Full migration checklist (from `.env` password → Docker secrets)
+
+1. **Edit `.env`** — delete the `POSTGRES_PASSWORD` line; keep `POSTGRES_USER`,
+   `POSTGRES_DB` and the `VITE_*` values (table above).
+2. **Generate the secret files** (pass user/db if not the `atlas` defaults):
+   ```bash
+   POSTGRES_USER=atlas POSTGRES_DB=atlas sh deploy/gen-secrets.sh 'YOUR_PASSWORD'
+   ```
+3. **Match the existing DB password** — if the `atlas_db` volume already exists
+   (`docker volume ls | grep atlas_db`), put its **current** password in the
+   secret files, or rotate it with `ALTER USER` (see the gotcha above). Fresh
+   deploys can use any password.
+4. **Build**: `docker compose -f docker-compose.yml -f docker-compose.secrets.yml build`
+5. **Up** (overlay last so it wins):
+   `docker compose -f docker-compose.yml -f docker-compose.secrets.yml up -d`
+   > Tip: `export COMPOSE_FILE=docker-compose.yml:docker-compose.secrets.yml` so
+   > plain `docker compose up -d` picks up both.
+6. **Verify** the API connected and the password isn't in the environment:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.secrets.yml logs api | grep -i "migrations applied\|ready"
+   docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.secrets.yml ps -q api)" \
+     --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i postgres   # → empty value
+   ```
+7. **Roll back** anytime by omitting the overlay and restoring
+   `POSTGRES_PASSWORD` in `.env`.
+
+The `secrets/` files live only on the host you deploy from (git-ignored), so
+repeat step 2 on each environment.
+
 ### Running Postgres under a domain account?
 This comes up, so to be clear about what applies here:
 
