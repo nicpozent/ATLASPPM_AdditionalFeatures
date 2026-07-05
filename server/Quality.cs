@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
-public record CreateTestPlanReq(string Name, int? Cases, int? Passed, int? Failed, int? Blocked);
+public record CreateTestPlanReq(string Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked);
+public record UpdateTestPlanReq(string? Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked);
 public record CreateDefectReq(string Title, string? Severity, string? Owner, string? Status, string? Test);
+public record UpdateDefectReq(string? Title, string? Severity, string? Owner, string? Status, string? Test);
 
 // ============================================================================
 //  Quality — test plans (execution breakdown) and defects for a project.
@@ -14,6 +16,7 @@ public static class Quality
 {
     static readonly string[] Severities = { "Critical", "High", "Medium", "Low" };
     static readonly string[] DefectStatuses = { "Open", "In progress", "Resolved", "Closed" };
+    static readonly string[] Stages = { "Unit", "Integration", "System", "UAT", "Regression", "Performance", "Security" };
 
     public static void MapQualityEndpoints(this RouteGroupBuilder api)
     {
@@ -50,7 +53,9 @@ public static class Quality
             var blocked = Math.Max(0, req.Blocked ?? 0);
             if (passed + failed + blocked > cases) return Results.BadRequest(new { error = "Passed + failed + blocked cannot exceed total cases." });
             var ord = (await db.TestPlans.Where(p => p.ProjectId == id).Select(p => (int?)p.Ord).MaxAsync() ?? 0) + 1;
-            var plan = new TestPlan { ProjectId = id, Ord = ord, Name = req.Name.Trim(), Cases = cases, Passed = passed, Failed = failed, Blocked = blocked };
+            var plan = new TestPlan { ProjectId = id, Ord = ord, Name = req.Name.Trim(),
+                Stage = Stages.Contains(req.Stage) ? req.Stage! : "System",
+                Cases = cases, Passed = passed, Failed = failed, Blocked = blocked };
             db.TestPlans.Add(plan);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Added test plan", $"{id} · {plan.Name}"));
             await db.SaveChangesAsync();
@@ -77,12 +82,87 @@ public static class Quality
             return Results.Created($"/api/v1/projects/{id}/defects/{def.Id}",
                 new DefectDto(def.Id, def.Code, def.Title, def.Severity, def.Owner, def.Status, def.Test));
         });
+
+        api.MapPatch("/test-plans/{planId:int}", async (int planId, UpdateTestPlanReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var plan = await db.TestPlans.FindAsync(planId);
+            if (plan is null) return Results.NotFound();
+            if (req.Name is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+                plan.Name = req.Name.Trim();
+            }
+            if (req.Stage is not null)
+            {
+                if (!Stages.Contains(req.Stage)) return Results.BadRequest(new { error = "Unknown stage." });
+                plan.Stage = req.Stage;
+            }
+            if (req.Cases is not null) plan.Cases = Math.Max(0, req.Cases.Value);
+            if (req.Passed is not null) plan.Passed = Math.Max(0, req.Passed.Value);
+            if (req.Failed is not null) plan.Failed = Math.Max(0, req.Failed.Value);
+            if (req.Blocked is not null) plan.Blocked = Math.Max(0, req.Blocked.Value);
+            if (plan.Passed + plan.Failed + plan.Blocked > plan.Cases)
+                return Results.BadRequest(new { error = "Passed + failed + blocked cannot exceed total cases." });
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Updated test plan", $"{plan.ProjectId} · {plan.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(ToPlanDto(plan));
+        });
+
+        api.MapDelete("/test-plans/{planId:int}", async (int planId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var plan = await db.TestPlans.FindAsync(planId);
+            if (plan is null) return Results.NotFound();
+            db.TestPlans.Remove(plan);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Removed test plan", $"{plan.ProjectId} · {plan.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        api.MapPatch("/defects/{defectId:int}", async (int defectId, UpdateDefectReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var def = await db.Defects.FindAsync(defectId);
+            if (def is null) return Results.NotFound();
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                def.Title = req.Title.Trim();
+            }
+            if (req.Severity is not null)
+            {
+                if (!Severities.Contains(req.Severity)) return Results.BadRequest(new { error = "Unknown severity." });
+                def.Severity = req.Severity;
+            }
+            if (req.Status is not null)
+            {
+                if (!DefectStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                def.Status = req.Status;
+            }
+            if (req.Owner is not null) def.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner.Trim();
+            if (req.Test is not null) def.Test = req.Test.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Updated defect", $"{def.ProjectId} · {def.Code} → {def.Status}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new DefectDto(def.Id, def.Code, def.Title, def.Severity, def.Owner, def.Status, def.Test));
+        });
+
+        api.MapDelete("/defects/{defectId:int}", async (int defectId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var def = await db.Defects.FindAsync(defectId);
+            if (def is null) return Results.NotFound();
+            db.Defects.Remove(def);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Removed defect", $"{def.ProjectId} · {def.Code}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
 
     static TestPlanDto ToPlanDto(TestPlan p)
     {
         var notRun = Math.Max(0, p.Cases - p.Passed - p.Failed - p.Blocked);
         var execPct = p.Cases == 0 ? 0 : (int)Math.Round(100.0 * (p.Passed + p.Failed + p.Blocked) / p.Cases);
-        return new TestPlanDto(p.Id, p.Name, p.Cases, p.Passed, p.Failed, p.Blocked, notRun, execPct);
+        return new TestPlanDto(p.Id, p.Name, p.Stage, p.Cases, p.Passed, p.Failed, p.Blocked, notRun, execPct);
     }
 }

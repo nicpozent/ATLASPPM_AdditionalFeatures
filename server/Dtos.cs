@@ -78,7 +78,7 @@ public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto>
     List<ArchApprovalDto> Approvals, string ArbStatus);
 public record SetArbDecisionReq(string Decision, string? Note);
 
-public record TestPlanDto(int Id, string Name, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct);
+public record TestPlanDto(int Id, string Name, string Stage, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct);
 public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);
 public record QualityTotalsDto(int Cases, int Coverage, int PassRate, int Failed, int OpenDefects);
 public record QualityDto(bool CanEdit, QualityTotalsDto Totals, List<TestPlanDto> Plans, List<DefectDto> Defects);
