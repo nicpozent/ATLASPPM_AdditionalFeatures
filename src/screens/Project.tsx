@@ -2655,11 +2655,12 @@ function StatusReportModal({ projectId, onClose }: { projectId: string; onClose:
 }
 
 // ---- Quality (test plans & defects) ----------------------------------------
-interface TestPlan { id: number; name: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; }
+interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; }
 interface Defect { id: number; code: string; title: string; severity: string; owner: string; status: string; test: string; }
 interface QualityData { canEdit: boolean; totals: { cases: number; coverage: number; passRate: number; failed: number; openDefects: number }; plans: TestPlan[]; defects: Defect[]; }
 
 const QUALITY_SOURCES: [string, string][] = [["jira", "Jira / Xray"], ["ado", "Azure Test Plans"], ["sdp", "ServiceDesk Plus"], ["manual", "Manual"]];
+const QA_STAGES = ["Unit", "Integration", "System", "UAT", "Regression", "Performance", "Security"];
 const DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"];
 const DEFECT_STATUSES = ["Open", "In progress", "Resolved", "Closed"];
 const SEV_COLOR: Record<string, { ink: string; tint: string }> = {
@@ -2674,6 +2675,8 @@ function Quality({ projectId }: { projectId: string | null }) {
   const [source, setSource] = useState("jira");
   const [planModal, setPlanModal] = useState(false);
   const [defectModal, setDefectModal] = useState(false);
+  const [openPlan, setOpenPlan] = useState<TestPlan | null>(null);
+  const [openDefect, setOpenDefect] = useState<Defect | null>(null);
   const { data } = useQuery({
     queryKey: ["quality", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<QualityData | null> => await api<QualityData>(`/projects/${projectId}/quality`),
@@ -2717,8 +2720,9 @@ function Quality({ projectId }: { projectId: string | null }) {
         ) : plans.map((p) => {
           const pct = (n: number) => p.cases === 0 ? "0%" : `${(100 * n / p.cases).toFixed(1)}%`;
           return (
-            <div key={p.id} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9" }}>
+            <div key={p.id} onClick={() => canEdit && setOpenPlan(p)} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#5E2E89", background: "#F0E8F7", padding: "2px 9px", borderRadius: 20 }}>{p.stage}</span>
                 <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.name}</span>
                 <span style={{ fontSize: 11.5, color: color.faint }}>{p.cases} cases · {p.execPct}% executed</span>
               </div>
@@ -2753,7 +2757,7 @@ function Quality({ projectId }: { projectId: string | null }) {
           const sv = SEV_COLOR[d.severity] ?? SEV_COLOR.Medium;
           const st = DEFECT_STATUS_COLOR[d.status] ?? DEFECT_STATUS_COLOR.Open;
           return (
-            <div key={d.id} style={{ display: "grid", gridTemplateColumns: DEF_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={d.id} onClick={() => canEdit && setOpenDefect(d)} style={{ display: "grid", gridTemplateColumns: DEF_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
               <div style={{ fontSize: 13, color: color.text, fontWeight: 500 }}>{d.title}</div>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: sv.ink, background: sv.tint, padding: "3px 9px", borderRadius: 6 }}>{d.severity}</span></div>
@@ -2765,48 +2769,87 @@ function Quality({ projectId }: { projectId: string | null }) {
         })}
       </Card>
 
-      {planModal && <NewPlanModal projectId={projectId} onClose={() => setPlanModal(false)} />}
-      {defectModal && <NewDefectModal projectId={projectId} onClose={() => setDefectModal(false)} />}
+      {planModal && <PlanModal projectId={projectId} onClose={() => setPlanModal(false)} />}
+      {openPlan && <PlanModal projectId={projectId} plan={openPlan} onClose={() => setOpenPlan(null)} />}
+      {defectModal && <DefectModal projectId={projectId} onClose={() => setDefectModal(false)} />}
+      {openDefect && <DefectModal projectId={projectId} defect={openDefect} onClose={() => setOpenDefect(null)} />}
     </div>
   );
 }
 
-function NewPlanModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function PlanModal({ projectId, plan, onClose }: { projectId: string; plan?: TestPlan; onClose: () => void }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ name: "", cases: "", passed: "", failed: "", blocked: "" });
+  const [f, setF] = useState({
+    name: plan?.name ?? "", stage: plan?.stage ?? "System",
+    cases: String(plan?.cases ?? ""), passed: String(plan?.passed ?? ""), failed: String(plan?.failed ?? ""), blocked: String(plan?.blocked ?? ""),
+  });
+  const [confirmDel, setConfirmDel] = useState(false);
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const create = useMutation({
-    mutationFn: () => api(`/projects/${projectId}/test-plans`, { method: "POST", body: JSON.stringify({ name: f.name.trim(), cases: Number(f.cases) || 0, passed: Number(f.passed) || 0, failed: Number(f.failed) || 0, blocked: Number(f.blocked) || 0 }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["quality", projectId] }); onClose(); },
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
+  const body = () => JSON.stringify({ name: f.name.trim(), stage: f.stage, cases: Number(f.cases) || 0, passed: Number(f.passed) || 0, failed: Number(f.failed) || 0, blocked: Number(f.blocked) || 0 });
+  const save = useMutation({
+    mutationFn: () => plan ? api(`/test-plans/${plan.id}`, { method: "PATCH", body: body() }) : api(`/projects/${projectId}/test-plans`, { method: "POST", body: body() }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/test-plans/${plan!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
   });
   return (
-    <Modal onClose={onClose} width={480} label="New test plan">
-      <DecLabel>Plan name</DecLabel>
-      <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Checkout regression" style={{ marginBottom: 14 }} />
-      <div style={{ display: "flex", gap: 12 }}>
-        <div style={{ flex: 1 }}><DecLabel>Cases</DecLabel><Input type="number" value={f.cases} onChange={(e) => set("cases", e.target.value)} placeholder="0" /></div>
-        <div style={{ flex: 1 }}><DecLabel>Passed</DecLabel><Input type="number" value={f.passed} onChange={(e) => set("passed", e.target.value)} placeholder="0" /></div>
-        <div style={{ flex: 1 }}><DecLabel>Failed</DecLabel><Input type="number" value={f.failed} onChange={(e) => set("failed", e.target.value)} placeholder="0" /></div>
-        <div style={{ flex: 1 }}><DecLabel>Blocked</DecLabel><Input type="number" value={f.blocked} onChange={(e) => set("blocked", e.target.value)} placeholder="0" /></div>
+    <Modal onClose={onClose} width={500} label={plan ? "Test plan" : "New test plan"}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 2 }}><DecLabel>Plan name</DecLabel><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Checkout regression" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Stage</DecLabel><Select value={f.stage} onChange={(e) => set("stage", e.target.value)}>{QA_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Cases</DecLabel><Input type="number" min={0} value={f.cases} onChange={(e) => set("cases", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Passed</DecLabel><Input type="number" min={0} value={f.passed} onChange={(e) => set("passed", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Failed</DecLabel><Input type="number" min={0} value={f.failed} onChange={(e) => set("failed", e.target.value)} placeholder="0" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Blocked</DecLabel><Input type="number" min={0} value={f.blocked} onChange={(e) => set("blocked", e.target.value)} placeholder="0" /></div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {plan && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this plan?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => f.name.trim() && create.mutate()} disabled={create.isPending || !f.name.trim()}>{create.isPending ? "Adding…" : "Add plan"}</Button>
+        <Button onClick={() => f.name.trim() && save.mutate()} disabled={save.isPending || !f.name.trim()}>{save.isPending ? "Saving…" : plan ? "Save changes" : "Add plan"}</Button>
       </div>
     </Modal>
   );
 }
 
-function NewDefectModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function DefectModal({ projectId, defect, onClose }: { projectId: string; defect?: Defect; onClose: () => void }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ title: "", severity: "Medium", owner: "", status: "Open", test: "" });
+  const [f, setF] = useState({
+    title: defect?.title ?? "", severity: defect?.severity ?? "Medium",
+    owner: defect && defect.owner !== "—" ? defect.owner : "", status: defect?.status ?? "Open", test: defect?.test ?? "",
+  });
+  const [confirmDel, setConfirmDel] = useState(false);
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const create = useMutation({
-    mutationFn: () => api(`/projects/${projectId}/defects`, { method: "POST", body: JSON.stringify({ ...f, title: f.title.trim() }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["quality", projectId] }); onClose(); },
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
+  const save = useMutation({
+    mutationFn: () => defect
+      ? api(`/defects/${defect.id}`, { method: "PATCH", body: JSON.stringify({ ...f, title: f.title.trim() }) })
+      : api(`/projects/${projectId}/defects`, { method: "POST", body: JSON.stringify({ ...f, title: f.title.trim() }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/defects/${defect!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
   });
   return (
-    <Modal onClose={onClose} width={480} label="Log defect">
+    <Modal onClose={onClose} width={480} label={defect ? `${defect.code} · Defect` : "Log defect"}>
       <DecLabel>Defect</DecLabel>
       <Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="What's the defect?" style={{ marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
@@ -2817,9 +2860,19 @@ function NewDefectModal({ projectId, onClose }: { projectId: string; onClose: ()
         <div style={{ flex: 1 }}><DecLabel>Owner</DecLabel><Input value={f.owner} onChange={(e) => set("owner", e.target.value)} placeholder="Owner" /></div>
         <div style={{ flex: 1 }}><DecLabel>Test</DecLabel><Input value={f.test} onChange={(e) => set("test", e.target.value)} placeholder="e.g. TC-090" /></div>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {defect && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this defect?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => f.title.trim() && create.mutate()} disabled={create.isPending || !f.title.trim()}>{create.isPending ? "Logging…" : "Log defect"}</Button>
+        <Button onClick={() => f.title.trim() && save.mutate()} disabled={save.isPending || !f.title.trim()}>{save.isPending ? "Saving…" : defect ? "Save changes" : "Log defect"}</Button>
       </div>
     </Modal>
   );

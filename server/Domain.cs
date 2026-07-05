@@ -675,6 +675,7 @@ public class TestPlan
     public int Id { get; set; }
     public string ProjectId { get; set; } = default!;
     public string Name { get; set; } = default!;
+    public string Stage { get; set; } = "System";        // Unit | Integration | System | UAT | Regression | Performance | Security
     public int Cases { get; set; }
     public int Passed { get; set; }
     public int Failed { get; set; }
