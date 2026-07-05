@@ -78,8 +78,19 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
     try
     {
-        db.Database.Migrate();
-        startupLog.LogInformation("Database migrations applied.");
+        // Relational providers run the real migrations; a non-relational
+        // provider (the in-memory DB used by integration tests) has no
+        // migration history, so create the schema directly instead.
+        if (db.Database.IsRelational())
+        {
+            db.Database.Migrate();
+            startupLog.LogInformation("Database migrations applied.");
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+            startupLog.LogInformation("Non-relational database created (test/in-memory).");
+        }
         // Roles & capabilities are structural reference data (the permission matrix
         // chrome) — always seeded, idempotent, independent of the demo portfolio.
         await Rbac.SeedAsync(db);
@@ -132,3 +143,7 @@ app.MapAtlasEndpoints();
 
 startupLog.LogInformation("Atlas API ready.");
 app.Run();
+
+// Exposed so WebApplicationFactory<Program> can host the app in integration
+// tests (the implicit top-level Program class is otherwise inaccessible).
+public partial class Program { }
