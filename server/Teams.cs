@@ -336,13 +336,13 @@ public static class Teams
     }
 
     // ---- Microsoft Graph sync (client credentials) ------------------------
-    // Sync is bounded so it can't time out the request the way a full
-    // directory-wide member expansion does:
-    //   1. Discover/refresh GROUP METADATA only (cheap — one page per 999 groups).
-    //   2. Expand MEMBERS only for groups already MAPPED to a manager slot (the
-    //      handful the admin actually uses), not the whole tenant.
-    // A wall-clock budget is a final backstop. First sync (nothing mapped yet)
-    // just lists groups so the admin can map them, then a re-sync pulls members.
+    // Sync only the groups ASSIGNED to the Atlas Enterprise Application — a
+    // small, admin-curated set — instead of crawling the whole directory:
+    //   1. Resolve Atlas's own service principal (by client id).
+    //   2. Read its appRoleAssignedTo; keep the Group assignments (optionally
+    //      just those to the marker app role Graph:SyncAppRoleId).
+    //   3. Upsert those groups and expand their members.
+    // A wall-clock budget is a final backstop.
     static async Task<int> SyncFromGraphAsync(AtlasDbContext db, IConfiguration cfg)
     {
         using var http = new HttpClient();
@@ -350,31 +350,42 @@ public static class Teams
         http.DefaultRequestHeaders.Authorization = new("Bearer", token);
         var deadline = DateTime.UtcNow.AddSeconds(cfg.GetValue("Graph:SyncBudgetSeconds", 45));
         var stamp = DateTime.UtcNow.ToString("dd MMM yyyy HH:mm 'UTC'");
+        var clientId = cfg["Graph:ClientId"];
+        var markerRole = cfg["Graph:SyncAppRoleId"];   // optional: only this app role's group assignments
 
-        // 1. Group metadata only — no member calls here.
-        var discovered = 0;
-        var url = "https://graph.microsoft.com/v1.0/groups?$select=id,displayName&$top=999";
+        // 1. Atlas's own service principal.
+        var spList = await http.GetFromJsonAsync<GraphList<SpRef>>(
+            $"https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '{clientId}'&$select=id");
+        var spId = spList?.Value.FirstOrDefault()?.Id
+            ?? throw new InvalidOperationException("Atlas service principal not found for the configured Graph:ClientId.");
+
+        // 2. Groups assigned to the app (optionally filtered to the marker role).
+        var groups = new Dictionary<string, string>();   // id -> displayName
+        var url = $"https://graph.microsoft.com/v1.0/servicePrincipals/{spId}/appRoleAssignedTo?$top=999";
         while (url is not null && DateTime.UtcNow < deadline)
         {
-            var page = await http.GetFromJsonAsync<GraphList<GraphGroup>>(url);
-            foreach (var gg in page?.Value ?? new())
+            var page = await http.GetFromJsonAsync<GraphList<AppRoleAssignment>>(url);
+            foreach (var a in page?.Value ?? new())
             {
-                var g = await db.EntraGroups.FirstOrDefaultAsync(x => x.Id == gg.Id);
-                if (g is null) { g = new EntraGroup { Id = gg.Id }; db.EntraGroups.Add(g); }
-                g.DisplayName = gg.DisplayName ?? g.DisplayName; g.Manual = false; g.LastSynced = stamp;
-                discovered++;
+                if (!string.Equals(a.PrincipalType, "Group", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.IsNullOrWhiteSpace(markerRole) && !string.Equals(a.AppRoleId, markerRole, StringComparison.OrdinalIgnoreCase)) continue;
+                groups[a.PrincipalId] = a.PrincipalDisplayName ?? "(group)";
             }
-            await db.SaveChangesAsync();
             url = page?.NextLink;
         }
 
-        // 2. Members only for mapped groups. One failing group doesn't abort the run.
-        var mapped = await db.EntraGroups.Where(g => g.ManagerKey != "").Select(g => g.Id).ToListAsync();
-        foreach (var gid in mapped)
+        // 3. Upsert each assigned group and refresh its members. A failing group
+        //    is logged and skipped rather than aborting the run.
+        foreach (var (gid, name) in groups)
         {
             if (DateTime.UtcNow >= deadline) break;
             try
             {
+                var g = await db.EntraGroups.FirstOrDefaultAsync(x => x.Id == gid);
+                if (g is null) { g = new EntraGroup { Id = gid }; db.EntraGroups.Add(g); }
+                g.DisplayName = name; g.Manual = false; g.LastSynced = stamp;
+                await db.SaveChangesAsync();
+
                 await db.TeamMembers.Where(m => m.GroupId == gid).ExecuteDeleteAsync();
                 var mUrl = $"https://graph.microsoft.com/v1.0/groups/{gid}/members/microsoft.graph.user?$select=id,displayName,mail,jobTitle&$top=999";
                 while (mUrl is not null && DateTime.UtcNow < deadline)
@@ -388,7 +399,7 @@ public static class Teams
             }
             catch (Exception ex) { _log?.LogWarning(ex, "Graph member sync failed for group {GroupId}: {Message}", gid, ex.Message); }
         }
-        return discovered;
+        return groups.Count;
     }
 
     static ILogger? _log;
@@ -412,5 +423,7 @@ public static class Teams
     class GraphList<T> { [System.Text.Json.Serialization.JsonPropertyName("value")] public List<T> Value { get; set; } = new(); [System.Text.Json.Serialization.JsonPropertyName("@odata.nextLink")] public string? NextLink { get; set; } }
     class GraphGroup { public string Id { get; set; } = ""; public string? DisplayName { get; set; } }
     class GraphUser { public string Id { get; set; } = ""; public string? DisplayName { get; set; } public string? Mail { get; set; } public string? JobTitle { get; set; } }
+    class SpRef { public string Id { get; set; } = ""; }
+    class AppRoleAssignment { public string PrincipalId { get; set; } = ""; public string? PrincipalType { get; set; } public string? PrincipalDisplayName { get; set; } public string AppRoleId { get; set; } = ""; }
     class TokenResponse { [System.Text.Json.Serialization.JsonPropertyName("access_token")] public string? AccessToken { get; set; } }
 }

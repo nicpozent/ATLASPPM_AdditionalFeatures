@@ -45,6 +45,8 @@ services:
       Graph__TenantId: ${GRAPH_TENANT_ID:-}
       Graph__ClientId: ${GRAPH_CLIENT_ID:-}
       Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
+      # Optional: sync only groups assigned to the "Atlas Team Group" app role.
+      Graph__SyncAppRoleId: ${GRAPH_SYNC_APP_ROLE_ID:-}
     depends_on:
       db:
         condition: service_healthy
