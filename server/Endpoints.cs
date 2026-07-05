@@ -36,6 +36,7 @@ public static class Endpoints
         api.MapNewsEndpoints();
         api.MapProjectExtraEndpoints();
         api.MapGanttEndpoints();
+        api.MapFinancialsEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -127,37 +128,6 @@ public static class Endpoints
             await db.Resources.OrderBy(r => r.Id).Select(r => new ResourceDto(
                 r.Name, r.Role, r.Dept, r.Initials, r.Color, r.OpsPct, r.ProjectPct, r.ProductPct, r.Over))
                 .ToListAsync());
-
-        // Financials fold the editable, role-owned cost lines into each project's
-        // actuals so edits in the cost modal flow straight through to the spend,
-        // labour breakdown and cost-composition. Cost lines are stored in whole
-        // euros; project figures are in € thousands, so lines are scaled /1000.
-        api.MapGet("/financials", async (AtlasDbContext db) =>
-        {
-            var projects = await db.Projects.Where(p => !p.Archived).OrderBy(p => p.Id).ToListAsync();
-            var lines = await db.CostLines.Where(c => c.Scope == "project").ToListAsync();
-            var byProject = lines.GroupBy(c => c.OwnerId).ToDictionary(g => g.Key, g => g.ToList());
-
-            var rows = projects.Select(p =>
-            {
-                var cl = byProject.TryGetValue(p.Id, out var l) ? l : new List<CostLine>();
-                decimal K(string key) => cl.Where(x => x.Key == key).Sum(x => x.Amount) / 1000m; // €→€k
-                var laborDev = p.LaborDev + K("laborDev");
-                var laborArch = p.LaborArch + K("laborArch");
-                var laborInfra = p.LaborInfra + K("laborInfra");
-                var infraCloud = K("licInfra") + K("paasInfra") + K("iaasInfra") + K("saasInfra");
-                var devTooling = K("licDev") + K("paasDev") + K("saasDev");
-                var vendor = K("vendor");
-                var savings = K("savings");
-                var linesTotal = cl.Where(x => x.Key != "savings").Sum(x => x.Amount) / 1000m;
-                var spent = p.Spent + linesTotal;
-                var usedPct = p.Budget > 0 ? (int)Math.Round(spent / p.Budget * 100) : 0;
-                return new FinRowDto(p.Id, p.Name, p.Budget, spent, p.Capex, p.Forecast, p.Budget - p.Forecast, p.Roi,
-                    laborDev, laborArch, laborInfra, usedPct, p.Budget - p.Forecast >= 0,
-                    savings, infraCloud, devTooling, vendor);
-            }).ToList();
-            return Results.Ok(rows);
-        });
 
         api.MapGet("/releases", async (AtlasDbContext db) =>
             await db.Releases.OrderBy(r => r.Id).Select(r => new ReleaseDto(
