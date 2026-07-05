@@ -47,11 +47,13 @@ public static class Observability
                 .AddService(serviceName: serviceName, serviceVersion: version)
                 .AddTelemetrySdk())
             .WithTracing(t => t
+                .AddSource(AtlasTelemetry.Name)                       // manual domain spans
                 .AddAspNetCoreInstrumentation(o => o.RecordException = true)
                 .AddHttpClientInstrumentation()
                 .AddEntityFrameworkCoreInstrumentation(o => o.SetDbStatementForText = false)
                 .AddOtlpExporter())
             .WithMetrics(m => m
+                .AddMeter(AtlasTelemetry.Name)                        // Atlas domain metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
