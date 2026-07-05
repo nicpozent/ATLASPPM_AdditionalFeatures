@@ -52,9 +52,9 @@ public static class Artifacts
             if (!http.Request.HasFormContentType) return Results.BadRequest(new { error = "Expected multipart/form-data." });
             var form = await http.Request.ReadFormAsync();
             var file = form.Files.FirstOrDefault();
-            if (file is null || file.Length <= 0) return Results.BadRequest(new { error = "No file provided." });
+            if (Hardening.ValidateUpload(file?.FileName, file?.Length ?? 0) is { } reason) return Results.BadRequest(new { error = reason });
             using var ms = new MemoryStream();
-            await file.CopyToAsync(ms);
+            await file!.CopyToAsync(ms);
             var v = (art.Versions.Count == 0 ? 0 : art.Versions.Max(x => x.Version)) + 1;
             var ver = new ArtifactVersion
             {
