@@ -63,7 +63,10 @@ public record ReqStatsDto(int Total, int Approved, int Coverage, int Verified);
 public record RequirementsDto(bool CanEdit, ReqStatsDto Stats, List<RequirementDto> Requirements, List<ChangeRequestDto> ChangeRequests);
 
 public record AdmPhaseDto(int Id, string Code, string Phase, string Focus, string Owner, string Artefact, string Status);
-public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases);
+public record ArchApprovalDto(int Id, string Role, string Decision, string DecidedBy, string DecidedAt, string Note);
+public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases,
+    List<ArchApprovalDto> Approvals, string ArbStatus);
+public record SetArbDecisionReq(string Decision, string? Note);
 
 public record TestPlanDto(int Id, string Name, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct);
 public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);

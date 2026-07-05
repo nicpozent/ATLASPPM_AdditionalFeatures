@@ -1702,7 +1702,8 @@ const sectionTitleS: React.CSSProperties = { fontFamily: font.head, fontSize: 15
 
 // ---- Architecture (TOGAF ADM) ----------------------------------------------
 interface AdmPhase { id: number; code: string; phase: string; focus: string; owner: string; artefact: string; status: string; }
-interface ArchData { canEdit: boolean; changeType: string; phases: AdmPhase[]; }
+interface ArchApproval { id: number; role: string; decision: string; decidedBy: string; decidedAt: string; note: string; }
+interface ArchData { canEdit: boolean; changeType: string; phases: AdmPhase[]; approvals: ArchApproval[]; arbStatus: string; }
 
 const CHANGE_TYPES: [string, string][] = [
   ["", "— Select change type —"], ["config", "Configuration change"], ["small-enhancement", "Small enhancement"],
@@ -1723,6 +1724,19 @@ const ADM_STATUS: Record<string, { ink: string; tint: string }> = {
 };
 const ADM_COLS = "1.6fr 1.4fr 1.1fr 1.2fr 0.9fr";
 
+// ARB decision → label + colour, and overall board status → colour.
+const ARB_DECISION: Record<string, { label: string; ink: string; tint: string }> = {
+  pending: { label: "Pending", ink: "#56607A", tint: "#EEF1F6" },
+  approved: { label: "Approved", ink: "#0B6B37", tint: "#E7F4EC" },
+  conditions: { label: "With conditions", ink: "#0C5798", tint: "#E6EFFB" },
+  rejected: { label: "Rejected", ink: "#A1282B", tint: "#FBE7E8" },
+};
+const ARB_OVERALL: Record<string, { ink: string; tint: string }> = {
+  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "Approved with conditions": { ink: "#0C5798", tint: "#E6EFFB" },
+  Rejected: { ink: "#A1282B", tint: "#FBE7E8" }, "In review": { ink: "#8A6300", tint: "#FBF2D7" },
+  Pending: { ink: "#56607A", tint: "#EEF1F6" }, "Not started": { ink: "#56607A", tint: "#EEF1F6" },
+};
+
 function Architecture({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const { data } = useQuery({
@@ -1737,13 +1751,19 @@ function Architecture({ projectId }: { projectId: string | null }) {
     mutationFn: (v: { id: number; status: string }) => api(`/adm-phases/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["architecture", projectId] }),
   });
+  const decide = useMutation({
+    mutationFn: (v: { id: number; decision: string; note?: string }) => api(`/arch-approvals/${v.id}`, { method: "PATCH", body: JSON.stringify({ decision: v.decision, note: v.note ?? "" }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["architecture", projectId] }),
+  });
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its architecture governance." /></Card>;
   if (!data) return <Card><EmptyBlock minHeight={220} message="Loading architecture governance…" /></Card>;
 
-  const { changeType, phases, canEdit } = data;
+  const { changeType, phases, canEdit, approvals = [], arbStatus = "Not started" } = data;
   const level = GOV_LEVEL[changeType] ?? "Architecture triage required";
   const full = level.startsWith("Full");
+  const arbOverall = ARB_OVERALL[arbStatus] ?? ARB_OVERALL["Not started"];
+  const signedOff = approvals.filter((a) => a.decision !== "pending").length;
 
   return (
     <div>
@@ -1793,6 +1813,48 @@ function Architecture({ projectId }: { projectId: string | null }) {
                   title={canEdit ? "Click to advance status" : undefined}
                   style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "4px 10px", borderRadius: 6, border: "none", cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{p.status}</button>
               </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Architecture Review Board — independent per-role sign-offs */}
+      <Card padding={0} style={{ overflow: "hidden", marginTop: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 22px 6px" }}>
+          <span style={{ ...sectionTitleS, flex: 1 }}>Architecture Review Board</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: arbOverall.ink, background: arbOverall.tint, padding: "5px 12px", borderRadius: 20 }}>{arbStatus}</span>
+        </div>
+        <div style={{ padding: "0 22px 12px", fontSize: 11.5, color: color.faint2, lineHeight: 1.45 }}>
+          Each sign-off is an independent approval by an architecture role. ARB — not the PMO — owns architectural correctness; the overall verdict is the roll-up of every role's decision. <b style={{ color: color.text }}>{signedOff}/{approvals.length}</b> recorded.
+        </div>
+        {approvals.map((a) => {
+          const dc = ARB_DECISION[a.decision] ?? ARB_DECISION.pending;
+          return (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 22px", borderTop: "1px solid #F2F4F9" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{a.role}</div>
+                <div style={{ fontSize: 11.5, color: color.faint3 }}>
+                  {a.decision === "pending" ? "Awaiting sign-off" : `${a.decidedBy || "—"} · ${a.decidedAt || "—"}`}
+                  {a.note ? ` · ${a.note}` : ""}
+                </div>
+              </div>
+              {canEdit ? (
+                <select value={a.decision} onChange={(e) => {
+                  const decision = e.target.value;
+                  const note = decision === "conditions" || decision === "rejected"
+                    ? (window.prompt(decision === "rejected" ? "Reason for rejection (optional):" : "Conditions to attach (optional):", a.note) ?? "")
+                    : "";
+                  decide.mutate({ id: a.id, decision, note });
+                }}
+                  style={{ fontSize: 11.5, fontWeight: 700, color: dc.ink, background: dc.tint, padding: "5px 10px", borderRadius: 7, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="conditions">With conditions</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 700, color: dc.ink, background: dc.tint, padding: "4px 10px", borderRadius: 6 }}>{dc.label}</span>
+              )}
             </div>
           );
         })}

@@ -651,6 +651,21 @@ public class AdmPhase
     public int Ord { get; set; }
 }
 
+// An Architecture Review Board sign-off: one per architecture role, per project.
+// Each is an INDEPENDENT approval — the ARB (not the PMO) owns architectural
+// correctness, so the overall verdict is the roll-up of every role's decision.
+public class ArchApproval
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Role { get; set; } = default!;          // Chief Architect, Solution Architect, …
+    public string Decision { get; set; } = "pending";     // pending | approved | conditions | rejected
+    public string DecidedBy { get; set; } = "";           // who recorded the sign-off
+    public string DecidedAt { get; set; } = "";           // display timestamp
+    public string Note { get; set; } = "";                // conditions / rejection rationale
+    public int Ord { get; set; }
+}
+
 // ---- Requirements & traceability ------------------------------------------
 public class Requirement
 {
