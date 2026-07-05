@@ -16,6 +16,18 @@ builder.Services.AddDbContext<AtlasDbContext>(o =>
             npg.CommandTimeout(30);
         }));
 
+// OpenAPI / Swagger — a machine-readable API surface + interactive docs at
+// /swagger. On by default; set OpenApi:Enabled=false to disable in production.
+var openApiEnabled = cfg.GetValue("OpenApi:Enabled", true);
+if (openApiEnabled)
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen(o =>
+    {
+        o.SwaggerDoc("v1", new() { Title = "Atlas PPM API", Version = "v1", Description = "Portfolio & Project Management REST API (/api/v1)." });
+    });
+}
+
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
 var corsOrigins = Hardening.CorsOrigins(cfg);
@@ -93,6 +105,12 @@ using (var scope = app.Services.CreateScope())
 
 // Log & handle every failing request centrally before routing to endpoints.
 app.UseAtlasRequestLogging();
+if (openApiEnabled)
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(o => { o.SwaggerEndpoint("/swagger/v1/swagger.json", "Atlas PPM API v1"); o.DocumentTitle = "Atlas PPM API"; });
+    startupLog.LogInformation("OpenAPI enabled — Swagger UI at /swagger.");
+}
 app.UseSecurityHeaders();
 app.UseCors(Hardening.CorsPolicy);
 app.UseRateLimiter();
