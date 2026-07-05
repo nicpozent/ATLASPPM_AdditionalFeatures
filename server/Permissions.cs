@@ -31,6 +31,13 @@ public static class Permissions
         // Canonical Entra app roles
         ["PlatformAdmin"] = "admin", ["PMO"] = "pmo", ["ProjectManager"] = "pm", ["PMLead"] = "pmlead",
         ["TeamMember"] = "team", ["Executive"] = "exec", ["Stakeholder"] = "stkhldr",
+        // Manager Entra app roles — these also carry a permission level (team, or
+        // pmo for the architect) so a manager assigned only their manager role
+        // gets the right access, not least-privilege. Their fine-grained manager
+        // identity (for team roll-up) is resolved separately by ManagerKey.
+        ["GlobalEngineeringManager"] = "team", ["GlobalServiceManager"] = "team",
+        ["DevelopersManager"] = "team", ["InfrastructureManager"] = "team",
+        ["ChiefArchitect"] = "pmo",
     };
     // Tie-break when a user carries several roles: keep the most privileged.
     static readonly string[] Privilege = { "admin", "pmo", "pm", "pmlead", "exec", "team", "stkhldr" };
