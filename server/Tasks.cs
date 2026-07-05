@@ -24,12 +24,13 @@ public static class Tasks
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var tasks = await db.ProjectTasks.Where(t => t.ProjectId == id).OrderBy(t => t.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
-            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(ToDto).ToList()));
+            var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
+            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(ToDto).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             // Task codes are global (T-1042 style) — number from the max across projects.
@@ -80,12 +81,13 @@ public static class Tasks
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var epics = await db.Epics.Where(e => e.ProjectId == id).OrderBy(e => e.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
-            return Results.Ok(new EpicsDto(canEdit, epics.Select(ToEpicDto).ToList()));
+            var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
+            return Results.Ok(new EpicsDto(canEdit, epics.Select(ToEpicDto).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/epics", async (string id, CreateEpicReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var stories = Math.Max(0, req.Stories ?? 0);

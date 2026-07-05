@@ -483,6 +483,7 @@ public class CostLine
     public int Id { get; set; }
     public string Scope { get; set; } = "project";        // project | program | product
     public string OwnerId { get; set; } = default!;       // the project/program/product id
+    public string Kind { get; set; } = "actual";          // actual (spent to date) | forecast (at completion)
     public string Key { get; set; } = "";                 // "laborDev"… for system lines; "" for custom
     public string Label { get; set; } = default!;
     public string Note { get; set; } = "";                 // owner display, e.g. "Eng. Manager / Developers Manager"

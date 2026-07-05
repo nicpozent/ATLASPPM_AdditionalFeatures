@@ -523,8 +523,8 @@ function Tasks({ projectId }: { projectId: string | null }) {
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[] }> =>
-      (await api<{ canEdit: boolean; tasks: Task[] }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }> =>
+      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
   });
   const move = useMutation({
     mutationFn: (v: { id: number; status: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
@@ -544,6 +544,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
 
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
+  const canCreate = data?.canCreate ?? false;
   const isSpilled = (t: Task) => !!t.sprint && !!t.baseline && t.sprint !== t.baseline;
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its tasks." /></Card>;
@@ -557,7 +558,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New task</Button>}
+        <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create tasks (needs the Project schedule right)"}><Icon name="plus" size={16} /> New task</Button>
       </div>
 
       {view === "board" ? (
@@ -1270,11 +1271,11 @@ function Epics({ projectId }: { projectId: string | null }) {
   const [modal, setModal] = useState(false);
   const { data } = useQuery({
     queryKey: ["epics", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; epics: EpicItem[] }> =>
-      (await api<{ canEdit: boolean; epics: EpicItem[] }>(`/projects/${projectId}/epics`)) ?? { canEdit: false, epics: [] },
+    queryFn: async (): Promise<{ canEdit: boolean; epics: EpicItem[]; canCreate?: boolean }> =>
+      (await api<{ canEdit: boolean; epics: EpicItem[]; canCreate?: boolean }>(`/projects/${projectId}/epics`)) ?? { canEdit: false, epics: [] },
   });
   const epics = data?.epics ?? [];
-  const canEdit = data?.canEdit ?? false;
+  const canCreate = data?.canCreate ?? false;
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its epics." /></Card>;
 
@@ -1283,7 +1284,7 @@ function Epics({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div style={{ fontSize: 13.5, color: color.faint }}>Epics group the delivery stories for this project.</div>
         <div style={{ flex: 1 }} />
-        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New epic</Button>}
+        <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create epics (needs the Project schedule right)"}><Icon name="plus" size={16} /> New epic</Button>
       </div>
       {epics.length === 0 ? (
         <Card><EmptyBlock minHeight={180} message="No epics yet." /></Card>

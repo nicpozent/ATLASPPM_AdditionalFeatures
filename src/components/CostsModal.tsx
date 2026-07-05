@@ -28,14 +28,17 @@ const OWNER_PRESETS: { label: string; roles: string[] }[] = [
 
 const fmtK = (euros: number) => "€" + (euros / 1000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + "k";
 
+type CostKind = "actual" | "forecast";
+
 export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id: string; name: string; onClose: () => void }) {
   const qc = useQueryClient();
-  const key = ["costs", scope, id];
+  const [kind, setKind] = useState<CostKind>("actual");
+  const key = ["costs", scope, id, kind];
   const { data } = useQuery({
     queryKey: key, retry: false, staleTime: 15_000,
-    queryFn: async (): Promise<CostsData> => (await api<CostsData>(`/${scope}/${id}/costs`)) ?? { canManage: false, total: 0, savings: 0, lines: [] },
+    queryFn: async (): Promise<CostsData> => (await api<CostsData>(`/${scope}/${id}/costs?kind=${kind}`)) ?? { canManage: false, total: 0, savings: 0, lines: [] },
   });
-  const invalidate = () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ["financials"] }); };
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["costs", scope, id] }); qc.invalidateQueries({ queryKey: ["financials"] }); };
   const save = useMutation({
     mutationFn: (v: { lineId: number; amount: number }) => api(`/costs/${v.lineId}`, { method: "PATCH", body: JSON.stringify({ amount: v.amount }) }),
     onSuccess: invalidate,
@@ -51,9 +54,15 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
 
   return (
     <Modal onClose={onClose} width={520} label={`${SCOPE_LABEL[scope]} costs · ${name}`}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
         <span style={{ width: 34, height: 34, borderRadius: 9, background: "#E7F4EC", color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
         <div style={{ fontSize: 12, color: color.faint2 }}>€ thousands · You can edit only the cost lines your role owns.</div>
+      </div>
+      {/* Spent to date vs Forecast at completion — same taxonomy, separate figures */}
+      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 9, padding: 3, gap: 2, marginBottom: 14 }}>
+        {([["actual", "Spent to date"], ["forecast", "Forecast at completion"]] as [CostKind, string][]).map(([k, lbl]) => (
+          <button key={k} onClick={() => setKind(k)} style={{ padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: kind === k ? "#fff" : "transparent", color: kind === k ? color.primary : "#6A7488", boxShadow: kind === k ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{lbl}</button>
+        ))}
       </div>
 
       {lines.map((ln) => (
@@ -77,7 +86,7 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
 
       {/* Add custom line (PMO / Admin) */}
       {data0.canManage && (adding
-        ? <AddLineForm scope={scope} id={id} onDone={() => { setAdding(false); invalidate(); }} onCancel={() => setAdding(false)} />
+        ? <AddLineForm scope={scope} id={id} kind={kind} onDone={() => { setAdding(false); invalidate(); }} onCancel={() => setAdding(false)} />
         : <button onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}><Icon name="plus" size={14} /> Add custom cost line</button>
       )}
 
@@ -88,12 +97,12 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
   );
 }
 
-function AddLineForm({ scope, id, onDone, onCancel }: { scope: CostScope; id: string; onDone: () => void; onCancel: () => void }) {
+function AddLineForm({ scope, id, kind, onDone, onCancel }: { scope: CostScope; id: string; kind: CostKind; onDone: () => void; onCancel: () => void }) {
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [ownerIdx, setOwnerIdx] = useState(0);
   const create = useMutation({
-    mutationFn: () => api(`/${scope}/${id}/costs`, {
+    mutationFn: () => api(`/${scope}/${id}/costs?kind=${kind}`, {
       method: "POST",
       body: JSON.stringify({ label: label.trim(), ownerRoles: OWNER_PRESETS[ownerIdx].roles, amount: Math.round((parseFloat(amount) || 0) * 1000) }),
     }),

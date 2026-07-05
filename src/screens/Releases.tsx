@@ -160,6 +160,23 @@ export default function Releases() {
         ))}
       </div>
 
+      {/* per-status tabs — a holistic "All" plus one tab per lifecycle status */}
+      {!showArchived && (
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+          {(["all", ...RELEASE_STATUSES] as string[]).map((s) => {
+            const count = s === "all" ? live.length : live.filter((r) => r.status === s).length;
+            const active = status === s;
+            const sc = s === "all" ? { ink: "#fff", tint: color.primary } : (STATUS_COLORS[s] ?? STATUS_COLORS.Planned);
+            return (
+              <button key={s} onClick={() => setStatus(s)} style={{
+                fontSize: 12.5, fontWeight: 600, padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit",
+                color: s === "all" ? "#fff" : sc.ink, background: sc.tint, boxShadow: active ? "0 0 0 2px #11163A33" : "none",
+              }}>{s === "all" ? "All" : s} · {count}</button>
+            );
+          })}
+        </div>
+      )}
+
       {/* view tabs */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
         <PillBtn active={view === "table"} onClick={() => setView("table")}>Table</PillBtn>

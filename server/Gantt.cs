@@ -19,6 +19,13 @@ public static class GanttEndpoints
     static int Clamp(int? v, int lo, int hi, int fallback) => v is int n ? Math.Clamp(n, lo, hi) : fallback;
     static string MonthLabel(int m) => Months[Math.Clamp(m, 0, 11)];
 
+    // Map a display date ("1 Aug 2026") to a 0-11 month index on the year grid.
+    static int? MonthOf(string? display)
+    {
+        if (string.IsNullOrWhiteSpace(display)) return null;
+        return DateTime.TryParse(display, out var d) ? d.Month - 1 : (int?)null;
+    }
+
     static PhaseDto ToDto(Phase p) => new(p.Id, p.Name, p.StartMonth, p.EndMonth, p.Progress);
     static MilestoneDto ToDto(Milestone m) => new(m.Id, m.Label, m.Month, m.Date);
 
@@ -27,18 +34,21 @@ public static class GanttEndpoints
         // ---- Project timeline ---------------------------------------------
         api.MapGet("/projects/{id}/gantt", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await db.Projects.FindAsync(id) is null) return Results.NotFound();
-            var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            var proj = await db.Projects.FindAsync(id);
+            if (proj is null) return Results.NotFound();
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
             var phases = await db.Phases.Where(p => p.ProjectId == id).OrderBy(p => p.Ord).ThenBy(p => p.Id)
                 .Select(p => ToDto(p)).ToListAsync();
             var milestones = await db.Milestones.Where(m => m.ProjectId == id).OrderBy(m => m.Month).ThenBy(m => m.Id)
                 .Select(m => ToDto(m)).ToListAsync();
-            return Results.Ok(new GanttDto(canEdit, phases, milestones));
+            var end = string.IsNullOrWhiteSpace(proj.Target) || proj.Target == "TBD" ? proj.Due : proj.Target;
+            return Results.Ok(new GanttDto(canEdit, phases, milestones,
+                MonthOf(proj.StartDate), MonthOf(end), proj.StartDate, end));
         });
 
         api.MapPost("/projects/{id}/phases", async (string id, CreatePhaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (await db.Projects.FindAsync(id) is null) return Results.NotFound();
             var start = Clamp(req.StartMonth, 0, 11, 0);
             var end = Math.Max(start, Clamp(req.EndMonth, 0, 11, start));
@@ -57,7 +67,7 @@ public static class GanttEndpoints
 
         api.MapPatch("/phases/{id:int}", async (int id, UpdatePhaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var p = await db.Phases.FindAsync(id);
             if (p is null) return Results.NotFound();
             if (req.Name is not null && req.Name.Trim().Length > 0) p.Name = req.Name.Trim();
@@ -71,7 +81,7 @@ public static class GanttEndpoints
 
         api.MapDelete("/phases/{id:int}", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var p = await db.Phases.FindAsync(id);
             if (p is null) return Results.NotFound();
             db.Phases.Remove(p);
@@ -83,7 +93,7 @@ public static class GanttEndpoints
         // ---- Milestones ---------------------------------------------------
         api.MapPost("/projects/{id}/milestones", async (string id, CreateMilestoneReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (await db.Projects.FindAsync(id) is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
             var month = Clamp(req.Month, 0, 11, 0);
@@ -96,7 +106,7 @@ public static class GanttEndpoints
 
         api.MapDelete("/milestones/{id:int}", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var m = await db.Milestones.FindAsync(id);
             if (m is null) return Results.NotFound();
             db.Milestones.Remove(m);

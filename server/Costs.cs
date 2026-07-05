@@ -36,13 +36,16 @@ public static class Costs
         string.IsNullOrEmpty(uiRole) || uiRole == "admin" || uiRole == "pmo" || ownerRoles.Contains(uiRole);
     static bool CanManage(string uiRole) => string.IsNullOrEmpty(uiRole) || uiRole == "admin" || uiRole == "pmo";
 
-    static async Task EnsureAsync(AtlasDbContext db, string scope, string ownerId)
+    static readonly string[] Kinds = { "actual", "forecast" };
+    static string NormKind(string? kind) => kind == "forecast" ? "forecast" : "actual";
+
+    static async Task EnsureAsync(AtlasDbContext db, string scope, string ownerId, string kind)
     {
-        if (await db.CostLines.AnyAsync(c => c.Scope == scope && c.OwnerId == ownerId)) return;
+        if (await db.CostLines.AnyAsync(c => c.Scope == scope && c.OwnerId == ownerId && c.Kind == kind)) return;
         for (var i = 0; i < Template.Length; i++)
         {
             var t = Template[i];
-            db.CostLines.Add(new CostLine { Scope = scope, OwnerId = ownerId, Key = t.Key, Label = t.Label, Note = t.Note, OwnerRoles = t.Roles.ToList(), IsSystem = true, Amount = 0, Ord = i });
+            db.CostLines.Add(new CostLine { Scope = scope, OwnerId = ownerId, Kind = kind, Key = t.Key, Label = t.Label, Note = t.Note, OwnerRoles = t.Roles.ToList(), IsSystem = true, Amount = 0, Ord = i });
         }
         await db.SaveChangesAsync();
     }
@@ -55,11 +58,12 @@ public static class Costs
         _ => await db.Projects.AnyAsync(p => p.Id == id),
     };
 
-    static async Task<IResult> GetCostsAsync(string scope, string id, AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    static async Task<IResult> GetCostsAsync(string scope, string id, string? kind, AtlasDbContext db, IConfiguration cfg, HttpContext http)
     {
         if (!await OwnerExistsAsync(db, scope, id)) return Results.NotFound();
-        await EnsureAsync(db, scope, id);
-        var lines = await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id).OrderBy(c => c.Ord).ToListAsync();
+        var k = NormKind(kind);
+        await EnsureAsync(db, scope, id, k);
+        var lines = await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id && c.Kind == k).OrderBy(c => c.Ord).ToListAsync();
         var uiRole = Permissions.EffectiveUiRole(http, cfg);
         var total = lines.Where(l => l.Key != "savings").Sum(l => l.Amount);
         var savings = lines.Where(l => l.Key == "savings").Sum(l => l.Amount);
@@ -67,16 +71,17 @@ public static class Costs
             lines.Select(l => new CostLineDto(l.Id, l.Label, l.Note, l.OwnerRoles, l.Amount, CanEditLine(uiRole, l.OwnerRoles), l.IsSystem)).ToList()));
     }
 
-    static async Task<IResult> AddCostAsync(string scope, string id, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    static async Task<IResult> AddCostAsync(string scope, string id, string? kind, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http)
     {
         var uiRole = Permissions.EffectiveUiRole(http, cfg);
         if (!CanManage(uiRole)) return Results.Json(new { error = "Only PMO / Admin can add cost lines." }, statusCode: StatusCodes.Status403Forbidden);
         if (!await OwnerExistsAsync(db, scope, id)) return Results.NotFound();
         if (string.IsNullOrWhiteSpace(req.Label)) return Results.BadRequest(new { error = "Label is required." });
-        var ord = (await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id).Select(c => (int?)c.Ord).MaxAsync() ?? 0) + 1;
+        var k = NormKind(kind);
+        var ord = (await db.CostLines.Where(c => c.Scope == scope && c.OwnerId == id && c.Kind == k).Select(c => (int?)c.Ord).MaxAsync() ?? 0) + 1;
         var line = new CostLine
         {
-            Scope = scope, OwnerId = id, Ord = ord, Key = "", Label = req.Label.Trim(), Note = req.Note?.Trim() ?? "Custom",
+            Scope = scope, OwnerId = id, Kind = k, Ord = ord, Key = "", Label = req.Label.Trim(), Note = req.Note?.Trim() ?? "Custom",
             OwnerRoles = req.OwnerRoles ?? new(), IsSystem = false, Amount = Math.Max(0, req.Amount ?? 0),
         };
         db.CostLines.Add(line);
@@ -91,8 +96,8 @@ public static class Costs
         // Same role-owned cost taxonomy for projects, programs and products.
         foreach (var (route, scope) in new[] { ("projects", "project"), ("programs", "program"), ("products", "product") })
         {
-            api.MapGet($"/{route}/{{id}}/costs", (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) => GetCostsAsync(scope, id, db, cfg, http));
-            api.MapPost($"/{route}/{{id}}/costs", (string id, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) => AddCostAsync(scope, id, req, db, cfg, http));
+            api.MapGet($"/{route}/{{id}}/costs", (string id, string? kind, AtlasDbContext db, IConfiguration cfg, HttpContext http) => GetCostsAsync(scope, id, kind, db, cfg, http));
+            api.MapPost($"/{route}/{{id}}/costs", (string id, string? kind, CreateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) => AddCostAsync(scope, id, kind, req, db, cfg, http));
         }
 
         api.MapPatch("/costs/{lineId:int}", async (int lineId, UpdateCostReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
