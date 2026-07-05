@@ -66,6 +66,7 @@ export const ROLES: RoleIdentity[] = [
   { value: "admin",       label: "Platform Administrator",   name: "Anders Lindgren",  roleLabel: "Platform Administrator", initials: "AL" },
   { value: "pmo",         label: "PMO Lead",                 name: "Astrid Holmqvist", roleLabel: "Head of PMO",            initials: "AH" },
   { value: "pm",          label: "Project Manager",          name: "Karin Sandberg",   roleLabel: "Project Manager",        initials: "KS" },
+  { value: "pmlead",      label: "PM Lead",                  name: "Lars Møller",      roleLabel: "PM Lead",                initials: "LM" },
   { value: "teammgr",     label: "Global Engineering Manager", name: "Mette Sørensen", roleLabel: "Global Engineering Manager", initials: "MS" },
   { value: "svcmgr",      label: "Global Service Manager",   name: "Petter Haugen",    roleLabel: "Global Service Manager", initials: "PH" },
   { value: "devmgr",      label: "Developers Manager",       name: "Johan Virtanen",   roleLabel: "Developers Manager",     initials: "JV" },

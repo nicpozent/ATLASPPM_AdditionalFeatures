@@ -25,15 +25,15 @@ public static class Permissions
     static readonly Dictionary<string, string> RoleMap = new(StringComparer.OrdinalIgnoreCase)
     {
         // UI switcher identities (nav.ts ROLES)
-        ["admin"] = "admin", ["pmo"] = "pmo", ["pm"] = "pm",
+        ["admin"] = "admin", ["pmo"] = "pmo", ["pm"] = "pm", ["pmlead"] = "pmlead",
         ["teammgr"] = "team", ["svcmgr"] = "team", ["devmgr"] = "team", ["inframgr"] = "team",
         ["architect"] = "pmo", ["stakeholder"] = "stkhldr",
         // Canonical Entra app roles
-        ["PlatformAdmin"] = "admin", ["PMO"] = "pmo", ["ProjectManager"] = "pm",
+        ["PlatformAdmin"] = "admin", ["PMO"] = "pmo", ["ProjectManager"] = "pm", ["PMLead"] = "pmlead",
         ["TeamMember"] = "team", ["Executive"] = "exec", ["Stakeholder"] = "stkhldr",
     };
     // Tie-break when a user carries several roles: keep the most privileged.
-    static readonly string[] Privilege = { "admin", "pmo", "pm", "exec", "team", "stkhldr" };
+    static readonly string[] Privilege = { "admin", "pmo", "pm", "pmlead", "exec", "team", "stkhldr" };
 
     // Returns the effective RoleDef id, or null for "full access" (dev, no header).
     public static string? ResolveRoleId(ClaimsPrincipal user, HttpRequest req, bool authEnabled)
@@ -47,6 +47,33 @@ public static class Permissions
         }
         var header = req.Headers["X-Atlas-Role"].ToString();
         return string.IsNullOrWhiteSpace(header) ? null : RoleMap.GetValueOrDefault(header);
+    }
+
+    // Fine-grained manager identity — distinct per manager (Global Engineering ≠
+    // Developers), unlike the coarse permission role which collapses them to
+    // "team". Resolved from the Entra app role when auth is on (the org assigns a
+    // distinct app role per manager), else the X-Atlas-Role header. Returns the
+    // manager slot key (teammgr/svcmgr/devmgr/inframgr/architect/pmo/pmlead) or null.
+    static readonly Dictionary<string, string> ManagerMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["teammgr"] = "teammgr", ["GlobalEngineeringManager"] = "teammgr",
+        ["svcmgr"] = "svcmgr", ["GlobalServiceManager"] = "svcmgr",
+        ["devmgr"] = "devmgr", ["DevelopersManager"] = "devmgr",
+        ["inframgr"] = "inframgr", ["InfrastructureManager"] = "inframgr",
+        ["architect"] = "architect", ["ChiefArchitect"] = "architect",
+        ["pmo"] = "pmo", ["PMO"] = "pmo",
+        ["pmlead"] = "pmlead", ["PMLead"] = "pmlead",
+    };
+    public static string? ManagerKey(HttpContext http, IConfiguration cfg)
+    {
+        if (cfg.GetValue("Auth:Enabled", false))
+        {
+            foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role)))
+                if (ManagerMap.TryGetValue(c.Value, out var k)) return k;
+            return null;
+        }
+        var header = http.Request.Headers["X-Atlas-Role"].ToString();
+        return ManagerMap.TryGetValue(header, out var hk) ? hk : null;
     }
 
     static async Task<string> LevelAsync(string roleId, AtlasDbContext db, string cap) =>

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Atlas.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Atlas.Api.Migrations
 {
     [DbContext(typeof(AtlasDbContext))]
-    partial class AtlasDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705084445_TeamsAndPmLead")]
+    partial class TeamsAndPmLead
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2100,6 +2103,9 @@ namespace Atlas.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("EntraGroupId")
+                        .HasColumnType("text");
+
                     b.Property<string>("GroupId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2110,7 +2116,7 @@ namespace Atlas.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GroupId");
+                    b.HasIndex("EntraGroupId");
 
                     b.ToTable("TeamMembers");
                 });
@@ -2261,9 +2267,7 @@ namespace Atlas.Api.Migrations
                 {
                     b.HasOne("Atlas.Api.EntraGroup", null)
                         .WithMany("Members")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("EntraGroupId");
                 });
 
             modelBuilder.Entity("Atlas.Api.Artifact", b =>

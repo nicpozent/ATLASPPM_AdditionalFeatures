@@ -18,6 +18,9 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Phase> Phases => Set<Phase>();
     public DbSet<Milestone> Milestones => Set<Milestone>();
     public DbSet<WowOverride> WowOverrides => Set<WowOverride>();
+    public DbSet<EntraGroup> EntraGroups => Set<EntraGroup>();
+    public DbSet<TeamMemberRow> TeamMembers => Set<TeamMemberRow>();
+    public DbSet<ManagerNode> ManagerNodes => Set<ManagerNode>();
     public DbSet<CommunicationEntry> CommunicationEntries => Set<CommunicationEntry>();
     public DbSet<Release> Releases => Set<Release>();
     public DbSet<DeliveryReport> DeliveryReports => Set<DeliveryReport>();
@@ -114,6 +117,11 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Phase>().HasKey(x => x.Id);
         b.Entity<Milestone>().HasKey(x => x.Id);
         b.Entity<WowOverride>().HasKey(x => x.ProjectId);
+        b.Entity<EntraGroup>().HasKey(x => x.Id);
+        b.Entity<EntraGroup>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<EntraGroup>().HasMany(x => x.Members).WithOne().HasForeignKey(m => m.GroupId);
+        b.Entity<TeamMemberRow>().HasKey(x => x.Id);
+        b.Entity<ManagerNode>().HasKey(x => x.Key);
         b.Entity<CommunicationEntry>().HasKey(x => x.Id);
         b.Entity<Release>().HasKey(x => x.Id);
         b.Entity<Release>().Property(x => x.Id).ValueGeneratedNever();

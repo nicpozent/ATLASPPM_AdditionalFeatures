@@ -21,6 +21,7 @@ const GRADIENT = "linear-gradient(115deg,#11163A,#0F6CBD)";
 const ADMIN_TABS: { id: string; label: string }[] = [
   { id: "roles", label: "Roles & Permissions" },
   { id: "users", label: "Users & Groups" },
+  { id: "teams", label: "Teams" },
   { id: "stakeholders", label: "Stakeholders" },
   { id: "archive", label: "Archive & Deletions" },
   { id: "audit", label: "Audit Log" },
@@ -105,6 +106,7 @@ export default function Admin() {
 
       {tab === "roles" && <RolesSection />}
       {tab === "users" && <UsersSection />}
+      {tab === "teams" && <TeamsSection />}
       {tab === "stakeholders" && <StakeholdersSection />}
       {tab === "archive" && <ArchiveSection />}
       {tab === "audit" && <AuditSection />}
@@ -489,6 +491,117 @@ function AuditSection() {
 function fmtAudit(iso: string): string {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// ---- TEAMS (Entra groups → manager slots, roll-up hierarchy) --------------
+interface TeamManager { key: string; label: string; parentKey: string; groupIds: string[]; memberCount: number; }
+interface TeamGroup { id: string; displayName: string; managerKey: string; manual: boolean; lastSynced: string; memberCount: number; }
+interface TeamsAdmin { canManage: boolean; graphConfigured: boolean; managers: TeamManager[]; groups: TeamGroup[]; }
+
+function TeamsSection() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["teams-admin"], retry: false, staleTime: 15_000,
+    queryFn: async (): Promise<TeamsAdmin> => (await api<TeamsAdmin>("/teams/admin")) ?? { canManage: false, graphConfigured: false, managers: [], groups: [] },
+  });
+  const d = data ?? { canManage: false, graphConfigured: false, managers: [], groups: [] };
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["teams-admin"] });
+  const sync = useMutation({
+    mutationFn: () => api<{ configured: boolean; synced: number; message?: string; error?: string }>("/teams/groups/sync", { method: "POST" }),
+    onSuccess: (r) => { invalidate(); toast(r?.error ?? r?.message ?? `Synced ${r?.synced ?? 0} group(s) from Entra.`, r?.error ? "error" : "info"); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const addGroup = useMutation({
+    mutationFn: (displayName: string) => api("/teams/groups", { method: "POST", body: JSON.stringify({ displayName }) }),
+    onSuccess: invalidate, onError: (e) => toast((e as Error).message, "error"),
+  });
+  const mapGroup = useMutation({
+    mutationFn: (v: { id: string; managerKey: string }) => api(`/teams/groups/${v.id}`, { method: "PATCH", body: JSON.stringify({ managerKey: v.managerKey }) }),
+    onSuccess: invalidate, onError: (e) => toast((e as Error).message, "error"),
+  });
+  const delGroup = useMutation({
+    mutationFn: (id: string) => api(`/teams/groups/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  });
+  const setParent = useMutation({
+    mutationFn: (v: { key: string; parentKey: string }) => api(`/teams/managers/${v.key}`, { method: "PATCH", body: JSON.stringify({ parentKey: v.parentKey }) }),
+    onSuccess: invalidate, onError: (e) => toast((e as Error).message, "error"),
+  });
+  const [newGroup, setNewGroup] = useState("");
+  const managerName = (k: string) => d.managers.find((m) => m.key === k)?.label ?? "—";
+
+  return (
+    <>
+      <div style={{ background: GRADIENT, borderRadius: radius.xxl, padding: "20px 24px", marginBottom: 18, color: "#fff", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600 }}>Teams</div>
+          <div style={{ fontSize: 13, color: "#C9D6EE", marginTop: 3 }}>
+            Map Entra groups to their team manager. {d.graphConfigured ? "Groups sync from Microsoft Graph." : "Graph isn't configured — add groups manually below."}
+          </div>
+        </div>
+        {d.canManage && (
+          <button onClick={() => sync.mutate()} disabled={sync.isPending} title={d.graphConfigured ? "Sync groups & members from Entra" : "Graph not configured — this will report how to enable it"}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: sync.isPending ? 0.7 : 1 }}>
+            <Icon name="refresh" size={16} /> {sync.isPending ? "Syncing…" : "Sync from Entra"}
+          </button>
+        )}
+      </div>
+
+      {/* Group → manager mapping */}
+      <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 0.7fr 0.9fr 40px", padding: "13px 22px", borderBottom: `1px solid ${color.bg}`, ...colHeadStyle, letterSpacing: "0.04em" }}>
+          <div>Entra group</div><div>Team manager</div><div>Members</div><div>Source</div><div />
+        </div>
+        {d.groups.length === 0 ? (
+          <EmptyBlock message={d.graphConfigured ? "No groups synced yet — click “Sync from Entra”." : "No groups yet — add one below or configure Graph to sync."} />
+        ) : d.groups.map((g) => (
+          <div key={g.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 0.7fr 0.9fr 40px", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+            <div style={{ fontWeight: 600, color: color.text }}>{g.displayName}</div>
+            <div>
+              {d.canManage ? (
+                <Select value={g.managerKey} onChange={(e) => mapGroup.mutate({ id: g.id, managerKey: e.target.value })} style={{ padding: "6px 9px", fontSize: 12.5 }}>
+                  <option value="">— Unmapped —</option>
+                  {d.managers.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                </Select>
+              ) : (g.managerKey ? managerName(g.managerKey) : "— Unmapped —")}
+            </div>
+            <div style={{ fontFamily: font.mono, color: color.textMuted }}>{g.memberCount}</div>
+            <div><span style={{ fontSize: 11, fontWeight: 600, color: g.manual ? "#8A6300" : "#0C5798", background: g.manual ? "#FBF2D7" : "#E6EFFB", padding: "3px 9px", borderRadius: 6 }}>{g.manual ? "Manual" : "Entra"}</span></div>
+            <div style={{ textAlign: "right" }}>{d.canManage && <button onClick={() => delGroup.mutate(g.id)} title="Remove group" style={{ border: "none", background: "transparent", color: "#B0546A", cursor: "pointer", display: "flex", padding: 0, marginLeft: "auto" }}><Icon name="trash" size={14} /></button>}</div>
+          </div>
+        ))}
+        {d.canManage && (
+          <div style={{ display: "flex", gap: 9, padding: "13px 22px", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
+            <Input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="Add a group by name (manual)" style={{ maxWidth: 320 }} />
+            <Button variant="secondary" onClick={() => { if (newGroup.trim()) { addGroup.mutate(newGroup.trim()); setNewGroup(""); } }} disabled={!newGroup.trim()}>Add group</Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Manager roll-up hierarchy */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, ...sectionTitle }}>Management roll-up</div>
+        <div style={{ padding: "6px 22px 14px" }}>
+          <div style={{ fontSize: 12, color: color.faint2, margin: "10px 0 12px" }}>Set each manager's parent. A manager sees their own team plus every team beneath them.</div>
+          {d.managers.map((m) => (
+            <div key={m.key} style={{ display: "grid", gridTemplateColumns: "1.4fr auto 1.2fr 0.7fr", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+              <div style={{ fontWeight: 600, color: color.text }}>{m.label}</div>
+              <div style={{ fontSize: 11.5, color: color.faint3 }}>reports to</div>
+              <div>
+                {d.canManage ? (
+                  <Select value={m.parentKey} onChange={(e) => setParent.mutate({ key: m.key, parentKey: e.target.value })} style={{ padding: "6px 9px", fontSize: 12.5 }}>
+                    <option value="">— Top of tree —</option>
+                    {d.managers.filter((p) => p.key !== m.key).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </Select>
+                ) : (m.parentKey ? managerName(m.parentKey) : "— Top —")}
+              </div>
+              <div style={{ fontFamily: font.mono, color: color.faint3, textAlign: "right" }}>{m.memberCount} member{m.memberCount === 1 ? "" : "s"}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
+  );
 }
 
 // ---- BACKUPS & RESTORE ----------------------------------------------------

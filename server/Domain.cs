@@ -300,6 +300,36 @@ public class Resource
     public bool Over { get; set; }
 }
 
+// An Entra (Azure AD) security/M365 group, synced from the directory (or added
+// manually when Graph isn't configured). The Platform Admin maps each group to a
+// team-manager slot inside Atlas — the mapping lives here, never hardcoded.
+public class EntraGroup
+{
+    public string Id { get; set; } = default!;        // Entra group object id (or "manual-…")
+    public string DisplayName { get; set; } = default!;
+    public string ManagerKey { get; set; } = "";      // mapped manager slot (teammgr/svcmgr/…); "" = unmapped
+    public bool Manual { get; set; }                    // added by hand (no Graph)
+    public string LastSynced { get; set; } = "";        // display timestamp
+    public List<TeamMemberRow> Members { get; set; } = new();
+}
+
+public class TeamMemberRow
+{
+    public int Id { get; set; }
+    public string GroupId { get; set; } = default!;
+    public string DisplayName { get; set; } = default!;
+    public string Email { get; set; } = "";
+    public string JobTitle { get; set; } = "";
+}
+
+// The management roll-up tree: each manager slot's parent, set by the Platform
+// Admin. A manager sees their own teams plus every team beneath them here.
+public class ManagerNode
+{
+    public string Key { get; set; } = default!;        // manager slot key (PK)
+    public string ParentKey { get; set; } = "";        // parent manager slot; "" = top of tree
+}
+
 // A per-project override of the methodology's default "ways of working". Absent
 // → the project shows the methodology default (see WaysOfWorking.For). Present →
 // the edited cadence/summary/ceremonies/artifacts/roles. Lists are stored as
