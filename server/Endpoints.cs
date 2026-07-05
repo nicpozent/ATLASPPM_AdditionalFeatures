@@ -41,6 +41,7 @@ public static class Endpoints
         api.MapNotificationEndpoints();
         api.MapHelpEndpoints();
         api.MapGdprEndpoints();
+        api.MapRetentionEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

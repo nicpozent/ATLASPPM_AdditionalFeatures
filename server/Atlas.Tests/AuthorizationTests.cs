@@ -27,6 +27,7 @@ public class AtlasApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Auth:Enabled", "false");
         builder.UseSetting("Seed:Enabled", "false");
         builder.UseSetting("OpenApi:Enabled", "false");
+        builder.UseSetting("Retention:Enabled", "false");
 
         builder.ConfigureTestServices(services =>
         {
