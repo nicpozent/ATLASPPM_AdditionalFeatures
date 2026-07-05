@@ -93,6 +93,31 @@ public class QualityTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Test_plan_tasks_can_be_added_status_changed_and_removed()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Plan tasks project" }));
+        var planId = await IntId(await c.PostAsJsonAsync($"/api/v1/projects/{projId}/test-plans", new { name = "Smoke", cases = 10 }));
+
+        var add = await c.PostAsJsonAsync($"/api/v1/test-plans/{planId}/tasks", new { title = "Login works", assignee = "QA" });
+        Assert.Equal(HttpStatusCode.OK, add.StatusCode);
+        var taskId = await IntId(add);
+
+        var patch = await c.PatchAsJsonAsync($"/api/v1/test-plan-tasks/{taskId}", new { status = "Passed" });
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        using (var d = JsonDocument.Parse(await patch.Content.ReadAsStringAsync()))
+            Assert.Equal("Passed", d.RootElement.GetProperty("status").GetString());
+
+        // Shows up nested under its plan in the quality payload.
+        var q = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/quality");
+        var plan = q.GetProperty("plans").EnumerateArray().First(p => p.GetProperty("id").GetInt32() == planId);
+        Assert.Single(plan.GetProperty("tasks").EnumerateArray());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PatchAsJsonAsync($"/api/v1/test-plan-tasks/{taskId}", new { status = "Nope" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/test-plan-tasks/{taskId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Editing_quality_needs_edit_rights()
     {
         var c = _factory.CreateClient();

@@ -6,6 +6,8 @@ public record CreateTestPlanReq(string Name, string? Stage, int? Cases, int? Pas
 public record UpdateTestPlanReq(string? Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked);
 public record CreateDefectReq(string Title, string? Severity, string? Owner, string? Status, string? Test);
 public record UpdateDefectReq(string? Title, string? Severity, string? Owner, string? Status, string? Test);
+public record CreatePlanTaskReq(string Title, string? Status, string? Assignee);
+public record UpdatePlanTaskReq(string? Title, string? Status, string? Assignee);
 
 // ============================================================================
 //  Quality — test plans (execution breakdown) and defects for a project.
@@ -17,13 +19,14 @@ public static class Quality
     static readonly string[] Severities = { "Critical", "High", "Medium", "Low" };
     static readonly string[] DefectStatuses = { "Open", "In progress", "Resolved", "Closed" };
     static readonly string[] Stages = { "Unit", "Integration", "System", "UAT", "Regression", "Performance", "Security" };
+    static readonly string[] PlanTaskStatuses = { "Not run", "In test", "Passed", "Failed", "Blocked" };
 
     public static void MapQualityEndpoints(this RouteGroupBuilder api)
     {
         api.MapGet("/projects/{id}/quality", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
-            var plans = await db.TestPlans.Where(p => p.ProjectId == id).OrderBy(p => p.Ord).ToListAsync();
+            var plans = await db.TestPlans.Where(p => p.ProjectId == id).Include(p => p.Tasks).OrderBy(p => p.Ord).ToListAsync();
             var defects = await db.Defects.Where(d => d.ProjectId == id).OrderBy(d => d.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
 
@@ -157,12 +160,62 @@ public static class Quality
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+
+        // ---- Test-plan tasks (test cases tracked under a plan) ------------
+        api.MapPost("/test-plans/{planId:int}/tasks", async (int planId, CreatePlanTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (!await db.TestPlans.AnyAsync(p => p.Id == planId)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+            var ord = (await db.TestPlanTasks.Where(t => t.TestPlanId == planId).Select(t => (int?)t.Ord).MaxAsync() ?? 0) + 1;
+            var t = new TestPlanTask
+            {
+                TestPlanId = planId, Ord = ord, Title = req.Title.Trim(),
+                Status = PlanTaskStatuses.Contains(req.Status) ? req.Status! : "Not run",
+                Assignee = req.Assignee?.Trim() ?? "",
+            };
+            db.TestPlanTasks.Add(t);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Added test-plan task", $"plan {planId} · {t.Title}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee));
+        });
+
+        api.MapPatch("/test-plan-tasks/{taskId:int}", async (int taskId, UpdatePlanTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var t = await db.TestPlanTasks.FindAsync(taskId);
+            if (t is null) return Results.NotFound();
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                t.Title = req.Title.Trim();
+            }
+            if (req.Status is not null)
+            {
+                if (!PlanTaskStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                t.Status = req.Status;
+            }
+            if (req.Assignee is not null) t.Assignee = req.Assignee.Trim();
+            await db.SaveChangesAsync();
+            return Results.Ok(new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee));
+        });
+
+        api.MapDelete("/test-plan-tasks/{taskId:int}", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var t = await db.TestPlanTasks.FindAsync(taskId);
+            if (t is null) return Results.NotFound();
+            db.TestPlanTasks.Remove(t);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
 
     static TestPlanDto ToPlanDto(TestPlan p)
     {
         var notRun = Math.Max(0, p.Cases - p.Passed - p.Failed - p.Blocked);
         var execPct = p.Cases == 0 ? 0 : (int)Math.Round(100.0 * (p.Passed + p.Failed + p.Blocked) / p.Cases);
-        return new TestPlanDto(p.Id, p.Name, p.Stage, p.Cases, p.Passed, p.Failed, p.Blocked, notRun, execPct);
+        return new TestPlanDto(p.Id, p.Name, p.Stage, p.Cases, p.Passed, p.Failed, p.Blocked, notRun, execPct,
+            p.Tasks.OrderBy(t => t.Ord).Select(t => new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee)).ToList());
     }
 }
