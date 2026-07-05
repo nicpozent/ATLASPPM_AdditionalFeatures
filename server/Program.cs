@@ -28,6 +28,10 @@ if (openApiEnabled)
     });
 }
 
+// OpenTelemetry — traces/metrics/logs over OTLP, off unless an endpoint is
+// configured (see Observability.cs and docs/observability.md).
+builder.AddAtlasObservability();
+
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
 var corsOrigins = Hardening.CorsOrigins(cfg);
