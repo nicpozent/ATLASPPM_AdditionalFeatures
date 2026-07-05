@@ -18,7 +18,7 @@ namespace Atlas.Api;
 public static class Permissions
 {
     // Level ranking: None < View < Edit < Full.
-    static int Rank(string level) => level switch { "F" => 3, "E" => 2, "V" => 1, _ => 0 };
+    internal static int Rank(string level) => level switch { "F" => 3, "E" => 2, "V" => 1, _ => 0 };
 
     // Both the 9 cosmetic UI identities and the 6 canonical Entra roles collapse
     // onto the six RoleDef ids that head the matrix.

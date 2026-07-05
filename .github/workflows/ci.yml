@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
 
   backend:
-    name: API (build)
+    name: API (build · test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,5 +37,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - run: dotnet restore
-      - run: dotnet build -c Release --no-restore
+      - run: dotnet restore Atlas.sln
+      - run: dotnet build Atlas.sln -c Release --no-restore
+      - run: dotnet test Atlas.sln -c Release --no-build --verbosity normal

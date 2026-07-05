@@ -36,7 +36,7 @@ public static class Notifications
     // Default channels when a user hasn't set a preference for an event type.
     // Entity events default to in-app (for people who subscribed); "created" is
     // opt-in (off) so it isn't a firehose.
-    static (bool InApp, bool Email) DefaultPref(string ev) =>
+    internal static (bool InApp, bool Email) DefaultPref(string ev) =>
         ev == Created ? (false, false) : (true, false);
 
     static bool MailConfigured(IConfiguration cfg) =>
