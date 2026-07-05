@@ -4,6 +4,9 @@ dist/
 *.local
 .env
 *.log
+
+# Docker secret files (see docs/secrets.md) — never commit real secrets
+secrets/
 .DS_Store
 
 # TypeScript / Vite build outputs
