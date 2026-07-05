@@ -45,8 +45,11 @@ public record SecurityControlDto(int Id, string Code, string Control, string Fra
 public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls);
 
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
-    string Status, string Sprint, string Baseline, string Priority);
+    string Status, string Sprint, string Baseline, string Priority,
+    string StartDate = "", string TargetDate = "", int Points = 0, string Size = "",
+    int EstimateHours = 0, bool AssigneeOnLeave = false);
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
+public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At);
 
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics, bool CanCreate = false);

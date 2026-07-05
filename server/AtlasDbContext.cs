@@ -45,6 +45,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<SecurityControl> SecurityControls => Set<SecurityControl>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
+    public DbSet<TaskComment> TaskComments => Set<TaskComment>();
     public DbSet<Epic> Epics => Set<Epic>();
     public DbSet<Artifact> Artifacts => Set<Artifact>();
     public DbSet<ArtifactVersion> ArtifactVersions => Set<ArtifactVersion>();

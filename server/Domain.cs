@@ -594,7 +594,23 @@ public class ProjectTask
     public string Sprint { get; set; } = "";
     public string Baseline { get; set; } = "";
     public string Priority { get; set; } = "Medium";     // Critical | High | Medium | Low
+    public string StartDate { get; set; } = "";           // ISO date
+    public string TargetDate { get; set; } = "";          // ISO date
+    public int Points { get; set; }                       // story points
+    public string Size { get; set; } = "";                // t-shirt: XS|S|M|L|XL|XXL
+    public int EstimateHours { get; set; }                // estimated effort to complete
     public int Ord { get; set; }
+}
+
+// A comment on a task's thread. Author/initials captured at post time.
+public class TaskComment
+{
+    public int Id { get; set; }
+    public int TaskId { get; set; }
+    public string Author { get; set; } = "";
+    public string Initials { get; set; } = "";
+    public string Body { get; set; } = "";
+    public DateTime At { get; set; }
 }
 
 // ---- Financial cost lines (role-owned) ------------------------------------
