@@ -41,6 +41,17 @@ public static class SecretRotation
 
     static int Rank(string s) => s switch { "critical" => 2, "warn" => 1, _ => 0 };
 
+    // Anchor the rotation clock at first deploy: if no rotation has ever been
+    // recorded, treat the deployment date as the baseline so the age counts from
+    // go-live (status starts "ok") rather than showing "unknown". Runs once —
+    // subsequent restarts leave the recorded date untouched. Idempotent.
+    public static async Task EnsureAnchorAsync(AtlasDbContext db)
+    {
+        if (await db.Settings.FindAsync(RotatedKey) is not null) return;
+        db.Settings.Add(new Setting { Key = RotatedKey, Value = DateTime.UtcNow.ToString("yyyy-MM-dd") });
+        await db.SaveChangesAsync();
+    }
+
     // Daily check: raise a single admin notification each time the status first
     // escalates (ok→warn, warn→critical). Idempotent between escalations.
     public static async Task<bool> CheckAndNotifyAsync(AtlasDbContext db, IConfiguration cfg)

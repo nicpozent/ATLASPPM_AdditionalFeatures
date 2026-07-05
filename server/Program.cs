@@ -112,6 +112,8 @@ using (var scope = app.Services.CreateScope())
         // Help centre content is reference data — seed the curated baseline and
         // ensure the troubleshooting categories exist (idempotent).
         await Help.SeedAsync(db);
+        // Start the DB-password rotation clock at first deploy (idempotent).
+        await SecretRotation.EnsureAnchorAsync(db);
         if (cfg.GetValue("Seed:Enabled", false))
         {
             await Seed.RunAsync(db);
