@@ -7,6 +7,7 @@ import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { DEPARTMENTS } from "@/departments";
 
 type Source = "jira" | "ado" | "manual";
 
@@ -16,7 +17,7 @@ interface Product {
   id: string; name: string; owner: string; source: Source; projects: string[];
   tasks: Task[]; members?: Member[]; releases?: string[]; status?: string;
   startDate?: string; endDate?: string; canManage?: boolean;
-  teamKey?: string; teamLabel?: string; teamSize?: number;
+  teamKey?: string; teamLabel?: string; teamSize?: number; dept?: string;
 }
 interface RelOpt { id: string; name: string; date: string; status: string }
 interface TeamOption { key: string; label: string }
@@ -56,7 +57,7 @@ function useProducts() {
 
 const pct = (done: number, total: number) => (total > 0 ? Math.round((done / total) * 100) : 0);
 
-interface NewProduct { name: string; owner: string; source: Source; projects: string[]; startDate: string; endDate: string; teamKey: string }
+interface NewProduct { name: string; owner: string; source: Source; projects: string[]; startDate: string; endDate: string; teamKey: string; dept: string }
 
 export default function Products() {
   const { data: products = [] } = useProducts();
@@ -66,8 +67,9 @@ export default function Products() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
   const [pstatus, setPstatus] = useState<ProductStatus>("Active");
+  const [deptFilter, setDeptFilter] = useState("all");
   const selected = useMemo(() => products.find((p) => p.id === selectedId) ?? null, [products, selectedId]);
-  const shown = products.filter((p) => (p.status ?? "Active") === pstatus);
+  const shown = products.filter((p) => (p.status ?? "Active") === pstatus).filter((p) => deptFilter === "all" || (p.dept || "") === deptFilter);
   const countBy = (s: ProductStatus) => products.filter((p) => (p.status ?? "Active") === s).length;
   const createProduct = useMutation({
     mutationFn: (body: NewProduct) => api<Product>("/products", { method: "POST", body: JSON.stringify(body) }),
@@ -86,6 +88,10 @@ export default function Products() {
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div style={{ fontSize: 13.5, color: color.subtle, flex: 1 }}>Products are durable containers; projects &amp; programs deliver against them. Tasks sync from Jira/ADO and are mapped to releases.</div>
+        <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} title="Filter by owning department" style={{ width: "auto", minWidth: 150 }}>
+          <option value="all">All departments</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </Select>
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create products"}><Icon name="plus" size={16} /> New product</Button>
       </div>
       {/* Products aren't deleted — they move through Active / Retired / Replaced. */}
@@ -157,6 +163,7 @@ function NewProductModal({ onClose, onCreate, submitting }: {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [teamKey, setTeamKey] = useState("");
+  const [dept, setDept] = useState("");
   const { data: teamOptions = [] } = useQuery({
     queryKey: ["team-slots"], retry: false, staleTime: 300_000,
     queryFn: async (): Promise<TeamOption[]> => { try { return (await api<TeamOption[]>("/teams/slots")) ?? []; } catch { return []; } },
@@ -166,7 +173,7 @@ function NewProductModal({ onClose, onCreate, submitting }: {
     onCreate({
       name: name.trim(), owner: owner.trim(), source,
       projects: projects.split(",").map((s) => s.trim()).filter(Boolean),
-      startDate: prdToDisplay(startDate), endDate: prdToDisplay(endDate), teamKey,
+      startDate: prdToDisplay(startDate), endDate: prdToDisplay(endDate), teamKey, dept,
     });
   };
   return (
@@ -187,11 +194,20 @@ function NewProductModal({ onClose, onCreate, submitting }: {
         <div><Lbl>Start date</Lbl><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
         <div><Lbl>End date</Lbl><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
       </div>
-      <Lbl>Delivery team</Lbl>
-      <Select value={teamKey} onChange={(e) => setTeamKey(e.target.value)}>
-        <option value="">Unassigned — assign a team later</option>
-        {teamOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-      </Select>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div><Lbl>Delivery team</Lbl>
+          <Select value={teamKey} onChange={(e) => setTeamKey(e.target.value)}>
+            <option value="">Unassigned</option>
+            {teamOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </Select>
+        </div>
+        <div><Lbl>Department</Lbl>
+          <Select value={dept} onChange={(e) => setDept(e.target.value)}>
+            <option value="">— Select —</option>
+            {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select>
+        </div>
+      </div>
       <Lbl>Linked projects (comma-separated)</Lbl>
       <Input value={projects} onChange={(e) => setProjects(e.target.value)} placeholder="PRJ-204, PRJ-176" />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -213,7 +229,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
   const updateProduct = useMutation({
-    mutationFn: (body: Partial<{ projects: string[]; releases: string[]; startDate: string; endDate: string }>) =>
+    mutationFn: (body: Partial<{ projects: string[]; releases: string[]; startDate: string; endDate: string; owner: string; dept: string }>) =>
       api(`/products/${product.id}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
@@ -258,6 +274,13 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
               {["Active", "Retired", "Replaced"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
+          {mayManage ? (
+            <select value={product.dept ?? ""} onChange={(e) => updateProduct.mutate({ dept: e.target.value })} title="Owning department"
+              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+              <option value="">Dept: none</option>
+              {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          ) : product.dept ? <span style={{ fontSize: 12, fontWeight: 600, color: color.subtle, background: color.bg, padding: "5px 11px", borderRadius: 20 }}>{product.dept}</span> : null}
           <SubscribeButton targetType="product" targetId={product.id} />
           <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
         </div>

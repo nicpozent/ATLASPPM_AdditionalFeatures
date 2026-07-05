@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { DEPARTMENTS } from "@/departments";
 import { toast } from "@/components/Toast";
 import { SCREENS } from "@/nav";
 
@@ -150,6 +151,20 @@ function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; 
   const [budget, setBudget] = useState(String(project.budget));
   const [spent, setSpent] = useState(String(project.spent));
 
+  // Owner options come from the project's team (lead + assigned architecture
+  // roles + the candidate people pool), with the current owner always included.
+  const { data: team } = useQuery({
+    queryKey: ["assignments", project.id], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ lead: string; archRoles: { person: string }[]; options: string[] } | null> =>
+      await api(`/projects/${project.id}/assignments`),
+  });
+  const ownerOptions = useMemo(() => {
+    const set = new Set<string>();
+    [project.owner, team?.lead, ...(team?.archRoles ?? []).map((r) => r.person), ...(team?.options ?? [])]
+      .forEach((p) => { if (p && p.trim() && p !== "Unassigned") set.add(p.trim()); });
+    return Array.from(set);
+  }, [project.owner, team]);
+
   const save = useMutation({
     mutationFn: () => api(`/projects/${project.id}`, {
       method: "PATCH",
@@ -174,8 +189,14 @@ function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; 
       <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Update the project's details. Health follows the status you pick.</div>
       <PdField label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} /></PdField>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <PdField label="Department"><Input value={dept} onChange={(e) => setDept(e.target.value)} /></PdField>
-        <PdField label="Project manager"><Input value={owner} onChange={(e) => setOwner(e.target.value)} /></PdField>
+        <PdField label="Department"><Select value={DEPARTMENTS.includes(dept as never) ? dept : ""} onChange={(e) => setDept(e.target.value)}>
+          <option value="">— Select —</option>
+          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </Select></PdField>
+        <PdField label="Project manager (owner)"><Select value={ownerOptions.includes(owner) ? owner : ""} onChange={(e) => setOwner(e.target.value)}>
+          <option value="">{ownerOptions.length ? "— Select from team —" : "No team members assigned yet"}</option>
+          {ownerOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+        </Select></PdField>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <PdField label="Methodology"><Select value={methodology} onChange={(e) => setMethodology(e.target.value)}>{PD_METHODOLOGIES.map((m) => <option key={m} value={m}>{m}</option>)}</Select></PdField>
