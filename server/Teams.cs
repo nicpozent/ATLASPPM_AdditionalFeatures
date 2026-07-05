@@ -336,38 +336,63 @@ public static class Teams
     }
 
     // ---- Microsoft Graph sync (client credentials) ------------------------
+    // Sync is bounded so it can't time out the request the way a full
+    // directory-wide member expansion does:
+    //   1. Discover/refresh GROUP METADATA only (cheap — one page per 999 groups).
+    //   2. Expand MEMBERS only for groups already MAPPED to a manager slot (the
+    //      handful the admin actually uses), not the whole tenant.
+    // A wall-clock budget is a final backstop. First sync (nothing mapped yet)
+    // just lists groups so the admin can map them, then a re-sync pulls members.
     static async Task<int> SyncFromGraphAsync(AtlasDbContext db, IConfiguration cfg)
     {
-        var http = new HttpClient();
+        using var http = new HttpClient();
         var token = await GraphTokenAsync(http, cfg);
         http.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        var deadline = DateTime.UtcNow.AddSeconds(cfg.GetValue("Graph:SyncBudgetSeconds", 45));
+        var stamp = DateTime.UtcNow.ToString("dd MMM yyyy HH:mm 'UTC'");
 
-        var count = 0;
-        var url = "https://graph.microsoft.com/v1.0/groups?$select=id,displayName&$top=100";
-        while (url is not null)
+        // 1. Group metadata only — no member calls here.
+        var discovered = 0;
+        var url = "https://graph.microsoft.com/v1.0/groups?$select=id,displayName&$top=999";
+        while (url is not null && DateTime.UtcNow < deadline)
         {
             var page = await http.GetFromJsonAsync<GraphList<GraphGroup>>(url);
             foreach (var gg in page?.Value ?? new())
             {
-                var g = await db.EntraGroups.Include(x => x.Members).FirstOrDefaultAsync(x => x.Id == gg.Id);
+                var g = await db.EntraGroups.FirstOrDefaultAsync(x => x.Id == gg.Id);
                 if (g is null) { g = new EntraGroup { Id = gg.Id }; db.EntraGroups.Add(g); }
-                g.DisplayName = gg.DisplayName ?? g.DisplayName; g.Manual = false; g.LastSynced = DateTime.UtcNow.ToString("dd MMM yyyy HH:mm 'UTC'");
-                // Refresh members (users only).
-                await db.TeamMembers.Where(m => m.GroupId == g.Id).ExecuteDeleteAsync();
-                var mUrl = $"https://graph.microsoft.com/v1.0/groups/{gg.Id}/members/microsoft.graph.user?$select=id,displayName,mail,jobTitle&$top=100";
-                while (mUrl is not null)
+                g.DisplayName = gg.DisplayName ?? g.DisplayName; g.Manual = false; g.LastSynced = stamp;
+                discovered++;
+            }
+            await db.SaveChangesAsync();
+            url = page?.NextLink;
+        }
+
+        // 2. Members only for mapped groups. One failing group doesn't abort the run.
+        var mapped = await db.EntraGroups.Where(g => g.ManagerKey != "").Select(g => g.Id).ToListAsync();
+        foreach (var gid in mapped)
+        {
+            if (DateTime.UtcNow >= deadline) break;
+            try
+            {
+                await db.TeamMembers.Where(m => m.GroupId == gid).ExecuteDeleteAsync();
+                var mUrl = $"https://graph.microsoft.com/v1.0/groups/{gid}/members/microsoft.graph.user?$select=id,displayName,mail,jobTitle&$top=999";
+                while (mUrl is not null && DateTime.UtcNow < deadline)
                 {
                     var mp = await http.GetFromJsonAsync<GraphList<GraphUser>>(mUrl);
                     foreach (var u in mp?.Value ?? new())
-                        g.Members.Add(new TeamMemberRow { GroupId = g.Id, DisplayName = u.DisplayName ?? "(unknown)", Email = u.Mail ?? "", JobTitle = u.JobTitle ?? "" });
+                        db.TeamMembers.Add(new TeamMemberRow { GroupId = gid, DisplayName = u.DisplayName ?? "(unknown)", Email = u.Mail ?? "", JobTitle = u.JobTitle ?? "" });
                     mUrl = mp?.NextLink;
                 }
-                count++;
+                await db.SaveChangesAsync();
             }
-            url = page?.NextLink;
+            catch (Exception ex) { _log?.LogWarning(ex, "Graph member sync failed for group {GroupId}: {Message}", gid, ex.Message); }
         }
-        return count;
+        return discovered;
     }
+
+    static ILogger? _log;
+    public static void UseLogger(ILoggerFactory f) => _log = f.CreateLogger("Atlas.Teams");
 
     public static async Task<string> GraphTokenAsync(HttpClient http, IConfiguration cfg)
     {
