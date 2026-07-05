@@ -58,6 +58,9 @@ using (var scope = app.Services.CreateScope())
         await Rbac.SeedAsync(db);
         // Add capabilities introduced after the initial seed (idempotent).
         await Rbac.ReconcileAsync(db);
+        // Help centre content is reference data — seed the curated baseline and
+        // ensure the troubleshooting categories exist (idempotent).
+        await Help.SeedAsync(db);
         if (cfg.GetValue("Seed:Enabled", false))
         {
             await Seed.RunAsync(db);

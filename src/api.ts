@@ -19,14 +19,35 @@ function roleHeader(): Record<string, string> {
   }
 }
 
-// Reads a server-provided { error } message from a failed response so callers
-// (e.g. a 403 from the permission matrix) can show why the action was refused.
-async function errorFrom(res: Response): Promise<Error> {
+// A failed API call. Carries the server's friendly message plus, for unexpected
+// (5xx) failures, the correlation code the request logger stamped — so the UI can
+// show it and deep-link to the matching troubleshooting entry.
+export class ApiError extends Error {
+  status: number;
+  errorId?: string;
+  category?: string;
+  constructor(message: string, status: number, errorId?: string, category?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.errorId = errorId;
+    this.category = category;
+  }
+}
+
+// Reads a server-provided { error, errorId, category } from a failed response so
+// callers can show why it failed (a 403 message, or a 5xx with its support code).
+async function errorFrom(res: Response): Promise<ApiError> {
+  let message = `API ${res.status} ${res.statusText}`;
+  let errorId: string | undefined;
+  let category: string | undefined;
   try {
     const body = await res.clone().json();
-    if (body && typeof body.error === "string") return new Error(body.error);
-  } catch { /* not JSON — fall through */ }
-  return new Error(`API ${res.status} ${res.statusText}`);
+    if (body && typeof body.error === "string") message = body.error;
+    if (body && typeof body.errorId === "string") errorId = body.errorId;
+    if (body && typeof body.category === "string") category = body.category;
+  } catch { /* not JSON — keep the status line */ }
+  return new ApiError(message, res.status, errorId, category);
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T | null> {

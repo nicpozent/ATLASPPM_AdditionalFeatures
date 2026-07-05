@@ -94,6 +94,11 @@ public record MyTeamGroupDto(string Id, string DisplayName, List<TeamMemberDto> 
 public record MyTeamManagerDto(string Key, string Label, bool IsSelf, List<MyTeamGroupDto> Groups, int MemberCount);
 public record MyTeamDto(bool IsAdmin, string ManagerKey, string ManagerLabel, List<MyTeamManagerDto> Teams);
 
+// ---- Help centre & troubleshooting -----------------------------------------
+public record HelpArticleDto(int Id, string Kind, string Audience, string Code, string Title, string Summary, string Body, int Ord);
+public record HelpDto(bool CanManage, List<HelpArticleDto> Guides, List<HelpArticleDto> Troubleshooting);
+public record UpsertHelpReq(string Kind, string? Audience, string? Code, string Title, string? Summary, string? Body, int? Ord);
+
 // ---- Notifications, subscriptions & preferences ----------------------------
 public record NotificationDto(int Id, string EventType, string Title, string Body, string TargetType, string TargetId, bool Read, string At);
 public record InboxDto(int UnreadCount, List<NotificationDto> Items);

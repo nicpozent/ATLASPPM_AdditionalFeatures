@@ -651,6 +651,21 @@ public class AdmPhase
     public int Ord { get; set; }
 }
 
+// A Help centre article. Two kinds: "guide" (role-based how-tos, keyed by
+// Audience) and "troubleshooting" (keyed by an error Code prefix, linked from
+// the error UI). Seeded with a curated baseline; Platform Admins can edit it.
+public class HelpArticle
+{
+    public int Id { get; set; }
+    public string Kind { get; set; } = "guide";          // guide | troubleshooting
+    public string Audience { get; set; } = "";            // guide: admin/pmo/pm/team/exec; troubleshooting: ""
+    public string Code { get; set; } = "";                // troubleshooting: NET/AUTH/VAL/SRV/INT; guide: ""
+    public string Title { get; set; } = default!;
+    public string Summary { get; set; } = "";             // troubleshooting: the symptom
+    public string Body { get; set; } = "";                // the how-to / resolution steps
+    public int Ord { get; set; }
+}
+
 // An Architecture Review Board sign-off: one per architecture role, per project.
 // Each is an INDEPENDENT approval — the ARB (not the PMO) owns architectural
 // correctness, so the overall verdict is the roll-up of every role's decision.
