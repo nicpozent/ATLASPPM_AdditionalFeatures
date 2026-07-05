@@ -239,6 +239,25 @@ public static class Rbac
                 changed = true;
             }
         }
+        if (changed) { await db.SaveChangesAsync(); changed = false; }
+
+        // PM Lead — a distinct role that mirrors Project Manager's permissions at
+        // creation (leads a group of PMs). Added here so it lands on existing DBs
+        // too; cloned from pm's current permission set so it inherits every cap.
+        if (!await db.RoleDefs.AnyAsync(r => r.Id == "pmlead") && await db.RoleDefs.AnyAsync(r => r.Id == "pm"))
+        {
+            var maxSort = await db.RoleDefs.MaxAsync(r => (int?)r.Sort) ?? 0;
+            db.RoleDefs.Add(new RoleDef
+            {
+                Id = "pmlead", Name = "PM Lead", Short = "PM Lead", Who = "Delivery",
+                Description = "Leads a group of project managers — same delivery permissions as a Project Manager.",
+                Icon = "folder", Color = "#7A3FB0", Tint = "#F0E8F7", IsSystem = true, Sort = maxSort + 1,
+            });
+            var pmPerms = await db.RolePermissions.Where(p => p.RoleId == "pm").ToListAsync();
+            foreach (var p in pmPerms)
+                db.RolePermissions.Add(new RolePermission { RoleId = "pmlead", CapabilityKey = p.CapabilityKey, Level = p.Level });
+            changed = true;
+        }
         if (changed) await db.SaveChangesAsync();
     }
 }

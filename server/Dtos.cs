@@ -81,6 +81,16 @@ public record VacationsDto(bool CanEdit, List<AbsenceDto> Absences);
 public record CommEntryDto(int Id, string Stakeholder, string Channel, string CommType, string Schedule, string Owner, string Notes);
 public record CommPlanDto(bool CanEdit, List<CommEntryDto> Entries);
 
+// ---- Teams (Entra groups → manager slots, roll-up hierarchy) ---------------
+public record TeamMemberDto(int Id, string DisplayName, string Email, string JobTitle);
+public record TeamGroupDto(string Id, string DisplayName, string ManagerKey, bool Manual, string LastSynced, int MemberCount);
+public record TeamManagerDto(string Key, string Label, string ParentKey, List<string> GroupIds, int MemberCount);
+public record TeamsAdminDto(bool CanManage, bool GraphConfigured, List<TeamManagerDto> Managers, List<TeamGroupDto> Groups);
+// My Team roll-up: one entry per manager in scope, with that manager's members.
+public record MyTeamGroupDto(string Id, string DisplayName, List<TeamMemberDto> Members);
+public record MyTeamManagerDto(string Key, string Label, bool IsSelf, List<MyTeamGroupDto> Groups, int MemberCount);
+public record MyTeamDto(bool IsAdmin, string ManagerKey, string ManagerLabel, List<MyTeamManagerDto> Teams);
+
 // ---- Timeline / Gantt ------------------------------------------------------
 public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);
 public record MilestoneDto(int Id, string Label, int Month, string Date);

@@ -1,67 +1,88 @@
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
-import { Card, EmptyBlock, Button, Input, Select } from "@/components/ui";
+import { api } from "@/api";
+import { Card, EmptyBlock } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 // ---------------------------------------------------------------------------
-// My Team — built 1:1 from the prototype (design/Atlas PPM.dc.html, lines
-// 2853-2909). Members and their skill levels sync from Entra ID / groups
-// (data), so the skills matrix and vacation calendar render their real
-// structure with empty states until members load.
+// My Team — members come from Entra groups mapped to a manager slot in Admin →
+// Teams. A manager sees their own team plus every team beneath them in the
+// roll-up tree; the Platform Admin sees all mapped teams. Skills/allocation are
+// enriched elsewhere; here we show the roster cleanly.
 // ---------------------------------------------------------------------------
+interface Member { id: number; displayName: string; email: string; jobTitle: string; }
+interface Group { id: string; displayName: string; members: Member[]; }
+interface ManagerTeam { key: string; label: string; isSelf: boolean; groups: Group[]; memberCount: number; }
+interface MyTeam { isAdmin: boolean; managerKey: string; managerLabel: string; teams: ManagerTeam[]; }
+
+const AVATAR_COLORS = ["#0F6CBD", "#7A3FB0", "#0E7C7B", "#C98A00", "#15A34A", "#A1282B"];
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+const avatarColor = (name: string) => AVATAR_COLORS[[...name].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export default function Teams() {
-  const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const { data } = useQuery({
+    queryKey: ["myteam"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<MyTeam> => (await api<MyTeam>("/myteam")) ?? { isAdmin: false, managerKey: "", managerLabel: "", teams: [] },
+  });
+  const teams = data?.teams ?? [];
+  const totalMembers = teams.reduce((s, t) => s + t.memberCount, 0);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ fontSize: 13.5, color: color.subtle, marginBottom: 16 }}>
-        Your team — members from Entra ID / groups. Edit skill levels (0–4) for your people; changes are audited.
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13.5, color: color.subtle, flex: 1 }}>
+          {data?.isAdmin
+            ? "All teams, grouped by manager. Members sync from the Entra groups mapped in Administration → Teams."
+            : data?.managerLabel
+              ? <>Your team{teams.some((t) => !t.isSelf) ? " and the teams that roll up to you" : ""} — synced from Entra groups.</>
+              : "Members sync from Entra groups mapped to a manager. Ask a Platform Admin to map your groups in Administration → Teams."}
+        </div>
+        {totalMembers > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: color.textMuted, background: color.bg, borderRadius: 20, padding: "5px 12px" }}>{totalMembers} member{totalMembers === 1 ? "" : "s"}</span>}
       </div>
 
-      {/* skills matrix */}
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", minWidth: 760, padding: "14px 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.03em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-            <div>Member</div>
-            <div style={{ textAlign: "center" }}>Skill levels (0–4)</div>
-          </div>
-          <EmptyBlock message="No team members yet — members sync from Entra ID / groups." />
+      {teams.length === 0 ? (
+        <Card><EmptyBlock minHeight={200} message="No team members yet — a Platform Admin maps Entra groups to managers in Administration → Teams." /></Card>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {teams.map((t) => (
+            <Card key={t.key} padding={0} style={{ overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="users" size={18} /></span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 600, color: color.navy }}>{t.label}</span>
+                    {t.isSelf && <span style={{ fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>}
+                    {!t.isSelf && !data?.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Reports to you</span>}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: color.faint3 }}>{t.memberCount} member{t.memberCount === 1 ? "" : "s"} · {t.groups.length} group{t.groups.length === 1 ? "" : "s"}</div>
+                </div>
+              </div>
+              {t.memberCount === 0 ? (
+                <EmptyBlock minHeight={80} message="No members in this team's Entra groups yet." />
+              ) : (
+                <div style={{ padding: "8px 12px" }}>
+                  {t.groups.map((g) => (
+                    <div key={g.id} style={{ padding: "8px 10px" }}>
+                      {t.groups.length > 1 && <div style={{ fontSize: 11, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 10px" }}>{g.displayName}</div>}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
+                        {g.members.map((m) => (
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 11, border: `1px solid ${color.border}`, borderRadius: 12, padding: "10px 12px" }}>
+                            <span style={{ width: 34, height: 34, borderRadius: "50%", background: avatarColor(m.displayName), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flex: "none" }}>{initials(m.displayName)}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.displayName}</div>
+                              <div style={{ fontSize: 11.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.jobTitle || m.email || "—"}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
-        <div style={{ display: "flex", gap: 14, padding: "13px 22px", flexWrap: "wrap", borderTop: `1px solid ${color.bg}` }}>
-          <span style={{ fontSize: 11, color: color.faint3 }}>Scale:</span>
-          <span style={{ fontSize: 11, color: "#566077" }}>0 None · 1–2 Working · 3 Proficient · 4 Expert</span>
-        </div>
-      </Card>
-
-      {/* vacation calendar */}
-      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, margin: "22px 0 12px" }}>Team vacation calendar</div>
-      <div style={{ fontSize: 12.5, color: color.faint, marginBottom: 12 }}>Jul–Dec 2026 · absences for your team. Plan allocations around these.</div>
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        <EmptyBlock message="No absences recorded yet." />
-      </Card>
-
-      {/* add absence */}
-      <div style={{ background: color.surfaceAlt, border: `1px solid ${color.bg}`, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add an absence</div>
-        <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
-          <Select style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", cursor: "pointer" }}><option value="">Select resource…</option></Select>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", color: color.textMuted }} />
-          <span style={{ fontSize: 12, color: color.faint3 }}>to</span>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", color: color.textMuted }} />
-          <Select style={{ borderRadius: 7, padding: "7px 10px", fontSize: 12.5, width: "auto", cursor: "pointer" }}>
-            <option value="vacation">Vacation</option><option value="sick">Sick</option><option value="training">Training</option>
-          </Select>
-          <Button style={{ fontSize: 12.5, padding: "8px 14px", borderRadius: 7 }}>Add</Button>
-        </div>
-        <div style={{ fontSize: 12, color: color.faint3, marginTop: 12 }}>No absences added yet.</div>
-      </div>
-
-      {/* consolidated calendar */}
-      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, margin: "26px 0 12px" }}>Consolidated vacation calendar</div>
-      <div style={{ fontSize: 12.5, color: color.faint, marginBottom: 12 }}>All resources across the portfolio — visible to PMO & Project Managers.</div>
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        <EmptyBlock message="No absences recorded across the portfolio yet." />
-      </Card>
+      )}
     </div>
   );
 }

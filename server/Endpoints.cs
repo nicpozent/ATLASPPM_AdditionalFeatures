@@ -37,6 +37,7 @@ public static class Endpoints
         api.MapProjectExtraEndpoints();
         api.MapGanttEndpoints();
         api.MapFinancialsEndpoints();
+        api.MapTeamEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
