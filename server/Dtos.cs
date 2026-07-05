@@ -208,7 +208,7 @@ public record ProductDto(string Id, string Name, string Owner, string Source, Li
     string StartDate = "", string EndDate = "", bool CanManage = false,
     string TeamKey = "", string TeamLabel = "", int TeamSize = 0, string Dept = "");
 
-public record KrDto(string Id, string Title, string Link, int Progress, string LinkType = "", string LinkId = "");
+public record KrDto(string Id, string Title, string Link, int Progress, string LinkType = "", string LinkId = "", bool Auto = false);
 public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active",
     string Health = "green", string StartDate = "", string TargetDate = "");
 public record UpdateObjectiveReq(string? Title, string? Owner, string? Horizon, string? StartDate, string? TargetDate, string? Health);

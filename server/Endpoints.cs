@@ -144,12 +144,35 @@ public static class Endpoints
                 x.TeamKey, Teams.SlotLabel(x.TeamKey), x.TeamSize, x.Dept)).ToList());
         });
 
+        // A key result linked to a deliverable measures itself from that deliverable's
+        // real advancement: a project → its % complete; a program/product → the mean
+        // % of the projects under it. Unlinked KRs keep their manually-entered value.
         api.MapGet("/okrs", async (AtlasDbContext db) =>
-            await db.Objectives.OrderBy(o => o.Id)
-                .Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
-                    o.Krs.OrderBy(k => k.Id).Select(k => new KrDto(k.Id, k.Title, k.Link, k.Progress, k.LinkType, k.LinkId)).ToList(), o.Status,
-                    o.Health, o.StartDate, o.TargetDate))
-                .ToListAsync());
+        {
+            var objectives = await db.Objectives.OrderBy(o => o.Id).Include(o => o.Krs).ToListAsync();
+            var projProgress = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Progress);
+            var programProjects = await db.Programs.ToDictionaryAsync(p => p.Id, p => p.Projects);
+            var productProjects = await db.Products.ToDictionaryAsync(p => p.Id, p => p.Projects);
+
+            int? Avg(List<string>? ids) =>
+                ids is { Count: > 0 } && ids.Any(projProgress.ContainsKey)
+                    ? (int)Math.Round(ids.Where(projProgress.ContainsKey).Select(i => projProgress[i]).Average())
+                    : null;
+            int? Derive(string type, string id) => type switch
+            {
+                "project" => projProgress.TryGetValue(id, out var v) ? v : null,
+                "program" => programProjects.TryGetValue(id, out var pr) ? Avg(pr) : null,
+                "product" => productProjects.TryGetValue(id, out var pd) ? Avg(pd) : null,
+                _ => null,
+            };
+
+            return objectives.Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
+                o.Krs.OrderBy(k => k.Id).Select(k =>
+                {
+                    var derived = k.LinkType.Length > 0 ? Derive(k.LinkType, k.LinkId) : null;
+                    return new KrDto(k.Id, k.Title, k.Link, derived ?? k.Progress, k.LinkType, k.LinkId, derived is not null);
+                }).ToList(), o.Status, o.Health, o.StartDate, o.TargetDate)).ToList();
+        });
 
         api.MapGet("/resources", async (AtlasDbContext db) =>
             await db.Resources.OrderBy(r => r.Id).Select(r => new ResourceDto(
