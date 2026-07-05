@@ -613,6 +613,22 @@ public class TaskComment
     public DateTime At { get; set; }
 }
 
+// A sprint (iteration) on an agile-with-sprints project. Tasks are matched to a
+// sprint by name (ProjectTask.Sprint == Sprint.Name); metrics are derived from
+// those tasks at read time, so the entity itself only carries the plan.
+public class Sprint
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = default!;         // "PI2 · S5"
+    public string Goal { get; set; } = "";
+    public string StartDate { get; set; } = "";           // ISO date
+    public string EndDate { get; set; } = "";             // ISO date
+    public string Status { get; set; } = "Planned";       // Planned | Active | Closed
+    public int CommittedPoints { get; set; }              // manual commitment; 0 ⇒ derive from tasks
+    public int Ord { get; set; }
+}
+
 // ---- Financial cost lines (role-owned) ------------------------------------
 // Each project carries a standard set of cost lines; a line is editable only by
 // the roles that own it (plus PMO/Admin). Amounts are stored in whole euros.
