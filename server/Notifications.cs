@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api;
 
@@ -14,6 +15,11 @@ namespace Atlas.Api;
 // ============================================================================
 public static class Notifications
 {
+    // Operational logger — set once at startup so the static emit path can report
+    // email failures / degradation. Defaults to a no-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.Notifications");
+
     // Event types and their human labels (used by the prefs UI and inbox).
     public const string Risk = "risk", DateSlip = "date_slip", Status = "status_change",
         Approval = "approval", Created = "created";
@@ -97,7 +103,15 @@ public static class Notifications
     // ---- Email via Graph Mail.Send (best-effort) --------------------------
     static async Task SendEmailsAsync(IConfiguration cfg, List<string> recipients, string subject, string body)
     {
-        if (recipients.Count == 0 || !MailConfigured(cfg)) return;
+        if (recipients.Count == 0) return;
+        if (!MailConfigured(cfg))
+        {
+            // Expected before Mail.Send is set up — Debug, not a warning, since the
+            // in-app copy is already delivered. Surfaces "why no email?" when tracing.
+            _log.LogDebug("Email skipped for {Count} recipient(s) on “{Subject}”: Graph Mail.Send not configured (set Graph:* and Notifications:SenderUpn).", recipients.Count, subject);
+            return;
+        }
+        var count = recipients.Distinct().Count();
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -114,10 +128,26 @@ public static class Notifications
                 },
                 saveToSentItems = false,
             };
-            await http.PostAsJsonAsync($"https://graph.microsoft.com/v1.0/users/{sender}/sendMail", payload);
+            var res = await http.PostAsJsonAsync($"https://graph.microsoft.com/v1.0/users/{sender}/sendMail", payload);
+            if (res.IsSuccessStatusCode)
+                _log.LogInformation("Notification email sent to {Count} recipient(s) for “{Subject}”.", count, subject);
+            else
+            {
+                // Graph returned an error (bad consent, unknown sender, throttling…).
+                // Log the status + body so the misconfiguration is diagnosable; the
+                // in-app copy is already persisted, so we degrade rather than fail.
+                var detail = await res.Content.ReadAsStringAsync();
+                _log.LogWarning("Notification email to {Count} recipient(s) for “{Subject}” failed: Graph returned {Status}. {Detail}", count, subject, (int)res.StatusCode, Trim(detail));
+            }
         }
-        catch { /* best-effort: in-app copy already persisted */ }
+        catch (Exception ex)
+        {
+            // Network/token failure. In-app delivery already succeeded; log for support.
+            _log.LogWarning(ex, "Notification email to {Count} recipient(s) for “{Subject}” failed: {Message}", count, subject, ex.Message);
+        }
     }
+
+    static string Trim(string s) => string.IsNullOrEmpty(s) ? "" : (s.Length > 400 ? s[..400] + "…" : s);
 
     // Resolve a user's effective preference (stored or default) for the UI.
     public static (bool InApp, bool Email) Effective(NotificationPref? stored, string ev) =>
