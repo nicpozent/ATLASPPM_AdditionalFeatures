@@ -449,6 +449,22 @@ public static class WriteEndpoints
                 p.Status, p.StartDate, p.EndDate, true, p.TeamKey, Teams.SlotLabel(p.TeamKey), 0));
         });
 
+        // Update a product's linked projects/releases and its start/end dates.
+        // Only supplied fields change. Requires Edit on Products.
+        api.MapPatch("/products/{id}", async (string id, UpdateProductReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-products", "E") is { } denied) return denied;
+            var p = await db.Products.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            if (req.Projects is not null) p.Projects = req.Projects.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().ToList();
+            if (req.Releases is not null) p.Releases = req.Releases.Select(x => x.Trim()).Where(x => x.Length > 0).Distinct().ToList();
+            if (req.StartDate is not null) p.StartDate = req.StartDate.Trim();
+            if (req.EndDate is not null) p.EndDate = req.EndDate.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Updated product", $"{p.Id} · {p.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         // ---- Releases ------------------------------------------------------
         api.MapPost("/releases", async (CreateReleaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {

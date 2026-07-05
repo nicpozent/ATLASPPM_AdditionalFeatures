@@ -18,6 +18,7 @@ interface Product {
   startDate?: string; endDate?: string; canManage?: boolean;
   teamKey?: string; teamLabel?: string; teamSize?: number;
 }
+interface RelOpt { id: string; name: string; date: string; status: string }
 interface TeamOption { key: string; label: string }
 interface Allocation { id: number; name: string; email: string; title: string; teamKey: string; teamLabel: string; alloc: number }
 interface Assignable { name: string; email: string; jobTitle: string; teamKey: string; teamLabel: string }
@@ -211,6 +212,19 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
     mutationFn: (status: string) => api(`/products/${product.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
+  const updateProduct = useMutation({
+    mutationFn: (body: Partial<{ projects: string[]; releases: string[]; startDate: string; endDate: string }>) =>
+      api(`/products/${product.id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+  });
+  const { data: allProjects = [] } = useQuery({
+    queryKey: ["products-projopts"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<{ id: string; name: string }[]> => { try { return (await api<{ id: string; name: string }[]>("/projects")) ?? []; } catch { return []; } },
+  });
+  const { data: allReleases = [] } = useQuery({
+    queryKey: ["products-relopts"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<RelOpt[]> => { try { return (await api<RelOpt[]>("/releases")) ?? []; } catch { return []; } },
+  });
   const [tasks, setTasks] = useState<Task[]>(product.tasks);
   const relOpts = useMemo(() => {
     const set = new Set<string>(product.releases ?? []);
@@ -252,16 +266,39 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
       {/* linked projects */}
       <div style={sectionCard}>
         <div style={sectionTitle}>Linked projects</div>
-        <div style={{ padding: "0 22px 16px", fontSize: 13, color: color.faint3 }}>
-          {product.projects.length ? product.projects.join(" · ") : "No projects linked to this product yet."}
+        <div style={{ padding: "0 22px 16px" }}>
+          <LinkManager
+            kind="project"
+            linked={product.projects}
+            options={allProjects.map((p) => ({ id: p.id, label: `${p.id} · ${p.name}` }))}
+            canManage={mayManage}
+            onChange={(projects) => updateProduct.mutate({ projects })}
+          />
         </div>
       </div>
 
-      {/* release timeline */}
+      {/* linked releases */}
       <div style={sectionCard}>
-        <div style={sectionTitle}>Product release timeline</div>
-        <div style={{ padding: "0 22px 20px", minHeight: 80, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No releases scheduled yet.</div>
+        <div style={sectionTitle}>Linked releases</div>
+        <div style={{ padding: "0 22px 16px" }}>
+          <LinkManager
+            kind="release"
+            linked={product.releases ?? []}
+            options={allReleases.map((r) => ({ id: r.id, label: `${r.name}${r.date ? ` · ${r.date}` : ""}` }))}
+            canManage={mayManage}
+            onChange={(releases) => updateProduct.mutate({ releases })}
+          />
+        </div>
       </div>
+
+      {/* product timeline */}
+      <ProductTimeline
+        startDate={product.startDate ?? ""}
+        endDate={product.endDate ?? ""}
+        releases={(product.releases ?? []).map((id) => allReleases.find((r) => r.id === id)).filter(Boolean) as RelOpt[]}
+        canManage={mayManage}
+        onDates={(startDate, endDate) => updateProduct.mutate({ startDate, endDate })}
+      />
 
       {/* team & allocation — members come from the Entra teams mapped in Admin → Teams */}
       <ProductTeamSection productId={product.id} />
@@ -305,6 +342,92 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         <div style={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No absences recorded.</div>
       </div>
       {costsOpen && <CostsModal scope="products" id={product.id} name={product.name} onClose={() => setCostsOpen(false)} />}
+    </div>
+  );
+}
+
+// Manage a list of linked entity IDs — chips with remove + an add dropdown.
+function LinkManager({ kind, linked, options, canManage, onChange }: {
+  kind: "project" | "release"; linked: string[]; options: { id: string; label: string }[];
+  canManage: boolean; onChange: (ids: string[]) => void;
+}) {
+  const [pick, setPick] = useState("");
+  const labelOf = (id: string) => options.find((o) => o.id === id)?.label ?? id;
+  const available = options.filter((o) => !linked.includes(o.id));
+  return (
+    <>
+      {linked.length === 0 ? (
+        <div style={{ fontSize: 13, color: color.faint3, padding: "2px 0 10px" }}>No {kind}s linked to this product yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: canManage ? 12 : 0 }}>
+          {linked.map((id) => (
+            <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 8, padding: "5px 10px", fontSize: 12.5, color: color.text }}>
+              {labelOf(id)}
+              {canManage && <button onClick={() => onChange(linked.filter((x) => x !== id))} title={`Unlink ${kind}`} style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 0 }}><Icon name="x" size={13} /></button>}
+            </span>
+          ))}
+        </div>
+      )}
+      {canManage && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <Select value={pick} onChange={(e) => setPick(e.target.value)} style={{ flex: 1 }}>
+            <option value="">{available.length ? `Link a ${kind}…` : `All ${kind}s already linked`}</option>
+            {available.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </Select>
+          <Button variant="secondary" onClick={() => { if (pick) { onChange([...linked, pick]); setPick(""); } }} disabled={!pick}><Icon name="link" size={15} /> Link</Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+const toIso = (display: string) => { const t = Date.parse(display); return isNaN(t) ? "" : new Date(t).toISOString().slice(0, 10); };
+
+// Product timeline — a start→end span with linked releases plotted as milestones.
+function ProductTimeline({ startDate, endDate, releases, canManage, onDates }: {
+  startDate: string; endDate: string; releases: RelOpt[]; canManage: boolean; onDates: (start: string, end: string) => void;
+}) {
+  const s = Date.parse(startDate), e = Date.parse(endDate);
+  const hasSpan = !isNaN(s) && !isNaN(e) && e > s;
+  const dated = releases.map((r) => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => (isNaN(a.t) ? 0 : a.t) - (isNaN(b.t) ? 0 : b.t));
+  const card: React.CSSProperties = { background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 22px 13px" }}>
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, flex: 1 }}>Product timeline</div>
+        {canManage && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: color.faint3 }}>
+            <input type="date" value={toIso(startDate)} title="Start" onChange={(e2) => onDates(prdToDisplay(e2.target.value), endDate)}
+              style={{ border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 7px", fontSize: 12, fontFamily: font.mono, color: color.text }} />
+            <span>→</span>
+            <input type="date" value={toIso(endDate)} title="End" onChange={(e2) => onDates(startDate, prdToDisplay(e2.target.value))}
+              style={{ border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 7px", fontSize: 12, fontFamily: font.mono, color: color.text }} />
+          </div>
+        )}
+      </div>
+      <div style={{ padding: "0 22px 22px" }}>
+        {!hasSpan ? (
+          <div style={{ fontSize: 13, color: color.faint3 }}>{startDate || endDate ? "Set a start and end date to plot the timeline." : "No start/end dates set yet."}{dated.length > 0 && ` ${dated.length} linked release${dated.length === 1 ? "" : "s"}.`}</div>
+        ) : (
+          <div style={{ position: "relative", margin: "26px 8px 8px" }}>
+            <div style={{ height: 6, background: color.bg, borderRadius: 3 }}>
+              <div style={{ height: "100%", background: "#DCE6F5", borderRadius: 3 }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7, fontSize: 11, color: color.faint3, fontFamily: font.mono }}>
+              <span>{startDate}</span><span>{endDate}</span>
+            </div>
+            {dated.map((r) => {
+              const pct = isNaN(r.t) ? 50 : Math.max(0, Math.min(100, ((r.t - s) / (e - s)) * 100));
+              return (
+                <div key={r.id} title={`${r.name}${r.date ? ` · ${r.date}` : ""}`} style={{ position: "absolute", top: -20, left: `${pct}%`, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: color.primary, whiteSpace: "nowrap" }}>{r.name}</span>
+                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: color.primary, border: "2px solid #fff", boxShadow: "0 0 0 1px " + color.primary, marginTop: 2 }} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
