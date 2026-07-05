@@ -46,10 +46,10 @@ public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<Securit
 
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
     string Status, string Sprint, string Baseline, string Priority);
-public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks);
+public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
 
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
-public record EpicsDto(bool CanEdit, List<EpicDto> Epics);
+public record EpicsDto(bool CanEdit, List<EpicDto> Epics, bool CanCreate = false);
 
 public record ArtifactVersionDto(int Id, int Version, string FileName, long Size, string UploadedAt);
 public record ArtifactDto(int Id, string Name, string Type, string Owner, string Status, List<ArtifactVersionDto> Versions);
@@ -84,7 +84,8 @@ public record CommPlanDto(bool CanEdit, List<CommEntryDto> Entries);
 // ---- Timeline / Gantt ------------------------------------------------------
 public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);
 public record MilestoneDto(int Id, string Label, int Month, string Date);
-public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones);
+public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones,
+    int? ProjectStart = null, int? ProjectEnd = null, string StartDate = "", string EndDate = "");
 public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<PhaseDto> Phases);
 public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> Milestones);
 

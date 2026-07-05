@@ -12,7 +12,7 @@ type ViewId = (typeof VIEW_TABS)[number][0];
 
 interface Phase { id: number; name: string; startMonth: number; endMonth: number; progress: number; }
 interface Milestone { id: number; label: string; month: number; date: string; }
-interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; }
+interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; projectStart?: number | null; projectEnd?: number | null; startDate?: string; endDate?: string; }
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
@@ -128,6 +128,8 @@ export default function Gantt() {
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
             : <ProjectSchedule
                 phases={gantt?.phases ?? []} milestones={milestones} canEdit={canEdit} hasProject={!!activeProjectId}
+                projectStart={gantt?.projectStart ?? null} projectEnd={gantt?.projectEnd ?? null}
+                startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""}
                 onAddPhase={() => setAddPhase(true)} onEditPhase={setEditPhase} onRemovePhase={(id) => removePhase.mutate(id)}
                 onAddMilestone={() => setAddMs(true)} onRemoveMilestone={(id) => removeMilestone.mutate(id)}
               />
@@ -187,12 +189,16 @@ function NowLine() {
 }
 
 // ---- Project schedule ------------------------------------------------------
-function ProjectSchedule({ phases, milestones, canEdit, hasProject, onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
+function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
+  projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string;
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
 }) {
   const rowsHeight = Math.max(200, phases.length * 38);
+  const hasWindow = projectStart != null && projectEnd != null;
+  const winStart = Math.min(projectStart ?? 0, projectEnd ?? 0);
+  const winEnd = Math.max(projectStart ?? 0, projectEnd ?? 0);
   return (
     <div style={{ display: "flex" }}>
       {/* left labels */}
@@ -201,6 +207,12 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, onAddPhase, 
           Phase / Workstream
           {canEdit && <button onClick={onAddPhase} style={addBtn}>+ Add</button>}
         </div>
+        {hasWindow && (
+          <div style={{ height: 34, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: "#FBFCFE" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: color.navy }}>Project window</span>
+            <span style={{ fontSize: 10.5, color: color.faint3 }}>{startDate || "—"} → {endDate || "—"}</span>
+          </div>
+        )}
         {phases.length === 0 ? (
           <div style={{ minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 22px", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
             {hasProject ? "No phases scheduled yet." : "Select a project."}
@@ -227,6 +239,11 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, onAddPhase, 
       {/* right grid */}
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
+        {hasWindow && (
+          <div style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA", background: "#FBFCFE", backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+            <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
+          </div>
+        )}
         <div style={{ position: "relative", minHeight: 200, height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
           <NowLine />
           <div>
