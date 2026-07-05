@@ -17,6 +17,10 @@ namespace Atlas.Tests;
 // permission matrix without a real Entra token.
 public class AtlasApiFactory : WebApplicationFactory<Program>
 {
+    // A distinct in-memory database per factory instance so test classes that
+    // seed rows can't leak state into one another.
+    readonly string _dbName = "atlas-tests-" + Guid.NewGuid().ToString("N");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -37,7 +41,7 @@ public class AtlasApiFactory : WebApplicationFactory<Program>
                 d.ServiceType.Name.StartsWith("IDbContextOptionsConfiguration")).ToList();
             foreach (var d in drop) services.Remove(d);
 
-            services.AddDbContext<AtlasDbContext>(o => o.UseInMemoryDatabase("atlas-authz-tests"));
+            services.AddDbContext<AtlasDbContext>(o => o.UseInMemoryDatabase(_dbName));
         });
     }
 }
