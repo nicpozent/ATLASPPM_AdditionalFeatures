@@ -228,6 +228,7 @@ public class Program
     public int Progress { get; set; }
     public string Health { get; set; } = "green";
     public string StartDate { get; set; } = "";        // display date, program start
+    public string EndDate { get; set; } = "";          // display date, program target/end
     public bool Archived { get; set; }
 }
 
@@ -238,6 +239,8 @@ public class Product
     public string Owner { get; set; } = default!;
     public string Source { get; set; } = "jira";       // jira|ado
     public string Status { get; set; } = "Active";     // Active|Retired|Replaced (products aren't deleted)
+    public string StartDate { get; set; } = "";        // display date
+    public string EndDate { get; set; } = "";          // display date, end-of-life / target
     public List<string> Projects { get; set; } = new();
     public List<string> Releases { get; set; } = new();
     public List<ProductTask> Tasks { get; set; } = new();
@@ -295,6 +298,20 @@ public class Resource
     public int ProjectPct { get; set; }
     public int ProductPct { get; set; }
     public bool Over { get; set; }
+}
+
+// A per-project override of the methodology's default "ways of working". Absent
+// → the project shows the methodology default (see WaysOfWorking.For). Present →
+// the edited cadence/summary/ceremonies/artifacts/roles. Lists are stored as
+// simple serialised text to keep the model flat.
+public class WowOverride
+{
+    public string ProjectId { get; set; } = default!;   // PK
+    public string Cadence { get; set; } = "";
+    public string Summary { get; set; } = "";
+    public string CeremoniesJson { get; set; } = "[]";   // JSON: [{label,detail}]
+    public string Artifacts { get; set; } = "";          // newline-delimited
+    public string Roles { get; set; } = "";              // newline-delimited
 }
 
 // A scheduled delivery phase / workstream on a project's timeline (Gantt).

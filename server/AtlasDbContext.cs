@@ -17,6 +17,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Resource> Resources => Set<Resource>();
     public DbSet<Phase> Phases => Set<Phase>();
     public DbSet<Milestone> Milestones => Set<Milestone>();
+    public DbSet<WowOverride> WowOverrides => Set<WowOverride>();
     public DbSet<CommunicationEntry> CommunicationEntries => Set<CommunicationEntry>();
     public DbSet<Release> Releases => Set<Release>();
     public DbSet<DeliveryReport> DeliveryReports => Set<DeliveryReport>();
@@ -112,6 +113,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Resource>().HasKey(x => x.Id);
         b.Entity<Phase>().HasKey(x => x.Id);
         b.Entity<Milestone>().HasKey(x => x.Id);
+        b.Entity<WowOverride>().HasKey(x => x.ProjectId);
         b.Entity<CommunicationEntry>().HasKey(x => x.Id);
         b.Entity<Release>().HasKey(x => x.Id);
         b.Entity<Release>().Property(x => x.Id).ValueGeneratedNever();

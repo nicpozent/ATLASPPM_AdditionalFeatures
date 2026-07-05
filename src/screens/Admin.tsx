@@ -5,6 +5,7 @@ import { api, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { toast } from "@/components/Toast";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -503,8 +504,15 @@ function BackupsSection() {
   });
   const d = data ?? { canManage: false, autoBackups: true, lastBackup: "Never", lastSizeBytes: 0, components: [], runs: [] };
   const runBackup = useMutation({
-    mutationFn: () => api("/backups/run", { method: "POST" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["backups"] }); apiDownload("/backups/snapshot.json", "atlas-backup.json"); },
+    mutationFn: () => api<{ size?: string; records?: number }>("/backups/run", { method: "POST" }),
+    onSuccess: async (res) => {
+      qc.invalidateQueries({ queryKey: ["backups"] });
+      const detail = res?.records != null ? ` — ${res.records.toLocaleString()} records${res.size ? `, ${res.size}` : ""}` : "";
+      toast(`Backup complete${detail}. Downloading snapshot…`, "info");
+      try { await apiDownload("/backups/snapshot.json", "atlas-backup.json"); }
+      catch (e) { toast(`Backup ran, but the download failed: ${(e as Error).message}`, "error"); }
+    },
+    onError: (e) => toast(`Backup failed: ${(e as Error).message}`, "error"),
   });
   const toggleAuto = useMutation({
     mutationFn: (on: boolean) => api("/settings/backups.auto", { method: "PATCH", body: JSON.stringify({ value: on ? "true" : "false" }) }),

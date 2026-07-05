@@ -54,6 +54,8 @@ using (var scope = app.Services.CreateScope())
         // Roles & capabilities are structural reference data (the permission matrix
         // chrome) — always seeded, idempotent, independent of the demo portfolio.
         await Rbac.SeedAsync(db);
+        // Add capabilities introduced after the initial seed (idempotent).
+        await Rbac.ReconcileAsync(db);
         if (cfg.GetValue("Seed:Enabled", false))
         {
             await Seed.RunAsync(db);

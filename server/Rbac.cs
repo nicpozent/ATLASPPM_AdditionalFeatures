@@ -197,4 +197,48 @@ public static class Rbac
         }
         await db.SaveChangesAsync();
     }
+
+    // ---- Capability reconcile (idempotent, runs every startup) -------------
+    // Adds capabilities introduced after the initial seed to BOTH fresh and
+    // already-seeded databases, plus a sensible default level per existing role.
+    // Only inserts what's missing, so it's safe to run on every boot and never
+    // overwrites an admin's edits.
+    public static async Task ReconcileAsync(AtlasDbContext db)
+    {
+        // New assignable rights. Sort continues after the 16 seeded capabilities.
+        var extra = new (string Key, string Label, int Sort)[]
+        {
+            ("cap-okrs",     "OKRs",             16),
+            ("cap-products", "Products",         17),
+            ("cap-ways",     "Ways of working",  18),
+            ("cap-schedule", "Project schedule", 19),
+        };
+        // Default level per role id for each new capability (absent role → "N").
+        var defaults = new Dictionary<string, Dictionary<string, string>>
+        {
+            ["cap-okrs"]     = new() { ["admin"] = "F", ["pmo"] = "F" },
+            ["cap-products"] = new() { ["admin"] = "F", ["pmo"] = "F" },
+            ["cap-ways"]     = new() { ["admin"] = "F", ["pmo"] = "F" },
+            ["cap-schedule"] = new() { ["admin"] = "F", ["pmo"] = "F", ["pm"] = "F" },
+        };
+
+        var existingCaps = (await db.Capabilities.Select(c => c.Key).ToListAsync()).ToHashSet();
+        var roleIds = await db.RoleDefs.Select(r => r.Id).ToListAsync();
+        var perms = await db.RolePermissions.Select(p => new { p.RoleId, p.CapabilityKey }).ToListAsync();
+        var have = perms.Select(p => (p.RoleId, p.CapabilityKey)).ToHashSet();
+        var changed = false;
+
+        foreach (var (key, label, sort) in extra)
+        {
+            if (!existingCaps.Contains(key)) { db.Capabilities.Add(new Capability { Key = key, Label = label, Sort = sort }); changed = true; }
+            foreach (var rid in roleIds)
+            {
+                if (have.Contains((rid, key))) continue;
+                var level = defaults.TryGetValue(key, out var m) && m.TryGetValue(rid, out var l) ? l : "N";
+                db.RolePermissions.Add(new RolePermission { RoleId = rid, CapabilityKey = key, Level = level });
+                changed = true;
+            }
+        }
+        if (changed) await db.SaveChangesAsync();
+    }
 }

@@ -14,7 +14,10 @@ interface Member { name: string; alloc: number }
 interface Product {
   id: string; name: string; owner: string; source: Source; projects: string[];
   tasks: Task[]; members?: Member[]; releases?: string[]; status?: string;
+  startDate?: string; endDate?: string; canManage?: boolean;
 }
+const PRD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const prdToDisplay = (iso: string): string => { if (!iso) return ""; const [y, m, dd] = iso.split("-").map(Number); return y && m && dd ? `${dd} ${PRD_MONTHS[m - 1]} ${y}` : ""; };
 type ProductStatus = "Active" | "Retired" | "Replaced";
 const PRODUCT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
   Active: { ink: "#0B6B37", tint: "#E7F4EC" }, Retired: { ink: "#566077", tint: "#EEF0F4" }, Replaced: { ink: "#8A6300", tint: "#FBF2D7" },
@@ -42,13 +45,13 @@ function useProducts() {
 
 const pct = (done: number, total: number) => (total > 0 ? Math.round((done / total) * 100) : 0);
 
-interface NewProduct { name: string; owner: string; source: Source; projects: string[] }
+interface NewProduct { name: string; owner: string; source: Source; projects: string[]; startDate: string; endDate: string }
 
 export default function Products() {
   const { data: products = [] } = useProducts();
   const qc = useQueryClient();
   const { can } = usePermissions();
-  const mayCreate = can("cap-projects", "F");
+  const mayCreate = can("cap-products", "F");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
   const [pstatus, setPstatus] = useState<ProductStatus>("Active");
@@ -134,11 +137,14 @@ function NewProductModal({ onClose, onCreate, submitting }: {
   const [owner, setOwner] = useState("");
   const [source, setSource] = useState<Source>("manual");
   const [projects, setProjects] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const submit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(), owner: owner.trim(), source,
       projects: projects.split(",").map((s) => s.trim()).filter(Boolean),
+      startDate: prdToDisplay(startDate), endDate: prdToDisplay(endDate),
     });
   };
   return (
@@ -155,6 +161,10 @@ function NewProductModal({ onClose, onCreate, submitting }: {
         <option value="jira">Jira</option>
         <option value="ado">Azure DevOps</option>
       </Select>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div><Lbl>Start date</Lbl><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+        <div><Lbl>End date</Lbl><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+      </div>
       <Lbl>Linked projects (comma-separated)</Lbl>
       <Input value={projects} onChange={(e) => setProjects(e.target.value)} placeholder="PRJ-204, PRJ-176" />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -169,7 +179,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
   const src = SOURCE_META[product.source];
   const qc = useQueryClient();
   const { can } = usePermissions();
-  const mayManage = can("cap-projects", "E");
+  const mayManage = product.canManage ?? can("cap-products", "E");
   const [costsOpen, setCostsOpen] = useState(false);
   const setStatus = useMutation({
     mutationFn: (status: string) => api(`/products/${product.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
@@ -197,7 +207,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
           <span style={boxBadge(44)}><Icon name="box" size={22} /></span>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: font.head, fontSize: 20, fontWeight: 600, color: color.navy }}>{product.name}</div>
-            <div style={{ fontSize: 12.5, color: color.faint2 }}>Owner {product.owner} · Projects: {product.projects.join(", ") || "—"}</div>
+            <div style={{ fontSize: 12.5, color: color.faint2 }}>Owner {product.owner} · Projects: {product.projects.join(", ") || "—"}{product.startDate ? ` · ${product.startDate}${product.endDate ? ` → ${product.endDate}` : ""}` : ""}</div>
           </div>
           <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#fff", background: src.c, padding: "6px 12px", borderRadius: 8 }}><Icon name={product.source === "manual" ? "edit" : "sync"} size={16} /> {product.source === "manual" ? "Manually created" : `Synced from ${src.label}`}</span>
           {(() => { const c = PRODUCT_STATUS_COLOR[product.status ?? "Active"] ?? PRODUCT_STATUS_COLOR.Active; return (

@@ -18,8 +18,8 @@ public record CreateProjectReq(string Name, string? Dept, string? Owner, string?
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
     string? StartDate);
-public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate);
-public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects);
+public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate);
+public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
 public record CreateKrReq(string Title, string? Link, int? Progress);
@@ -330,6 +330,7 @@ public static class WriteEndpoints
             await db.CommunicationEntries.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.Phases.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             await db.Milestones.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
+            await db.WowOverrides.Where(x => x.ProjectId == id).ExecuteDeleteAsync();
             db.Projects.Remove(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Deleted project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
@@ -352,12 +353,13 @@ public static class WriteEndpoints
                 Projects = req.Projects ?? new(),
                 Health = "green",
                 StartDate = req.StartDate?.Trim() ?? "",
+                EndDate = req.EndDate?.Trim() ?? "",
             };
             db.Programs.Add(pg);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
-                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived));
+                pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived, pg.EndDate));
         });
 
         // Archive / restore a program (soft delete — kept, just hidden from the
@@ -397,7 +399,7 @@ public static class WriteEndpoints
         // ---- Products ------------------------------------------------------
         api.MapPost("/products", async (CreateProductReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-products", "F") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var p = new Product
             {
@@ -406,13 +408,16 @@ public static class WriteEndpoints
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
                 // Manually-created products are tagged "manual", not a tracker.
                 Source = req.Source is "ado" or "jira" ? req.Source! : "manual",
+                StartDate = req.StartDate?.Trim() ?? "",
+                EndDate = req.EndDate?.Trim() ?? "",
                 Projects = req.Projects ?? new(),
             };
             db.Products.Add(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Created product", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
-                p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>()));
+                p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>(),
+                p.Status, p.StartDate, p.EndDate, true));
         });
 
         // ---- Releases ------------------------------------------------------
@@ -476,7 +481,7 @@ public static class WriteEndpoints
         // ---- OKRs ----------------------------------------------------------
         api.MapPost("/okrs", async (CreateObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var o = new Objective
             {
@@ -494,7 +499,7 @@ public static class WriteEndpoints
 
         api.MapPost("/okrs/{id}/krs", async (string id, CreateKrReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var obj = await db.Objectives.FindAsync(id);
             if (obj is null) return Results.NotFound();
@@ -514,7 +519,7 @@ public static class WriteEndpoints
 
         api.MapPatch("/krs/{id}", async (string id, UpdateKrProgressReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
             var kr = await db.KeyResults.FindAsync(id);
             if (kr is null) return Results.NotFound();
             kr.Progress = Math.Clamp(req.Progress, 0, 100);
@@ -526,7 +531,7 @@ public static class WriteEndpoints
         // "Create / edit projects".
         api.MapDelete("/okrs/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "F") is { } denied) return denied;
             var o = await db.Objectives.FindAsync(id);
             if (o is null) return Results.NotFound();
             await db.KeyResults.Where(k => k.ObjectiveId == id).ExecuteDeleteAsync();

@@ -91,7 +91,7 @@ public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> 
 // ---- Ways of working (methodology-specific ceremonies & artifacts) ---------
 public record WowItemDto(string Label, string Detail);
 public record WaysOfWorkingDto(string Methodology, string Cadence, string Summary,
-    List<WowItemDto> Ceremonies, List<string> Artifacts, List<string> Roles);
+    List<WowItemDto> Ceremonies, List<string> Artifacts, List<string> Roles, bool CanEdit = false);
 
 public record CostLineDto(int Id, string Label, string Note, List<string> OwnerRoles, decimal Amount, bool CanEdit, bool IsSystem);
 public record CostsDto(bool CanManage, decimal Total, decimal Savings, List<CostLineDto> Lines);
@@ -148,12 +148,13 @@ public record RolesMatrixDto(List<CapabilityDto> Capabilities, List<RoleDto> Rol
 
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
     List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health, string StartDate = "",
-    bool Archived = false);
+    bool Archived = false, string EndDate = "");
 
 public record TaskDto(string Id, string Title, string Status, int Points, string DateISO, string MappedRelease);
 public record MemberDto(string Name, int Alloc);
 public record ProductDto(string Id, string Name, string Owner, string Source, List<string> Projects,
-    List<TaskDto> Tasks, List<MemberDto> Members, List<string> Releases, string Status = "Active");
+    List<TaskDto> Tasks, List<MemberDto> Members, List<string> Releases, string Status = "Active",
+    string StartDate = "", string EndDate = "", bool CanManage = false);
 
 public record KrDto(string Id, string Title, string Link, int Progress);
 public record ObjectiveDto(string Id, string Title, string Owner, string Horizon, List<KrDto> Krs, string Status = "Active");
