@@ -1,8 +1,10 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
 public record CommEntryReq(string? Stakeholder, string? Channel, string? CommType, string? Schedule, string? Owner, string? Notes);
+public record WowReq(string? Cadence, string? Summary, List<WowItemDto>? Ceremonies, List<string>? Artifacts, List<string>? Roles);
 
 // ============================================================================
 //  Per-project extras surfaced on the Overview tab:
@@ -74,12 +76,41 @@ public static class ProjectExtras
             return Results.NoContent();
         });
 
-        // ---- Ways of working (methodology-specific) -----------------------
-        api.MapGet("/projects/{id}/ways-of-working", async (string id, AtlasDbContext db) =>
+        // ---- Ways of working (methodology default, editable per project) ---
+        api.MapGet("/projects/{id}/ways-of-working", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             var p = await db.Projects.FindAsync(id);
             if (p is null) return Results.NotFound();
-            return Results.Ok(WaysOfWorking.For(p.Methodology));
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-ways", "E");
+            var ov = await db.WowOverrides.FindAsync(id);
+            var baseWow = WaysOfWorking.For(p.Methodology);
+            if (ov is null) return Results.Ok(baseWow with { CanEdit = canEdit });
+
+            var ceremonies = JsonSerializer.Deserialize<List<WowItemDto>>(ov.CeremoniesJson) ?? new();
+            var artifacts = ov.Artifacts.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            var roles = ov.Roles.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            return Results.Ok(new WaysOfWorkingDto(p.Methodology, ov.Cadence, ov.Summary, ceremonies, artifacts, roles, canEdit));
+        });
+
+        // Save a per-project override. Seeds from the methodology default for any
+        // field the caller omits. Requires Edit on "Ways of working".
+        api.MapPatch("/projects/{id}/ways-of-working", async (string id, WowReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-ways", "E") is { } denied) return denied;
+            var p = await db.Projects.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            var baseWow = WaysOfWorking.For(p.Methodology);
+            var ov = await db.WowOverrides.FindAsync(id);
+            if (ov is null) { ov = new WowOverride { ProjectId = id }; db.WowOverrides.Add(ov); }
+            ov.Cadence = (req.Cadence ?? baseWow.Cadence).Trim();
+            ov.Summary = (req.Summary ?? baseWow.Summary).Trim();
+            ov.CeremoniesJson = JsonSerializer.Serialize(req.Ceremonies ?? baseWow.Ceremonies);
+            ov.Artifacts = string.Join('\n', req.Artifacts ?? baseWow.Artifacts);
+            ov.Roles = string.Join('\n', req.Roles ?? baseWow.Roles);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Edited ways of working", id));
+            await db.SaveChangesAsync();
+            return Results.Ok(new WaysOfWorkingDto(p.Methodology, ov.Cadence, ov.Summary,
+                req.Ceremonies ?? baseWow.Ceremonies, req.Artifacts ?? baseWow.Artifacts, req.Roles ?? baseWow.Roles, true));
         });
     }
 }

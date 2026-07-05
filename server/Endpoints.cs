@@ -104,15 +104,18 @@ public static class Endpoints
 
         api.MapGet("/programs", async (AtlasDbContext db) =>
             await db.Programs.OrderBy(x => x.Id).Select(x => new ProgramDto(
-                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate, x.Archived))
+                x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate, x.Archived, x.EndDate))
                 .ToListAsync());
 
-        api.MapGet("/products", async (AtlasDbContext db) =>
-            await db.Products.OrderBy(x => x.Id)
+        api.MapGet("/products", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var canManage = await Permissions.Allows(http, db, cfg, "cap-products", "F");
+            return Results.Ok(await db.Products.OrderBy(x => x.Id)
                 .Select(x => new ProductDto(x.Id, x.Name, x.Owner, x.Source, x.Projects,
                     x.Tasks.OrderBy(t => t.Id).Select(t => new TaskDto(t.TaskId, t.Title, t.Status, t.Points, t.DateIso, t.MappedRelease)).ToList(),
                     x.Members.OrderBy(m => m.Id).Select(m => new MemberDto(m.Name, m.Alloc)).ToList(),
-                    x.Releases, x.Status)).ToListAsync());
+                    x.Releases, x.Status, x.StartDate, x.EndDate, canManage)).ToListAsync());
+        });
 
         api.MapGet("/okrs", async (AtlasDbContext db) =>
             await db.Objectives.OrderBy(o => o.Id)

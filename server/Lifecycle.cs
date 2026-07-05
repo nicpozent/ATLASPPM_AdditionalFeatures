@@ -20,7 +20,7 @@ public static class Lifecycle
     {
         api.MapPatch("/products/{id}/status", async (string id, StatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-products", "E") is { } denied) return denied;
             if (!ProductStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var p = await db.Products.FindAsync(id);
             if (p is null) return Results.NotFound();
@@ -32,7 +32,7 @@ public static class Lifecycle
 
         api.MapPatch("/okrs/{id}/status", async (string id, StatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
             if (!ObjectiveStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var o = await db.Objectives.FindAsync(id);
             if (o is null) return Results.NotFound();
