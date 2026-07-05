@@ -50,6 +50,9 @@ public record ProjectTaskDto(int Id, string Code, string Name, string Epic, stri
     int EstimateHours = 0, bool AssigneeOnLeave = false);
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
 public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At);
+public record SprintDto(int Id, string Name, string Goal, string StartDate, string EndDate, string Status,
+    int CommittedPoints, int TaskCount, int DoneCount, int Points, int DonePoints, int SpilledCount);
+public record SprintsDto(bool CanEdit, bool CanCreate, List<SprintDto> Sprints);
 
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn);
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics, bool CanCreate = false);

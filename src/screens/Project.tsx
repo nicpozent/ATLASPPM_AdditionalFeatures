@@ -28,12 +28,16 @@ function useProject(id: string | null) {
 }
 
 const TABS = [
-  ["overview", "Overview"], ["tasks", "Tasks"], ["epics", "Epics"], ["requirements", "Requirements"],
+  ["overview", "Overview"], ["tasks", "Tasks"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
   ["quality", "Quality"], ["governance", "Governance"], ["architecture", "Architecture"],
   ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["vacations", "Vacations"],
   ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"],
 ] as const;
 type TabId = (typeof TABS)[number][0];
+
+// Methodologies that run in fixed-length sprints/iterations get the Sprints tab.
+const AGILE_WITH_SPRINTS = ["Scrum", "SAFe", "Scrumban", "Disciplined Agile"];
+const isAgileWithSprints = (m?: string) => !!m && AGILE_WITH_SPRINTS.includes(m);
 
 const BOARD_COLS = [
   { label: "To Do", color: "#8A93A6", tint: "#EEF1F6", ink: "#56607A" },
@@ -102,7 +106,7 @@ export default function Project() {
 
       {/* tab bar */}
       <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${color.border3}`, marginBottom: 20, overflowX: "auto" }}>
-        {TABS.map(([tid, label]) => {
+        {TABS.filter(([tid]) => tid !== "sprints" || isAgileWithSprints(p?.methodology)).map(([tid, label]) => {
           const active = tab === tid;
           return (
             <button key={tid} onClick={() => setTab(tid)} style={{
@@ -115,6 +119,7 @@ export default function Project() {
 
       {tab === "overview" && <Overview projectId={id} />}
       {tab === "tasks" && <Tasks projectId={id} />}
+      {tab === "sprints" && (isAgileWithSprints(p?.methodology) ? <Sprints projectId={id} /> : <Overview projectId={id} />)}
       {tab === "governance" && <Governance projectId={id} />}
       {tab === "raid" && <Raid projectId={id} />}
       {tab === "security" && <Security projectId={id} />}
@@ -970,6 +975,150 @@ function NewTaskModal({ projectId, assigneeOptions, onClose }: { projectId: stri
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Adding…" : "Add task"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- Sprints (agile-with-sprints projects only) ---------------------------
+interface SprintItem {
+  id: number; name: string; goal: string; startDate: string; endDate: string; status: string;
+  committedPoints: number; taskCount: number; doneCount: number; points: number; donePoints: number; spilledCount: number;
+}
+const SPRINT_STATUSES = ["Planned", "Active", "Closed"];
+const SPRINT_STATUS: Record<string, { ink: string; tint: string }> = {
+  Active:  { ink: "#0B6B37", tint: "#E7F4EC" },
+  Planned: { ink: "#56607A", tint: "#EEF1F6" },
+  Closed:  { ink: "#0C5798", tint: "#E6EFFB" },
+};
+
+function Sprints({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
+  const [modal, setModal] = useState(false);
+  const [edit, setEdit] = useState<SprintItem | null>(null);
+
+  const { data } = useQuery({
+    queryKey: ["sprints", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; canCreate: boolean; sprints: SprintItem[] }> =>
+      (await api<{ canEdit: boolean; canCreate: boolean; sprints: SprintItem[] }>(`/projects/${projectId}/sprints`)) ?? { canEdit: false, canCreate: false, sprints: [] },
+  });
+  const sprints = data?.sprints ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const canCreate = data?.canCreate ?? false;
+
+  const del = useMutation({
+    mutationFn: (id: number) => api(`/sprints/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sprints", projectId] }),
+    onError: (e) => toastError(e),
+  });
+
+  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its sprints." /></Card>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.ink }}>Sprints</div>
+        <div style={{ flex: 1 }} />
+        <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create sprints (needs the Project schedule right)"}><Icon name="plus" size={16} /> New sprint</Button>
+      </div>
+
+      {sprints.length === 0 ? (
+        <Card><EmptyBlock minHeight={200} message="No sprints planned yet. Create one to group tasks into an iteration." /></Card>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {sprints.map((s) => {
+            const sc = SPRINT_STATUS[s.status] ?? SPRINT_STATUS.Planned;
+            const pct = s.committedPoints > 0 ? Math.min(100, Math.round((100 * s.donePoints) / s.committedPoints)) : (s.points > 0 ? Math.round((100 * s.donePoints) / s.points) : 0);
+            return (
+              <Card key={s.id} padding={18}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+                      <span style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 700, color: color.ink }}>{s.name}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "2px 9px", borderRadius: 20 }}>{s.status}</span>
+                      {s.spilledCount > 0 && <span title={`${s.spilledCount} task(s) carried in from another sprint`} style={{ fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }}>{s.spilledCount} spilled-in</span>}
+                    </div>
+                    {s.goal && <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 4 }}>{s.goal}</div>}
+                    <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{s.startDate || "—"} → {s.endDate || "—"}</div>
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: "flex", gap: 7 }}>
+                      <Button variant="secondary" onClick={() => setEdit(s)}><Icon name="edit" size={15} /> Edit</Button>
+                      <button onClick={() => { if (confirm(`Delete sprint “${s.name}”? Tasks stay, but lose this iteration.`)) del.mutate(s.id); }} title="Delete sprint" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: `1px solid ${color.border}`, background: "#fff", cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={15} /></button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}` }}>
+                  <SprintMetric label="Committed" value={`${s.committedPoints} pts`} />
+                  <SprintMetric label="Completed" value={`${s.donePoints} pts`} />
+                  <SprintMetric label="Tasks" value={`${s.doneCount} / ${s.taskCount} done`} />
+                  <div>
+                    <div style={{ fontSize: 10.5, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Progress</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <ProgressBar pct={pct} height={7} />
+                      <span style={{ fontFamily: font.head, fontSize: 13, fontWeight: 700, color: color.ink }}>{pct}%</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {modal && <SprintModal projectId={projectId} onClose={() => setModal(false)} />}
+      {edit && <SprintModal projectId={projectId} sprint={edit} onClose={() => setEdit(null)} />}
+    </div>
+  );
+}
+
+function SprintMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10.5, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{value}</div>
+    </div>
+  );
+}
+
+function SprintModal({ projectId, sprint, onClose }: { projectId: string; sprint?: SprintItem; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(sprint?.name ?? "");
+  const [goal, setGoal] = useState(sprint?.goal ?? "");
+  const [startDate, setStartDate] = useState(sprint?.startDate ?? "");
+  const [endDate, setEndDate] = useState(sprint?.endDate ?? "");
+  const [status, setStatus] = useState(sprint?.status ?? "Planned");
+  const [committed, setCommitted] = useState(String(sprint?.committedPoints || ""));
+
+  const body = () => JSON.stringify({
+    name: name.trim(), goal: goal.trim(), startDate: startDate.trim(), endDate: endDate.trim(),
+    status, committedPoints: Number(committed) || 0,
+  });
+  const save = useMutation({
+    mutationFn: () => sprint
+      ? api(`/sprints/${sprint.id}`, { method: "PATCH", body: body() })
+      : api(`/projects/${projectId}/sprints`, { method: "POST", body: body() }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sprints", projectId] }); onClose(); },
+    onError: (e) => toastError(e),
+  });
+
+  return (
+    <Modal onClose={onClose} width={480} label={sprint ? "Edit sprint" : "New sprint"}>
+      <DecLabel>Name</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. PI2 · S5" style={{ marginBottom: 14 }} />
+      <DecLabel>Goal</DecLabel>
+      <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Sprint goal" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Start date</DecLabel><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+        <div style={{ flex: 1 }}><DecLabel>End date</DecLabel><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{SPRINT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Committed points</DecLabel><Input type="number" min={0} value={committed} onChange={(e) => setCommitted(e.target.value)} placeholder="auto from tasks" /></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (name.trim()) save.mutate(); }} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : sprint ? "Save changes" : "Add sprint"}</Button>
       </div>
     </Modal>
   );
