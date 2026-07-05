@@ -636,7 +636,7 @@ public static class WriteEndpoints
             db.KeyResults.Add(kr);
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/okrs/{id}/krs/{kr.Id}",
-                new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId));
+                new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId, kr.LinkType.Length > 0));
         });
 
         api.MapPatch("/krs/{id}", async (string id, UpdateKrReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -653,7 +653,7 @@ public static class WriteEndpoints
                 kr.Link = lType.Length > 0 ? lName : "";
             }
             await db.SaveChangesAsync();
-            return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId));
+            return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId, kr.LinkType.Length > 0));
         });
 
         // Permanently delete an objective and its key results. Requires Full on

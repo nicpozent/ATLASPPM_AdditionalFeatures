@@ -9,7 +9,7 @@ import { usePermissions } from "@/components/usePermissions";
 // ---------------------------------------------------------------------------
 // Data model + hook (empty by default until the API exists).
 // ---------------------------------------------------------------------------
-interface Kr { id: string; title: string; link: string; progress: number; linkType?: string; linkId?: string }
+interface Kr { id: string; title: string; link: string; progress: number; linkType?: string; linkId?: string; auto?: boolean }
 interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[]; status?: string; health?: string; startDate?: string; targetDate?: string }
 type OkrStatus = "Active" | "Completed";
 
@@ -268,7 +268,11 @@ export default function Okrs() {
                             <Icon name="link" size={13} /> {k.link ? "Edit link" : "Link"}
                           </button>
                         )}
-                        {canEdit ? (
+                        {k.auto ? (
+                          <span title={`Measured automatically from ${k.linkType ?? "the linked deliverable"}: ${k.link}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: color.textMuted, whiteSpace: "nowrap" }}>
+                            <Icon name="link" size={12} />{k.progress}%
+                          </span>
+                        ) : canEdit ? (
                           <input type="number" min={0} max={100} value={k.progress}
                             onChange={(e) => updateKrProgress.mutate({ krId: k.id, progress: clampPct(e.target.value) })}
                             style={{ width: 52, textAlign: "center", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 0", fontSize: 12, fontWeight: 700, fontFamily: font.mono, color: color.text, outline: "none" }} />
