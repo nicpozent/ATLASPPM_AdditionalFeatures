@@ -33,7 +33,7 @@ public record GateDto(int Id, string Code, string Name, string Approver, string 
     int Pct, string MetLabel, List<GateCriterionDto> Criteria);
 public record GatesDto(bool CanGovern, List<GateDto> Gates);
 
-public record DecisionDto(string Code, string Title, string Context, string Decision, string Owner, string Date, string Status);
+public record DecisionDto(string Code, string Title, string Context, string Decision, string Owner, string Date, string Status, int Id = 0);
 public record DecisionsDto(bool CanGovern, List<DecisionDto> Decisions);
 
 public record RaidItemDto(int Id, string Type, string Title, string Owner, string Status, bool Auto = false);
@@ -44,7 +44,8 @@ public record SecurityProfileDto(string Classification, string Residency, string
     bool Gdpr, bool Pci, bool Iso, bool AiAct, bool Soc2, bool Nis2);
 public record SecurityControlDto(int Id, string Code, string Control, string Framework, string Evidence, string Owner, string Status,
     string Description = "", string Reason = "");
-public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls);
+public record SecurityReviewGateDto(int Id, string Name, string Type, string Reviewer, string Status, string Date, string Note);
+public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls, List<SecurityReviewGateDto> ReviewGates);
 
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
     string Status, string Sprint, string Baseline, string Priority,

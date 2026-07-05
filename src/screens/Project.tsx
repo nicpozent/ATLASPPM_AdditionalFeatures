@@ -1239,7 +1239,7 @@ function Governance({ projectId }: { projectId: string | null }) {
   );
 }
 
-interface Decision { code: string; title: string; context: string; decision: string; owner: string; date: string; status: string; }
+interface Decision { id: number; code: string; title: string; context: string; decision: string; owner: string; date: string; status: string; }
 const DEC_STATUS: Record<string, { ink: string; tint: string }> = {
   Approved: { ink: "#0B6B37", tint: "#E7F4EC" },
   Proposed: { ink: "#0C5798", tint: "#E6EFFB" },
@@ -1249,6 +1249,7 @@ const DEC_COLS = "0.7fr 1.6fr 2fr 1fr 0.8fr 0.9fr";
 
 function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGovern: boolean }) {
   const [modal, setModal] = useState(false);
+  const [open, setOpen] = useState<Decision | null>(null);
   const { data } = useQuery({
     queryKey: ["decisions", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<Decision[]> => (await api<{ decisions: Decision[] }>(`/projects/${projectId}/decisions`))?.decisions ?? [],
@@ -1271,7 +1272,7 @@ function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGo
       ) : decisions.map((d) => {
         const sc = DEC_STATUS[d.status] ?? DEC_STATUS.Proposed;
         return (
-          <div key={d.code} style={{ display: "grid", gridTemplateColumns: DEC_COLS, alignItems: "flex-start", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+          <div key={d.code} onClick={() => canGovern && setOpen(d)} style={{ display: "grid", gridTemplateColumns: DEC_COLS, alignItems: "flex-start", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canGovern ? "pointer" : "default" }}>
             <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
             <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{d.title}</div>
             <div style={{ fontSize: 12, color: color.faint, lineHeight: 1.4 }}><span style={{ color: color.faint3 }}>{d.context}</span> {d.decision}</div>
@@ -1282,7 +1283,57 @@ function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGo
         );
       })}
       {modal && <LogDecisionModal projectId={projectId!} onClose={() => setModal(false)} />}
+      {open && <EditDecisionModal projectId={projectId!} decision={open} onClose={() => setOpen(null)} />}
     </Card>
+  );
+}
+
+function EditDecisionModal({ projectId, decision, onClose }: { projectId: string; decision: Decision; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(decision.title);
+  const [context, setContext] = useState(decision.context);
+  const [dtext, setDtext] = useState(decision.decision);
+  const [owner, setOwner] = useState(decision.owner === "—" ? "" : decision.owner);
+  const [status, setStatus] = useState(decision.status);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["decisions", projectId] });
+  const save = useMutation({
+    mutationFn: () => api(`/decisions/${decision.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim(), context: context.trim(), decision: dtext.trim(), owner: owner.trim(), status }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/decisions/${decision.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  return (
+    <Modal onClose={onClose} width={500} label={`${decision.code} · Decision`}>
+      <DecLabel>Decision title</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What was decided?" style={{ marginBottom: 14 }} />
+      <DecLabel>Context / problem</DecLabel>
+      <Textarea value={context} onChange={(e) => setContext(e.target.value)} placeholder="Why was a decision needed?" style={{ minHeight: 56, resize: "vertical", marginBottom: 14 }} />
+      <DecLabel>Decision &amp; rationale</DecLabel>
+      <Textarea value={dtext} onChange={(e) => setDtext(e.target.value)} placeholder="What was chosen and why?" style={{ minHeight: 56, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Owner</DecLabel><Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Decision owner" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{["Proposed", "Approved", "Rejected"].map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this decision?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        )}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1538,7 +1589,17 @@ interface SecProfile {
   gdpr: boolean; pci: boolean; iso: boolean; aiAct: boolean; soc2: boolean; nis2: boolean;
 }
 interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
-interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; }
+interface SecReviewGate { id: number; name: string; type: string; reviewer: string; status: string; date: string; note: string; }
+interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; reviewGates: SecReviewGate[]; }
+const SRG_TYPES = ["Security", "Architecture", "Privacy", "Threat model", "Data protection"];
+const SRG_STATUSES = ["Scheduled", "Passed", "Failed", "Waived", "Not required"];
+const SRG_STATUS: Record<string, { ink: string; tint: string }> = {
+  Passed:         { ink: "#0B6B37", tint: "#E7F4EC" },
+  Scheduled:      { ink: "#0C5798", tint: "#E6EFFB" },
+  Failed:         { ink: "#A1282B", tint: "#FBE7E8" },
+  Waived:         { ink: "#8A6300", tint: "#FBF2D7" },
+  "Not required": { ink: "#56607A", tint: "#EEF1F6" },
+};
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
 const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
@@ -1576,6 +1637,8 @@ function Security({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [openCtl, setOpenCtl] = useState<SecControl | null>(null);
+  const [gateModal, setGateModal] = useState(false);
+  const [openGate, setOpenGate] = useState<SecReviewGate | null>(null);
   const { data } = useQuery({
     queryKey: ["security", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<SecData | null> => await api<SecData>(`/projects/${projectId}/security`),
@@ -1660,13 +1723,29 @@ function Security({ projectId }: { projectId: string | null }) {
         </div>
       </Card>
 
-      {/* security review gates (structural; follow-up) */}
+      {/* security review gates */}
       <Card padding={0} style={{ overflow: "hidden", marginBottom: 16 }}>
-        <div style={{ padding: "15px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Security review gates</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1.3fr 0.9fr 1fr", padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-          <div>Gate</div><div>Owner</div><div>Date</div><div>Status</div>
+        <div style={{ display: "flex", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
+          <span style={{ flex: 1, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Security review gates</span>
+          {canEdit && <button onClick={() => setGateModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add gate</button>}
         </div>
-        <EmptyBlock message="No security review gates scheduled yet." minHeight={110} />
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1.1fr 0.9fr 0.9fr", padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+          <div>Gate</div><div>Type</div><div>Reviewer</div><div>Date</div><div>Status</div>
+        </div>
+        {(data.reviewGates ?? []).length === 0 ? (
+          <EmptyBlock message="No security review gates scheduled yet." minHeight={110} />
+        ) : data.reviewGates.map((g) => {
+          const gs = SRG_STATUS[g.status] ?? SRG_STATUS.Scheduled;
+          return (
+            <div key={g.id} onClick={() => canEdit && setOpenGate(g)} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA", cursor: canEdit ? "pointer" : "default" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: canEdit ? color.primary : color.text }}>{g.name}{g.note && <div style={{ fontSize: 11, color: color.faint3, fontWeight: 400, marginTop: 2 }}>{g.note}</div>}</div>
+              <div style={{ fontSize: 11.5, color: color.subtle }}>{g.type}</div>
+              <div style={{ fontSize: 11.5, color: color.subtle }}>{g.reviewer || "—"}</div>
+              <div style={{ fontSize: 11.5, color: color.faint, fontFamily: font.mono }}>{g.date || "—"}</div>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: gs.ink, background: gs.tint, padding: "3px 9px", borderRadius: 6 }}>{g.status}</span></div>
+            </div>
+          );
+        })}
       </Card>
 
       {/* control evidence register */}
@@ -1709,7 +1788,64 @@ function Security({ projectId }: { projectId: string | null }) {
 
       {addOpen && <AddControlModal projectId={projectId} onClose={() => setAddOpen(false)} />}
       {openCtl && <EditControlModal projectId={projectId} ctl={openCtl} onClose={() => setOpenCtl(null)} />}
+      {gateModal && <SecReviewGateModal projectId={projectId} onClose={() => setGateModal(false)} />}
+      {openGate && <SecReviewGateModal projectId={projectId} gate={openGate} onClose={() => setOpenGate(null)} />}
     </div>
+  );
+}
+
+function SecReviewGateModal({ projectId, gate, onClose }: { projectId: string; gate?: SecReviewGate; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(gate?.name ?? "");
+  const [type, setType] = useState(gate?.type ?? "Security");
+  const [reviewer, setReviewer] = useState(gate?.reviewer ?? "");
+  const [status, setStatus] = useState(gate?.status ?? "Scheduled");
+  const [date, setDate] = useState(gate?.date ?? "");
+  const [note, setNote] = useState(gate?.note ?? "");
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["security", projectId] });
+  const body = () => JSON.stringify({ name: name.trim(), type, reviewer: reviewer.trim(), status, date: date.trim(), note: note.trim() });
+  const save = useMutation({
+    mutationFn: () => gate
+      ? api(`/security/review-gates/${gate.id}`, { method: "PATCH", body: body() })
+      : api(`/projects/${projectId}/security/review-gates`, { method: "POST", body: body() }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/security/review-gates/${gate!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  return (
+    <Modal onClose={onClose} width={480} label={gate ? "Security review gate" : "New review gate"}>
+      <DecLabel>Gate</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. G2 Security review" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={type} onChange={(e) => setType(e.target.value)}>{SRG_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{SRG_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Reviewer</DecLabel><Input value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Reviewer" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Date</DecLabel><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+      </div>
+      <DecLabel>Note</DecLabel>
+      <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Scope, findings, conditions…" style={{ minHeight: 56, resize: "vertical" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {gate && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this gate?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (name.trim()) save.mutate(); }} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : gate ? "Save changes" : "Add gate"}</Button>
+      </div>
+    </Modal>
   );
 }
 
