@@ -7,8 +7,8 @@ public record UpdateSecurityProfileReq(
     string? Classification, string? Residency, string? Subjects, string? Retention,
     bool? PersonalData, bool? SpecialCategory, bool? AutomatedDecisions, bool? CardholderData,
     bool? Gdpr, bool? Pci, bool? Iso, bool? AiAct, bool? Soc2, bool? Nis2);
-public record CreateSecControlReq(string Control, string? Framework, string? Evidence, string? Owner, string? Status);
-public record SetControlStatusReq(string Status);
+public record CreateSecControlReq(string Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
+public record UpdateSecControlReq(string? Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 
 // ============================================================================
 //  Security, privacy & compliance — per-project data classification/privacy
@@ -20,7 +20,7 @@ public static class Security
 {
     static readonly string[] Classifications = { "Public", "Internal", "Confidential", "Restricted" };
     static readonly string[] Residencies = { "EU / EEA", "Global", "On-prem only" };
-    static readonly string[] ControlStatuses = { "Planned", "Partial", "Implemented" };
+    static readonly string[] ControlStatuses = { "Planned", "Partial", "Implemented", "Archived" };
 
     static async Task<SecurityProfile> EnsureAsync(AtlasDbContext db, string projectId)
     {
@@ -48,7 +48,7 @@ public static class Security
             var controls = await db.SecurityControls.Where(c => c.ProjectId == id).OrderBy(c => c.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-approve", "E");
             return Results.Ok(new SecurityDto(canEdit, ToDto(prof),
-                controls.Select(c => new SecurityControlDto(c.Id, c.Code, c.Control, c.Framework, c.Evidence, c.Owner, c.Status)).ToList()));
+                controls.Select(ToControlDto).ToList()));
         });
 
         api.MapPatch("/projects/{id}/security", async (string id, UpdateSecurityProfileReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -88,23 +88,53 @@ public static class Security
                 Evidence = string.IsNullOrWhiteSpace(req.Evidence) ? "—" : req.Evidence!.Trim(),
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner!.Trim(),
                 Status = ControlStatuses.Contains(req.Status) ? req.Status! : "Planned",
+                Description = req.Description?.Trim() ?? "", Reason = req.Reason?.Trim() ?? "",
             };
             db.SecurityControls.Add(ctl);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Added control", $"{id} · {ctl.Code} {ctl.Control}"));
             await db.SaveChangesAsync();
-            return Results.Created($"/api/v1/projects/{id}/security/controls/{ctl.Id}",
-                new SecurityControlDto(ctl.Id, ctl.Code, ctl.Control, ctl.Framework, ctl.Evidence, ctl.Owner, ctl.Status));
+            return Results.Created($"/api/v1/projects/{id}/security/controls/{ctl.Id}", ToControlDto(ctl));
         });
 
-        api.MapPatch("/security/controls/{ctlId:int}", async (int ctlId, SetControlStatusReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        // Modify a control — status (incl. Archived), or any of its fields, with
+        // an optional reason capturing why it changed. Removable via DELETE.
+        api.MapPatch("/security/controls/{ctlId:int}", async (int ctlId, UpdateSecControlReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } denied) return denied;
-            if (!ControlStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
             var ctl = await db.SecurityControls.FindAsync(ctlId);
             if (ctl is null) return Results.NotFound();
-            ctl.Status = req.Status;
+            if (req.Control is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Control)) return Results.BadRequest(new { error = "Control is required." });
+                ctl.Control = req.Control.Trim();
+            }
+            if (req.Framework is not null) ctl.Framework = string.IsNullOrWhiteSpace(req.Framework) ? "ISO 27001" : req.Framework.Trim();
+            if (req.Evidence is not null) ctl.Evidence = string.IsNullOrWhiteSpace(req.Evidence) ? "—" : req.Evidence.Trim();
+            if (req.Owner is not null) ctl.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner.Trim();
+            if (req.Status is not null)
+            {
+                if (!ControlStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                ctl.Status = req.Status;
+            }
+            if (req.Description is not null) ctl.Description = req.Description.Trim();
+            if (req.Reason is not null) ctl.Reason = req.Reason.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Updated control", $"{ctl.ProjectId} · {ctl.Code} → {ctl.Status}"));
             await db.SaveChangesAsync();
-            return Results.Ok(new SecurityControlDto(ctl.Id, ctl.Code, ctl.Control, ctl.Framework, ctl.Evidence, ctl.Owner, ctl.Status));
+            return Results.Ok(ToControlDto(ctl));
+        });
+
+        api.MapDelete("/security/controls/{ctlId:int}", async (int ctlId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } denied) return denied;
+            var ctl = await db.SecurityControls.FindAsync(ctlId);
+            if (ctl is null) return Results.NotFound();
+            db.SecurityControls.Remove(ctl);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Removed control", $"{ctl.ProjectId} · {ctl.Code} {ctl.Control}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
     }
+
+    static SecurityControlDto ToControlDto(SecurityControl c) =>
+        new(c.Id, c.Code, c.Control, c.Framework, c.Evidence, c.Owner, c.Status, c.Description, c.Reason);
 }

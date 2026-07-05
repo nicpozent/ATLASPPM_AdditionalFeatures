@@ -865,7 +865,9 @@ public class SecurityControl
     public string Framework { get; set; } = "ISO 27001";
     public string Evidence { get; set; } = "";
     public string Owner { get; set; } = "";
-    public string Status { get; set; } = "Planned";     // Planned | Partial | Implemented
+    public string Status { get; set; } = "Planned";     // Planned | Partial | Implemented | Archived
+    public string Description { get; set; } = "";
+    public string Reason { get; set; } = "";              // rationale / why archived or modified
     public int Ord { get; set; }
 }
 
