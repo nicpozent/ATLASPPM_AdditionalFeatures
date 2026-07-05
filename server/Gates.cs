@@ -5,6 +5,7 @@ namespace Atlas.Api;
 public record ToggleCriterionReq(bool? Met, string? Label);
 public record AddCriterionReq(string Label);
 public record CreateDecisionReq(string Title, string? Context, string? Decision, string? Owner, string? Status);
+public record UpdateDecisionReq(string? Title, string? Context, string? Decision, string? Owner, string? Status);
 public record CreateRaidReq(string Type, string Title, string? Owner, string? Status);
 public record UpdateRaidReq(string? Type, string? Title, string? Owner, string? Status);
 
@@ -109,7 +110,7 @@ public static class Gates
             var decisions = await db.Decisions.Where(d => d.ProjectId == id).OrderBy(d => d.Ord).ToListAsync();
             var canGovern = await Permissions.Allows(http, db, cfg, "cap-approve", "F");
             return Results.Ok(new DecisionsDto(canGovern,
-                decisions.Select(d => new DecisionDto(d.Code, d.Title, d.Context, d.DecisionText, d.Owner, d.Date, d.Status)).ToList()));
+                decisions.Select(d => new DecisionDto(d.Code, d.Title, d.Context, d.DecisionText, d.Owner, d.Date, d.Status, d.Id)).ToList()));
         });
 
         api.MapPost("/projects/{id}/decisions", async (string id, CreateDecisionReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -131,7 +132,43 @@ public static class Gates
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Decisions", "Logged decision", $"{id} · {dec.Code} {dec.Title}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{id}/decisions/{dec.Code}",
-                new DecisionDto(dec.Code, dec.Title, dec.Context, dec.DecisionText, dec.Owner, dec.Date, dec.Status));
+                new DecisionDto(dec.Code, dec.Title, dec.Context, dec.DecisionText, dec.Owner, dec.Date, dec.Status, dec.Id));
+        });
+
+        // Amend or supersede a logged decision (ADRs are revisable governance
+        // records). Same Full-on-approve gate as logging one.
+        api.MapPatch("/decisions/{decId:int}", async (int decId, UpdateDecisionReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
+            var dec = await db.Decisions.FindAsync(decId);
+            if (dec is null) return Results.NotFound();
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                dec.Title = req.Title.Trim();
+            }
+            if (req.Context is not null) dec.Context = req.Context.Trim();
+            if (req.Decision is not null) dec.DecisionText = req.Decision.Trim();
+            if (req.Owner is not null) dec.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner.Trim();
+            if (req.Status is not null)
+            {
+                if (!new[] { "Proposed", "Approved", "Rejected" }.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                dec.Status = req.Status;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Decisions", "Updated decision", $"{dec.ProjectId} · {dec.Code}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new DecisionDto(dec.Code, dec.Title, dec.Context, dec.DecisionText, dec.Owner, dec.Date, dec.Status, dec.Id));
+        });
+
+        api.MapDelete("/decisions/{decId:int}", async (int decId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "F") is { } denied) return denied;
+            var dec = await db.Decisions.FindAsync(decId);
+            if (dec is null) return Results.NotFound();
+            db.Decisions.Remove(dec);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Decisions", "Deleted decision", $"{dec.ProjectId} · {dec.Code}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // ---- RAID register ------------------------------------------------

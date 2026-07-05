@@ -872,6 +872,20 @@ public class SecurityControl
     public int Ord { get; set; }
 }
 
+// A scheduled security/architecture/privacy review checkpoint for a project.
+public class SecurityReviewGate
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Name { get; set; } = default!;          // e.g. "G2 Security review"
+    public string Type { get; set; } = "Security";        // Security | Architecture | Privacy | Threat model | Data protection
+    public string Reviewer { get; set; } = "";
+    public string Status { get; set; } = "Scheduled";     // Scheduled | Passed | Failed | Waived | Not required
+    public string Date { get; set; } = "";                // ISO date
+    public string Note { get; set; } = "";
+    public int Ord { get; set; }
+}
+
 // ---- RAID register --------------------------------------------------------
 public class RaidItem
 {

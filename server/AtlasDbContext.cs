@@ -44,6 +44,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<RaidItem> RaidItems => Set<RaidItem>();
     public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<SecurityControl> SecurityControls => Set<SecurityControl>();
+    public DbSet<SecurityReviewGate> SecurityReviewGates => Set<SecurityReviewGate>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<TaskComment> TaskComments => Set<TaskComment>();
     public DbSet<Sprint> Sprints => Set<Sprint>();

@@ -9,6 +9,8 @@ public record UpdateSecurityProfileReq(
     bool? Gdpr, bool? Pci, bool? Iso, bool? AiAct, bool? Soc2, bool? Nis2);
 public record CreateSecControlReq(string Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 public record UpdateSecControlReq(string? Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
+public record CreateReviewGateReq(string Name, string? Type, string? Reviewer, string? Status, string? Date, string? Note);
+public record UpdateReviewGateReq(string? Name, string? Type, string? Reviewer, string? Status, string? Date, string? Note);
 
 // ============================================================================
 //  Security, privacy & compliance — per-project data classification/privacy
@@ -21,6 +23,8 @@ public static class Security
     static readonly string[] Classifications = { "Public", "Internal", "Confidential", "Restricted" };
     static readonly string[] Residencies = { "EU / EEA", "Global", "On-prem only" };
     static readonly string[] ControlStatuses = { "Planned", "Partial", "Implemented", "Archived" };
+    static readonly string[] GateTypes = { "Security", "Architecture", "Privacy", "Threat model", "Data protection" };
+    static readonly string[] GateStatuses = { "Scheduled", "Passed", "Failed", "Waived", "Not required" };
 
     static async Task<SecurityProfile> EnsureAsync(AtlasDbContext db, string projectId)
     {
@@ -46,9 +50,10 @@ public static class Security
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var prof = await EnsureAsync(db, id);
             var controls = await db.SecurityControls.Where(c => c.ProjectId == id).OrderBy(c => c.Ord).ToListAsync();
+            var gates = await db.SecurityReviewGates.Where(g => g.ProjectId == id).OrderBy(g => g.Ord).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-approve", "E");
             return Results.Ok(new SecurityDto(canEdit, ToDto(prof),
-                controls.Select(ToControlDto).ToList()));
+                controls.Select(ToControlDto).ToList(), gates.Select(ToGateDto).ToList()));
         });
 
         api.MapPatch("/projects/{id}/security", async (string id, UpdateSecurityProfileReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -133,8 +138,75 @@ public static class Security
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+
+        MapReviewGateEndpoints(api);
     }
 
     static SecurityControlDto ToControlDto(SecurityControl c) =>
         new(c.Id, c.Code, c.Control, c.Framework, c.Evidence, c.Owner, c.Status, c.Description, c.Reason);
+
+    static SecurityReviewGateDto ToGateDto(SecurityReviewGate g) =>
+        new(g.Id, g.Name, g.Type, g.Reviewer, g.Status, g.Date, g.Note);
+
+    static void MapReviewGateEndpoints(RouteGroupBuilder api)
+    {
+        api.MapPost("/projects/{id}/security/review-gates", async (string id, CreateReviewGateReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } denied) return denied;
+            if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+            var ord = (await db.SecurityReviewGates.Where(g => g.ProjectId == id).Select(g => (int?)g.Ord).MaxAsync() ?? 0) + 1;
+            var gate = new SecurityReviewGate
+            {
+                ProjectId = id, Ord = ord, Name = req.Name.Trim(),
+                Type = GateTypes.Contains(req.Type) ? req.Type! : "Security",
+                Reviewer = req.Reviewer?.Trim() ?? "",
+                Status = GateStatuses.Contains(req.Status) ? req.Status! : "Scheduled",
+                Date = req.Date?.Trim() ?? "", Note = req.Note?.Trim() ?? "",
+            };
+            db.SecurityReviewGates.Add(gate);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Added review gate", $"{id} · {gate.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/security/review-gates/{gate.Id}", ToGateDto(gate));
+        });
+
+        api.MapPatch("/security/review-gates/{gateId:int}", async (int gateId, UpdateReviewGateReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } denied) return denied;
+            var gate = await db.SecurityReviewGates.FindAsync(gateId);
+            if (gate is null) return Results.NotFound();
+            if (req.Name is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+                gate.Name = req.Name.Trim();
+            }
+            if (req.Type is not null)
+            {
+                if (!GateTypes.Contains(req.Type)) return Results.BadRequest(new { error = "Unknown type." });
+                gate.Type = req.Type;
+            }
+            if (req.Status is not null)
+            {
+                if (!GateStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                gate.Status = req.Status;
+            }
+            if (req.Reviewer is not null) gate.Reviewer = req.Reviewer.Trim();
+            if (req.Date is not null) gate.Date = req.Date.Trim();
+            if (req.Note is not null) gate.Note = req.Note.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Updated review gate", $"{gate.ProjectId} · {gate.Name} → {gate.Status}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(ToGateDto(gate));
+        });
+
+        api.MapDelete("/security/review-gates/{gateId:int}", async (int gateId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } denied) return denied;
+            var gate = await db.SecurityReviewGates.FindAsync(gateId);
+            if (gate is null) return Results.NotFound();
+            db.SecurityReviewGates.Remove(gate);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Removed review gate", $"{gate.ProjectId} · {gate.Name}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+    }
 }
