@@ -2039,17 +2039,20 @@ function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: 
 }
 
 // ---- Requirements & traceability -------------------------------------------
-interface Requirement { id: number; code: string; title: string; type: string; priority: string; status: string; epic: string; story: string; test: string; testStatus: string; release: string; verified: boolean; }
+interface ReqAttachment { id: number; fileName: string; size: number; uploadedAt: string; }
+interface Requirement { id: number; code: string; title: string; type: string; priority: string; status: string; epic: string; story: string; test: string; testStatus: string; release: string; verified: boolean; description: string; attachments: ReqAttachment[]; }
 interface ChangeRequest { id: number; code: string; title: string; reqCode: string; impact: string; sdp: string; status: string; raisedBy: string; date: string; }
 interface ReqData { canEdit: boolean; stats: { total: number; approved: number; coverage: number; verified: number }; requirements: Requirement[]; changeRequests: ChangeRequest[]; }
 
 const REQ_TYPES = ["Functional", "Non-functional", "Compliance"];
-const REQ_STATUSES = ["Draft", "In review", "Approved"];
+const REQ_STATUSES = ["Draft", "In review", "Approved", "Replaced", "Archived", "Retired (Requester)", "Retired (PM)", "Retired (Team)"];
 const REQ_PRIORITIES = ["Critical", "High", "Medium", "Low"];
 const TEST_RESULTS = ["Not run", "In test", "Passed", "Failed"];
 const CR_IMPACTS = ["Low", "Medium", "High"];
 const REQ_STATUS: Record<string, { ink: string; tint: string }> = {
   Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "In review": { ink: "#0C5798", tint: "#E6EFFB" }, Draft: { ink: "#56607A", tint: "#EEF1F6" },
+  Replaced: { ink: "#5E2E89", tint: "#F0E8F7" }, Archived: { ink: "#56607A", tint: "#EEF1F6" },
+  "Retired (Requester)": { ink: "#8A6300", tint: "#FBF2D7" }, "Retired (PM)": { ink: "#8A6300", tint: "#FBF2D7" }, "Retired (Team)": { ink: "#8A6300", tint: "#FBF2D7" },
 };
 const TEST_STATUS: Record<string, { ink: string; tint: string }> = {
   Passed: { ink: "#0B6B37", tint: "#E7F4EC" }, "In test": { ink: "#0C5798", tint: "#E6EFFB" }, Failed: { ink: "#A1282B", tint: "#FBE7E8" }, "Not run": { ink: "#56607A", tint: "#EEF1F6" },
@@ -2063,6 +2066,7 @@ const CR_COLS = "0.7fr 2.2fr 0.9fr 0.8fr 1fr 0.9fr 1fr";
 function Requirements({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [reqModal, setReqModal] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
   const [crFor, setCrFor] = useState<string | null>(null); // req code prefill, or "" for blank
   const { data } = useQuery({
     queryKey: ["requirements", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
@@ -2113,8 +2117,8 @@ function Requirements({ projectId }: { projectId: string | null }) {
           return (
             <div key={r.id} style={{ display: "grid", gridTemplateColumns: REQ_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.title}</div>
-                <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{r.code} · {r.type} · {r.priority}</div>
+                <button onClick={() => setOpenId(r.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{r.title}</button>
+                <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono, display: "flex", alignItems: "center", gap: 6 }}>{r.code} · {r.type} · {r.priority}{r.attachments.length > 0 && <span title={`${r.attachments.length} attachment(s)`} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}><Icon name="paperclip" size={11} />{r.attachments.length}</span>}</div>
               </div>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{r.status}</span></div>
               <div style={{ fontSize: 12, color: color.subtle }}>{r.epic || "—"}<div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{r.story}</div></div>
@@ -2165,6 +2169,11 @@ function Requirements({ projectId }: { projectId: string | null }) {
       </Card>
 
       {reqModal && <NewRequirementModal projectId={projectId} onClose={() => setReqModal(false)} />}
+      {openId !== null && (() => {
+        const r = requirements.find((x) => x.id === openId);
+        if (!r) return null;
+        return <RequirementModal projectId={projectId} req={r} canEdit={canEdit} onClose={() => setOpenId(null)} />;
+      })()}
       {crFor !== null && <RaiseCrModal projectId={projectId} reqCodes={requirements.map((r) => r.code)} prefill={crFor} onClose={() => setCrFor(null)} />}
     </div>
   );
@@ -2172,7 +2181,7 @@ function Requirements({ projectId }: { projectId: string | null }) {
 
 function NewRequirementModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const qc = useQueryClient();
-  const [f, setF] = useState({ title: "", type: REQ_TYPES[0], priority: "Medium", status: "Draft", epic: "", story: "", test: "", release: "" });
+  const [f, setF] = useState({ title: "", type: REQ_TYPES[0], priority: "Medium", status: "Draft", epic: "", story: "", test: "", release: "", description: "" });
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
   const create = useMutation({
     mutationFn: () => api(`/projects/${projectId}/requirements`, { method: "POST", body: JSON.stringify({ ...f, title: f.title.trim() }) }),
@@ -2182,6 +2191,8 @@ function NewRequirementModal({ projectId, onClose }: { projectId: string; onClos
     <Modal onClose={onClose} width={520} label="New requirement">
       <DecLabel>Requirement</DecLabel>
       <Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="What must the solution do?" style={{ marginBottom: 14 }} />
+      <DecLabel>Description</DecLabel>
+      <Textarea value={f.description} onChange={(e) => set("description", e.target.value)} placeholder="Acceptance criteria, context, notes…" style={{ minHeight: 64, resize: "vertical", marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={f.type} onChange={(e) => set("type", e.target.value)}>{REQ_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
         <div style={{ flex: 1 }}><DecLabel>Priority</DecLabel><Select value={f.priority} onChange={(e) => set("priority", e.target.value)}>{REQ_PRIORITIES.map((t) => <option key={t}>{t}</option>)}</Select></div>
@@ -2198,6 +2209,116 @@ function NewRequirementModal({ projectId, onClose }: { projectId: string; onClos
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => f.title.trim() && create.mutate()} disabled={create.isPending || !f.title.trim()}>{create.isPending ? "Adding…" : "Add requirement"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function RequirementModal({ projectId, req, canEdit, onClose }: { projectId: string; req: Requirement; canEdit: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(req.title);
+  const [description, setDescription] = useState(req.description);
+  const [type, setType] = useState(req.type);
+  const [priority, setPriority] = useState(req.priority);
+  const [status, setStatus] = useState(req.status);
+  const [epic, setEpic] = useState(req.epic);
+  const [story, setStory] = useState(req.story);
+  const [test, setTest] = useState(req.test === "—" ? "" : req.test);
+  const [release, setRelease] = useState(req.release);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["requirements", projectId] });
+
+  const save = useMutation({
+    mutationFn: () => api(`/requirements/${req.id}`, { method: "PATCH", body: JSON.stringify({
+      title: title.trim(), description: description.trim(), type, priority, status,
+      epic: epic.trim(), story: story.trim(), test: test.trim(), release: release.trim(),
+    }) }),
+    onSuccess: () => { invalidate(); toast("Requirement saved"); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/requirements/${req.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); toast("Requirement deleted"); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const upload = useMutation({
+    mutationFn: async (file: File) => { const fd = new FormData(); fd.append("file", file); await apiUpload(`/requirements/${req.id}/attachments`, fd); },
+    onSuccess: () => invalidate(),
+    onError: (e) => toastError(e),
+  });
+  const removeAtt = useMutation({
+    mutationFn: (attId: number) => api(`/requirement-attachments/${attId}`, { method: "DELETE" }),
+    onSuccess: () => invalidate(),
+    onError: (e) => toastError(e),
+  });
+
+  return (
+    <Modal onClose={onClose} width={560} label={`${req.code} · Requirement`}>
+      <DecLabel>Requirement</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} placeholder="What must the solution do?" style={{ marginBottom: 14 }} />
+      <DecLabel>Description</DecLabel>
+      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit} placeholder="Acceptance criteria, context, notes…" style={{ minHeight: 72, resize: "vertical", marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={type} onChange={(e) => setType(e.target.value)} disabled={!canEdit}>{REQ_TYPES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Priority</DecLabel><Select value={priority} onChange={(e) => setPriority(e.target.value)} disabled={!canEdit}>{REQ_PRIORITIES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!canEdit}>{REQ_STATUSES.map((t) => <option key={t}>{t}</option>)}</Select></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Epic</DecLabel><Input value={epic} onChange={(e) => setEpic(e.target.value)} disabled={!canEdit} placeholder="Epic" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Story</DecLabel><Input value={story} onChange={(e) => setStory(e.target.value)} disabled={!canEdit} placeholder="e.g. CHK-204" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Test</DecLabel><Input value={test} onChange={(e) => setTest(e.target.value)} disabled={!canEdit} placeholder="e.g. TC-118" /></div>
+        <div style={{ flex: 1 }}><DecLabel>Release</DecLabel><Input value={release} onChange={(e) => setRelease(e.target.value)} disabled={!canEdit} placeholder="e.g. R2.0 · Aug" /></div>
+      </div>
+
+      {/* Attachments */}
+      <div style={{ borderTop: `1px solid ${color.bg}`, marginTop: 18, paddingTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: color.ink }}>Attachments</span>
+          <div style={{ flex: 1 }} />
+          {canEdit && (
+            <>
+              <input ref={fileRef} type="file" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ""; }} />
+              <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={upload.isPending}><Icon name="paperclip" size={15} /> {upload.isPending ? "Uploading…" : "Attach file"}</Button>
+            </>
+          )}
+        </div>
+        {req.attachments.length === 0 ? (
+          <div style={{ fontSize: 12, color: color.faint3 }}>No attachments.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {req.attachments.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 11px", border: `1px solid ${color.border}`, borderRadius: 9 }}>
+                <Icon name="paperclip" size={15} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.fileName}</div>
+                  <div style={{ fontSize: 11, color: color.faint3 }}>{fmtSize(a.size)} · {a.uploadedAt}</div>
+                </div>
+                <button onClick={() => apiDownload(`/requirement-attachments/${a.id}`, a.fileName)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={14} /> Download</button>
+                {canEdit && <button onClick={() => removeAtt.mutate(a.id)} title="Remove attachment" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={14} /></button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 22 }}>
+        {canEdit && (
+          confirmDel ? (
+            <>
+              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this requirement?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete requirement</button>
+          )
+        )}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>{canEdit ? "Cancel" : "Close"}</Button>
+        {canEdit && <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>}
       </div>
     </Modal>
   );

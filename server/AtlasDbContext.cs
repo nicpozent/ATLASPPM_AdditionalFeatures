@@ -51,6 +51,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Artifact> Artifacts => Set<Artifact>();
     public DbSet<ArtifactVersion> ArtifactVersions => Set<ArtifactVersion>();
     public DbSet<Requirement> Requirements => Set<Requirement>();
+    public DbSet<RequirementAttachment> RequirementAttachments => Set<RequirementAttachment>();
     public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
     public DbSet<ArchProfile> ArchProfiles => Set<ArchProfile>();
     public DbSet<AdmPhase> AdmPhases => Set<AdmPhase>();
