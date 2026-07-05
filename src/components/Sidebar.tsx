@@ -5,6 +5,7 @@ import { api } from "@/api";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
+import { useT } from "@/i18n";
 import {
   SCREENS, NAV_MAIN, NAV_CONFIG, NAV_STAKEHOLDER_MAIN, NAV_STAKEHOLDER_CONFIG,
   type ScreenId,
@@ -12,6 +13,7 @@ import {
 
 function NavItem({ id, badge }: { id: ScreenId; badge?: string }) {
   const s = SCREENS[id];
+  const t = useT();
   const shown = badge ?? s.badge;
   return (
     <NavLink
@@ -31,7 +33,7 @@ function NavItem({ id, badge }: { id: ScreenId; badge?: string }) {
           <span style={{ display: "flex", color: isActive ? "#fff" : color.sidebarMuted }}>
             <Icon name={s.icon} size={19} />
           </span>
-          <span style={{ flex: 1 }}>{s.label}</span>
+          <span style={{ flex: 1 }}>{t(`screen.${id}.label`, s.label)}</span>
           {shown && (
             <span style={{
               fontSize: 11, fontWeight: 700, background: color.primary, color: "#fff",
@@ -68,6 +70,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 export function Sidebar() {
   const { identity, role } = useRole();
   const { enabled: authEnabled, user, logout } = useAuth();
+  const t = useT();
   const isStakeholder = role === "stakeholder";
   const main = isStakeholder ? NAV_STAKEHOLDER_MAIN : NAV_MAIN;
   const config = isStakeholder ? NAV_STAKEHOLDER_CONFIG : NAV_CONFIG;
@@ -96,9 +99,9 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
-        <GroupLabel>Workspace</GroupLabel>
+        <GroupLabel>{t("group.workspace", "Workspace")}</GroupLabel>
         {main.map((id) => <NavItem key={id} id={id} badge={id === "demands" ? demandBadge : undefined} />)}
-        <GroupLabel>Configuration</GroupLabel>
+        <GroupLabel>{t("group.configuration", "Configuration")}</GroupLabel>
         {config.map((id) => <NavItem key={id} id={id} />)}
       </nav>
 
@@ -119,8 +122,8 @@ export function Sidebar() {
         {authEnabled && user && (
           <button
             onClick={logout}
-            title={`Sign out (${user.name})`}
-            aria-label={`Sign out ${user.name}`}
+            title={`${t("common.signOut", "Sign out")} (${user.name})`}
+            aria-label={`${t("common.signOut", "Sign out")} ${user.name}`}
             style={{
               flex: "none", display: "flex", alignItems: "center", justifyContent: "center",
               width: 32, height: 32, borderRadius: 8, cursor: "pointer",

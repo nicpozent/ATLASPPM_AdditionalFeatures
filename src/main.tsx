@@ -4,6 +4,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import App from "./App";
 import { RoleProvider } from "@/components/RoleContext";
 import { AuthProvider } from "@/components/AuthContext";
+import { I18nProvider } from "@/i18n";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster, toastError } from "@/components/Toast";
 import { ApiError } from "@/api";
@@ -46,14 +47,16 @@ async function boot() {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <QueryClientProvider client={qc}>
-        <AuthProvider>
-          <RoleProvider>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-            <Toaster />
-          </RoleProvider>
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <RoleProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+              <Toaster />
+            </RoleProvider>
+          </AuthProvider>
+        </I18nProvider>
       </QueryClientProvider>
     </React.StrictMode>
   );
