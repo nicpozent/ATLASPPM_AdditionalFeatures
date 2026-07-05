@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Atlas.Api;
 
 public record CreateArtifactReq(string Name, string? Type, string? Owner, string? Status);
+public record UpdateArtifactReq(string? Name, string? Type, string? Owner, string? Status);
 
 // ============================================================================
 //  Artifacts — a per-project document register where each artifact carries file
@@ -41,6 +42,26 @@ public static class Artifacts
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Artifacts", "Created artifact", $"{id} · {art.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/artifacts/{art.Id}", ToDto(art));
+        });
+
+        // Update an artifact's status (or name/type/owner) after creation — this
+        // is what lets a document move Draft → In review → Approved → Living.
+        api.MapPatch("/artifacts/{artId:int}", async (int artId, UpdateArtifactReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-artifacts", "E") is { } denied) return denied;
+            var art = await db.Artifacts.Include(a => a.Versions).FirstOrDefaultAsync(a => a.Id == artId);
+            if (art is null) return Results.NotFound();
+            if (req.Status is not null)
+            {
+                if (!Statuses.Contains(req.Status)) return Results.BadRequest(new { error = $"Status must be one of: {string.Join(", ", Statuses)}." });
+                art.Status = req.Status;
+            }
+            if (!string.IsNullOrWhiteSpace(req.Name)) art.Name = req.Name.Trim();
+            if (req.Type is not null && Types.Contains(req.Type)) art.Type = req.Type;
+            if (req.Owner is not null) art.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner.Trim();
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Artifacts", "Updated artifact", $"{art.ProjectId} · {art.Name} → {art.Status}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(ToDto(art));
         });
 
         // Upload a new file version (multipart). Version number = current count + 1.

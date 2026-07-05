@@ -177,7 +177,7 @@ public record RolesMatrixDto(List<CapabilityDto> Capabilities, List<RoleDto> Rol
 public record ProgramDto(string Id, string Name, string Owner, string Goal, string Status,
     List<string> Projects, decimal Budget, decimal Spent, int Progress, string Health, string StartDate = "",
     bool Archived = false, string EndDate = "", string Dept = "");
-public record UpdateProgramReq(string? Owner, string? Dept, string? Goal, string? StartDate, string? EndDate);
+public record UpdateProgramReq(string? Owner, string? Dept, string? Goal, string? StartDate, string? EndDate, List<string>? Projects);
 
 public record TaskDto(string Id, string Title, string Status, int Points, string DateISO, string MappedRelease);
 public record MemberDto(string Name, int Alloc);
