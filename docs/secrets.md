@@ -106,7 +106,11 @@ dev password.
 ### Interim hygiene (do these regardless)
 - **Never commit real secrets.** Keep `secrets/` and `.env` git-ignored.
 - **Lock file permissions** — `chmod 600`, owned by the service user.
-- **Rotate** the DB password and any Graph client secret periodically.
+- **Rotate** the DB password and any Graph client secret periodically. Atlas
+  tracks the database password's age under **Administration → Backups** (the
+  "Database password rotation" card) — it shows days since the last rotation,
+  warns at 90 days and flags "Change it now!" at 180, and an admin records each
+  rotation with **Mark as rotated today**.
 - Prefer a **strong, unique** Postgres password in every non-local environment
   (the `atlas`/`atlas` default is for local dev only).
 

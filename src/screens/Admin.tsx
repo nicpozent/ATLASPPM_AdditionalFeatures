@@ -609,6 +609,69 @@ interface BackupComponent { name: string; schedule: string; retention: string; r
 interface BackupRun { at: string; actor: string; role: string; size: string; records: number; status: string; }
 interface BackupsData { canManage: boolean; autoBackups: boolean; lastBackup: string; lastSizeBytes: number; components: BackupComponent[]; runs: BackupRun[]; }
 
+// ---- SECRET ROTATION (database password age + 90/180-day nudges) ----------
+interface RotationStatus {
+  rotatedAt: string | null; daysSince: number | null;
+  status: "unknown" | "ok" | "warn" | "critical";
+  warnDays: number; criticalDays: number; canManage: boolean;
+}
+const ROTATION_UI: Record<RotationStatus["status"], { label: string; fg: string; bg: string }> = {
+  unknown:  { label: "Not recorded", fg: "#6A7488", bg: "#EEF1F6" },
+  ok:       { label: "Healthy",      fg: "#15A34A", bg: "#E7F4EC" },
+  warn:     { label: "Rotate soon",  fg: "#9A6800", bg: "#FBF2D7" },
+  critical: { label: "Change it now!", fg: "#A1282B", bg: "#FBE7E8" },
+};
+
+function SecretRotationCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["secret-rotation"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<RotationStatus | null> => {
+      try { return await api<RotationStatus>("/admin/secret-rotation"); } catch { return null; }
+    },
+  });
+  const mark = useMutation({
+    mutationFn: () => api("/admin/secret-rotation/mark", { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["secret-rotation"] }); toast("Recorded — database password marked rotated today.", "info"); },
+    onError: (e) => toast(`Couldn’t record rotation: ${(e as Error).message}`, "error"),
+  });
+  if (!data) return null;
+  const ui = ROTATION_UI[data.status];
+  const age = data.daysSince == null ? "—" : `${data.daysSince} day${data.daysSince === 1 ? "" : "s"} ago`;
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={sectionTitle}>Database password rotation</div>
+            <div style={sectionSub}>
+              Last changed: <b style={{ color: color.text }}>{data.rotatedAt ?? "not recorded yet"}</b>
+              {data.daysSince != null && <> · {age}</>} · warn at {data.warnDays}d, critical at {data.criticalDays}d
+            </div>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, color: ui.fg, background: ui.bg, padding: "6px 12px", borderRadius: 20 }}>
+            {ui.label}
+          </span>
+          {data.canManage && (
+            <button onClick={() => mark.mutate()} disabled={mark.isPending}
+              style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: mark.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: mark.isPending ? 0.7 : 1 }}>
+              Mark as rotated today
+            </button>
+          )}
+        </div>
+        {data.status !== "ok" && data.status !== "unknown" && (
+          <div style={{ marginTop: 12, fontSize: 12.5, color: ui.fg, background: ui.bg, borderRadius: 8, padding: "9px 12px" }}>
+            {data.status === "critical"
+              ? "This password is overdue for rotation. Rotate it, then mark it here."
+              : "This password is approaching its rotation window. Plan to rotate it soon."}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function BackupsSection() {
   const qc = useQueryClient();
   const { data } = useQuery({
@@ -634,6 +697,7 @@ function BackupsSection() {
 
   return (
     <>
+      <SecretRotationCard />
       <div style={{ background: GRADIENT, borderRadius: radius.xxl, padding: "20px 24px", marginBottom: 18, color: "#fff", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600 }}>Backups & restore</div>
