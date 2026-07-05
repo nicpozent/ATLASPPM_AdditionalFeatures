@@ -3,6 +3,7 @@ import { color, font, layout } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useAuth } from "./AuthContext";
+import { NotificationCenter } from "./NotificationCenter";
 import { ROLES, SCREENS } from "@/nav";
 
 export function Topbar() {
@@ -56,14 +57,7 @@ export function Topbar() {
       </div>
 
       {/* Notifications */}
-      <button style={{
-        position: "relative", width: 40, height: 40, borderRadius: 9,
-        border: `1px solid ${color.border3}`, background: color.surface,
-        display: "flex", alignItems: "center", justifyContent: "center", color: "#56607A", cursor: "pointer",
-      }}>
-        <Icon name="bell" size={18} />
-        <span style={{ position: "absolute", top: 8, right: 9, width: 7, height: 7, borderRadius: "50%", background: color.danger, border: "2px solid #fff" }} />
-      </button>
+      <NotificationCenter />
 
       {/* Export */}
       <button style={{

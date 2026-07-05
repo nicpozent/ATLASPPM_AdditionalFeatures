@@ -63,7 +63,10 @@ public record ReqStatsDto(int Total, int Approved, int Coverage, int Verified);
 public record RequirementsDto(bool CanEdit, ReqStatsDto Stats, List<RequirementDto> Requirements, List<ChangeRequestDto> ChangeRequests);
 
 public record AdmPhaseDto(int Id, string Code, string Phase, string Focus, string Owner, string Artefact, string Status);
-public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases);
+public record ArchApprovalDto(int Id, string Role, string Decision, string DecidedBy, string DecidedAt, string Note);
+public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto> Phases,
+    List<ArchApprovalDto> Approvals, string ArbStatus);
+public record SetArbDecisionReq(string Decision, string? Note);
 
 public record TestPlanDto(int Id, string Name, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct);
 public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);
@@ -90,6 +93,15 @@ public record TeamsAdminDto(bool CanManage, bool GraphConfigured, List<TeamManag
 public record MyTeamGroupDto(string Id, string DisplayName, List<TeamMemberDto> Members);
 public record MyTeamManagerDto(string Key, string Label, bool IsSelf, List<MyTeamGroupDto> Groups, int MemberCount);
 public record MyTeamDto(bool IsAdmin, string ManagerKey, string ManagerLabel, List<MyTeamManagerDto> Teams);
+
+// ---- Notifications, subscriptions & preferences ----------------------------
+public record NotificationDto(int Id, string EventType, string Title, string Body, string TargetType, string TargetId, bool Read, string At);
+public record InboxDto(int UnreadCount, List<NotificationDto> Items);
+public record SubscriptionDto(int Id, string TargetType, string TargetId);
+public record NotifPrefDto(string EventType, string Label, string Detail, bool EntityScoped, bool InApp, bool Email);
+public record MarkReadReq(List<int>? Ids, bool All);
+public record SubscribeReq(string TargetType, string TargetId);
+public record SetPrefReq(bool InApp, bool Email);
 
 // ---- Timeline / Gantt ------------------------------------------------------
 public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);

@@ -369,7 +369,7 @@ public static class Teams
         return count;
     }
 
-    static async Task<string> GraphTokenAsync(HttpClient http, IConfiguration cfg)
+    public static async Task<string> GraphTokenAsync(HttpClient http, IConfiguration cfg)
     {
         var form = new FormUrlEncodedContent(new Dictionary<string, string>
         {

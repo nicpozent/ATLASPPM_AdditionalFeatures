@@ -87,6 +87,7 @@ public static class WriteEndpoints
             db.Demands.Add(d);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Created demand", d.Id));
             await db.SaveChangesAsync();
+            await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New demand: {d.Title}", $"{d.Id} · {d.Title} ({d.Dept}) was submitted.", "demand", d.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/demands/{d.Id}",
                 new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
@@ -148,9 +149,16 @@ public static class WriteEndpoints
             if (!Stages.Contains(req.Stage)) return Results.BadRequest(new { error = "Unknown stage." });
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
+            var oldStage = d.Stage;
             d.Stage = req.Stage;
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", $"Advanced demand to {req.Stage}", d.Id));
             await db.SaveChangesAsync();
+            if (req.Stage != oldStage)
+            {
+                var ev = req.Stage == "approved" ? Notifications.Approval : Notifications.Status;
+                var msg = req.Stage == "approved" ? "was approved" : $"moved to “{req.Stage}”";
+                await Notifications.EmitToEntityAsync(db, cfg, ev, "demand", d.Id, $"Demand {d.Title} {msg}", $"{d.Id} · {d.Title} {msg}.", Permissions.CallerKey(http, cfg));
+            }
             return Results.Ok(new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
 
@@ -226,6 +234,7 @@ public static class WriteEndpoints
                 db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Applied methodology template", $"{p.Id} · {p.Methodology}"));
             }
             await db.SaveChangesAsync();
+            await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New project: {p.Name}", $"{p.Id} · {p.Name} ({p.Dept}) was created.", "project", p.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/projects/{p.Id}", new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent, p.Target, 0,
                 p.Archived, p.IsSystem, p.StartDate));
@@ -238,6 +247,7 @@ public static class WriteEndpoints
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var p = await db.Projects.Include(x => x.Blockers).FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
+            var (oldStatus, oldTarget) = (p.Status, p.Target);
 
             if (!string.IsNullOrWhiteSpace(req.Name)) p.Name = req.Name!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Dept)) p.Dept = req.Dept!.Trim();
@@ -258,6 +268,14 @@ public static class WriteEndpoints
 
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Updated project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
+            // Notify subscribers of the meaningful transitions.
+            var actor = Permissions.CallerKey(http, cfg);
+            if (p.Status != oldStatus && p.Status is "amber" or "red")
+                await Notifications.EmitToEntityAsync(db, cfg, Notifications.Risk, "project", p.Id, $"{p.Name} is now {(p.Status == "red" ? "critical" : "at risk")}", $"{p.Id} · health is now “{p.Health}”.", actor);
+            else if (p.Status != oldStatus)
+                await Notifications.EmitToEntityAsync(db, cfg, Notifications.Status, "project", p.Id, $"{p.Name} status changed", $"{p.Id} · status is now “{p.Health}”.", actor);
+            if (p.Target != oldTarget && !string.IsNullOrWhiteSpace(oldTarget))
+                await Notifications.EmitToEntityAsync(db, cfg, Notifications.DateSlip, "project", p.Id, $"{p.Name} target date changed", $"{p.Id} · target moved from {oldTarget} to {p.Target}.", actor);
             return Results.Ok(new ProjectDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
                 p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate));
         });
@@ -358,6 +376,7 @@ public static class WriteEndpoints
             db.Programs.Add(pg);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Programs", "Created program", $"{pg.Id} · {pg.Name}"));
             await db.SaveChangesAsync();
+            await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New program: {pg.Name}", $"{pg.Id} · {pg.Name} was created.", "program", pg.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/programs/{pg.Id}", new ProgramDto(
                 pg.Id, pg.Name, pg.Owner, pg.Goal, pg.Status, pg.Projects, pg.Budget, pg.Spent, pg.Progress, pg.Health, pg.StartDate, pg.Archived, pg.EndDate));
         });
@@ -416,6 +435,7 @@ public static class WriteEndpoints
             db.Products.Add(p);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Products", "Created product", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();
+            await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New product: {p.Name}", $"{p.Id} · {p.Name} was created.", "product", p.Id, Permissions.CallerKey(http, cfg));
             return Results.Created($"/api/v1/products/{p.Id}", new ProductDto(
                 p.Id, p.Name, p.Owner, p.Source, p.Projects, new List<TaskDto>(), new List<MemberDto>(), new List<string>(),
                 p.Status, p.StartDate, p.EndDate, true, p.TeamKey, Teams.SlotLabel(p.TeamKey), 0));

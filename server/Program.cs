@@ -40,6 +40,8 @@ if (authEnabled)
 var app = builder.Build();
 var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Atlas.Startup");
 startupLog.LogInformation("Atlas API starting — auth {AuthMode}", authEnabled ? "ENABLED (Entra bearer)" : "disabled (anonymous, dev)");
+// Give the static notification emit path a real logger for email diagnostics.
+Notifications.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
 // Apply migrations on startup. Demo seed is OFF by default — production starts
 // empty and fills with real data; set Seed:Enabled=true (env Seed__Enabled) to

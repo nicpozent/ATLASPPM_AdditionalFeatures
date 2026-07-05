@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
+import { SubscribeButton } from "@/components/SubscribeButton";
 
 type Source = "jira" | "ado" | "manual";
 
@@ -243,6 +244,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
               {["Active", "Retired", "Replaced"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
+          <SubscribeButton targetType="product" targetId={product.id} />
           <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
         </div>
       </div>

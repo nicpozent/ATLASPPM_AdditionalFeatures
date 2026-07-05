@@ -347,6 +347,49 @@ public class ManagerNode
     public string ParentKey { get; set; } = "";        // parent manager slot; "" = top of tree
 }
 
+// ---- Notifications, subscriptions & per-user preferences -------------------
+// A user's subscription to an entity's activity. UserKey is the caller's stable
+// identity (Entra oid under auth; the role identity when auth is off). Entity
+// events (risk, date slip, status, approvals) reach a user only if they're
+// subscribed to that entity and have the event's channel switched on.
+public class Subscription
+{
+    public int Id { get; set; }
+    public string UserKey { get; set; } = default!;
+    public string Email { get; set; } = "";             // captured at subscribe time (for email delivery)
+    public string TargetType { get; set; } = default!;  // project|program|product
+    public string TargetId { get; set; } = default!;
+    public DateTime CreatedAt { get; set; }
+}
+
+// A per-user, per-event-type channel choice. Absent → the role-aware default
+// (Notifications.DefaultPref) applies, so the system works before anyone opts in.
+public class NotificationPref
+{
+    public int Id { get; set; }
+    public string UserKey { get; set; } = default!;
+    public string EmailAddr { get; set; } = "";         // captured at pref-set time (for email delivery)
+    public string EventType { get; set; } = default!;   // risk|date_slip|status_change|approval|created
+    public bool InApp { get; set; } = true;
+    public bool Email { get; set; }
+}
+
+// An in-app notification in a user's inbox. Email delivery (when the user's pref
+// asks for it and Graph Mail.Send is configured) is fired at emit time; this row
+// is the durable in-app copy and drives the bell's unread count.
+public class Notification
+{
+    public int Id { get; set; }
+    public string UserKey { get; set; } = default!;
+    public string EventType { get; set; } = default!;
+    public string Title { get; set; } = default!;
+    public string Body { get; set; } = "";
+    public string TargetType { get; set; } = "";
+    public string TargetId { get; set; } = "";
+    public bool Read { get; set; }
+    public DateTime At { get; set; }
+}
+
 // A per-project override of the methodology's default "ways of working". Absent
 // → the project shows the methodology default (see WaysOfWorking.For). Present →
 // the edited cadence/summary/ceremonies/artifacts/roles. Lists are stored as
@@ -605,6 +648,21 @@ public class AdmPhase
     public string Owner { get; set; } = "";
     public string Artefact { get; set; } = "";
     public string Status { get; set; } = "Not started";   // Not started | Draft | In progress | In review | Approved
+    public int Ord { get; set; }
+}
+
+// An Architecture Review Board sign-off: one per architecture role, per project.
+// Each is an INDEPENDENT approval — the ARB (not the PMO) owns architectural
+// correctness, so the overall verdict is the roll-up of every role's decision.
+public class ArchApproval
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Role { get; set; } = default!;          // Chief Architect, Solution Architect, …
+    public string Decision { get; set; } = "pending";     // pending | approved | conditions | rejected
+    public string DecidedBy { get; set; } = "";           // who recorded the sign-off
+    public string DecidedAt { get; set; } = "";           // display timestamp
+    public string Note { get; set; } = "";                // conditions / rejection rationale
     public int Ord { get; set; }
 }
 

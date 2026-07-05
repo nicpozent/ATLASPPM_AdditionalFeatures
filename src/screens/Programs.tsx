@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
+import { SubscribeButton } from "@/components/SubscribeButton";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
@@ -243,6 +244,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: h.ink, background: h.tint, padding: "4px 12px", borderRadius: 20 }}>{HEALTH[program.health]?.label ?? program.status}</span>
+            <SubscribeButton targetType="program" targetId={program.id} />
             <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
           </div>
         </div>

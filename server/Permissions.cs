@@ -120,6 +120,26 @@ public static class Permissions
             : http.Request.Headers["X-Atlas-Role"].ToString();
     }
 
+    // Stable per-user identity for personal data (subscriptions, notification
+    // prefs). Under auth it's the Entra object id; with auth off it's the role
+    // identity from the header (so each switcher identity is its own "user").
+    public static string CallerKey(HttpContext http, IConfiguration cfg)
+    {
+        if (cfg.GetValue("Auth:Enabled", false)) return Rbac.CallerId(http.User);
+        var header = http.Request.Headers["X-Atlas-Role"].ToString();
+        return string.IsNullOrWhiteSpace(header) ? "dev" : header;
+    }
+
+    // The caller's email for outbound notifications (empty when unknown, e.g.
+    // auth off — email delivery is then skipped and only in-app is used).
+    public static string CallerEmail(HttpContext http, IConfiguration cfg)
+    {
+        if (!cfg.GetValue("Auth:Enabled", false)) return "";
+        return http.User.FindFirst("preferred_username")?.Value
+            ?? http.User.FindFirst(ClaimTypes.Email)?.Value
+            ?? http.User.FindFirst("upn")?.Value ?? "";
+    }
+
     // Display name for the current caller (real name/UPN under auth, else role).
     public static string ActorName(HttpContext http, IConfiguration cfg)
     {
