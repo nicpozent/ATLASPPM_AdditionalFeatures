@@ -21,10 +21,10 @@ public static class RequestLogging
 
     // A short, human-quotable correlation code (e.g. "SRV-3F9K2A"). Written to the
     // log line AND returned to the user so support can find the exact entry.
-    static string NewCode(string prefix) => $"{prefix}-{Guid.NewGuid():N}"[..(prefix.Length + 7)].ToUpperInvariant();
+    internal static string NewCode(string prefix) => $"{prefix}-{Guid.NewGuid():N}"[..(prefix.Length + 7)].ToUpperInvariant();
 
     // Category prefix for a status: server bug vs an upstream/integration failure.
-    static string CategoryFor(int status) => status is 502 or 503 or 504 ? "INT" : "SRV";
+    internal static string CategoryFor(int status) => status is 502 or 503 or 504 ? "INT" : "SRV";
 
     // Merge the correlation code into a 5xx body, preserving the endpoint's own
     // error message when it had one (else a friendly default).

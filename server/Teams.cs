@@ -51,7 +51,7 @@ public static class Teams
         !string.IsNullOrWhiteSpace(cfg["Graph:ClientSecret"]);
 
     // All manager keys at or below `key` in the parent tree (inclusive).
-    static HashSet<string> DescendantsOf(string key, Dictionary<string, string> parentOf)
+    internal static HashSet<string> DescendantsOf(string key, Dictionary<string, string> parentOf)
     {
         var result = new HashSet<string> { key };
         bool grew = true;

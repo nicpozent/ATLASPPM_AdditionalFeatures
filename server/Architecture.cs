@@ -27,7 +27,7 @@ public static class Architecture
     static readonly string[] Decisions = { "pending", "approved", "conditions", "rejected" };
 
     // Roll-up of the independent sign-offs into an overall board verdict.
-    static string ArbStatus(IReadOnlyCollection<ArchApproval> a)
+    internal static string ArbStatus(IReadOnlyCollection<ArchApproval> a)
     {
         if (a.Count == 0) return "Not started";
         if (a.Any(x => x.Decision == "rejected")) return "Rejected";

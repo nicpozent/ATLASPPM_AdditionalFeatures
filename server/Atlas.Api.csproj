@@ -7,6 +7,17 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Atlas.Tests" />
+  </ItemGroup>
+  <!-- The test project lives under this folder; keep its sources out of the web
+       app's implicit compile glob so the API doesn't try to build the tests. -->
+  <ItemGroup>
+    <Compile Remove="Atlas.Tests/**/*.cs" />
+    <Content Remove="Atlas.Tests/**/*" />
+    <EmbeddedResource Remove="Atlas.Tests/**/*" />
+    <None Remove="Atlas.Tests/**/*" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
