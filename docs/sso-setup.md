@@ -74,13 +74,25 @@ stays in manual-add mode until all three are set.
 the **client-credentials (app-only)** flow, which needs a **confidential client
 with a client secret**. The Web registration is a public SPA and can't do this.
 
+**Only the groups you ASSIGN to the Atlas Enterprise Application are synced** —
+not the whole directory. So the sync stays small and fast, and *you* decide
+what syncs by assigning groups (see step 4 below).
+
 On the **API** registration:
 1. **Certificates & secrets → New client secret** — copy the secret **Value**
    (not the Secret ID).
-2. **API permissions → Microsoft Graph → Application permissions →
-   `GroupMember.Read.All`**, then **Grant admin consent**. (Add `Mail.Send` too
-   if you enable email notifications.) It must be an **Application** permission,
-   not Delegated.
+2. **API permissions → Microsoft Graph → Application permissions**, add both,
+   then **Grant admin consent** (they must be **Application**, not Delegated):
+   - **`Application.Read.All`** — lets Atlas read its own assigned groups.
+   - **`GroupMember.Read.All`** — lets Atlas read those groups' members.
+   - (Add **`Mail.Send`** too if you enable email notifications.)
+3. **App roles → Create app role** — a *marker* role to tag groups for sync
+   (it grants no Atlas permissions):
+   - Display name **Atlas Team Group**, Allowed member types **Users/Groups**,
+     Value **`AtlasTeamGroup`**, enabled.
+4. **Enterprise Applications → Atlas → Users and groups → Add assignment** —
+   assign each team group to the **Atlas Team Group** role. Those are the groups
+   Atlas will sync (with their members).
 
 Then set (the compose forwards these to the API container):
 
@@ -89,6 +101,7 @@ Then set (the compose forwards these to the API container):
 | `GRAPH_TENANT_ID` | `Graph__TenantId` | tenant GUID |
 | `GRAPH_CLIENT_ID` | `Graph__ClientId` | the **ATLAS PPM API** app (client) id |
 | `GRAPH_CLIENT_SECRET` | `Graph__ClientSecret` | the client secret **Value** |
+| `GRAPH_SYNC_APP_ROLE_ID` *(optional)* | `Graph__SyncAppRoleId` | the **Atlas Team Group** app-role id (GUID). Set it to sync *only* groups assigned to that role; leave empty to sync **all** groups assigned to the app |
 
 > **`.env` alone is not enough unless the compose forwards it.** Docker Compose
 > uses `.env` only to fill `${…}` placeholders in the compose file — it does not
