@@ -2274,19 +2274,35 @@ function Vacations({ projectId }: { projectId: string | null }) {
 
 // ---- Ways of working — methodology-specific ceremonies, artifacts & roles ---
 interface WowItem { label: string; detail: string; }
-interface WaysOfWorkingData { methodology: string; cadence: string; summary: string; ceremonies: WowItem[]; artifacts: string[]; roles: string[]; }
+interface WaysOfWorkingData { methodology: string; cadence: string; summary: string; ceremonies: WowItem[]; artifacts: string[]; roles: string[]; canEdit?: boolean; }
+
+const WOW_UPPER: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 };
 
 function WaysOfWorking({ projectId }: { projectId: string | null }) {
+  const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["wow", projectId], enabled: !!projectId, retry: false, staleTime: 60_000,
     queryFn: async (): Promise<WaysOfWorkingData | null> => {
       try { return await api<WaysOfWorkingData>(`/projects/${projectId}/ways-of-working`); } catch { return null; }
     },
   });
+  const [draft, setDraft] = useState<WaysOfWorkingData | null>(null);
+  const save = useMutation({
+    mutationFn: (d: WaysOfWorkingData) => api(`/projects/${projectId}/ways-of-working`, {
+      method: "PATCH",
+      body: JSON.stringify({ cadence: d.cadence, summary: d.summary, ceremonies: d.ceremonies, artifacts: d.artifacts, roles: d.roles }),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wow", projectId] }); setDraft(null); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
   if (!projectId || !data) return null;
   const chip = (t: string, ink: string, tint: string) => (
     <span key={t} style={{ fontSize: 11.5, fontWeight: 600, color: ink, background: tint, padding: "3px 10px", borderRadius: 20 }}>{t}</span>
   );
+
+  if (draft) return <WowEditor draft={draft} setDraft={setDraft} onSave={() => save.mutate(draft)} onCancel={() => setDraft(null)} saving={save.isPending} />;
+
   return (
     <Card padding={22}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
@@ -2294,13 +2310,14 @@ function WaysOfWorking({ projectId }: { projectId: string | null }) {
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{data.cadence}</span>
+        {data.canEdit && <button onClick={() => setDraft({ ...data, ceremonies: data.ceremonies.map((c) => ({ ...c })), artifacts: [...data.artifacts], roles: [...data.roles] })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 8, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
       </div>
       <div style={{ fontSize: 12.5, color: color.faint2, lineHeight: 1.5, marginBottom: 16 }}>{data.summary}</div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Ceremonies &amp; cadences</div>
+      <div style={WOW_UPPER}>Ceremonies &amp; cadences</div>
       <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
         {data.ceremonies.map((c, i) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 13px", borderBottom: i < data.ceremonies.length - 1 ? "1px solid #F4F6FA" : "none" }}>
+          <div key={c.label + i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 13px", borderBottom: i < data.ceremonies.length - 1 ? "1px solid #F4F6FA" : "none" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0F6CBD", marginTop: 6, flex: "none" }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{c.label}</div>
@@ -2312,15 +2329,76 @@ function WaysOfWorking({ projectId }: { projectId: string | null }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Key artifacts</div>
+          <div style={WOW_UPPER}>Key artifacts</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.artifacts.map((a) => chip(a, "#6A2E9E", "#F0E8F7"))}</div>
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 }}>Roles</div>
+          <div style={WOW_UPPER}>Roles</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.roles.map((r) => chip(r, "#0B6B37", "#E7F4EC"))}</div>
         </div>
       </div>
     </Card>
+  );
+}
+
+function WowEditor({ draft, setDraft, onSave, onCancel, saving }: {
+  draft: WaysOfWorkingData; setDraft: (d: WaysOfWorkingData) => void; onSave: () => void; onCancel: () => void; saving: boolean;
+}) {
+  const set = (patch: Partial<WaysOfWorkingData>) => setDraft({ ...draft, ...patch });
+  const editChips = (label: string, list: string[], key: "artifacts" | "roles", ink: string, tint: string) => (
+    <div>
+      <div style={WOW_UPPER}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 8 }}>
+        {list.map((t, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: ink, background: tint, padding: "3px 6px 3px 10px", borderRadius: 20 }}>
+            {t}<button onClick={() => set({ [key]: list.filter((_, j) => j !== i) } as Partial<WaysOfWorkingData>)} style={{ border: "none", background: "transparent", color: ink, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+          </span>
+        ))}
+      </div>
+      <AddChip onAdd={(v) => set({ [key]: [...list, v] } as Partial<WaysOfWorkingData>)} />
+    </div>
+  );
+  return (
+    <Card padding={22}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <SectionTitle>Edit ways of working</SectionTitle>
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+        <Button onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 14 }}>
+        <div><div style={WOW_UPPER}>Cadence</div><Input value={draft.cadence} onChange={(e) => set({ cadence: e.target.value })} /></div>
+        <div><div style={WOW_UPPER}>Summary</div><Input value={draft.summary} onChange={(e) => set({ summary: e.target.value })} /></div>
+      </div>
+
+      <div style={WOW_UPPER}>Ceremonies &amp; cadences</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+        {draft.ceremonies.map((c, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr 28px", gap: 8, alignItems: "center" }}>
+            <Input value={c.label} placeholder="Ceremony" onChange={(e) => set({ ceremonies: draft.ceremonies.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
+            <Input value={c.detail} placeholder="What happens" onChange={(e) => set({ ceremonies: draft.ceremonies.map((x, j) => j === i ? { ...x, detail: e.target.value } : x) })} />
+            <button onClick={() => set({ ceremonies: draft.ceremonies.filter((_, j) => j !== i) })} title="Remove" style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 14 }}>×</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => set({ ceremonies: [...draft.ceremonies, { label: "", detail: "" }] })} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}><Icon name="plus" size={14} /> Add ceremony</button>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {editChips("Key artifacts", draft.artifacts, "artifacts", "#6A2E9E", "#F0E8F7")}
+        {editChips("Roles", draft.roles, "roles", "#0B6B37", "#E7F4EC")}
+      </div>
+    </Card>
+  );
+}
+
+function AddChip({ onAdd }: { onAdd: (v: string) => void }) {
+  const [v, setV] = useState("");
+  const add = () => { if (v.trim()) { onAdd(v.trim()); setV(""); } };
+  return (
+    <div style={{ display: "flex", gap: 7 }}>
+      <Input value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder="Add…" style={{ padding: "6px 9px", fontSize: 12 }} />
+      <Button variant="secondary" onClick={add} style={{ padding: "6px 12px" }}>Add</Button>
+    </div>
   );
 }
 

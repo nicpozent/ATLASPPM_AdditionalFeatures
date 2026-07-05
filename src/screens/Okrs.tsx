@@ -34,8 +34,8 @@ const krFill = (p: number) => (p >= 66 ? "#15A34A" : p >= 33 ? "#E0A100" : "#D13
 
 export default function Okrs() {
   const { can } = usePermissions();
-  const canEdit = can("cap-projects", "E"); // cosmetic gate, driven by the matrix (API is authoritative)
-  const canDelete = can("cap-projects", "F");
+  const canEdit = can("cap-okrs", "E"); // cosmetic gate, driven by the matrix (API is authoritative)
+  const canDelete = can("cap-okrs", "F");
   const { data: objectives = [] } = useObjectives();
   const qc = useQueryClient();
 
