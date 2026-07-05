@@ -7,11 +7,11 @@ import { Button, Input, Select, RowMenu, MenuItem, MenuDivider } from "@/compone
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { DEPARTMENTS } from "@/departments";
 import { Overlay } from "./Demands";
 
 type Health = "green" | "amber" | "red" | "hold";
-type PowInt = "High" | "Low";
 
 interface Program {
   id: string; name: string; owner: string; goal: string; status: string;
@@ -26,7 +26,6 @@ const pgToDisplay = (iso: string): string => {
   const [y, m, d] = iso.split("-").map(Number);
   return y && m && d ? `${d} ${PG_MONTHS[m - 1]} ${y}` : "";
 };
-interface Stakeholder { id: string; user: string; role: string; power: PowInt; interest: PowInt }
 
 const STATUS_OPTS = ["Planning", "On track", "At risk", "Critical", "On hold", "Completed", "Closed"] as const;
 const STATUS_COLOR: Record<string, { tint: string; ink: string; dot: string }> = {
@@ -224,18 +223,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
     onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
   });
   const [costsOpen, setCostsOpen] = useState(false);
-  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
-  const [skName, setSkName] = useState("");
-  const [skRole, setSkRole] = useState("");
-  const [skPower, setSkPower] = useState<PowInt>("High");
-  const [skInterest, setSkInterest] = useState<PowInt>("High");
   const projectRows = projectOpts.filter((p) => program.projects.includes(p.id));
-
-  const addStk = () => {
-    if (!skName.trim()) return;
-    setStakeholders((l) => [...l, { id: "STK-" + Math.floor(1000 + Math.random() * 9000), user: skName.trim(), role: skRole.trim() || "Stakeholder", power: skPower, interest: skInterest }]);
-    setSkName(""); setSkRole("");
-  };
 
   const kpi = (label: string, node: React.ReactNode) => (
     <div><div style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>{label}</div>{node}</div>
@@ -353,85 +341,15 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
         })}
       </div>
 
-      {/* stakeholder matrix */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginTop: 18 }}>
-        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 14 }}>Stakeholder matrix · power / interest</div>
-        <StakeholderMatrix items={stakeholders} />
-        <div style={{ borderTop: `1px solid ${color.bg}`, marginTop: 16, paddingTop: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 10 }}>Program-level stakeholders</div>
-          {stakeholders.map((s) => {
-            const q = quadrant(s.power, s.interest);
-            return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 0", borderBottom: "1px solid #F4F6FA" }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: q.dot, flex: "none" }} />
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: color.text }}>{s.user}</span>
-                <span style={{ fontSize: 11, color: color.faint2 }}>{s.role} · {q.label}</span>
-                <button onClick={() => setStakeholders((l) => l.filter((x) => x.id !== s.id))} style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
-              </div>
-            );
-          })}
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 8, marginTop: 12 }}>
-            <Input value={skName} onChange={(e) => setSkName(e.target.value)} placeholder="Stakeholder name" />
-            <Input value={skRole} onChange={(e) => setSkRole(e.target.value)} placeholder="Role" />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, marginTop: 8 }}>
-            <Select value={skPower} onChange={(e) => setSkPower(e.target.value as PowInt)}><option value="High">Power: High</option><option value="Low">Power: Low</option></Select>
-            <Select value={skInterest} onChange={(e) => setSkInterest(e.target.value as PowInt)}><option value="High">Interest: High</option><option value="Low">Interest: Low</option></Select>
-            <button onClick={addStk} style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Add</button>
-          </div>
-        </div>
+      {/* stakeholder matrix (persisted) */}
+      <div style={{ marginTop: 18 }}>
+        <StakeholderMatrixCard scopeType="program" scopeId={program.id} />
       </div>
       {costsOpen && <CostsModal scope="programs" id={program.id} name={program.name} onClose={() => setCostsOpen(false)} />}
     </>
   );
 }
 
-function quadrant(power: PowInt, interest: PowInt) {
-  const hi = (s: PowInt) => s === "High";
-  if (hi(power) && hi(interest)) return { key: "manage", label: "Manage Closely", tint: "#FBE7E8", ink: "#A1282B", dot: "#D13438" };
-  if (hi(power) && !hi(interest)) return { key: "satisfy", label: "Keep Satisfied", tint: "#FBF2D7", ink: "#8A6300", dot: "#E0A100" };
-  if (!hi(power) && hi(interest)) return { key: "inform", label: "Keep Informed", tint: "#E6EFFB", ink: "#0C5798", dot: "#0F6CBD" };
-  return { key: "monitor", label: "Monitor", tint: "#EEF0F4", ink: "#566077", dot: "#8A93A6" };
-}
-
-function StakeholderMatrix({ items }: { items: Stakeholder[] }) {
-  const cell = (power: PowInt, interest: PowInt) => {
-    const q = quadrant(power, interest);
-    const inq = items.filter((it) => quadrant(it.power, it.interest).key === q.key);
-    return (
-      <div style={{ background: q.tint, borderRadius: 10, padding: "12px 13px", minHeight: 96 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: q.ink, marginBottom: 8 }}>{q.label}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {inq.length ? inq.map((it) => (
-            <span key={it.id} title={it.role} style={{ fontSize: 11, fontWeight: 600, color: q.ink, background: "#fff", border: `1px solid ${q.dot}`, borderRadius: 20, padding: "2px 9px" }}>{it.user}</span>
-          )) : <span style={{ fontSize: 11, color: color.faint3 }}>—</span>}
-        </div>
-      </div>
-    );
-  };
-  const axisLabel = (t: string) => <span style={{ fontSize: 10.5, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em" }}>{t}</span>;
-  const vAxis = (t: string) => (
-    <div style={{ width: 46, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ fontSize: 10.5, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em", transform: "rotate(-90deg)", whiteSpace: "nowrap" }}>{t}</span>
-    </div>
-  );
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 6, paddingLeft: 54 }}>
-        <div style={{ flex: 1 }}>{axisLabel("Low interest")}</div>
-        <div style={{ flex: 1 }}>{axisLabel("High interest")}</div>
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        {vAxis("High power")}
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{cell("High", "Low")}{cell("High", "High")}</div>
-      </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        {vAxis("Low power")}
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{cell("Low", "Low")}{cell("Low", "High")}</div>
-      </div>
-    </div>
-  );
-}
 
 function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { projectOpts: ProjOpt[]; onClose: () => void; onCreate: (p: NewProgram) => void; submitting?: boolean }) {
   const [name, setName] = useState("");

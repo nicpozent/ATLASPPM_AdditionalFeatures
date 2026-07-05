@@ -47,6 +47,18 @@ public class Project
     public List<Blocker> Blockers { get; set; } = new();
 }
 
+// A stakeholder on a project's or program's power/interest matrix.
+public class StakeholderEntry
+{
+    public int Id { get; set; }
+    public string ScopeType { get; set; } = "project";   // project|program
+    public string ScopeId { get; set; } = default!;
+    public string Name { get; set; } = "";
+    public string Role { get; set; } = "";
+    public string Power { get; set; } = "High";           // High|Low
+    public string Interest { get; set; } = "High";        // High|Low
+}
+
 // A comment on a project's collaboration thread. Author/initials captured at
 // post time from the caller's identity.
 public class ProjectComment
