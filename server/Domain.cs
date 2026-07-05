@@ -813,7 +813,8 @@ public class Epic
     public int Stories { get; set; }
     public int Done { get; set; }
     public string Status { get; set; } = "Upcoming";     // Complete | In progress | Upcoming | At risk
-    public string DependsOn { get; set; } = "";
+    public string DependsOn { get; set; } = "";           // legacy free-text note (still shown)
+    public List<int> DependsOnIds { get; set; } = new();  // other epics in this project this one depends on
     public int Ord { get; set; }
 }
 
