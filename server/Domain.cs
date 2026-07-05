@@ -328,7 +328,9 @@ public class KeyResult
 {
     public string Id { get; set; } = default!;
     public string Title { get; set; } = default!;
-    public string Link { get; set; } = default!;
+    public string Link { get; set; } = default!;    // display label (linked entity's name, or free text)
+    public string LinkType { get; set; } = "";       // "" | project | program | product
+    public string LinkId { get; set; } = "";         // id of the linked entity
     public int Progress { get; set; }
     public string ObjectiveId { get; set; } = default!;
 }

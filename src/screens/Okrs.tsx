@@ -9,13 +9,53 @@ import { usePermissions } from "@/components/usePermissions";
 // ---------------------------------------------------------------------------
 // Data model + hook (empty by default until the API exists).
 // ---------------------------------------------------------------------------
-interface Kr { id: string; title: string; link: string; progress: number }
+interface Kr { id: string; title: string; link: string; progress: number; linkType?: string; linkId?: string }
 interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[]; status?: string; health?: string; startDate?: string; targetDate?: string }
 type OkrStatus = "Active" | "Completed";
 
 interface NewObjective { title: string; owner: string; horizon: string; startDate: string; targetDate: string }
 interface EditObjective { title: string; owner: string; horizon: string; startDate: string; targetDate: string }
-interface NewKr { title: string; link: string; progress: number }
+interface NewKr { title: string; linkType: string; linkId: string; progress: number }
+
+// Typed link to a project / program / product for a key result.
+interface LinkOpt { id: string; name: string }
+const LINK_TYPES = [
+  { key: "project", label: "Project" },
+  { key: "program", label: "Program" },
+  { key: "product", label: "Product" },
+];
+function useLinkList(path: string): LinkOpt[] {
+  const { data } = useQuery({
+    queryKey: ["link-opts", path], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<LinkOpt[]> => { try { return (await api<LinkOpt[]>(path)) ?? []; } catch { return []; } },
+  });
+  return data ?? [];
+}
+function useLinkOptions() {
+  const projects = useLinkList("/projects");
+  const programs = useLinkList("/programs");
+  const products = useLinkList("/products");
+  return (type: string): LinkOpt[] => type === "project" ? projects : type === "program" ? programs : type === "product" ? products : [];
+}
+
+// Type + entity picker for a KR's linked deliverable.
+function LinkPicker({ type, id, onChange }: { type: string; id: string; onChange: (type: string, id: string) => void }) {
+  const optsFor = useLinkOptions();
+  const opts = optsFor(type);
+  return (
+    <div style={{ display: "flex", gap: 9 }}>
+      <select value={type} onChange={(e) => onChange(e.target.value, "")} style={okrSelectStyle}>
+        <option value="">No link</option>
+        {LINK_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+      </select>
+      <select value={id} disabled={!type} onChange={(e) => onChange(type, e.target.value)} style={{ ...okrSelectStyle, flex: 1 }}>
+        <option value="">{type ? "Select…" : "—"}</option>
+        {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+    </div>
+  );
+}
+const okrSelectStyle: React.CSSProperties = { fontSize: 13.5, padding: "8px 10px", border: `1px solid ${color.border2}`, borderRadius: 8, background: "#fff", color: color.text, fontFamily: "inherit", outline: "none" };
 
 // Manual RAG health (set by PMO / Platform Admin).
 const RAG: Record<string, { label: string; ink: string; tint: string; dot: string }> = {
@@ -67,6 +107,7 @@ export default function Okrs() {
   const [modal, setModal] = useState<null | { kind: "obj" } | { kind: "kr"; objId: string }>(null);
   const [editObj, setEditObj] = useState<Objective | null>(null);
   const [confirmDel, setConfirmDel] = useState<Objective | null>(null);
+  const [linkKr, setLinkKr] = useState<Kr | null>(null);
 
   const createObjective = useMutation({
     mutationFn: (body: NewObjective) => api<Objective>("/okrs", { method: "POST", body: JSON.stringify(body) }),
@@ -81,6 +122,11 @@ export default function Okrs() {
     mutationFn: ({ krId, progress }: { krId: string; progress: number }) =>
       api<Kr>(`/krs/${krId}`, { method: "PATCH", body: JSON.stringify({ progress }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+  const updateKrLink = useMutation({
+    mutationFn: ({ krId, linkType, linkId }: { krId: string; linkType: string; linkId: string }) =>
+      api<Kr>(`/krs/${krId}`, { method: "PATCH", body: JSON.stringify({ linkType, linkId }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["okrs"] }); setLinkKr(null); },
   });
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -212,8 +258,15 @@ export default function Okrs() {
                         <span style={{ flex: 1, fontSize: 13.5, color: color.text, fontWeight: 500 }}>{k.title}</span>
                         {k.link && (
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: color.primaryDark, background: color.primaryTint2, padding: "2px 9px", borderRadius: 6 }}>
-                            <Icon name="link" size={14} /> {k.link}
+                            <Icon name="link" size={14} />
+                            {k.linkType && <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", opacity: 0.7 }}>{k.linkType}</span>}
+                            {k.link}
                           </span>
+                        )}
+                        {canEdit && (
+                          <button onClick={() => setLinkKr(k)} title="Link to a project, program or product" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: color.primary, background: "transparent", border: `1px solid ${color.border2}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+                            <Icon name="link" size={13} /> {k.link ? "Edit link" : "Link"}
+                          </button>
                         )}
                         {canEdit ? (
                           <input type="number" min={0} max={100} value={k.progress}
@@ -260,6 +313,14 @@ export default function Okrs() {
           submitting={updateObjective.isPending}
           onClose={() => setEditObj(null)}
           onSave={(body) => updateObjective.mutate({ id: editObj.id, body }, { onSuccess: () => setEditObj(null) })}
+        />
+      )}
+      {linkKr && (
+        <KrLinkModal
+          kr={linkKr}
+          submitting={updateKrLink.isPending}
+          onClose={() => setLinkKr(null)}
+          onSave={(linkType, linkId) => updateKrLink.mutate({ krId: linkKr.id, linkType, linkId })}
         />
       )}
       {confirmDel && (
@@ -350,11 +411,12 @@ function EditObjectiveModal({ objective, onClose, onSave, submitting }: { object
 // --- Add key result modal -------------------------------------------------
 function KrModal({ onClose, onSave, submitting }: { onClose: () => void; onSave: (k: NewKr) => void; submitting?: boolean }) {
   const [title, setTitle] = useState("");
-  const [link, setLink] = useState("");
+  const [linkType, setLinkType] = useState("");
+  const [linkId, setLinkId] = useState("");
   const [progress, setProgress] = useState(0);
   const save = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), link: link.trim(), progress: clampPct(progress) });
+    onSave({ title: title.trim(), linkType, linkId, progress: clampPct(progress) });
   };
   return (
     <ModalShell title="Add key result" onClose={onClose} width={480}>
@@ -362,11 +424,31 @@ function KrModal({ onClose, onSave, submitting }: { onClose: () => void; onSave:
         <Label>Key result</Label>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Conversion rate 3.2% → 4.0%" style={{ fontSize: 13.5, marginBottom: 13 }} />
         <Label>Linked deliverable</Label>
-        <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Project, program or product" style={{ fontSize: 13.5, marginBottom: 13 }} />
+        <div style={{ marginBottom: 13 }}>
+          <LinkPicker type={linkType} id={linkId} onChange={(t, i) => { setLinkType(t); setLinkId(i); }} />
+        </div>
         <Label>Starting progress %</Label>
         <Input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(clampPct(e.target.value))} style={{ fontSize: 13.5, width: 90, fontFamily: font.mono }} />
       </div>
       <ModalActions onClose={onClose} onSave={save} saveLabel={submitting ? "Adding…" : "Add key result"} disabled={submitting} />
+    </ModalShell>
+  );
+}
+
+// --- Edit an existing key result's link ----------------------------------
+function KrLinkModal({ kr, onClose, onSave, submitting }: { kr: Kr; onClose: () => void; onSave: (linkType: string, linkId: string) => void; submitting?: boolean }) {
+  const [linkType, setLinkType] = useState(kr.linkType ?? "");
+  const [linkId, setLinkId] = useState(kr.linkId ?? "");
+  return (
+    <ModalShell title="Link key result" onClose={onClose} width={480}>
+      <div style={{ padding: 20 }}>
+        <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 12 }}>{kr.title}</div>
+        <Label>Linked deliverable</Label>
+        <div style={{ marginTop: 4 }}>
+          <LinkPicker type={linkType} id={linkId} onChange={(t, i) => { setLinkType(t); setLinkId(i); }} />
+        </div>
+      </div>
+      <ModalActions onClose={onClose} onSave={() => onSave(linkType, linkId)} saveLabel={submitting ? "Saving…" : "Save link"} disabled={submitting} />
     </ModalShell>
   );
 }
