@@ -5,6 +5,7 @@ namespace Atlas.Api;
 public record ToggleCriterionReq(bool Met);
 public record CreateDecisionReq(string Title, string? Context, string? Decision, string? Owner, string? Status);
 public record CreateRaidReq(string Type, string Title, string? Owner, string? Status);
+public record UpdateRaidReq(string? Type, string? Title, string? Owner, string? Status);
 
 // ============================================================================
 //  Stage gates (G0–G5). Every project carries the standard six-gate rail; the
@@ -131,7 +132,51 @@ public static class Gates
             return Results.Created($"/api/v1/projects/{id}/raid/{item.Id}",
                 new RaidItemDto(item.Id, item.Type, item.Title, item.Owner, item.Status));
         });
+
+        // Move a RAID item along its lifecycle, or edit its type/title/owner.
+        // Auto-raised items are system-managed, so they can't be hand-edited.
+        api.MapPatch("/raid/{raidId:int}", async (int raidId, UpdateRaidReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var item = await db.RaidItems.FindAsync(raidId);
+            if (item is null) return Results.NotFound();
+            if (item.Auto) return Results.BadRequest(new { error = "Auto-raised items are managed by Atlas and can't be edited." });
+            if (req.Type is not null)
+            {
+                if (!RaidTypes.Contains(req.Type)) return Results.BadRequest(new { error = "Unknown type." });
+                item.Type = req.Type;
+            }
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                item.Title = req.Title.Trim();
+            }
+            if (req.Owner is not null) item.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "—" : req.Owner.Trim();
+            if (req.Status is not null)
+            {
+                if (!RaidStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                item.Status = req.Status;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "RAID", "Updated item", $"{item.ProjectId} · {item.Title} → {item.Status}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new RaidItemDto(item.Id, item.Type, item.Title, item.Owner, item.Status, item.Auto));
+        });
+
+        api.MapDelete("/raid/{raidId:int}", async (int raidId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var item = await db.RaidItems.FindAsync(raidId);
+            if (item is null) return Results.NotFound();
+            if (item.Auto) return Results.BadRequest(new { error = "Auto-raised items clear themselves when the underlying condition resolves." });
+            db.RaidItems.Remove(item);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "RAID", "Removed item", $"{item.ProjectId} · {item.Title}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
+
+    static readonly string[] RaidTypes = { "Risk", "Issue", "Assumption", "Dependency" };
+    static readonly string[] RaidStatuses = { "Open", "Mitigating", "Validating", "On track", "Resolved", "Closed" };
 
     static async Task<IResult> DecideAsync(int gateId, string status, AtlasDbContext db, IConfiguration cfg, HttpContext http)
     {

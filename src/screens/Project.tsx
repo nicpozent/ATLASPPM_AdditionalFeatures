@@ -1333,6 +1333,7 @@ const RAID_STATUSES = ["Open", "Mitigating", "Validating", "On track", "Resolved
 
 function Raid({ projectId }: { projectId: string | null }) {
   const [modal, setModal] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
   const { data } = useQuery({
     queryKey: ["raid", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<{ canEdit: boolean; items: RaidItem[] }> =>
@@ -1359,8 +1360,10 @@ function Raid({ projectId }: { projectId: string | null }) {
         ) : items.map((r) => {
           const tc = RAID_TYPE_COLORS[r.type] ?? RAID_TYPE_COLORS.Risk;
           const sc = raidStatus(r.status);
+          const clickable = canEdit && !r.auto;
           return (
-            <div key={r.id} style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={r.id} onClick={() => clickable && setOpenId(r.id)}
+              style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: clickable ? "pointer" : "default" }}>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: tc.ink, background: tc.tint, padding: "3px 10px", borderRadius: 6 }}>{r.type}</span></div>
               <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 {r.title}
@@ -1373,26 +1376,41 @@ function Raid({ projectId }: { projectId: string | null }) {
         })}
       </Card>
       {modal && <RaidModal projectId={projectId} onClose={() => setModal(false)} />}
+      {openId !== null && (() => {
+        const r = items.find((x) => x.id === openId);
+        if (!r) return null;
+        return <RaidModal projectId={projectId} item={r} onClose={() => setOpenId(null)} />;
+      })()}
     </>
   );
 }
 
-function RaidModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function RaidModal({ projectId, item, onClose }: { projectId: string; item?: RaidItem; onClose: () => void }) {
   const qc = useQueryClient();
-  const [type, setType] = useState(RAID_TYPES[0]);
-  const [title, setTitle] = useState("");
-  const [owner, setOwner] = useState("");
-  const [status, setStatus] = useState(RAID_STATUSES[0]);
+  const [type, setType] = useState(item?.type ?? RAID_TYPES[0]);
+  const [title, setTitle] = useState(item?.title ?? "");
+  const [owner, setOwner] = useState(item && item.owner !== "—" ? item.owner : "");
+  const [status, setStatus] = useState(item?.status ?? RAID_STATUSES[0]);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["raid", projectId] });
 
-  const create = useMutation({
-    mutationFn: () => api(`/projects/${projectId}/raid`, { method: "POST", body: JSON.stringify({ type, title: title.trim(), owner: owner.trim(), status }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["raid", projectId] }); onClose(); },
+  const body = () => JSON.stringify({ type, title: title.trim(), owner: owner.trim(), status });
+  const save = useMutation({
+    mutationFn: () => item
+      ? api(`/raid/${item.id}`, { method: "PATCH", body: body() })
+      : api(`/projects/${projectId}/raid`, { method: "POST", body: body() }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
   });
-  const submit = () => { if (title.trim()) create.mutate(); };
+  const del = useMutation({
+    mutationFn: () => api(`/raid/${item!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
 
   return (
-    <Modal onClose={onClose} width={480} label="New RAID item">
-      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Log a risk, issue, assumption or dependency against this project.</div>
+    <Modal onClose={onClose} width={480} label={item ? "RAID item" : "New RAID item"}>
+      {!item && <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Log a risk, issue, assumption or dependency against this project.</div>}
       <DecLabel>Type</DecLabel>
       <Select value={type} onChange={(e) => setType(e.target.value)} style={{ marginBottom: 14 }}>
         {RAID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -1411,9 +1429,21 @@ function RaidModal({ projectId, onClose }: { projectId: string; onClose: () => v
           </Select>
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {item && (
+          confirmDel ? (
+            <>
+              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this item?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+            </>
+          ) : (
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          )
+        )}
+        <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={submit} disabled={create.isPending || !title.trim()}>{create.isPending ? "Adding…" : "Add item"}</Button>
+        <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : item ? "Save changes" : "Add item"}</Button>
       </div>
     </Modal>
   );
@@ -2807,10 +2837,16 @@ const STATUS_PILL: Record<string, { ink: string; tint: string; dot: string }> = 
 
 function Dependencies({ projectId }: { projectId: string | null }) {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const { data } = useQuery({
     queryKey: ["dependencies", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<DepData | null> => await api<DepData>(`/projects/${projectId}/dependencies`),
+  });
+  const unlink = useMutation({
+    mutationFn: (depId: string) => api(`/projects/${projectId}/dependencies/${depId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dependencies", projectId] }),
+    onError: (e) => toastError(e),
   });
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its dependencies." /></Card>;
@@ -2819,7 +2855,7 @@ function Dependencies({ projectId }: { projectId: string | null }) {
   const { dependsOn, blocks, inheritedRisk, ownHealth, effHealth, depRiskTitle, canEdit } = data;
   const openProject = (pid: string) => navigate(`${SCREENS.project.path}?id=${pid}`);
 
-  const column = (title: string, icon: React.ReactNode, links: DepLink[], empty: string) => (
+  const column = (title: string, icon: React.ReactNode, links: DepLink[], empty: string, unlinkable = false) => (
     <Card padding={0} style={{ overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 18px", borderBottom: `1px solid ${color.bg}` }}>
         {icon}<span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.ink }}>{title}</span>
@@ -2836,6 +2872,12 @@ function Dependencies({ projectId }: { projectId: string | null }) {
               <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono }}>{d.id} · {d.dept}</div>
             </div>
             <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{d.health}</span>
+            {unlinkable && canEdit && (
+              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Unlink dependency on “${d.name}”?`)) unlink.mutate(d.id); }}
+                title="Remove dependency" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: "#A1282B", flex: "none" }}>
+                <Icon name="trash" size={15} />
+              </button>
+            )}
           </div>
         );
       })}
@@ -2854,7 +2896,7 @@ function Dependencies({ projectId }: { projectId: string | null }) {
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {column("Depends on", <span style={{ color: "#C98A00", display: "flex" }}><Icon name="arrowRight" size={16} /></span>, dependsOn, "No upstream dependencies.")}
+        {column("Depends on", <span style={{ color: "#C98A00", display: "flex" }}><Icon name="arrowRight" size={16} /></span>, dependsOn, "No upstream dependencies.", true)}
         {column("Blocks / enables", <span style={{ color: color.primary, display: "flex", transform: "rotate(180deg)" }}><Icon name="arrowRight" size={16} /></span>, blocks, "Nothing depends on this project.")}
       </div>
       {canEdit && (

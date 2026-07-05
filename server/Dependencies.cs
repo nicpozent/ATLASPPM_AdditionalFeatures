@@ -55,5 +55,16 @@ public static class Dependencies
             return Results.Created($"/api/v1/projects/{id}/dependencies",
                 new DepLinkDto(target.Id, target.Name, target.Dept, target.Status, target.Health));
         });
+
+        api.MapDelete("/projects/{id}/dependencies/{dependsOnId}", async (string id, string dependsOnId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var link = await db.ProjectDependencies.FirstOrDefaultAsync(d => d.ProjectId == id && d.DependsOnId == dependsOnId);
+            if (link is null) return Results.NotFound();
+            db.ProjectDependencies.Remove(link);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Dependencies", "Unlinked dependency", $"{id} ✕ {dependsOnId}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
 }
