@@ -10,11 +10,35 @@ import { usePermissions } from "@/components/usePermissions";
 // Data model + hook (empty by default until the API exists).
 // ---------------------------------------------------------------------------
 interface Kr { id: string; title: string; link: string; progress: number }
-interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[]; status?: string }
+interface Objective { id: string; title: string; owner: string; horizon: string; krs: Kr[]; status?: string; health?: string; startDate?: string; targetDate?: string }
 type OkrStatus = "Active" | "Completed";
 
-interface NewObjective { title: string; owner: string; horizon: string }
+interface NewObjective { title: string; owner: string; horizon: string; startDate: string; targetDate: string }
+interface EditObjective { title: string; owner: string; horizon: string; startDate: string; targetDate: string }
 interface NewKr { title: string; link: string; progress: number }
+
+// Manual RAG health (set by PMO / Platform Admin).
+const RAG: Record<string, { label: string; ink: string; tint: string; dot: string }> = {
+  green: { label: "On track", ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  amber: { label: "At risk", ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
+  red: { label: "Off track", ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
+};
+const OKR_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const okrToDisplay = (iso: string) => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return y && m && d ? `${d} ${OKR_MONTHS[m - 1]} ${y}` : ""; };
+const okrToIso = (display: string) => { const t = Date.parse(display || ""); return isNaN(t) ? "" : new Date(t).toISOString().slice(0, 10); };
+const parseTs = (d?: string) => { const t = Date.parse(d || ""); return isNaN(t) ? null : t; };
+
+// Timing signals: near-horizon warning, missed (spilled past the target and not
+// achieved), and where "today" sits on the start→target span.
+function okrTiming(o: Objective, progress: number) {
+  const start = parseTs(o.startDate), target = parseTs(o.targetDate);
+  const now = Date.now();
+  const done = (o.status ?? "Active") === "Completed" || progress >= 100;
+  const missed = target != null && !done && now > target;
+  const near = target != null && !done && !missed && target - now <= 30 * 24 * 3600 * 1000 && progress < 100;
+  const todayPct = start != null && target != null && target > start ? Math.max(0, Math.min(100, ((now - start) / (target - start)) * 100)) : null;
+  return { start, target, missed, near, spillover: missed, todayPct };
+}
 
 function useObjectives() {
   return useQuery({
@@ -41,6 +65,7 @@ export default function Okrs() {
 
   // Modal state: obj = new objective, { objId } = add key result to objId.
   const [modal, setModal] = useState<null | { kind: "obj" } | { kind: "kr"; objId: string }>(null);
+  const [editObj, setEditObj] = useState<Objective | null>(null);
   const [confirmDel, setConfirmDel] = useState<Objective | null>(null);
 
   const createObjective = useMutation({
@@ -60,6 +85,11 @@ export default function Okrs() {
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api(`/okrs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
+  });
+  const updateObjective = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<EditObjective & { health: string }> }) =>
+      api(`/okrs/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["okrs"] }),
   });
   const del = useMutation({
@@ -113,6 +143,8 @@ export default function Okrs() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {shown.map((o) => {
             const p = objProgress(o);
+            const t = okrTiming(o, p);
+            const rag = RAG[o.health ?? "green"] ?? RAG.green;
             return (
               <div key={o.id} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 13, padding: "18px 22px", borderBottom: `1px solid ${color.bg}` }}>
@@ -120,13 +152,28 @@ export default function Okrs() {
                     <Icon name="target" size={20} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{o.title}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{o.title}</span>
+                      {/* At-risk / missed signals against the horizon. */}
+                      {t.missed && <span title="Missed — past its target date and not achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Missed</span>}
+                      {t.near && <span title="Close to its horizon and not yet achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Near horizon</span>}
+                    </div>
                     <div style={{ fontSize: 11.5, color: color.faint3 }}>{o.id} · {o.owner} · {o.horizon}</div>
                   </div>
+                  {/* Manual RAG health — editable by PMO / Platform Admin. */}
+                  {canEdit ? (
+                    <select value={o.health ?? "green"} onChange={(e) => updateObjective.mutate({ id: o.id, body: { health: e.target.value } })} title="Manual RAG status"
+                      style={{ fontSize: 11.5, fontWeight: 700, color: rag.ink, background: rag.tint, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+                      <option value="green">On track</option><option value="amber">At risk</option><option value="red">Off track</option>
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: rag.ink, background: rag.tint, padding: "4px 10px", borderRadius: 6 }}>{rag.label}</span>
+                  )}
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: objInk(p) }}>{p}%</div>
                     <div style={{ fontSize: 10.5, color: color.faint3 }}>objective</div>
                   </div>
+                  {canEdit && <button onClick={() => setEditObj(o)} title="Edit objective" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
                   {canEdit && (
                     (o.status ?? "Active") === "Completed"
                       ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
@@ -140,6 +187,19 @@ export default function Okrs() {
                     </RowMenu>
                   )}
                 </div>
+                {/* Timeline — start → target with today's position + progress. */}
+                {(o.startDate || o.targetDate) && (
+                  <div style={{ padding: "13px 22px 4px" }}>
+                    <div style={{ position: "relative", height: 8, background: color.bg, borderRadius: 5 }}>
+                      <div style={{ height: "100%", width: `${p}%`, background: t.missed ? "#D13438" : rag.dot, borderRadius: 5 }} />
+                      {t.todayPct != null && <div title="Today" style={{ position: "absolute", top: -3, left: `${t.todayPct}%`, transform: "translateX(-50%)", width: 2, height: 14, background: color.ink }} />}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 10.5, color: color.faint3, fontFamily: font.mono }}>
+                      <span>{o.startDate || "—"}</span>
+                      <span>{t.spillover && <span style={{ color: "#A1282B", fontWeight: 700, fontFamily: font.body }}>Spilled over · </span>}Target {o.targetDate || "—"}</span>
+                    </div>
+                  </div>
+                )}
                 <div style={{ padding: "8px 22px 16px" }}>
                   {o.krs.length === 0 && (
                     <div style={{ padding: "18px 0", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
@@ -194,6 +254,14 @@ export default function Okrs() {
           onSave={(body) => createKr.mutate({ objId: modal.objId, body }, { onSuccess: () => setModal(null) })}
         />
       )}
+      {editObj && (
+        <EditObjectiveModal
+          objective={editObj}
+          submitting={updateObjective.isPending}
+          onClose={() => setEditObj(null)}
+          onSave={(body) => updateObjective.mutate({ id: editObj.id, body }, { onSuccess: () => setEditObj(null) })}
+        />
+      )}
       {confirmDel && (
         <ModalShell title="Delete objective" onClose={() => setConfirmDel(null)} width={440}>
           <div style={{ padding: 20 }}>
@@ -219,16 +287,18 @@ function ObjectiveModal({ onClose, onSave, submitting }: { onClose: () => void; 
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("");
   const [horizon, setHorizon] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [targetDate, setTargetDate] = useState("");
   const save = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026" });
+    onSave({ title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026", startDate: okrToDisplay(startDate), targetDate: okrToDisplay(targetDate) });
   };
   return (
     <ModalShell title="New objective" onClose={onClose} width={480}>
       <div style={{ padding: 20 }}>
         <Label>Objective</Label>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Lead Nordic e-commerce conversion" style={{ fontSize: 13.5, marginBottom: 13 }} />
-        <div style={{ display: "flex", gap: 11 }}>
+        <div style={{ display: "flex", gap: 11, marginBottom: 13 }}>
           <div style={{ flex: 1 }}>
             <Label>Owner</Label>
             <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" style={{ fontSize: 13.5 }} />
@@ -238,8 +308,41 @@ function ObjectiveModal({ onClose, onSave, submitting }: { onClose: () => void; 
             <Input value={horizon} onChange={(e) => setHorizon(e.target.value)} placeholder="FY2026" style={{ fontSize: 13.5 }} />
           </div>
         </div>
+        <div style={{ display: "flex", gap: 11 }}>
+          <div style={{ flex: 1 }}><Label>Start date</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+          <div style={{ flex: 1 }}><Label>Target date</Label><Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+        </div>
       </div>
       <ModalActions onClose={onClose} onSave={save} saveLabel={submitting ? "Creating…" : "Create objective"} disabled={submitting} />
+    </ModalShell>
+  );
+}
+
+function EditObjectiveModal({ objective, onClose, onSave, submitting }: { objective: Objective; onClose: () => void; onSave: (o: EditObjective) => void; submitting?: boolean }) {
+  const [title, setTitle] = useState(objective.title);
+  const [owner, setOwner] = useState(objective.owner);
+  const [horizon, setHorizon] = useState(objective.horizon);
+  const [startDate, setStartDate] = useState(okrToIso(objective.startDate ?? ""));
+  const [targetDate, setTargetDate] = useState(okrToIso(objective.targetDate ?? ""));
+  const save = () => {
+    if (!title.trim()) return;
+    onSave({ title: title.trim(), owner: owner.trim() || "Unassigned", horizon: horizon.trim() || "FY2026", startDate: okrToDisplay(startDate), targetDate: okrToDisplay(targetDate) });
+  };
+  return (
+    <ModalShell title={`Edit ${objective.id}`} onClose={onClose} width={480}>
+      <div style={{ padding: 20 }}>
+        <Label>Objective</Label>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} style={{ fontSize: 13.5, marginBottom: 13 }} />
+        <div style={{ display: "flex", gap: 11, marginBottom: 13 }}>
+          <div style={{ flex: 1 }}><Label>Owner</Label><Input value={owner} onChange={(e) => setOwner(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+          <div style={{ width: 140 }}><Label>Horizon</Label><Input value={horizon} onChange={(e) => setHorizon(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 11 }}>
+          <div style={{ flex: 1 }}><Label>Start date</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+          <div style={{ flex: 1 }}><Label>Target date</Label><Input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} style={{ fontSize: 13.5 }} /></div>
+        </div>
+      </div>
+      <ModalActions onClose={onClose} onSave={save} saveLabel={submitting ? "Saving…" : "Save changes"} disabled={submitting} />
     </ModalShell>
   );
 }

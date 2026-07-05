@@ -21,7 +21,7 @@ public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate, string? Dept);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
-public record CreateObjectiveReq(string Title, string? Owner, string? Horizon);
+public record CreateObjectiveReq(string Title, string? Owner, string? Horizon, string? StartDate, string? TargetDate);
 public record CreateKrReq(string Title, string? Link, int? Progress);
 public record UpdateKrProgressReq(int Progress);
 
@@ -554,12 +554,36 @@ public static class WriteEndpoints
                 Title = req.Title.Trim(),
                 Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner!.Trim(),
                 Horizon = string.IsNullOrWhiteSpace(req.Horizon) ? "FY26" : req.Horizon!.Trim(),
+                StartDate = req.StartDate?.Trim() ?? "",
+                TargetDate = req.TargetDate?.Trim() ?? "",
             };
             db.Objectives.Add(o);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "OKRs", "Created objective", $"{o.Id} · {o.Title}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/okrs/{o.Id}",
-                new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon, new List<KrDto>()));
+                new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon, new List<KrDto>(), o.Status, o.Health, o.StartDate, o.TargetDate));
+        });
+
+        // Edit an objective's fields and manual RAG health. Gated on Edit for OKRs
+        // — in the matrix that's exactly PMO + Platform Admin.
+        api.MapPatch("/okrs/{id}", async (string id, UpdateObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
+            var o = await db.Objectives.FindAsync(id);
+            if (o is null) return Results.NotFound();
+            if (!string.IsNullOrWhiteSpace(req.Title)) o.Title = req.Title!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Owner)) o.Owner = req.Owner!.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Horizon)) o.Horizon = req.Horizon!.Trim();
+            if (req.StartDate is not null) o.StartDate = req.StartDate.Trim();
+            if (req.TargetDate is not null) o.TargetDate = req.TargetDate.Trim();
+            if (req.Health is not null)
+            {
+                if (req.Health is not ("green" or "amber" or "red")) return Results.BadRequest(new { error = "Health must be green, amber or red." });
+                o.Health = req.Health;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "OKRs", "Updated objective", $"{o.Id} · {o.Title}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         api.MapPost("/okrs/{id}/krs", async (string id, CreateKrReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
