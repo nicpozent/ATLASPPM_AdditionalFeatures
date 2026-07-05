@@ -7,6 +7,7 @@ public record CreateRequirementReq(string Title, string? Type, string? Priority,
 public record UpdateRequirementReq(string? Title, string? Type, string? Priority, string? Status,
     string? Epic, string? Story, string? Test, string? TestStatus, string? Release, string? Description);
 public record CreateChangeReq(string Title, string? ReqCode, string? Impact, string? Sdp);
+public record UpdateChangeReq(string? Title, string? ReqCode, string? Impact, string? Sdp, string? Status);
 
 // ============================================================================
 //  Requirements & traceability — requirement → epic/story → test → release,
@@ -21,6 +22,7 @@ public static class Requirements
         "Replaced", "Archived", "Retired (Requester)", "Retired (PM)", "Retired (Team)" };
     static readonly string[] TestStatuses = { "Not run", "In test", "Passed", "Failed" };
     static readonly string[] Impacts = { "Low", "Medium", "High" };
+    static readonly string[] CrStatuses = { "Pending", "Approved", "Rejected" };
 
     public static void MapRequirementEndpoints(this RouteGroupBuilder api)
     {
@@ -172,6 +174,44 @@ public static class Requirements
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Requirements", "Raised change request", $"{id} · {cr.Code} {cr.Title}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{id}/change-requests/{cr.Id}", ToCrDto(cr));
+        });
+
+        api.MapPatch("/change-requests/{crId:int}", async (int crId, UpdateChangeReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var cr = await db.ChangeRequests.FindAsync(crId);
+            if (cr is null) return Results.NotFound();
+            if (req.Title is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
+                cr.Title = req.Title.Trim();
+            }
+            if (req.ReqCode is not null) cr.ReqCode = req.ReqCode.Trim();
+            if (req.Impact is not null)
+            {
+                if (!Impacts.Contains(req.Impact)) return Results.BadRequest(new { error = "Unknown impact." });
+                cr.Impact = req.Impact;
+            }
+            if (req.Sdp is not null) cr.Sdp = req.Sdp.Trim();
+            if (req.Status is not null)
+            {
+                if (!CrStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                cr.Status = req.Status;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Requirements", "Updated change request", $"{cr.ProjectId} · {cr.Code} → {cr.Status}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(ToCrDto(cr));
+        });
+
+        api.MapDelete("/change-requests/{crId:int}", async (int crId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var cr = await db.ChangeRequests.FindAsync(crId);
+            if (cr is null) return Results.NotFound();
+            db.ChangeRequests.Remove(cr);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Requirements", "Deleted change request", $"{cr.ProjectId} · {cr.Code}"));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
     }
 

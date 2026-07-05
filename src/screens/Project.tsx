@@ -2329,6 +2329,7 @@ function Requirements({ projectId }: { projectId: string | null }) {
   const [reqModal, setReqModal] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   const [crFor, setCrFor] = useState<string | null>(null); // req code prefill, or "" for blank
+  const [openCr, setOpenCr] = useState<ChangeRequest | null>(null);
   const { data } = useQuery({
     queryKey: ["requirements", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<ReqData | null> => await api<ReqData>(`/projects/${projectId}/requirements`),
@@ -2416,9 +2417,9 @@ function Requirements({ projectId }: { projectId: string | null }) {
         ) : changeRequests.map((c) => {
           const sc = CR_STATUS[c.status] ?? CR_STATUS.Pending;
           return (
-            <div key={c.id} style={{ display: "grid", gridTemplateColumns: CR_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={c.id} onClick={() => canEdit && setOpenCr(c)} style={{ display: "grid", gridTemplateColumns: CR_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
-              <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{c.title}</div>
+              <div style={{ fontSize: 13, color: canEdit ? color.primary : color.text, fontWeight: 600 }}>{c.title}</div>
               <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{c.reqCode || "—"}</div>
               <div style={{ fontSize: 12, color: color.subtle }}>{c.impact}</div>
               <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{c.sdp || "—"}</div>
@@ -2436,7 +2437,63 @@ function Requirements({ projectId }: { projectId: string | null }) {
         return <RequirementModal projectId={projectId} req={r} canEdit={canEdit} onClose={() => setOpenId(null)} />;
       })()}
       {crFor !== null && <RaiseCrModal projectId={projectId} reqCodes={requirements.map((r) => r.code)} prefill={crFor} onClose={() => setCrFor(null)} />}
+      {openCr && <EditCrModal projectId={projectId} cr={openCr} reqCodes={requirements.map((r) => r.code)} onClose={() => setOpenCr(null)} />}
     </div>
+  );
+}
+
+function EditCrModal({ projectId, cr, reqCodes, onClose }: { projectId: string; cr: ChangeRequest; reqCodes: string[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(cr.title);
+  const [reqCode, setReqCode] = useState(cr.reqCode);
+  const [impact, setImpact] = useState(cr.impact);
+  const [sdp, setSdp] = useState(cr.sdp);
+  const [status, setStatus] = useState(cr.status);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["requirements", projectId] });
+  const save = useMutation({
+    mutationFn: () => api(`/change-requests/${cr.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim(), reqCode, impact, sdp: sdp.trim(), status }) }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/change-requests/${cr.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toastError(e),
+  });
+  return (
+    <Modal onClose={onClose} width={480} label={`${cr.code} · Change request`}>
+      <DecLabel>Change</DecLabel>
+      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What is changing?" style={{ marginBottom: 14 }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}>
+          <DecLabel>Requirement</DecLabel>
+          <Select value={reqCode} onChange={(e) => setReqCode(e.target.value)}>
+            <option value="">—</option>
+            {reqCodes.map((rc) => <option key={rc} value={rc}>{rc}</option>)}
+            {reqCode && !reqCodes.includes(reqCode) && <option value={reqCode}>{reqCode}</option>}
+          </Select>
+        </div>
+        <div style={{ flex: 1 }}><DecLabel>Impact</DecLabel><Select value={impact} onChange={(e) => setImpact(e.target.value)}>{CR_IMPACTS.map((i) => <option key={i}>{i}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{["Pending", "Approved", "Rejected"].map((s) => <option key={s}>{s}</option>)}</Select></div>
+      </div>
+      <DecLabel>SDP change (optional)</DecLabel>
+      <Input value={sdp} onChange={(e) => setSdp(e.target.value)} placeholder="e.g. SDP-48213" />
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this CR?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        )}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
+      </div>
+    </Modal>
   );
 }
 
