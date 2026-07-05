@@ -28,31 +28,68 @@ Windows Docker host, the container itself is Linux. Use Docker secrets instead
 service against SQL Server.
 
 ### Option A — Docker secrets (recommended)
-Mount each secret as a file; Atlas reads `/run/secrets` automatically. A file
-named with `__` maps to a config section — e.g. `ConnectionStrings__Postgres`
-becomes `ConnectionStrings:Postgres`.
 
-`docker-compose.yml`:
+> **You don't have to change anything to keep running as you do today** — the
+> base `docker-compose.yml` and its env-var approach still work. Docker secrets
+> is an opt-in upgrade that moves the DB password out of environment variables
+> (and out of `docker inspect`) into files mounted at `/run/secrets`. Atlas
+> reads that directory automatically — a file named `ConnectionStrings__Postgres`
+> maps to the config key `ConnectionStrings:Postgres`, so **no code change is
+> needed**.
 
-```yaml
-services:
-  api:
-    # …
-    secrets:
-      - ConnectionStrings__Postgres
-    # do NOT also set the ConnectionStrings__Postgres env var — the file wins,
-    # but keeping the plaintext out of the environment is the point.
+This repo ships the pieces so you don't hand-edit the base compose file:
 
-secrets:
-  ConnectionStrings__Postgres:
-    file: ./secrets/postgres-connection-string.txt   # git-ignored, perms 600
+- **`deploy/gen-secrets.sh`** — generates the two secret files (git-ignored, `chmod 600`).
+- **`docker-compose.secrets.yml`** — an overlay applied only when you name it.
+
+**Step by step:**
+
+```bash
+# 1. Generate the secret files. Reuse your CURRENT DB password if the atlas_db
+#    volume already exists (see the gotcha below); otherwise omit the argument
+#    to get a fresh strong password.
+sh deploy/gen-secrets.sh 'YOUR_CURRENT_DB_PASSWORD'
+#    → writes secrets/db_password.txt and secrets/pg_conn.txt
+
+# 2. Start the stack WITH the overlay (order matters — overlay comes last):
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
+
+# 3. Verify the API connected, and that the password is NOT in the env:
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml logs api | grep -i "migrations applied\|ready"
+docker inspect "$(docker compose -f docker-compose.yml -f docker-compose.secrets.yml ps -q api)" \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i postgres
+#    → shows ConnectionStrings__Postgres= (empty); the real value lives only in the secret file
 ```
 
-The file's *contents* are the full connection string, e.g.
-`Host=db;Port=5432;Database=atlas;Username=atlas;Password=<strong-password>`.
+Your everyday `docker compose up` (without `-f …secrets.yml`) still runs the old
+way, so this changes nothing until you choose it.
 
-Override the directory with `Secrets:Directory` (env `Secrets__Directory`) if
-you mount elsewhere.
+> **⚠️ Gotcha — Postgres only sets its password on first init.** If the
+> `atlas_db` volume already exists, it keeps the password it was created with;
+> pointing a new one at it via the file won't change it, and the API will fail
+> auth. So either **reuse the existing password** in the secret files
+> (recommended — you're just moving *where* it's read from), start fresh with
+> `docker compose down -v` (⚠️ deletes DB data), or rotate the role in place:
+> `docker compose exec db psql -U atlas -c "ALTER USER atlas PASSWORD '<new>';"`
+
+Override the mount directory with `Secrets:Directory` (env `Secrets__Directory`)
+if you mount elsewhere.
+
+### Running Postgres under a domain account?
+This comes up, so to be clear about what applies here:
+
+- **Postgres as a Windows *service* under a domain account** (`services.msc` →
+  the PostgreSQL service → **Log On** tab → *This account* → `DOMAIN\svc-…`)
+  is a **native-Windows** concept. It does **not** apply to this deployment:
+  your Postgres runs inside a **Linux container** as the container's `postgres`
+  user — there is no Windows service to reconfigure. It also wouldn't change how
+  Atlas authenticates (the app still uses a Postgres role + password).
+- **Authenticating with a domain identity (passwordless)** is the goal that
+  actually removes the password. Postgres supports it via **Kerberos/GSSAPI**,
+  and **Azure Database for PostgreSQL supports Microsoft Entra auth**. For the
+  Windows-Docker-now → Azure-later path, the clean win is **Entra passwordless
+  auth after the Azure move** (below) — no domain service account needed, and it
+  fits the Linux container (unlike gMSA).
 
 ### Option B — environment variables (baseline)
 If you're not using Docker secrets yet, inject secrets as env vars from your
