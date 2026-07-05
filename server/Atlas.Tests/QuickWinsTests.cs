@@ -180,4 +180,53 @@ public class QuickWinsTests : IClassFixture<AtlasApiFactory>
         var res = await c.PostAsJsonAsync("/api/v1/stakeholder-matrix/project/PRJ-1", new { name = "X" });
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
+
+    static JsonElement FindOkr(JsonElement list, string id) =>
+        list.EnumerateArray().First(o => o.GetProperty("id").GetString() == id);
+
+    [Fact]
+    public async Task Key_result_links_to_a_project_by_typed_reference()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Billing platform" }));
+        var objId = await Id(await c.PostAsJsonAsync("/api/v1/okrs", new { title = "Grow revenue" }));
+
+        var krRes = await c.PostAsJsonAsync($"/api/v1/okrs/{objId}/krs", new { title = "Ship billing", linkType = "project", linkId = projId });
+        Assert.Equal(HttpStatusCode.Created, krRes.StatusCode);
+
+        var okrs = await c.GetFromJsonAsync<JsonElement>("/api/v1/okrs");
+        var kr = FindOkr(okrs, objId).GetProperty("krs")[0];
+        Assert.Equal("project", kr.GetProperty("linkType").GetString());
+        Assert.Equal(projId, kr.GetProperty("linkId").GetString());
+        Assert.Equal("Billing platform", kr.GetProperty("link").GetString());   // display name resolved
+    }
+
+    [Fact]
+    public async Task A_key_result_link_can_be_changed_and_cleared()
+    {
+        var c = Admin();
+        var prodId = await Id(await c.PostAsJsonAsync("/api/v1/products", new { name = "Mobile app" }));
+        var objId = await Id(await c.PostAsJsonAsync("/api/v1/okrs", new { title = "Delight users" }));
+        var krId = await Id(await c.PostAsJsonAsync($"/api/v1/okrs/{objId}/krs", new { title = "KR" }));
+
+        await c.PatchAsJsonAsync($"/api/v1/krs/{krId}", new { linkType = "product", linkId = prodId });
+        var kr1 = FindOkr(await c.GetFromJsonAsync<JsonElement>("/api/v1/okrs"), objId).GetProperty("krs")[0];
+        Assert.Equal("product", kr1.GetProperty("linkType").GetString());
+        Assert.Equal("Mobile app", kr1.GetProperty("link").GetString());
+
+        await c.PatchAsJsonAsync($"/api/v1/krs/{krId}", new { linkType = "", linkId = "" });
+        var kr2 = FindOkr(await c.GetFromJsonAsync<JsonElement>("/api/v1/okrs"), objId).GetProperty("krs")[0];
+        Assert.Equal("", kr2.GetProperty("linkType").GetString());
+        Assert.Equal("", kr2.GetProperty("link").GetString());
+    }
+
+    [Fact]
+    public async Task An_unknown_link_target_is_ignored()
+    {
+        var c = Admin();
+        var objId = await Id(await c.PostAsJsonAsync("/api/v1/okrs", new { title = "O" }));
+        await c.PostAsJsonAsync($"/api/v1/okrs/{objId}/krs", new { title = "KR", linkType = "project", linkId = "PRJ-nope" });
+        var kr = FindOkr(await c.GetFromJsonAsync<JsonElement>("/api/v1/okrs"), objId).GetProperty("krs")[0];
+        Assert.Equal("", kr.GetProperty("linkType").GetString());
+    }
 }

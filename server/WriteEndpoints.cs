@@ -22,8 +22,8 @@ public record CreateProgramReq(string Name, string? Owner, string? Goal, string?
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon, string? StartDate, string? TargetDate);
-public record CreateKrReq(string Title, string? Link, int? Progress);
-public record UpdateKrProgressReq(int Progress);
+public record CreateKrReq(string Title, string? Link, int? Progress, string? LinkType, string? LinkId);
+public record UpdateKrReq(int? Progress, string? LinkType, string? LinkId);
 
 public static class WriteEndpoints
 {
@@ -599,28 +599,38 @@ public static class WriteEndpoints
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var obj = await db.Objectives.FindAsync(id);
             if (obj is null) return Results.NotFound();
+            var (lType, lId, lName) = await ResolveKrLink(db, req.LinkType, req.LinkId);
             var kr = new KeyResult
             {
                 Id = await NextId(db.KeyResults.Select(x => x.Id), "KR-", db),
                 Title = req.Title.Trim(),
-                Link = req.Link?.Trim() ?? "",
+                // A typed link wins; otherwise keep any free-text label supplied.
+                Link = lType.Length > 0 ? lName : (req.Link?.Trim() ?? ""),
+                LinkType = lType, LinkId = lId,
                 Progress = Math.Clamp(req.Progress ?? 0, 0, 100),
                 ObjectiveId = id,
             };
             db.KeyResults.Add(kr);
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/okrs/{id}/krs/{kr.Id}",
-                new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
+                new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId));
         });
 
-        api.MapPatch("/krs/{id}", async (string id, UpdateKrProgressReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/krs/{id}", async (string id, UpdateKrReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-okrs", "E") is { } denied) return denied;
             var kr = await db.KeyResults.FindAsync(id);
             if (kr is null) return Results.NotFound();
-            kr.Progress = Math.Clamp(req.Progress, 0, 100);
+            if (req.Progress is int p) kr.Progress = Math.Clamp(p, 0, 100);
+            // Update or clear the typed link when either field is provided.
+            if (req.LinkType is not null || req.LinkId is not null)
+            {
+                var (lType, lId, lName) = await ResolveKrLink(db, req.LinkType ?? kr.LinkType, req.LinkId ?? kr.LinkId);
+                kr.LinkType = lType; kr.LinkId = lId;
+                kr.Link = lType.Length > 0 ? lName : "";
+            }
             await db.SaveChangesAsync();
-            return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress));
+            return Results.Ok(new KrDto(kr.Id, kr.Title, kr.Link, kr.Progress, kr.LinkType, kr.LinkId));
         });
 
         // Permanently delete an objective and its key results. Requires Full on
@@ -636,6 +646,23 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+    }
+
+    // Resolve a KR's typed link to (type, id, displayName). Validates the target
+    // exists across projects/programs/products; anything unknown clears the link.
+    static async Task<(string Type, string Id, string Name)> ResolveKrLink(AtlasDbContext db, string? type, string? id)
+    {
+        type = (type ?? "").Trim().ToLowerInvariant();
+        id = (id ?? "").Trim();
+        if (id.Length == 0) return ("", "", "");
+        var name = type switch
+        {
+            "project" => await db.Projects.Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(),
+            "program" => await db.Programs.Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(),
+            "product" => await db.Products.Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(),
+            _ => null,
+        };
+        return name is null ? ("", "", "") : (type, id, name);
     }
 
     // Next sequential id for a prefix (e.g. "DM-" -> "DM-331"), based on the
