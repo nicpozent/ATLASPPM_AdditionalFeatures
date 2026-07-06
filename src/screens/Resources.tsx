@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
-import { api } from "@/api";
+import { api, apiDownload } from "@/api";
 import { usePermissions } from "@/components/usePermissions";
 import { toast, toastError } from "@/components/Toast";
 
@@ -112,6 +112,12 @@ export default function Resources() {
             <Icon name="alert" size={16} /> {overCount} over-allocated
           </span>
         )}
+        <button
+          onClick={() => { const y = new Date().getFullYear(); apiDownload(`/resources/allocation-report.xlsx?period=${period}&from=${y}-01-01&to=${y}-12-31`, `atlas-allocation-${period}.xlsx`); }}
+          title={`Download this year's allocation as a colour-graded Excel, bucketed by ${period}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#fff", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+          <Icon name="download" size={15} /> Export .xlsx
+        </button>
       </div>
 
       {/* period selector + filters */}
