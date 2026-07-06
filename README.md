@@ -53,3 +53,10 @@ src/
 React 18 · TypeScript (strict) · Vite · react-router-dom v6 · TanStack Query ·
 @azure/msal-browser. **Inline styles only** (no CSS framework) to match the
 prototype.
+
+## Documentation
+
+Setup & ops guides live in [`docs/`](./docs/) (setup, docker, sso, secrets,
+observability, retention, security hardening, Jira). The **architecture reference**
+— High Level Design, Low Level Design, ABB/SBB catalogue and ADRs, with diagrams —
+is in [`docs/architecture/`](./docs/architecture/).
