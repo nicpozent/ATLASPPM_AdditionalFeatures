@@ -258,6 +258,11 @@ public static class Jira
         var projectKey = p.JiraProjectKey.Trim();
         var pointsField = string.IsNullOrWhiteSpace(cfg["Jira:StoryPointsField"]) ? "customfield_10016" : cfg["Jira:StoryPointsField"]!.Trim();
         var truncated = false;
+        var browseBase = NormalizeBaseUrl(cfg["Jira:BaseUrl"]) ?? "";
+        // Files & comments are pulled by default; opt out or cap file size via config.
+        var importAttachments = !string.Equals(cfg["Jira:ImportAttachments"], "false", StringComparison.OrdinalIgnoreCase);
+        var importComments = !string.Equals(cfg["Jira:ImportComments"], "false", StringComparison.OrdinalIgnoreCase);
+        var maxAttachmentBytes = long.TryParse(cfg["Jira:MaxAttachmentBytes"], out var mb) && mb > 0 ? mb : 25L * 1024 * 1024;
 
         // --- Sprints: only when a board is mapped (they live on a board) -----
         var existingSprints = await db.Sprints.Where(s => s.ProjectId == p.Id).ToListAsync();
@@ -277,6 +282,8 @@ public static class Jira
                 s.Goal = Str(js, "goal");
                 s.StartDate = DatePart(Str(js, "startDate"));
                 s.EndDate = DatePart(Str(js, "endDate"));
+                s.CompleteDate = DatePart(Str(js, "completeDate"));
+                s.BoardId = IntProp(js, "originBoardId") is var ob && ob > 0 ? ob : bSprint;
                 s.Status = MapSprintState(Str(js, "state"));
             }
             if (seenSprints.Count > 0)
@@ -287,29 +294,46 @@ public static class Jira
         var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
         var epicOrd = existingEpics.Select(e => e.Ord).DefaultIfEmpty(0).Max();
         var seenEpics = new HashSet<string>();
-        void UpsertEpic(string ekey, string name, bool done)
+        void UpsertEpic(string ejiraId, string name, bool done, string browseKey = "", string description = "")
         {
-            if (ekey.Length == 0) return;
-            seenEpics.Add(ekey);
-            var e = existingEpics.FirstOrDefault(x => x.JiraKey == ekey);
-            if (e is null) { e = new Epic { ProjectId = p.Id, JiraKey = ekey, Ord = ++epicOrd }; db.Epics.Add(e); existingEpics.Add(e); }
+            if (ejiraId.Length == 0) return;
+            seenEpics.Add(ejiraId);
+            var e = existingEpics.FirstOrDefault(x => x.JiraKey == ejiraId);
+            if (e is null) { e = new Epic { ProjectId = p.Id, JiraKey = ejiraId, Ord = ++epicOrd }; db.Epics.Add(e); existingEpics.Add(e); }
             if (name.Length > 0) e.Name = name;
             e.Status = done ? "Complete" : "In progress";
+            if (browseKey.Length > 0) { e.EpicKey = browseKey; e.JiraUrl = browseBase.Length > 0 ? $"{browseBase}/browse/{browseKey}" : ""; }
+            if (description.Length > 0) e.Description = description;
         }
         if (board is int bEpic)
         {
             var jiraEpics = await FetchPagedAsync(c, $"rest/agile/1.0/board/{bEpic}/epic", "values", () => truncated = true);
             foreach (var je in jiraEpics)
-                UpsertEpic(NumOrStr(je, "id"), Str(je, "name").Length > 0 ? Str(je, "name") : Str(je, "summary"), Bool(je, "done"));
+                UpsertEpic(NumOrStr(je, "id"), Str(je, "name").Length > 0 ? Str(je, "name") : Str(je, "summary"), Bool(je, "done"), Str(je, "key"));
         }
 
         // --- Issues: board issue list, or a JQL project search (boardless) ---
-        var fields = $"summary,status,issuetype,assignee,duedate,priority,sprint,closedSprints,epic,parent,{pointsField}";
+        // Pull the full field set so tasks carry description, people, labels,
+        // components, versions, resolution, time tracking, timestamps, comments
+        // and attachments — not just the summary/status subset.
+        var fields = "summary,description,status,issuetype,assignee,reporter,creator,duedate,priority," +
+                     "labels,components,fixVersions,resolution,resolutiondate,created,updated," +
+                     "timetracking,timespent,timeoriginalestimate,sprint,closedSprints,epic,parent,comment,attachment," +
+                     pointsField;
         var jiraIssues = board is int bIssue
             ? await FetchIssuesAsync(c, $"rest/agile/1.0/board/{bIssue}/issue", fields, () => truncated = true)
             : await FetchJqlAsync(c, $"project = \"{projectKey}\" ORDER BY created ASC", fields, () => truncated = true);
         var existingTasks = await db.ProjectTasks.Where(t => t.ProjectId == p.Id).ToListAsync();
         var taskOrd = existingTasks.Select(t => t.Ord).DefaultIfEmpty(0).Max();
+        // Which Jira attachment/comment ids each existing task already holds — so a
+        // re-sync tops up new files/comments without re-downloading or duplicating.
+        var existingTaskIds = existingTasks.Where(t => t.Id != 0).Select(t => t.Id).ToList();
+        var haveAtt = (await db.TaskAttachments.Where(a => existingTaskIds.Contains(a.TaskId))
+                .Select(a => new { a.TaskId, a.JiraId }).ToListAsync())
+            .GroupBy(x => x.TaskId).ToDictionary(g => g.Key, g => g.Select(x => x.JiraId).ToHashSet());
+        var haveCom = (await db.TaskComments.Where(cm => existingTaskIds.Contains(cm.TaskId) && cm.JiraId != "")
+                .Select(cm => new { cm.TaskId, cm.JiraId }).ToListAsync())
+            .GroupBy(x => x.TaskId).ToDictionary(g => g.Key, g => g.Select(x => x.JiraId).ToHashSet());
         var seenTasks = new HashSet<string>();
         int backlog = 0;
         foreach (var ji in jiraIssues)
@@ -321,7 +345,8 @@ public static class Jira
             // Epics are not tasks. With no board, derive them from Epic-type issues.
             if (itype.Equals("Epic", StringComparison.OrdinalIgnoreCase))
             {
-                if (board is null) UpsertEpic(key, Str(f, "summary"), MapIssueStatus(StrPath(f, "status", "statusCategory", "key")) == "Done");
+                if (board is null) UpsertEpic(key, Str(f, "summary"), MapIssueStatus(StrPath(f, "status", "statusCategory", "key")) == "Done",
+                    key, AdfToText(Prop(f, "description")));
                 continue;
             }
             seenTasks.Add(key);
@@ -338,6 +363,73 @@ public static class Jira
             t.Sprint = sprintName;
             if (sprintName.Length == 0) backlog++;
             t.Epic = EpicNameOf(f);
+            // Rich fields.
+            t.Description = AdfToText(Prop(f, "description"));
+            t.IssueType = itype;
+            t.Reporter = StrPath(f, "reporter", "displayName");
+            t.StatusName = StrPath(f, "status", "name");
+            t.Resolution = StrPath(f, "resolution", "name");
+            t.Labels = StrArray(f, "labels");
+            t.Components = ObjNameArray(f, "components");
+            t.FixVersions = ObjNameArray(f, "fixVersions");
+            t.ParentKey = StrPath(f, "parent", "key");
+            t.EpicKey = EpicKeyOf(f);
+            t.EstimateHours = SecondsToHours(LongProp(f, "timeoriginalestimate"));
+            t.TimeSpentHours = SecondsToHours(LongProp(f, "timespent"));
+            t.JiraCreated = Str(f, "created");
+            t.JiraUpdated = Str(f, "updated");
+            t.JiraUrl = browseBase.Length > 0 ? $"{browseBase}/browse/{key}" : "";
+
+            // Comments — upsert by Jira comment id into the task's thread.
+            if (importComments && Prop(f, "comment") is { } cwrap && Prop(cwrap, "comments") is { ValueKind: JsonValueKind.Array } clist)
+            {
+                var have = t.Id != 0 && haveCom.TryGetValue(t.Id, out var hc) ? hc : new HashSet<string>();
+                foreach (var cm in clist.EnumerateArray())
+                {
+                    var cid = NumOrStr(cm, "id");
+                    if (cid.Length == 0 || have.Contains(cid)) continue;
+                    var author = StrPath(cm, "author", "displayName");
+                    t.Comments.Add(new TaskComment
+                    {
+                        JiraId = cid, Author = author.Length > 0 ? author : "Jira",
+                        Initials = Initials(author), Body = AdfToText(Prop(cm, "body")),
+                        At = ParseAt(Str(cm, "created")),
+                    });
+                    have.Add(cid);
+                }
+            }
+
+            // Attachments — download each new file (within the size cap) and store
+            // its bytes; best-effort so one bad file never fails the whole sync.
+            if (importAttachments && Prop(f, "attachment") is { ValueKind: JsonValueKind.Array } alist)
+            {
+                var have = t.Id != 0 && haveAtt.TryGetValue(t.Id, out var ha) ? ha : new HashSet<string>();
+                foreach (var att in alist.EnumerateArray())
+                {
+                    var aid = NumOrStr(att, "id");
+                    var url = Str(att, "content");
+                    var size = LongProp(att, "size");
+                    if (aid.Length == 0 || url.Length == 0 || have.Contains(aid)) continue;
+                    if (size > maxAttachmentBytes) continue;
+                    try
+                    {
+                        using var fileRes = await c.GetAsync(url);
+                        if (!fileRes.IsSuccessStatusCode) continue;
+                        var bytes = await fileRes.Content.ReadAsByteArrayAsync();
+                        if (bytes.LongLength > maxAttachmentBytes) continue;
+                        t.Attachments.Add(new TaskAttachment
+                        {
+                            JiraId = aid, FileName = Str(att, "filename"),
+                            ContentType = Str(att, "mimeType") is { Length: > 0 } mt ? mt : "application/octet-stream",
+                            Size = size > 0 ? size : bytes.LongLength,
+                            Author = StrPath(att, "author", "displayName"), CreatedAt = Str(att, "created"),
+                            Bytes = bytes,
+                        });
+                        have.Add(aid);
+                    }
+                    catch { /* skip this attachment, keep syncing */ }
+                }
+            }
         }
         if (seenTasks.Count > 0)
             db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.JiraKey.Length > 0 && !seenTasks.Contains(t.JiraKey)));
@@ -464,6 +556,82 @@ public static class Jira
             return Str(pf, "summary");
         return "";
     }
+
+    // Flatten Jira's Atlassian Document Format (ADF) rich text into plain text:
+    // collect text/mention nodes, break blocks with newlines. Tolerates a plain
+    // string (older/plain descriptions) and a missing field.
+    public static string AdfToText(JsonElement? node)
+    {
+        if (node is not { } n) return "";
+        var sb = new StringBuilder();
+        WalkAdf(n, sb);
+        return sb.ToString().Replace("\r\n", "\n").Trim();
+    }
+
+    static void WalkAdf(JsonElement n, StringBuilder sb)
+    {
+        if (n.ValueKind == JsonValueKind.String) { sb.Append(n.GetString()); return; }
+        if (n.ValueKind == JsonValueKind.Array) { foreach (var child in n.EnumerateArray()) WalkAdf(child, sb); return; }
+        if (n.ValueKind != JsonValueKind.Object) return;
+        var type = Str(n, "type");
+        if (type == "text") sb.Append(Str(n, "text"));
+        else if (type == "mention" && Prop(n, "attrs") is { } at) sb.Append(Str(at, "text"));
+        else if (type == "hardBreak") sb.Append('\n');
+        if (Prop(n, "content") is { ValueKind: JsonValueKind.Array } content)
+            foreach (var child in content.EnumerateArray()) WalkAdf(child, sb);
+        if (type is "paragraph" or "heading" or "blockquote" or "codeBlock" or "listItem" or "rule") sb.Append('\n');
+    }
+
+    // A string[] field (e.g. labels).
+    static List<string> StrArray(JsonElement e, string name)
+    {
+        var list = new List<string>();
+        if (e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var arr) && arr.ValueKind == JsonValueKind.Array)
+            foreach (var it in arr.EnumerateArray())
+                if (it.ValueKind == JsonValueKind.String && it.GetString() is { Length: > 0 } s) list.Add(s);
+        return list;
+    }
+
+    // An array-of-objects field projected to each object's "name" (components, fixVersions).
+    static List<string> ObjNameArray(JsonElement e, string name)
+    {
+        var list = new List<string>();
+        if (e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var arr) && arr.ValueKind == JsonValueKind.Array)
+            foreach (var it in arr.EnumerateArray())
+                if (Str(it, "name") is { Length: > 0 } s) list.Add(s);
+        return list;
+    }
+
+    // The stable epic key: agile `epic.key`, else an Epic-typed parent's key.
+    static string EpicKeyOf(JsonElement fields)
+    {
+        if (Prop(fields, "epic") is { ValueKind: JsonValueKind.Object } ep && Str(ep, "key") is { Length: > 0 } k) return k;
+        if (Prop(fields, "parent") is { ValueKind: JsonValueKind.Object } par &&
+            Prop(par, "fields") is { } pf && StrPath(pf, "issuetype", "name").Equals("Epic", StringComparison.OrdinalIgnoreCase))
+            return Str(par, "key");
+        return "";
+    }
+
+    // Jira tracks time in seconds; Atlas stores whole hours.
+    public static int SecondsToHours(long seconds) => seconds <= 0 ? 0 : (int)Math.Round(seconds / 3600.0);
+
+    static long LongProp(JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) &&
+        v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var l) ? l : 0;
+
+    static string Initials(string name)
+    {
+        var parts = (name ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "?";
+        return parts.Length == 1
+            ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant()
+            : (parts[0][0].ToString() + parts[^1][0]).ToUpperInvariant();
+    }
+
+    static DateTime ParseAt(string iso) =>
+        DateTime.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var dt)
+            ? dt : DateTime.UtcNow;
 
     // Page a values[]/isLast agile endpoint, cloning each element so it outlives
     // the JsonDocument. Flags `onTruncate` if the page cap is hit.

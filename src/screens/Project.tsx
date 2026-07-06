@@ -606,7 +606,15 @@ interface Task {
   startDate: string; targetDate: string; points: number; size: string; estimateHours: number;
   assigneeOnLeave: boolean;
   assigneeKnown?: boolean;
+  // Rich fields carried across from Jira (empty/zero for locally-created tasks).
+  description?: string; issueType?: string; reporter?: string; statusName?: string;
+  resolution?: string; labels?: string[]; components?: string[]; fixVersions?: string[];
+  parentKey?: string; epicKey?: string; timeSpentHours?: number;
+  jiraKey?: string; jiraUrl?: string; jiraCreated?: string; jiraUpdated?: string;
+  attachmentCount?: number; commentCount?: number;
 }
+
+interface TaskAttachment { id: number; fileName: string; contentType: string; size: number; author: string; createdAt: string; }
 
 function useAssigneeOptions(projectId: string | null): string[] {
   const { data } = useQuery({
@@ -861,6 +869,102 @@ function Tasks({ projectId }: { projectId: string | null }) {
   );
 }
 
+// Read-only detail carried across from Jira — shown only for synced tasks. The
+// editable fields above stay authoritative; this surfaces everything the sync
+// imports that Atlas doesn't otherwise edit (description, people, labels,
+// components, versions, resolution, time, timestamps) plus the file list.
+function ChipRow({ label, items }: { label: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 11, color: color.faint2, minWidth: 76 }}>{label}</span>
+      {items.map((it) => (
+        <span key={it} style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, border: `1px solid ${color.border2}`, borderRadius: 6, padding: "2px 8px" }}>{it}</span>
+      ))}
+    </div>
+  );
+}
+
+function KV({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+      <span style={{ fontSize: 11, color: color.faint2, minWidth: 76 }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: color.text }}>{children}</span>
+    </div>
+  );
+}
+
+function JiraTaskPanel({ task }: { task: Task }) {
+  const { data: attachments } = useQuery({
+    queryKey: ["task-attachments", task.id], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<TaskAttachment[]> => (await api<TaskAttachment[]>(`/tasks/${task.id}/attachments`)) ?? [],
+  });
+  if (!task.jiraKey) return null;
+  return (
+    <div style={{ borderTop: `1px solid ${color.bg}`, marginTop: 20, paddingTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <SectionTitle>Jira details</SectionTitle>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", color: color.primary, background: color.primaryTint, borderRadius: 6, padding: "2px 8px" }}>SYNCED · {task.jiraKey}</span>
+        <div style={{ flex: 1 }} />
+        {task.jiraUrl && (
+          <a href={task.jiraUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, textDecoration: "none" }}>
+            <Icon name="externalLink" size={14} /> View in Jira
+          </a>
+        )}
+      </div>
+
+      {task.description && (
+        <div style={{ fontSize: 12.5, color: color.subtle, whiteSpace: "pre-wrap", background: color.surfaceAlt, border: `1px solid ${color.border2}`, borderRadius: 9, padding: "10px 12px", marginBottom: 12, maxHeight: 220, overflow: "auto" }}>{task.description}</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {task.issueType && <KV label="Type">{task.issueType}</KV>}
+        {task.statusName && <KV label="Jira status">{task.statusName}</KV>}
+        {task.reporter && <KV label="Reporter">{task.reporter}</KV>}
+        {task.resolution && <KV label="Resolution">{task.resolution}</KV>}
+        {task.parentKey && <KV label="Parent">{task.parentKey}</KV>}
+        {!!task.timeSpentHours && <KV label="Time spent">{task.timeSpentHours}h logged</KV>}
+        <ChipRow label="Labels" items={task.labels} />
+        <ChipRow label="Components" items={task.components} />
+        <ChipRow label="Fix versions" items={task.fixVersions} />
+        {(task.jiraCreated || task.jiraUpdated) && (
+          <KV label="Jira dates">
+            <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint }}>
+              {task.jiraCreated ? `created ${task.jiraCreated.slice(0, 10)}` : ""}{task.jiraUpdated ? ` · updated ${task.jiraUpdated.slice(0, 10)}` : ""}
+            </span>
+          </KV>
+        )}
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 11, color: color.faint2, marginBottom: 6 }}>Attachments ({attachments?.length ?? 0})</div>
+        {attachments && attachments.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {attachments.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 10px" }}>
+                <Icon name="paperclip" size={15} color={color.faint2} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: color.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.fileName}</div>
+                  <div style={{ fontSize: 10.5, color: color.faint3, fontFamily: font.mono }}>{fmtBytes(a.size)}{a.author ? ` · ${a.author}` : ""}</div>
+                </div>
+                <button onClick={() => apiDownload(`/task-attachments/${a.id}`, a.fileName)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={14} /> Download</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: color.faint3 }}>No files attached in Jira.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, epicOptions, sprintOptions, onClose }: { projectId: string; task: Task; canEdit: boolean; assigneeOptions: string[]; epicOptions: string[]; sprintOptions: string[]; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState(task.name);
@@ -951,6 +1055,9 @@ function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, epicOption
         <div style={{ flex: 1 }}><DecLabel>T-shirt size</DecLabel><Select value={size} onChange={(e) => setSize(e.target.value)} disabled={!canEdit}><option value="">—</option>{TASK_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
         <div style={{ flex: 1 }}><DecLabel>Estimate (h)</DecLabel><Input type="number" min={0} value={estimate} onChange={(e) => setEstimate(e.target.value)} disabled={!canEdit} placeholder="0" /></div>
       </div>
+
+      {/* Jira-sourced detail (read-only) — only for synced tasks */}
+      <JiraTaskPanel task={task} />
 
       {/* Comments */}
       <div style={{ borderTop: `1px solid ${color.bg}`, marginTop: 20, paddingTop: 16 }}>

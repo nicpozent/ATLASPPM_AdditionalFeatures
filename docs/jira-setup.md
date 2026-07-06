@@ -79,15 +79,28 @@ What the sync maps, Jira → Atlas:
 
 | Atlas section | Jira source |
 | ------------- | ----------- |
-| Project → Sprints | board sprints (`/rest/agile/1.0/board/{id}/sprint`); state → Planned/Active/Closed |
-| Project → Epics | board epics (`/rest/agile/1.0/board/{id}/epic`); story rollup counted from issues |
-| Project → Tasks | board issues (`/rest/agile/1.0/board/{id}/issue`); status category, assignee, priority, due date, points |
+| Project → Sprints | board sprints (`/rest/agile/1.0/board/{id}/sprint`); state → Planned/Active/Closed, plus goal, start/end and complete date, origin board |
+| Project → Epics | board epics (`/rest/agile/1.0/board/{id}/epic`); name, key, description, deep link; story rollup counted from issues |
+| Project → Tasks | board issues (`/rest/agile/1.0/board/{id}/issue`) — the **full field set** (see below) |
 | Project → Backlog | issues with no sprint |
 
-**Idempotent & safe.** Each synced sprint/epic/task carries its Jira id. A
-re-sync upserts by that id, prunes synced rows that vanished from Jira, and
-**never touches locally-created rows** (those you added by hand in Atlas). Points
-come from the story-points custom field (see `JIRA_STORY_POINTS_FIELD` above).
+**Every task field.** Each synced issue brings across its summary, description
+(Jira's rich ADF flattened to text), issue type, exact status name, assignee,
+reporter, priority, due date, story points, labels, components, fix versions,
+resolution, original-estimate and logged time, parent/epic keys, created/updated
+timestamps and a deep link back to Jira. It also mirrors the issue's **comments**
+(shown inline, flagged as from Jira) and downloads its **attachments** (stored in
+Atlas and downloadable from the task). Comments and files are pulled by default;
+toggle with `JIRA_IMPORT_COMMENTS` / `JIRA_IMPORT_ATTACHMENTS` and cap file size
+with `JIRA_MAX_ATTACHMENT_BYTES` (default 25 MiB). These appear in the task's
+**Jira details** panel.
+
+**Idempotent & safe.** Each synced sprint/epic/task carries its Jira id, and each
+comment/attachment its Jira comment/attachment id. A re-sync upserts by those
+ids (topping up new comments/files without re-downloading), prunes synced rows
+that vanished from Jira, and **never touches locally-created rows** (those you
+added by hand in Atlas). Points come from the story-points custom field (see
+`JIRA_STORY_POINTS_FIELD` above).
 
 Syncing requires **Edit** on the *Integrations & connectors* capability.
 

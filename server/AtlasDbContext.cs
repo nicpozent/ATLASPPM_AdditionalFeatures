@@ -52,6 +52,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<SecurityReviewGate> SecurityReviewGates => Set<SecurityReviewGate>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<TaskComment> TaskComments => Set<TaskComment>();
+    public DbSet<TaskAttachment> TaskAttachments => Set<TaskAttachment>();
     public DbSet<Sprint> Sprints => Set<Sprint>();
     public DbSet<Epic> Epics => Set<Epic>();
     public DbSet<Artifact> Artifacts => Set<Artifact>();
@@ -210,6 +211,12 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<SecurityControl>().HasIndex(x => x.ProjectId);
         b.Entity<ProjectTask>().HasKey(x => x.Id);
         b.Entity<ProjectTask>().HasIndex(x => x.ProjectId);
+        b.Entity<ProjectTask>().HasMany(x => x.Comments).WithOne().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ProjectTask>().HasMany(x => x.Attachments).WithOne().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<TaskComment>().HasKey(x => x.Id);
+        b.Entity<TaskComment>().HasIndex(x => x.TaskId);
+        b.Entity<TaskAttachment>().HasKey(x => x.Id);
+        b.Entity<TaskAttachment>().HasIndex(x => x.TaskId);
         b.Entity<Epic>().HasKey(x => x.Id);
         b.Entity<Epic>().HasIndex(x => x.ProjectId);
         b.Entity<Artifact>().HasKey(x => x.Id);

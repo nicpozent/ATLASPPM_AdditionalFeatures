@@ -51,16 +51,24 @@ public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<Securit
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
     string Status, string Sprint, string Baseline, string Priority,
     string StartDate = "", string TargetDate = "", int Points = 0, string Size = "",
-    int EstimateHours = 0, bool AssigneeOnLeave = false, bool AssigneeKnown = true);
+    int EstimateHours = 0, bool AssigneeOnLeave = false, bool AssigneeKnown = true,
+    // Rich fields carried from Jira (empty/zero for locally-created tasks).
+    string Description = "", string IssueType = "", string Reporter = "", string StatusName = "",
+    string Resolution = "", List<string>? Labels = null, List<string>? Components = null,
+    List<string>? FixVersions = null, string ParentKey = "", string EpicKey = "",
+    int TimeSpentHours = 0, string JiraKey = "", string JiraUrl = "", string JiraCreated = "",
+    string JiraUpdated = "", int AttachmentCount = 0, int CommentCount = 0);
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
-public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At);
+public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At, bool FromJira = false);
+public record TaskAttachmentDto(int Id, string FileName, string ContentType, long Size, string Author, string CreatedAt);
 public record SprintDto(int Id, string Name, string Goal, string StartDate, string EndDate, string Status,
-    int CommittedPoints, int TaskCount, int DoneCount, int Points, int DonePoints, int SpilledCount);
+    int CommittedPoints, int TaskCount, int DoneCount, int Points, int DonePoints, int SpilledCount,
+    string CompleteDate = "", int BoardId = 0, string JiraKey = "");
 public record SprintsDto(bool CanEdit, bool CanCreate, List<SprintDto> Sprints);
 
 public record EpicRefDto(int Id, string Name);
 public record EpicDto(int Id, string Name, int Stories, int Done, int Pct, string Status, string DependsOn,
-    List<EpicRefDto> Deps);
+    List<EpicRefDto> Deps, string Description = "", string EpicKey = "", string JiraUrl = "", string JiraKey = "");
 public record EpicsDto(bool CanEdit, List<EpicDto> Epics, bool CanCreate = false);
 
 public record ArtifactVersionDto(int Id, int Version, string FileName, long Size, string UploadedAt);

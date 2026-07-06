@@ -256,4 +256,37 @@ public class JiraSyncMappingTests
     [InlineData(null, "")]
     public void Date_part_keeps_calendar_day(string? iso, string expected) =>
         Assert.Equal(expected, Jira.DatePart(iso));
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(-5, 0)]
+    [InlineData(3600, 1)]
+    [InlineData(5400, 2)]     // 1.5h rounds to 2
+    [InlineData(28800, 8)]
+    public void Seconds_convert_to_whole_hours(long seconds, int expected) =>
+        Assert.Equal(expected, Jira.SecondsToHours(seconds));
+
+    [Fact]
+    public void Adf_flattens_to_plain_text()
+    {
+        // A minimal ADF doc: two paragraphs, a bold run and a hard break.
+        var adf = System.Text.Json.JsonDocument.Parse("""
+        {"type":"doc","version":1,"content":[
+          {"type":"paragraph","content":[{"type":"text","text":"Hello "},{"type":"text","text":"world"}]},
+          {"type":"paragraph","content":[{"type":"text","text":"line one"},{"type":"hardBreak"},{"type":"text","text":"line two"}]}
+        ]}
+        """).RootElement;
+        var text = Jira.AdfToText(adf);
+        Assert.Contains("Hello world", text);
+        Assert.Contains("line one", text);
+        Assert.Contains("line two", text);
+    }
+
+    [Fact]
+    public void Adf_tolerates_plain_string_and_null()
+    {
+        var plain = System.Text.Json.JsonDocument.Parse("\"just a string\"").RootElement;
+        Assert.Equal("just a string", Jira.AdfToText(plain));
+        Assert.Equal("", Jira.AdfToText(null));
+    }
 }
