@@ -40,35 +40,41 @@ public static class ResourcesData
             var productAllocs = await db.ProductAllocations.ToListAsync();
             var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
             var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
+            var opsByPerson = await Ops.AllocByPersonAsync(db);   // Ops% source: active ops work items
 
             // Accumulate per person (keyed case-insensitively by name).
-            var people = new Dictionary<string, (string Name, string Title, string Dept, int Project, int Product)>(StringComparer.OrdinalIgnoreCase);
-            (string, string, string, int, int) Get(string name) =>
-                people.TryGetValue(name, out var v) ? v : (name, "", "", 0, 0);
+            var people = new Dictionary<string, (string Name, string Title, string Dept, int Project, int Product, int Ops)>(StringComparer.OrdinalIgnoreCase);
+            (string, string, string, int, int, int) Get(string name) =>
+                people.TryGetValue(name, out var v) ? v : (name, "", "", 0, 0, 0);
 
             foreach (var a in productAllocs)
             {
                 var p = Get(a.MemberName);
-                people[a.MemberName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? a.MemberTitle : p.Item2, p.Item3, p.Item4, p.Item5 + a.Alloc);
+                people[a.MemberName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? a.MemberTitle : p.Item2, p.Item3, p.Item4, p.Item5 + a.Alloc, p.Item6);
             }
             foreach (var t in projAssignments)
                 foreach (var m in t.Members)
                 {
                     var p = Get(m.Name);
-                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4 + m.Alloc, p.Item5);
+                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4 + m.Alloc, p.Item5, p.Item6);
                 }
             foreach (var g in groups)
                 foreach (var m in g.Members)
                 {
                     var p = Get(m.DisplayName);
                     people[m.DisplayName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.JobTitle : p.Item2,
-                        string.IsNullOrEmpty(p.Item3) ? g.DisplayName : p.Item3, p.Item4, p.Item5);
+                        string.IsNullOrEmpty(p.Item3) ? g.DisplayName : p.Item3, p.Item4, p.Item5, p.Item6);
                 }
+            foreach (var (name, ops) in opsByPerson)
+            {
+                var p = Get(name);
+                people[name] = (p.Item1, p.Item2, p.Item3, p.Item4, p.Item5, p.Item6 + ops);
+            }
 
             var rows = people.Values
-                .OrderByDescending(p => p.Project + p.Product).ThenBy(p => p.Name)
+                .OrderByDescending(p => p.Project + p.Product + p.Ops).ThenBy(p => p.Name)
                 .Select(p => new ResourceDto(p.Name, string.IsNullOrEmpty(p.Title) ? "Team member" : p.Title, p.Dept,
-                    Initials(p.Name), ColorFor(p.Name), 0, p.Project, p.Product, p.Project + p.Product > 100))
+                    Initials(p.Name), ColorFor(p.Name), p.Ops, p.Project, p.Product, p.Project + p.Product + p.Ops > 100))
                 .ToList();
             return Results.Ok(rows);
         });

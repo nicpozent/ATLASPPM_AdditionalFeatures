@@ -308,6 +308,7 @@ function Overview({ projectId }: { projectId: string | null }) {
         <WaysOfWorking projectId={projectId} />
         <TeamCapacity projectId={projectId} />
         <CommunicationPlan projectId={projectId} />
+        <OpsImpactPanel projectId={projectId} />
         {/* AI assist (structural chrome) */}
         <div style={{ background: "linear-gradient(120deg,#0F1B3D,#123B7A)", border: "1px solid #14264F", borderRadius: 16, padding: "20px 22px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
@@ -4108,6 +4109,44 @@ interface CommEntry { id: number; stakeholder: string; channel: string; commType
 const COMM_CHANNELS = ["Email", "Teams", "Meeting", "Report", "Slack", "Call"];
 const COMM_TYPES = ["Status update", "Steering", "Escalation", "Newsletter", "Review", "Ad-hoc"];
 const COMM_SCHEDULES = ["Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Ad-hoc"];
+
+// Operational load impacting this project — run-the-business ops work tagged to
+// it (from the Ops module) that pulls capacity off delivery. Shown only when
+// there's at least one active impacting item, so it stays quiet otherwise.
+interface OpsImpactRow { id: number; title: string; serviceName: string; type: string; priority: string; status: string; assignee: string; alloc: number; impactNote: string; }
+function OpsImpactPanel({ projectId }: { projectId: string | null }) {
+  const { data } = useQuery({
+    queryKey: ["ops-impact", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ alloc: number; items: OpsImpactRow[] }> =>
+      (await api<{ alloc: number; items: OpsImpactRow[] }>(`/projects/${projectId}/ops-impact`)) ?? { alloc: 0, items: [] },
+  });
+  const items = data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: `1px solid ${color.bg}` }}>
+        <Icon name="activity" size={17} color={color.warningAlt} />
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Operational load</div>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#8A6300", background: "#FBF2D7", borderRadius: 6, padding: "2px 8px" }}>{data?.alloc ?? 0}% capacity</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, color: color.faint2 }}>{items.length} item{items.length === 1 ? "" : "s"} pulling capacity off delivery</span>
+      </div>
+      <div>
+        {items.map((i) => (
+          <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", borderBottom: "1px solid #F4F6FA" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{i.title}</div>
+              <div style={{ fontSize: 11, color: color.faint2, marginTop: 1 }}>
+                {i.serviceName} · {i.type} · {i.assignee}{i.impactNote ? ` · ${i.impactNote}` : ""}
+              </div>
+            </div>
+            <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.warningAlt }}>{i.alloc}%</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function CommunicationPlan({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
