@@ -85,9 +85,13 @@ public static class Endpoints
             q = (archived ?? false) ? q.Where(p => p.Archived)
               : (completed ?? false) ? q.Where(p => !p.Archived && p.Status == "completed")
               : q.Where(p => !p.Archived && p.Status != "completed");
-            return await q.OrderBy(p => p.Id).Select(p => new ProjectDto(
-                p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress,
-                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate)).ToListAsync();
+            var list = await q.OrderBy(p => p.Id).ToListAsync();
+            // Completion is derived from task state where a project has tasks.
+            var derived = await ProjectProgress.MapAsync(db, list.Select(p => p.Id).ToList());
+            return list.Select(p => new ProjectDto(
+                p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
+                derived.TryGetValue(p.Id, out var pr) ? pr : p.Progress,
+                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate)).ToList();
         });
 
         api.MapGet("/projects/my", async (AtlasDbContext db) =>
@@ -98,10 +102,11 @@ public static class Endpoints
         api.MapGet("/projects/{id}", async (string id, AtlasDbContext db) =>
         {
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
-            return p is null
-                ? Results.NotFound()
-                : Results.Ok(new ProjectDetailDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology,
-                    p.Status, p.Health, p.Progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target, p.Summary,
+            if (p is null) return Results.NotFound();
+            var derived = await ProjectProgress.MapAsync(db, new[] { id });
+            var progress = derived.TryGetValue(id, out var pr) ? pr : p.Progress;
+            return Results.Ok(new ProjectDetailDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology,
+                    p.Status, p.Health, progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target, p.Summary,
                     p.JiraProjectKey, p.JiraBoardId));
         });
 
@@ -156,6 +161,8 @@ public static class Endpoints
         {
             var objectives = await db.Objectives.OrderBy(o => o.Id).Include(o => o.Krs).ToListAsync();
             var projProgress = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Progress);
+            // Prefer task-derived completion so OKRs reflect real delivery.
+            foreach (var (pid, pr) in await ProjectProgress.MapAsync(db, projProgress.Keys.ToList())) projProgress[pid] = pr;
             var programProjects = await db.Programs.ToDictionaryAsync(p => p.Id, p => p.Projects);
             var productProjects = await db.Products.ToDictionaryAsync(p => p.Id, p => p.Projects);
 
@@ -231,8 +238,10 @@ public static class DashboardEndpoint
         var budget = snap is null ? null
             : new BudgetDto(snap.Allocated, snap.Spent, snap.SpentPct, snap.Months, snap.Planned, snap.Actual, snap.Max);
 
+        var derivedProgress = await ProjectProgress.MapAsync(db, projects.Select(p => p.Id).ToList());
         var projectRows = projects.Select(p => new ProjectRowDto(
-            p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health, p.Progress, p.Budget, p.Spent)).ToList();
+            p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
+            derivedProgress.TryGetValue(p.Id, out var pr) ? pr : p.Progress, p.Budget, p.Spent)).ToList();
 
         var attention = projects.Where(p => p.AttentionReason != null)
             .Select(p => new AttentionItemDto(p.Id, p.Name, p.AttentionReason!, p.AttentionSeverity ?? "amber")).ToList();
