@@ -12,6 +12,7 @@ import { DEPARTMENTS } from "@/departments";
 import {
   STATUS_FILTERS, useProjects, useBlockers, type Project, type ProjectBucket, type Blocker, type BlockerStatus,
 } from "./portfolio/data";
+import PortfolioOverview from "./portfolio/Overview";
 
 const fmtBudget = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
 
@@ -47,7 +48,7 @@ const BLK_VIEWS: { key: string; label: string; match: (s: BlockerStatus) => bool
 interface RaiseBlocker { title: string; projectId: string; owner: string; status: BlockerStatus; description: string; }
 
 export default function Portfolio() {
-  const [tab, setTab] = useState<"projects" | "blockers">("projects");
+  const [tab, setTab] = useState<"overview" | "projects" | "blockers">("projects");
   const [filter, setFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [newProject, setNewProject] = useState(false);
@@ -108,6 +109,7 @@ export default function Portfolio() {
       {/* sub-tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+          <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>Overview</TabBtn>
           <TabBtn active={tab === "projects"} onClick={() => setTab("projects")}>Projects</TabBtn>
           <TabBtn active={tab === "blockers"} onClick={() => setTab("blockers")}>
             <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -131,10 +133,12 @@ export default function Portfolio() {
             {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
           </Select>
         )}
-        <Button onClick={() => setNewProject(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>
+        {tab !== "blockers" && <Button onClick={() => setNewProject(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create projects"}><Icon name="plus" size={16} /> New project</Button>}
       </div>
 
-      {tab === "projects" ? (
+      {tab === "overview" ? (
+        <PortfolioOverview />
+      ) : tab === "projects" ? (
         <>
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
             {STATUS_FILTERS.map((f) => {
