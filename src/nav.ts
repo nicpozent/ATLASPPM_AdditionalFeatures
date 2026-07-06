@@ -5,7 +5,7 @@
 
 export type ScreenId =
   | "dashboard" | "portfolio" | "programs" | "products" | "okrs"
-  | "demands" | "gantt" | "project" | "resources" | "financials"
+  | "demands" | "gantt" | "pip" | "project" | "resources" | "financials"
   | "delivery" | "releases" | "news"
   | "teams" | "methodologies" | "integrations" | "reports" | "admin" | "help"
   | "myprojects" | "mydemands";
@@ -29,6 +29,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
   okrs:          { id: "okrs",          path: "/okrs",          label: "OKRs",             title: "OKRs & Strategic Alignment",   subtitle: "Objectives linked to projects, programs & products", icon: "target" },
   demands:       { id: "demands",       path: "/demands",       label: "Demand Pipeline",  title: "Demand Pipeline",              subtitle: "Open demands awaiting triage & approval",            icon: "inbox" },
   gantt:         { id: "gantt",         path: "/timeline",      label: "Timeline / Gantt", title: "Timeline / Gantt",             subtitle: "Schedule, phases, milestones & dependencies",        icon: "gantt" },
+  pip:           { id: "pip",           path: "/pi-planning",   label: "PI Planning",      title: "Program Increment Planning",   subtitle: "Quarterly PI objectives, calendar, capacity & dependencies", icon: "calendar" },
   project:       { id: "project",       path: "/project",       label: "Project Detail",   title: "Project Detail",               subtitle: "Tasks, epics, artifacts, RAID & collaboration",      icon: "folder" },
   resources:     { id: "resources",     path: "/resources",     label: "Resources",        title: "Resources & Capacity",         subtitle: "People synced from Entra ID · allocation vs availability", icon: "users" },
   financials:    { id: "financials",    path: "/financials",    label: "Financials",       title: "Financials",                   subtitle: "Budget vs actual · CapEx/OpEx · benefits & ROI",     icon: "coins" },
@@ -48,7 +49,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
 // Sidebar groups per role family (mirrors the prototype's navMain / navConfig).
 export const NAV_MAIN: ScreenId[] = [
   "dashboard", "portfolio", "programs", "products", "okrs",
-  "demands", "gantt", "project", "resources", "financials",
+  "demands", "gantt", "pip", "project", "resources", "financials",
   "delivery", "releases", "news",
 ];
 export const NAV_CONFIG: ScreenId[] = [

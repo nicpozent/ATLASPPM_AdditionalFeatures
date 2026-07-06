@@ -48,6 +48,7 @@ public static class Endpoints
         api.MapSecretRotationEndpoints();
         api.MapCommentEndpoints();
         api.MapStakeholderEndpoints();
+        api.MapPipEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
