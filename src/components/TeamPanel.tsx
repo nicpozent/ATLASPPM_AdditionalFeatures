@@ -9,7 +9,42 @@ import { toast } from "@/components/Toast";
 // A person on a sub-team or an assignment.
 export interface TeamMemberT { id: number; name: string; email: string; title: string }
 export interface SubTeamT { id: number; name: string; managerKey: string; managerLabel: string; description: string; canManage: boolean; members: TeamMemberT[] }
-interface AssignmentT { id: number; subTeamId: number; subTeamName: string; managerLabel: string; members: TeamMemberT[] }
+// An assignment member carries the full allocation shape.
+interface AssignMemberT extends TeamMemberT {
+  alloc: number; allocHours: number; startDate: string; endDate: string;
+  extAlloc: number; extHours: number; extStartDate: string; extEndDate: string;
+}
+interface AssignmentT { id: number; subTeamId: number; subTeamName: string; managerLabel: string; members: AssignMemberT[] }
+
+const HOURS_PER_WEEK = 40;
+const pct = (mode: "percent" | "hours", value: number) =>
+  mode === "hours" ? Math.min(100, Math.round((value / HOURS_PER_WEEK) * 100)) : value;
+
+// Per-member allocation editing state (base segment + optional extension).
+interface AllocEdit {
+  mode: "percent" | "hours"; value: number; start: string; end: string;
+  extOn: boolean; extMode: "percent" | "hours"; extValue: number; extStart: string; extEnd: string;
+}
+const blankAlloc = (): AllocEdit => ({ mode: "percent", value: 0, start: "", end: "", extOn: false, extMode: "hours", extValue: 0, extStart: "", extEnd: "" });
+function allocFrom(m: AssignMemberT): AllocEdit {
+  return {
+    mode: m.allocHours > 0 ? "hours" : "percent", value: m.allocHours > 0 ? m.allocHours : m.alloc,
+    start: m.startDate, end: m.endDate,
+    extOn: m.extAlloc > 0 || m.extHours > 0 || !!m.extStartDate || !!m.extEndDate,
+    extMode: m.extHours > 0 ? "hours" : "percent", extValue: m.extHours > 0 ? m.extHours : m.extAlloc,
+    extStart: m.extStartDate, extEnd: m.extEndDate,
+  };
+}
+function allocReq(name: string, email: string, title: string, a: AllocEdit) {
+  return {
+    name, email, title,
+    ...(a.mode === "hours" ? { allocHours: a.value } : { alloc: a.value }),
+    startDate: a.start, endDate: a.end,
+    ...(a.extOn
+      ? { ...(a.extMode === "hours" ? { extHours: a.extValue } : { extAlloc: a.extValue }), extStartDate: a.extStart, extEndDate: a.extEnd }
+      : { extAlloc: 0, extHours: 0, extStartDate: "", extEndDate: "" }),
+  };
+}
 
 const avatarColors = ["#0F6CBD", "#7A3FB0", "#0E7C7B", "#C98A00", "#15A34A", "#A1282B"];
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -38,6 +73,7 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
   });
   const { data: subs } = useSubTeams();
   const [attach, setAttach] = useState(false);
+  const [individual, setIndividual] = useState(false);
   const [editing, setEditing] = useState<AssignmentT | null>(null);
 
   const assignments = data?.assignments ?? [];
@@ -54,9 +90,10 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
 
   return (
     <Card padding={20}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         <div style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 700, color: color.ink }}>Team</div>
         <div style={{ flex: 1 }} />
+        {canEdit && <Button variant="secondary" onClick={() => setIndividual(true)}><Icon name="plus" size={15} /> Assign individual</Button>}
         {canEdit && <Button variant="secondary" onClick={() => setAttach(true)} disabled={available.length === 0} title={available.length === 0 ? (subTeams.length ? "Every sub-team is already attached" : "No sub-teams yet — a manager creates them in My Team") : undefined}><Icon name="plus" size={15} /> Attach sub-team</Button>}
       </div>
       {assignments.length === 0 ? (
@@ -80,11 +117,19 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
                 <div style={{ fontSize: 12, color: color.faint3 }}>No members selected.</div>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {a.members.map((m) => (
-                    <span key={m.id} title={[m.title, m.email].filter(Boolean).join(" · ")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: color.bg, borderRadius: 20, padding: "3px 10px 3px 3px" }}>
-                      <Avatar name={m.name} /><span style={{ fontSize: 12, color: color.text }}>{m.name}</span>
-                    </span>
-                  ))}
+                  {a.members.map((m) => {
+                    const range = m.startDate || m.endDate ? `${m.startDate || "…"} → ${m.endDate || "…"}` : "";
+                    const tip = [m.title, m.email, range, m.extAlloc ? `+${m.extAlloc}% extension` : ""].filter(Boolean).join(" · ");
+                    return (
+                      <span key={m.id} title={tip} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: color.bg, borderRadius: 20, padding: "3px 10px 3px 3px" }}>
+                        <Avatar name={m.name} />
+                        <span style={{ fontSize: 12, color: color.text }}>{m.name}</span>
+                        {m.alloc > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: color.primary }}>{m.alloc}%</span>}
+                        {m.extAlloc > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#8A6300" }} title="extension">+{m.extAlloc}%</span>}
+                        {range && <span style={{ fontSize: 10, color: color.faint3, fontFamily: font.mono }}>{range}</span>}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -92,36 +137,72 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
         </div>
       )}
       {attach && <AttachModal entityType={entityType} entityId={entityId} available={available} onClose={() => setAttach(false)} invalidate={() => qc.invalidateQueries({ queryKey: key })} />}
+      {individual && <IndividualModal entityType={entityType} entityId={entityId} onClose={() => setIndividual(false)} invalidate={() => qc.invalidateQueries({ queryKey: key })} />}
       {editing && <MembersModal assignment={editing} subTeam={subTeams.find((s) => s.id === editing.subTeamId)} onClose={() => setEditing(null)} invalidate={() => qc.invalidateQueries({ queryKey: key })} />}
     </Card>
   );
 }
 
-function MemberChecklist({ members, selected, onToggle, allocs, onAlloc }: {
+// Per-member allocation editor — %/hours toggle, date window, and an optional
+// extension segment (extra capacity when the work runs long).
+function AllocEditor({ value, onChange }: { value: AllocEdit; onChange: (a: AllocEdit) => void }) {
+  const set = (patch: Partial<AllocEdit>) => onChange({ ...value, ...patch });
+  const dateInput: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontFamily: "inherit", color: color.text };
+  const modeBtn = (active: boolean): React.CSSProperties => ({ fontSize: 11, fontWeight: 700, padding: "3px 8px", border: "none", cursor: "pointer", background: active ? color.primary : color.surfaceAlt, color: active ? "#fff" : color.subtle, fontFamily: "inherit" });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 7 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", borderRadius: 7, overflow: "hidden", border: `1px solid ${color.border2}` }}>
+          <button type="button" onClick={() => set({ mode: "percent" })} style={modeBtn(value.mode === "percent")}>%</button>
+          <button type="button" onClick={() => set({ mode: "hours" })} style={modeBtn(value.mode === "hours")}>h/wk</button>
+        </span>
+        <input type="number" min={0} max={value.mode === "percent" ? 100 : 60} value={value.value || ""}
+          onChange={(e) => set({ value: Math.max(0, Number(e.target.value) || 0) })}
+          style={{ width: 56, textAlign: "right", ...dateInput }} />
+        {value.mode === "hours" && <span style={{ fontSize: 11, color: color.faint3 }}>≈ {pct("hours", value.value)}%</span>}
+        <span style={{ fontSize: 11, color: color.faint3 }}>from</span>
+        <input type="date" value={value.start} onChange={(e) => set({ start: e.target.value })} style={dateInput} />
+        <span style={{ fontSize: 11, color: color.faint3 }}>to</span>
+        <input type="date" value={value.end} onChange={(e) => set({ end: e.target.value })} style={dateInput} />
+      </div>
+      {value.extOn ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#FBF6E7", border: "1px solid #F0E4BE", borderRadius: 8, padding: "6px 8px" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: "#8A6300" }}>EXTENSION</span>
+          <span style={{ display: "inline-flex", borderRadius: 7, overflow: "hidden", border: `1px solid ${color.border2}` }}>
+            <button type="button" onClick={() => set({ extMode: "percent" })} style={modeBtn(value.extMode === "percent")}>%</button>
+            <button type="button" onClick={() => set({ extMode: "hours" })} style={modeBtn(value.extMode === "hours")}>h/wk</button>
+          </span>
+          <input type="number" min={0} max={value.extMode === "percent" ? 100 : 60} value={value.extValue || ""}
+            onChange={(e) => set({ extValue: Math.max(0, Number(e.target.value) || 0) })} style={{ width: 52, textAlign: "right", ...dateInput }} />
+          <input type="date" value={value.extStart} onChange={(e) => set({ extStart: e.target.value })} style={dateInput} />
+          <input type="date" value={value.extEnd} onChange={(e) => set({ extEnd: e.target.value })} style={dateInput} />
+          <button type="button" onClick={() => set({ extOn: false })} style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, fontSize: 11, fontFamily: "inherit" }}>remove</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => set({ extOn: true })} style={{ alignSelf: "flex-start", background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>+ Add extension (extra hours if it runs long)</button>
+      )}
+    </div>
+  );
+}
+
+function MemberChecklist({ members, selected, onToggle, edits, onEdit }: {
   members: TeamMemberT[]; selected: Set<string>; onToggle: (name: string) => void;
-  allocs?: Record<string, number>; onAlloc?: (name: string, alloc: number) => void;
+  edits: Record<string, AllocEdit>; onEdit: (name: string, a: AllocEdit) => void;
 }) {
   if (members.length === 0) return <div style={{ fontSize: 12, color: color.faint3 }}>This sub-team has no members yet — add them in My Team.</div>;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 380, overflowY: "auto" }}>
       {members.map((m) => {
         const on = selected.has(m.name);
         return (
           <div key={m.id}
-            style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#EAF2FB" : color.surfaceAlt, border: `1px solid ${on ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "7px 10px" }}>
-            <button type="button" onClick={() => onToggle(m.name)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: "none", border: "none", flex: 1, minWidth: 0, padding: 0 }}>
+            style={{ background: on ? "#EAF2FB" : color.surfaceAlt, border: `1px solid ${on ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "8px 10px" }}>
+            <button type="button" onClick={() => onToggle(m.name)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: "none", border: "none", width: "100%", minWidth: 0, padding: 0 }}>
               <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primary : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
               <Avatar name={m.name} />
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12.5, color: color.text }}>{m.name}</span>{m.title && <span style={{ fontSize: 11, color: color.faint3 }}> · {m.title}</span>}</span>
             </button>
-            {on && allocs && onAlloc && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flex: "none" }} title="Allocation on this item">
-                <input type="number" min={0} max={100} value={allocs[m.name] ?? 0}
-                  onChange={(e) => onAlloc(m.name, Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-                  style={{ width: 52, textAlign: "right", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "4px 6px", fontSize: 12, fontFamily: "inherit", color: color.text }} />
-                <span style={{ fontSize: 11, color: color.faint3 }}>%</span>
-              </span>
-            )}
+            {on && <AllocEditor value={edits[m.name] ?? blankAlloc()} onChange={(a) => onEdit(m.name, a)} />}
           </div>
         );
       })}
@@ -133,28 +214,28 @@ function AttachModal({ entityType, entityId, available, onClose, invalidate }: {
   const [subId, setSubId] = useState(available[0]?.id ?? 0);
   const sub = available.find((s) => s.id === subId);
   const [selected, setSelected] = useState<Set<string>>(new Set(available[0]?.members.map((m) => m.name) ?? []));
-  const [allocs, setAllocs] = useState<Record<string, number>>({});
-  const pick = (id: number) => { setSubId(id); setSelected(new Set(available.find((s) => s.id === id)?.members.map((m) => m.name) ?? [])); };
+  const [edits, setEdits] = useState<Record<string, AllocEdit>>({});
+  const pick = (id: number) => { setSubId(id); setSelected(new Set(available.find((s) => s.id === id)?.members.map((m) => m.name) ?? [])); setEdits({}); };
   const toggle = (n: string) => setSelected((prev) => { const s = new Set(prev); if (s.has(n)) s.delete(n); else s.add(n); return s; });
-  const setAlloc = (n: string, v: number) => setAllocs((prev) => ({ ...prev, [n]: v }));
+  const onEdit = (n: string, a: AllocEdit) => setEdits((prev) => ({ ...prev, [n]: a }));
   const attach = useMutation({
     mutationFn: () => api(`/teams/assignments/${entityType}/${entityId}`, {
       method: "POST",
-      body: JSON.stringify({ subTeamId: subId, members: (sub?.members ?? []).filter((m) => selected.has(m.name)).map((m) => ({ name: m.name, email: m.email, title: m.title, alloc: allocs[m.name] ?? 0 })) }),
+      body: JSON.stringify({ subTeamId: subId, members: (sub?.members ?? []).filter((m) => selected.has(m.name)).map((m) => allocReq(m.name, m.email, m.title, edits[m.name] ?? blankAlloc())) }),
     }),
     onSuccess: () => { invalidate(); onClose(); },
     onError: (e) => toast((e as Error).message, "error"),
   });
 
   return (
-    <Modal onClose={onClose} width={460} label="Attach a sub-team">
+    <Modal onClose={onClose} width={520} label="Attach a sub-team">
       <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Sub-team</div>
       <Select value={String(subId)} onChange={(e) => pick(Number(e.target.value))} style={{ marginBottom: 14 }}>
         {available.map((s) => <option key={s.id} value={s.id}>{s.name}{s.managerLabel ? ` · ${s.managerLabel}` : ""}</option>)}
       </Select>
       <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Who's working on this {entityType}? ({selected.size})</div>
-      <MemberChecklist members={sub?.members ?? []} selected={selected} onToggle={toggle} allocs={allocs} onAlloc={setAlloc} />
-      <div style={{ fontSize: 11, color: color.faint3, marginTop: 8 }}>Set each person's allocation % on this {entityType} (you can also fine-tune later on Resources → By project).</div>
+      <MemberChecklist members={sub?.members ?? []} selected={selected} onToggle={toggle} edits={edits} onEdit={onEdit} />
+      <div style={{ fontSize: 11, color: color.faint3, marginTop: 8 }}>Set each person's allocation as a % or weekly hours (40h = 100%), with an optional start/end and an extension if the work runs long.</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => subId && attach.mutate()} disabled={!subId || attach.isPending}>{attach.isPending ? "Attaching…" : "Attach"}</Button>
@@ -165,25 +246,76 @@ function AttachModal({ entityType, entityId, available, onClose, invalidate }: {
 
 function MembersModal({ assignment, subTeam, onClose, invalidate }: { assignment: AssignmentT; subTeam?: SubTeamT; onClose: () => void; invalidate: () => void }) {
   // Choose from the sub-team's full roster; pre-check the currently-assigned ones.
-  const roster = subTeam?.members ?? assignment.members;
+  const roster: TeamMemberT[] = subTeam?.members ?? assignment.members;
   const [selected, setSelected] = useState<Set<string>>(new Set(assignment.members.map((m) => m.name)));
+  const [edits, setEdits] = useState<Record<string, AllocEdit>>(
+    Object.fromEntries(assignment.members.map((m) => [m.name, allocFrom(m)])));
   const toggle = (n: string) => setSelected((prev) => { const s = new Set(prev); if (s.has(n)) s.delete(n); else s.add(n); return s; });
+  const onEdit = (n: string, a: AllocEdit) => setEdits((prev) => ({ ...prev, [n]: a }));
   const save = useMutation({
     mutationFn: () => api(`/teams/assignments/${assignment.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ members: roster.filter((m) => selected.has(m.name)).map((m) => ({ name: m.name, email: m.email, title: m.title })) }),
+      body: JSON.stringify({ members: roster.filter((m) => selected.has(m.name)).map((m) => allocReq(m.name, m.email, m.title, edits[m.name] ?? blankAlloc())) }),
     }),
     onSuccess: () => { invalidate(); onClose(); },
     onError: (e) => toast((e as Error).message, "error"),
   });
 
   return (
-    <Modal onClose={onClose} width={460} label={`Members · ${assignment.subTeamName}`}>
+    <Modal onClose={onClose} width={520} label={`Members · ${assignment.subTeamName}`}>
       <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Who's working on this? ({selected.size})</div>
-      <MemberChecklist members={roster} selected={selected} onToggle={toggle} />
+      <MemberChecklist members={roster} selected={selected} onToggle={toggle} edits={edits} onEdit={onEdit} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+interface DirEntry { name: string; email: string; title: string }
+function IndividualModal({ entityType, entityId, onClose, invalidate }: { entityType: string; entityId: string; onClose: () => void; invalidate: () => void }) {
+  const { data: dir = [] } = useQuery({
+    queryKey: ["team-roster"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<DirEntry[]> => { try { return (await api<DirEntry[]>("/teams/roster")) ?? []; } catch { return []; } },
+  });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [title, setTitle] = useState("");
+  const [manual, setManual] = useState(false);
+  const [alloc, setAlloc] = useState<AllocEdit>(blankAlloc());
+  const pick = (n: string) => { const d = dir.find((x) => x.name === n); setName(n); setEmail(d?.email ?? ""); setTitle(d?.title ?? ""); };
+  const add = useMutation({
+    mutationFn: () => api(`/teams/assignments/${entityType}/${entityId}/individual`, {
+      method: "POST", body: JSON.stringify(allocReq(name.trim(), email.trim(), title.trim(), alloc)),
+    }),
+    onSuccess: () => { invalidate(); onClose(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
+  return (
+    <Modal onClose={onClose} width={520} label={`Assign an individual to this ${entityType}`}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Person</div>
+      {!manual && dir.length > 0 ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+          <Select value={name} onChange={(e) => pick(e.target.value)} style={{ flex: 1 }}>
+            <option value="">Pick from directory…</option>
+            {dir.map((d) => <option key={d.name} value={d.name}>{d.name}{d.title ? ` · ${d.title}` : ""}</option>)}
+          </Select>
+          <button onClick={() => { setManual(true); setName(""); setEmail(""); setTitle(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11.5, fontFamily: "inherit" }}>+ manual</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" style={{ flex: 1 }} />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" style={{ flex: 1 }} />
+          {dir.length > 0 && <button onClick={() => setManual(false)} style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11.5, fontFamily: "inherit" }}>from directory</button>}
+        </div>
+      )}
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 2 }}>Allocation</div>
+      <AllocEditor value={alloc} onChange={setAlloc} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => name.trim() && add.mutate()} disabled={!name.trim() || add.isPending}>{add.isPending ? "Assigning…" : "Assign"}</Button>
       </div>
     </Modal>
   );

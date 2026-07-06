@@ -290,3 +290,35 @@ public class JiraSyncMappingTests
         Assert.Equal("", Jira.AdfToText(null));
     }
 }
+
+// Capacity model behind time-phased allocation (40h/week = 100%).
+public class AllocMathTests
+{
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(40, 100)]
+    [InlineData(20, 50)]
+    [InlineData(10, 25)]
+    [InlineData(80, 100)]     // clamped
+    public void Hours_convert_to_percent(int hours, int expected) =>
+        Assert.Equal(expected, AllocMath.PctFromHours(hours));
+
+    [Fact]
+    public void Percent_prefers_hours_when_given()
+    {
+        Assert.Equal(50, AllocMath.Percent(30, 20));   // hours win → 20/40
+        Assert.Equal(30, AllocMath.Percent(30, null)); // no hours → percent
+        Assert.Equal(30, AllocMath.Percent(30, 0));    // zero hours → percent
+    }
+
+    [Fact]
+    public void Segment_is_active_only_within_its_window()
+    {
+        var mid = new DateOnly(2026, 6, 15);
+        Assert.True(AllocMath.ActiveOn("", "", mid));                       // open both ends
+        Assert.True(AllocMath.ActiveOn("2026-06-01", "2026-06-30", mid));   // inside
+        Assert.False(AllocMath.ActiveOn("2026-07-01", "2026-07-31", mid));  // before start
+        Assert.False(AllocMath.ActiveOn("2026-01-01", "2026-05-31", mid));  // after end
+        Assert.True(AllocMath.ActiveOn("2026-06-15", "", mid));             // starts today, open end
+    }
+}

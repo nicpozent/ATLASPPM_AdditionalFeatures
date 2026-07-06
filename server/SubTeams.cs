@@ -15,15 +15,21 @@ namespace Atlas.Api;
 //  attaching a sub-team to an entity needs Edit on "Projects & tasks".
 // ============================================================================
 public record SubTeamReq(string? Name, string? Description, string? ManagerKey);
-public record SubTeamMemberReq(string Name, string? Email, string? Title, int? Alloc = null);
+public record SubTeamMemberReq(string Name, string? Email, string? Title, int? Alloc = null,
+    int? AllocHours = null, string? StartDate = null, string? EndDate = null,
+    int? ExtAlloc = null, int? ExtHours = null, string? ExtStartDate = null, string? ExtEndDate = null);
 public record AttachTeamReq(int SubTeamId, List<SubTeamMemberReq>? Members);
 public record SetAssignmentMembersReq(List<SubTeamMemberReq> Members);
 
 public record SubTeamMemberDto(int Id, string Name, string Email, string Title);
+// Assignment members carry the full allocation shape (percent/hours + dates + extension).
+public record AssignMemberDto(int Id, string Name, string Email, string Title, int Alloc, int AllocHours,
+    string StartDate, string EndDate, int ExtAlloc, int ExtHours, string ExtStartDate, string ExtEndDate);
 public record SubTeamDto(int Id, string Name, string ManagerKey, string ManagerLabel, string Description, bool CanManage, List<SubTeamMemberDto> Members);
 public record SubTeamsDto(bool CanManage, List<SubTeamDto> SubTeams);
-public record TeamAssignmentDto(int Id, int SubTeamId, string SubTeamName, string ManagerLabel, List<SubTeamMemberDto> Members);
+public record TeamAssignmentDto(int Id, int SubTeamId, string SubTeamName, string ManagerLabel, List<AssignMemberDto> Members);
 public record TeamAssignmentsDto(bool CanEdit, List<TeamAssignmentDto> Assignments);
+public record DirectoryMemberDto(string Name, string Email, string Title);
 
 public static class SubTeams
 {
@@ -39,6 +45,22 @@ public static class SubTeams
     };
 
     static SubTeamMemberDto ToDto(SubTeamMember m) => new(m.Id, m.Name, m.Email, m.Title);
+    static AssignMemberDto ToAssignDto(TeamAssignmentMember m) =>
+        new(m.Id, m.Name, m.Email, m.Title, m.Alloc, m.AllocHours, m.StartDate, m.EndDate, m.ExtAlloc, m.ExtHours, m.ExtStartDate, m.ExtEndDate);
+
+    // Build a tracked assignment member from a request, resolving hours→% for
+    // both the base and (optional) extension segments.
+    static TeamAssignmentMember MemberFrom(SubTeamMemberReq x, int assignmentId = 0) => new()
+    {
+        TeamAssignmentId = assignmentId,
+        Name = x.Name.Trim(), Email = x.Email?.Trim() ?? "", Title = x.Title?.Trim() ?? "",
+        Alloc = AllocMath.Percent(x.Alloc, x.AllocHours),
+        AllocHours = Math.Max(0, x.AllocHours ?? 0),
+        StartDate = x.StartDate?.Trim() ?? "", EndDate = x.EndDate?.Trim() ?? "",
+        ExtAlloc = AllocMath.Percent(x.ExtAlloc, x.ExtHours),
+        ExtHours = Math.Max(0, x.ExtHours ?? 0),
+        ExtStartDate = x.ExtStartDate?.Trim() ?? "", ExtEndDate = x.ExtEndDate?.Trim() ?? "",
+    };
 
     public static void MapSubTeamEndpoints(this RouteGroupBuilder api)
     {
@@ -147,9 +169,9 @@ public static class SubTeams
                 .Where(a => a.EntityType == type && a.EntityId == entityId).ToListAsync();
             var subs = await db.SubTeams.ToDictionaryAsync(s => s.Id, s => s);
             var dto = rows.Select(a => new TeamAssignmentDto(a.Id, a.SubTeamId,
-                subs.TryGetValue(a.SubTeamId, out var s) ? s.Name : "(removed sub-team)",
-                subs.TryGetValue(a.SubTeamId, out var s2) ? Teams.SlotLabel(s2.ManagerKey) : "",
-                a.Members.OrderBy(m => m.Name).Select(m => new SubTeamMemberDto(m.Id, m.Name, m.Email, m.Title)).ToList())).ToList();
+                a.SubTeamId == 0 ? "Individuals" : subs.TryGetValue(a.SubTeamId, out var s) ? s.Name : "(removed sub-team)",
+                a.SubTeamId == 0 ? "" : subs.TryGetValue(a.SubTeamId, out var s2) ? Teams.SlotLabel(s2.ManagerKey) : "",
+                a.Members.OrderBy(m => m.Name).Select(ToAssignDto).ToList())).ToList();
             return Results.Ok(new TeamAssignmentsDto(canEdit, dto));
         });
 
@@ -164,12 +186,10 @@ public static class SubTeams
                 return Results.Conflict(new { error = "That sub-team is already attached." });
             var a = new TeamAssignment { EntityType = type, EntityId = entityId, SubTeamId = req.SubTeamId };
             // Default to every member of the sub-team when a selection isn't given.
-            var chosen = (req.Members is { Count: > 0 } m
-                    ? m.Select(x => (x.Name, x.Email ?? "", x.Title ?? "", x.Alloc ?? 0))
-                    : sub.Members.Select(x => (x.Name, x.Email, x.Title, 0)))
-                .Where(x => !string.IsNullOrWhiteSpace(x.Item1));
-            foreach (var (name, email, title, alloc) in chosen)
-                a.Members.Add(new TeamAssignmentMember { Name = name.Trim(), Email = email.Trim(), Title = title.Trim(), Alloc = Math.Clamp(alloc, 0, 100) });
+            var chosen = req.Members is { Count: > 0 } m
+                ? m.Where(x => !string.IsNullOrWhiteSpace(x.Name)).Select(x => MemberFrom(x))
+                : sub.Members.Select(x => new TeamAssignmentMember { Name = x.Name, Email = x.Email, Title = x.Title });
+            foreach (var tm in chosen) a.Members.Add(tm);
             db.TeamAssignments.Add(a);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", $"Attached sub-team to {type}", $"{entityId} · {sub.Name}"));
             await db.SaveChangesAsync();
@@ -183,9 +203,44 @@ public static class SubTeams
             if (a is null) return Results.NotFound();
             db.TeamAssignmentMembers.RemoveRange(a.Members);
             foreach (var x in req.Members.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
-                a.Members.Add(new TeamAssignmentMember { TeamAssignmentId = a.Id, Name = x.Name.Trim(), Email = x.Email?.Trim() ?? "", Title = x.Title?.Trim() ?? "", Alloc = Math.Clamp(x.Alloc ?? 0, 0, 100) });
+                a.Members.Add(MemberFrom(x, a.Id));
             await db.SaveChangesAsync();
             return Results.NoContent();
+        });
+
+        // Assign an individual person directly to an entity (not via a sub-team).
+        // Lands in the entity's shared "Individuals" bucket (SubTeamId 0), created
+        // on first use. Same allocation shape as sub-team members.
+        api.MapPost("/teams/assignments/{type}/{entityId}/individual", async (string type, string entityId, SubTeamMemberReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (!EntityTypes.Contains(type)) return Results.BadRequest(new { error = "Unknown entity type." });
+            if (!await EntityExists(db, type, entityId)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "A person is required." });
+            var a = await db.TeamAssignments.Include(x => x.Members)
+                .FirstOrDefaultAsync(x => x.EntityType == type && x.EntityId == entityId && x.SubTeamId == 0);
+            if (a is null) { a = new TeamAssignment { EntityType = type, EntityId = entityId, SubTeamId = 0 }; db.TeamAssignments.Add(a); }
+            var name = req.Name.Trim();
+            if (a.Members.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return Results.Conflict(new { error = $"{name} is already assigned individually." });
+            a.Members.Add(MemberFrom(req, a.Id));
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", $"Assigned individual to {type}", $"{entityId} · {name}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/teams/assignments/{type}/{entityId}", new { a.Id });
+        });
+
+        // The roster of people who can be assigned individually — everyone in the
+        // synced Entra groups (name/email/title).
+        api.MapGet("/teams/roster", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "V") is { } denied) return denied;
+            var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
+            var members = groups.SelectMany(g => g.Members)
+                .Where(m => !string.IsNullOrWhiteSpace(m.DisplayName))
+                .GroupBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
+                .OrderBy(m => m.DisplayName)
+                .Select(m => new DirectoryMemberDto(m.DisplayName, m.Email, m.JobTitle)).ToList();
+            return Results.Ok(members);
         });
 
         api.MapDelete("/teams/assignments/{id:int}", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
