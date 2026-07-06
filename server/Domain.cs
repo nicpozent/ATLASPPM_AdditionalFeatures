@@ -158,6 +158,42 @@ public class OperationalItem
     public string Date { get; set; } = "";             // raised, display date
 }
 
+// ---- Ops module (run-the-business) ----------------------------------------
+// A distinct work TYPE from project delivery: standing operational services
+// (support, maintenance, monitoring, infrastructure) and the run-the-business
+// work items within them. Work items carry an allocation % per assignee — which
+// rolls up into each person's Ops% on Resources — and may be tagged as impacting
+// a specific project's outcome (ops load pulling capacity off delivery).
+public class OpsService
+{
+    public int Id { get; set; }
+    public string Ref { get; set; } = default!;        // "OPS-1" business key
+    public string Name { get; set; } = default!;
+    public string Category { get; set; } = "Support";  // Support | Maintenance | Monitoring | Infrastructure | Incident response | Other
+    public string Dept { get; set; } = "Unassigned";
+    public string Owner { get; set; } = "";
+    public string Status { get; set; } = "Active";      // Active | Paused | Retired
+    public string Description { get; set; } = "";
+    public int Ord { get; set; }
+}
+
+public class OpsItem
+{
+    public int Id { get; set; }
+    public int ServiceId { get; set; }
+    public string Title { get; set; } = default!;
+    public string Description { get; set; } = "";
+    public string Type { get; set; } = "Maintenance";   // Incident | Request | Maintenance | Monitoring | Change | Other
+    public string Priority { get; set; } = "Medium";    // Critical | High | Medium | Low
+    public string Status { get; set; } = "Open";         // Open | In progress | Blocked | Done
+    public string Assignee { get; set; } = "";
+    public int Alloc { get; set; }                       // % of assignee's capacity this consumes
+    public string? ImpactProjectId { get; set; }         // project whose outcome this ops work affects (null = none)
+    public string ImpactNote { get; set; } = "";         // how it affects the project
+    public int Ord { get; set; }
+    public string CreatedAt { get; set; } = "";          // display date
+}
+
 // A person assigned to a project role. RoleKey is "pm" (the project lead, set by
 // PMO) or one of the architecture role keys (set by the Chief Architect). One
 // row per (project, role). Person "" = unassigned, "N/A" = not applicable.

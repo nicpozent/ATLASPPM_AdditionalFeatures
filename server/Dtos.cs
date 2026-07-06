@@ -186,6 +186,19 @@ public record OperationalItemDto(int Id, string Ref, string Title, string Type, 
     string Status, string Source, string? ProjectId, string? ProjectName, string Owner, string Date);
 public record OperationalDto(bool CanEdit, List<OperationalItemDto> Items);
 
+// ---- Ops module (run-the-business services & work items) -------------------
+public record OpsItemDto(int Id, int ServiceId, string ServiceName, string Title, string Description,
+    string Type, string Priority, string Status, string Assignee, int Alloc,
+    string? ImpactProjectId, string? ImpactProjectName, string ImpactNote, string CreatedAt);
+public record OpsServiceDto(int Id, string Ref, string Name, string Category, string Dept, string Owner,
+    string Status, string Description, List<OpsItemDto> Items, int ActiveCount, int Alloc);
+public record OpsSummaryDto(int Services, int OpenItems, int Blocked, int ImpactedProjects, int PeopleEngaged);
+public record OpsBoardDto(bool CanEdit, List<OpsServiceDto> Services, OpsSummaryDto Summary);
+// Ops load impacting a single project (shown on Project Detail).
+public record OpsImpactRowDto(int Id, string Title, string ServiceName, string Type, string Priority,
+    string Status, string Assignee, int Alloc, string ImpactNote);
+public record OpsImpactDto(int Alloc, List<OpsImpactRowDto> Items);
+
 // ---- People & roles (project assignments) ----------------------------------
 public record RoleAssignmentDto(string Key, string Label, string Person);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,

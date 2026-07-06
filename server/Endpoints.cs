@@ -30,6 +30,7 @@ public static class Endpoints
         api.MapTemplateEndpoints();
         api.MapSpilloverEndpoints();
         api.MapOperationalEndpoints();
+        api.MapOpsEndpoints();
         api.MapCapacityEndpoints();
         api.MapDeletionEndpoints();
         api.MapLifecycleEndpoints();

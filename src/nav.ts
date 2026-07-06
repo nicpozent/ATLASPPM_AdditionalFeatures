@@ -6,7 +6,7 @@
 export type ScreenId =
   | "dashboard" | "portfolio" | "programs" | "products" | "okrs"
   | "demands" | "gantt" | "pip" | "project" | "resources" | "financials"
-  | "delivery" | "releases" | "news"
+  | "delivery" | "releases" | "ops" | "news"
   | "teams" | "methodologies" | "integrations" | "reports" | "admin" | "help"
   | "myprojects" | "mydemands";
 
@@ -35,6 +35,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
   financials:    { id: "financials",    path: "/financials",    label: "Financials",       title: "Financials",                   subtitle: "Budget vs actual · CapEx/OpEx · benefits & ROI",     icon: "coins" },
   delivery:      { id: "delivery",      path: "/delivery",      label: "Delivery Status",  title: "Delivery Status",              subtitle: "Stakeholder delivery report · pick a reporting period", icon: "trendUp" },
   releases:      { id: "releases",      path: "/releases",      label: "Releases",         title: "Releases",                     subtitle: "Release calendar & deployment tracking",             icon: "rocket" },
+  ops:           { id: "ops",           path: "/ops",           label: "Ops",              title: "Operational Work",             subtitle: "Run-the-business services & work · impact on projects", icon: "activity" },
   news:          { id: "news",          path: "/updates",       label: "Weekly Updates",   title: "Weekly Updates",               subtitle: "Portfolio news wall · curated by the PMO",           icon: "megaphone" },
   teams:         { id: "teams",         path: "/team",          label: "My Team",          title: "My Team",                      subtitle: "Your team members & their skills",                   icon: "users" },
   methodologies: { id: "methodologies", path: "/methodologies", label: "Methodologies",    title: "Methodology Library",          subtitle: "Waterfall, Agile, hybrid & SDLC templates",          icon: "template" },
@@ -50,7 +51,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
 export const NAV_MAIN: ScreenId[] = [
   "dashboard", "portfolio", "programs", "products", "okrs",
   "demands", "gantt", "pip", "project", "resources", "financials",
-  "delivery", "releases", "news",
+  "delivery", "releases", "ops", "news",
 ];
 export const NAV_CONFIG: ScreenId[] = [
   "teams", "methodologies", "integrations", "reports", "admin", "help",

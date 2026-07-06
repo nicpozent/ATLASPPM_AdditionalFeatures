@@ -15,6 +15,7 @@ import Resources from "@/screens/Resources";
 import Financials from "@/screens/Financials";
 import Delivery from "@/screens/Delivery";
 import Releases from "@/screens/Releases";
+import Ops from "@/screens/Ops";
 import News from "@/screens/News";
 import Teams from "@/screens/Teams";
 import Methodologies from "@/screens/Methodologies";
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: SCREENS.financials.path.slice(1), element: <Financials /> },
       { path: SCREENS.delivery.path.slice(1), element: <Delivery /> },
       { path: SCREENS.releases.path.slice(1), element: <Releases /> },
+      { path: SCREENS.ops.path.slice(1), element: <Ops /> },
       { path: SCREENS.news.path.slice(1), element: <News /> },
       { path: SCREENS.teams.path.slice(1), element: <Teams /> },
       { path: SCREENS.methodologies.path.slice(1), element: <Methodologies /> },

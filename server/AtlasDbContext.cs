@@ -53,6 +53,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<TaskComment> TaskComments => Set<TaskComment>();
     public DbSet<TaskAttachment> TaskAttachments => Set<TaskAttachment>();
+    public DbSet<OpsService> OpsServices => Set<OpsService>();
+    public DbSet<OpsItem> OpsItems => Set<OpsItem>();
     public DbSet<Sprint> Sprints => Set<Sprint>();
     public DbSet<Epic> Epics => Set<Epic>();
     public DbSet<Artifact> Artifacts => Set<Artifact>();
@@ -217,6 +219,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<TaskComment>().HasIndex(x => x.TaskId);
         b.Entity<TaskAttachment>().HasKey(x => x.Id);
         b.Entity<TaskAttachment>().HasIndex(x => x.TaskId);
+        b.Entity<OpsService>().HasKey(x => x.Id);
+        b.Entity<OpsItem>().HasKey(x => x.Id);
+        b.Entity<OpsItem>().HasIndex(x => x.ServiceId);
+        b.Entity<OpsItem>().HasIndex(x => x.ImpactProjectId);
         b.Entity<Epic>().HasKey(x => x.Id);
         b.Entity<Epic>().HasIndex(x => x.ProjectId);
         b.Entity<Artifact>().HasKey(x => x.Id);
