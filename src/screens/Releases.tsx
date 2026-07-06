@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay, RowMenu, Men
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { TeamPanel } from "@/components/TeamPanel";
+import { SkillsPanel } from "@/components/SkillsPanel";
 
 // ---- data ----------------------------------------------------------------
 type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed" | "Cancelled";
@@ -275,6 +276,7 @@ export default function Releases() {
       {teamFor && (
         <Overlay onClose={() => setTeamFor(null)} width={520} label={`Team · ${teamFor.name}`}>
           <TeamPanel entityType="release" entityId={teamFor.id} />
+          <div style={{ marginTop: 14 }}><SkillsPanel entityType="release" entityId={teamFor.id} /></div>
         </Overlay>
       )}
 

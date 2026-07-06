@@ -93,6 +93,29 @@ public static class Skills
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "atlas-skills-matrix.xlsx");
         });
 
+        // Skills for the people ASSIGNED to one entity (project/program/product/
+        // release) — the matrix filtered to that team, WITHOUT the My-Team roster
+        // scope (so a viewer sees the assigned team's skills even if they don't
+        // manage them). Read-only; shown on the entity's Overview.
+        api.MapGet("/skills/entity/{type}/{id}", async (string type, string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var types = new[] { "project", "program", "product", "release" };
+            if (!types.Contains(type)) return Results.BadRequest(new { error = "Unknown entity type." });
+            var members = (await db.TeamAssignments.Include(a => a.Members)
+                    .Where(a => a.EntityType == type && a.EntityId == id).ToListAsync())
+                .SelectMany(a => a.Members).Select(m => m.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+            var skills = await db.Skills.OrderBy(s => s.Ord).ThenBy(s => s.Id)
+                .Select(s => new SkillDto(s.Id, s.Name)).ToListAsync();
+            var known = members.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var ratings = (await db.SkillRatings.ToListAsync())
+                .Where(r => known.Contains(r.Person))
+                .Select(r => new SkillRatingDto(r.SkillId, r.Person, r.Level)).ToList();
+            // canEdit is false here — editing stays in My Team.
+            return Results.Ok(new SkillsMatrixDto(false, skills, members, ratings));
+        });
+
         api.MapPost("/skills", async (CreateSkillReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;

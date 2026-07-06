@@ -9,6 +9,7 @@ import { usePermissions } from "@/components/usePermissions";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { TeamPanel } from "@/components/TeamPanel";
+import { SkillsPanel } from "@/components/SkillsPanel";
 import { DEPARTMENTS } from "@/departments";
 import { toast, toastError } from "@/components/Toast";
 import { SCREENS } from "@/nav";
@@ -305,6 +306,7 @@ function Overview({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <PeopleRoles projectId={projectId} />
         {projectId && <TeamPanel entityType="project" entityId={projectId} />}
+        {projectId && <SkillsPanel entityType="project" entityId={projectId} />}
         <WaysOfWorking projectId={projectId} />
         <TeamCapacity projectId={projectId} />
         <CommunicationPlan projectId={projectId} />
