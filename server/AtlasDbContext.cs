@@ -79,9 +79,14 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<PiIteration> PiIterations => Set<PiIteration>();
     public DbSet<PiObjective> PiObjectives => Set<PiObjective>();
     public DbSet<PiDependency> PiDependencies => Set<PiDependency>();
+    public DbSet<Skill> Skills => Set<Skill>();
+    public DbSet<SkillRating> SkillRatings => Set<SkillRating>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<Skill>().HasKey(x => x.Id);
+        b.Entity<SkillRating>().HasKey(x => x.Id);
+        b.Entity<SkillRating>().HasIndex(x => new { x.SkillId, x.Person });
         b.Entity<ProgramIncrement>().HasKey(x => x.Id);
         b.Entity<ProgramIncrement>().HasMany(x => x.Iterations).WithOne().HasForeignKey(x => x.IncrementId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ProgramIncrement>().HasMany(x => x.Objectives).WithOne().HasForeignKey(x => x.IncrementId).OnDelete(DeleteBehavior.Cascade);
