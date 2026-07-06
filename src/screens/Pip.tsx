@@ -6,6 +6,11 @@ import { api } from "@/api";
 import { Button, Input, Textarea, Select, Field, Modal, Card, EmptyBlock, RowMenu, MenuItem, ProgressBar } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { toast, toastError } from "@/components/Toast";
+import {
+  type IncrementSummary, type Iteration, type Objective, type Dependency, type LinkTarget, type IncrementDetail,
+  STATES, OBJ_STATUSES, DEP_STATUSES, LINK_TYPES, STATE_PILL, OBJ_PILL, DEP_COL,
+  parseTs, toDisplay, confColor, isOverAllocated, iterationTotals, objectiveRollup, timelineSpan, barPos, monthTicks,
+} from "./pip/data";
 
 // ============================================================================
 //  Program Increment Planning (PIP) — quarterly PI planning across the whole
@@ -13,60 +18,8 @@ import { toast, toastError } from "@/components/Toast";
 //  confidence vote), iterations (calendar + capacity vs load), and cross-team
 //  dependencies. Everything is data-driven; with no increments the screen shows
 //  a tasteful empty state and a "New increment" affordance (when permitted).
+//  Pure types, constants and derivations live in ./pip/data (unit-tested).
 // ============================================================================
-
-interface IncrementSummary {
-  id: number; key: string; name: string; startDate: string; endDate: string; state: string;
-  objectives: number; iterations: number; dependencies: number;
-}
-interface Iteration { id: number; name: string; startDate: string; endDate: string; capacity: number; load: number }
-interface Objective {
-  id: number; title: string; description: string; entityType: string; entityId: string; entityName: string;
-  businessValue: number; actualValue: number; committed: boolean; confidence: number; status: string;
-}
-interface Dependency {
-  id: number; title: string; fromType: string; fromId: string; fromName: string;
-  toType: string; toId: string; toName: string; owner: string; dueDate: string; status: string;
-}
-interface LinkTarget { type: string; id: string; name: string }
-interface IncrementDetail {
-  id: number; key: string; name: string; startDate: string; endDate: string; state: string; canEdit: boolean;
-  iterationList: Iteration[]; objectiveList: Objective[]; dependencyList: Dependency[]; targets: LinkTarget[];
-}
-
-const STATES = ["Planning", "Active", "Completed", "Cancelled"];
-const OBJ_STATUSES = ["Planned", "In Progress", "Done", "Missed"];
-const DEP_STATUSES = ["Identified", "Committed", "Resolved", "Blocked"];
-const LINK_TYPES = [
-  { key: "", label: "No link" },
-  { key: "project", label: "Project" },
-  { key: "program", label: "Program" },
-  { key: "product", label: "Product" },
-  { key: "release", label: "Release" },
-];
-
-const STATE_PILL: Record<string, { ink: string; tint: string }> = {
-  Planning: { ink: "#4A5266", tint: "#EEF1F6" },
-  Active: { ink: "#0C5798", tint: "#E6EFFB" },
-  Completed: { ink: "#0B6B37", tint: "#E7F4EC" },
-  Cancelled: { ink: "#A1282B", tint: "#FBE7E8" },
-};
-const OBJ_PILL: Record<string, { ink: string; tint: string; dot: string }> = {
-  Planned: { ink: "#4A5266", tint: "#EEF1F6", dot: chart.onHold },
-  "In Progress": { ink: "#0C5798", tint: "#E6EFFB", dot: color.primary },
-  Done: { ink: "#0B6B37", tint: "#E7F4EC", dot: chart.onTrack },
-  Missed: { ink: "#A1282B", tint: "#FBE7E8", dot: chart.critical },
-};
-const DEP_COL: Record<string, { ink: string; tint: string; bar: string }> = {
-  Identified: { ink: "#4A5266", tint: "#EEF1F6", bar: chart.onHold },
-  Committed: { ink: "#0C5798", tint: "#E6EFFB", bar: color.primary },
-  Resolved: { ink: "#0B6B37", tint: "#E7F4EC", bar: chart.onTrack },
-  Blocked: { ink: "#A1282B", tint: "#FBE7E8", bar: chart.critical },
-};
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const parseTs = (d?: string) => { const t = Date.parse((d || "") + (d && d.length === 10 ? "T00:00:00" : "")); return isNaN(t) ? null : t; };
-const toDisplay = (iso: string) => { if (!iso) return "—"; const [y, m, dd] = iso.split("-").map(Number); return y && m && dd ? `${dd} ${MONTHS[m - 1]} ${y}` : iso; };
 
 function Pill({ label, ink, tint }: { label: string; ink: string; tint: string }) {
   return <span style={{ fontSize: 11, fontWeight: 700, color: ink, background: tint, padding: "3px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>{label}</span>;
@@ -80,14 +33,13 @@ function Confidence({ value, onVote }: { value: number; onVote?: (v: number) => 
         const on = n <= value;
         const dot = <span style={{ width: 12, height: 12, borderRadius: "50%", background: on ? confColor(value) : chart.track, display: "block" }} />;
         return onVote ? (
-          <button key={n} onClick={() => onVote(n === value ? 0 : n)} title={`Vote ${n}`}
+          <button key={n} onClick={() => onVote(n === value ? 0 : n)} title={`Vote ${n}`} aria-label={`Vote ${n}`}
             style={{ border: "none", background: "transparent", padding: 1, cursor: "pointer", lineHeight: 0 }}>{dot}</button>
         ) : <span key={n} style={{ lineHeight: 0 }}>{dot}</span>;
       })}
     </div>
   );
 }
-const confColor = (v: number) => v >= 4 ? chart.onTrack : v === 3 ? chart.atRisk : v > 0 ? chart.critical : chart.onHold;
 
 export default function Pip() {
   const qc = useQueryClient();
@@ -229,12 +181,7 @@ function ObjectivesView({ inc }: { inc: IncrementDetail }) {
     onSuccess: invalidate, onError: toastError,
   });
 
-  const committed = inc.objectiveList.filter((o) => o.committed);
-  const stretch = inc.objectiveList.filter((o) => !o.committed);
-  const avgConf = committed.filter((o) => o.confidence > 0);
-  const meanConf = avgConf.length ? (avgConf.reduce((s, o) => s + o.confidence, 0) / avgConf.length) : 0;
-  const plannedBV = committed.reduce((s, o) => s + o.businessValue, 0);
-  const doneBV = committed.filter((o) => o.status === "Done").reduce((s, o) => s + o.businessValue, 0);
+  const { committed, stretch, meanConf, plannedBV, doneBV } = objectiveRollup(inc.objectiveList);
 
   return (
     <div>
@@ -323,26 +270,8 @@ function CalendarView({ inc }: { inc: IncrementDetail }) {
 
   const its = inc.iterationList;
   // Span: increment dates, widened to cover any iteration outside it.
-  const spans = [parseTs(inc.startDate), parseTs(inc.endDate), ...its.flatMap((i) => [parseTs(i.startDate), parseTs(i.endDate)])].filter((x): x is number => x != null);
-  const min = spans.length ? Math.min(...spans) : null;
-  const max = spans.length ? Math.max(...spans) : null;
-  const total = min != null && max != null && max > min ? max - min : null;
-  const pos = (a: number | null, b: number | null) => {
-    if (min == null || total == null || a == null) return null;
-    const left = ((a - min) / total) * 100;
-    const right = b != null ? ((b - min) / total) * 100 : left + 2;
-    return { left: Math.max(0, left), width: Math.max(2, right - left) };
-  };
-  // Month ticks across the span.
-  const ticks: { pct: number; label: string }[] = [];
-  if (min != null && max != null && total != null) {
-    const d = new Date(min); d.setDate(1);
-    while (d.getTime() <= max) {
-      const pct = ((d.getTime() - min) / total) * 100;
-      if (pct >= 0 && pct <= 100) ticks.push({ pct, label: `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` });
-      d.setMonth(d.getMonth() + 1);
-    }
-  }
+  const { min, max, total } = timelineSpan(inc, its);
+  const ticks = monthTicks(min, max, total);
 
   return (
     <div>
@@ -357,8 +286,8 @@ function CalendarView({ inc }: { inc: IncrementDetail }) {
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {its.map((it) => {
-              const p = pos(parseTs(it.startDate), parseTs(it.endDate));
-              const over = it.load > it.capacity && it.capacity > 0;
+              const p = barPos(min, total, parseTs(it.startDate), parseTs(it.endDate));
+              const over = isOverAllocated(it);
               return (
                 <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 140, flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
@@ -393,21 +322,20 @@ function CalendarView({ inc }: { inc: IncrementDetail }) {
 // --- Capacity & Load --------------------------------------------------------
 function CapacityView({ inc }: { inc: IncrementDetail }) {
   const its = inc.iterationList;
-  const totalCap = its.reduce((s, i) => s + i.capacity, 0);
-  const totalLoad = its.reduce((s, i) => s + i.load, 0);
+  const totals = iterationTotals(its);
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <Stat label="Total capacity" value={String(totalCap)} />
-        <Stat label="Total planned load" value={String(totalLoad)} valueColor={totalLoad > totalCap && totalCap > 0 ? color.danger : undefined} />
-        <Stat label="Headroom" value={String(totalCap - totalLoad)} sub={totalCap > 0 ? `${Math.round((totalLoad / totalCap) * 100)}% loaded` : undefined} valueColor={totalCap - totalLoad < 0 ? color.danger : chart.onTrack} />
+        <Stat label="Total capacity" value={String(totals.capacity)} />
+        <Stat label="Total planned load" value={String(totals.load)} valueColor={totals.over ? color.danger : undefined} />
+        <Stat label="Headroom" value={String(totals.headroom)} sub={totals.capacity > 0 ? `${totals.loadedPct}% loaded` : undefined} valueColor={totals.headroom < 0 ? color.danger : chart.onTrack} />
       </div>
       {its.length === 0 ? <Card><EmptyBlock message="No iterations to load. Add iterations on the Calendar tab, then set capacity vs load here." /></Card> : (
         <Card padding={18}>
           <div style={{ display: "grid", gap: 14 }}>
             {its.map((it) => {
               const pct = it.capacity > 0 ? (it.load / it.capacity) * 100 : 0;
-              const over = it.load > it.capacity && it.capacity > 0;
+              const over = isOverAllocated(it);
               return (
                 <div key={it.id}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
