@@ -79,8 +79,16 @@ export default function Gantt() {
     queryFn: async (): Promise<{ tasks: GTask[] }> => (await api<{ tasks: GTask[] }>(`/projects/${activeProjectId}/tasks`)) ?? { tasks: [] },
   });
   const sprintBars = useMemo<SprintBar[]>(() => (sprintData?.sprints ?? []).map((s) => {
-    const a = monthOfIso(s.startDate), b = monthOfIso(s.endDate);
-    if (a === null && b === null) return null;
+    let a = monthOfIso(s.startDate), b = monthOfIso(s.endDate);
+    // Jira often omits dates on future/closed sprints — keep them in the band
+    // (falling back to the project window, else the current month) instead of
+    // dropping them, so past & current sprints always show as phases.
+    const undated = a === null && b === null;
+    if (undated) {
+      const nowM = new Date().getMonth();
+      a = gantt?.projectStart ?? nowM;
+      b = gantt?.projectEnd ?? nowM;
+    }
     const start = Math.min(a ?? b!, b ?? a!), end = Math.max(a ?? b!, b ?? a!);
     // Tasks in this sprint, placed by their own dates (falling back to the sprint window).
     const tasks = (taskData?.tasks ?? []).filter((t) => t.sprint === s.name).map((t) => {
@@ -88,8 +96,8 @@ export default function Gantt() {
       const ts = ta ?? tb ?? start, te = tb ?? ta ?? end;
       return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te) };
     });
-    return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks };
-  }).filter(Boolean) as SprintBar[], [sprintData, taskData]);
+    return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks, undated };
+  }), [sprintData, taskData, gantt]);
 
   const canEdit = scope === "project" && (gantt?.canEdit ?? false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gantt"] });
@@ -253,7 +261,7 @@ function NowLine() {
 
 // ---- Project schedule ------------------------------------------------------
 interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
-interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; }
+interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; }
 const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Started:   { bg: "#D7EFE0", border: "#15A34A" },
   Completed: { bg: "#E6EFFB", border: "#0F6CBD" },
@@ -270,7 +278,9 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
 }) {
-  const rowsHeight = Math.max(200, phases.length * 38);
+  // Collapse the phase grid when there are no phases but sprints exist, so the
+  // sprint band sits directly under the window and the columns stay aligned.
+  const rowsHeight = phases.length ? Math.max(200, phases.length * 38) : (sprints.length ? 0 : 200);
   const hasWindow = projectStart != null && projectEnd != null;
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set());
   const toggleSprint = (id: number) => setOpenSprints((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -291,9 +301,11 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
           </div>
         )}
         {phases.length === 0 ? (
-          <div style={{ minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 22px", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
-            {hasProject ? "No phases scheduled yet." : "Select a project."}
-          </div>
+          (sprints.length === 0 || !hasProject) && (
+            <div style={{ minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 22px", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
+              {hasProject ? "No phases scheduled yet — sprints appear below." : "Select a project."}
+            </div>
+          )
         ) : phases.map((p) => (
           <div key={p.id} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
             <span style={{ flex: 1, fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
@@ -345,7 +357,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
           </div>
         )}
-        <div style={{ position: "relative", minHeight: 200, height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", minHeight: rowsHeight, height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
           <NowLine />
           <div>
             {phases.map((p) => <PhaseBar key={p.id} phase={p} editable={canEdit} onEdit={() => onEditPhase(p)} />)}
@@ -360,8 +372,8 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               return (
                 <div key={s.id}>
                   <div style={{ position: "relative", height: 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
-                    <div title={`${s.name} · ${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]} · ${s.status}`}
-                      style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px solid ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                    <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
+                      style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
                     ? <div style={{ height: 28, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }} />
