@@ -290,3 +290,8 @@ public record IncrementDto(int Id, string Key, string Name, string StartDate, st
 // A pickable deliverable for objective/dependency links (projects, programs, products, releases).
 public record PiLinkTargetDto(string Type, string Id, string Name);
 public record IncrementsDto(bool CanEdit, List<IncrementSummaryDto> Increments);
+
+// ---- Resources & allocation (derived from real product/project allocations) --
+public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc);
+public record ResByProjectDto(string Id, string Name, bool CanEdit, List<ResAllocRowDto> Members);
+public record ResByProductDto(string Id, string Name, List<ResAllocRowDto> Members);

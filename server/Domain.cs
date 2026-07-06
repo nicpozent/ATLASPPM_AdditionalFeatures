@@ -259,6 +259,7 @@ public class TeamAssignmentMember
     public string Name { get; set; } = "";
     public string Email { get; set; } = "";
     public string Title { get; set; } = "";
+    public int Alloc { get; set; }                     // % of the person's capacity on this entity
 }
 
 // ---- Roles & permissions (in-app RBAC) ------------------------------------
