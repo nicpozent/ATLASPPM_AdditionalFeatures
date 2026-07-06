@@ -75,9 +75,21 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<BackupRun> BackupRuns => Set<BackupRun>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<NewsBlock> NewsBlocks => Set<NewsBlock>();
+    public DbSet<ProgramIncrement> ProgramIncrements => Set<ProgramIncrement>();
+    public DbSet<PiIteration> PiIterations => Set<PiIteration>();
+    public DbSet<PiObjective> PiObjectives => Set<PiObjective>();
+    public DbSet<PiDependency> PiDependencies => Set<PiDependency>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<ProgramIncrement>().HasKey(x => x.Id);
+        b.Entity<ProgramIncrement>().HasMany(x => x.Iterations).WithOne().HasForeignKey(x => x.IncrementId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ProgramIncrement>().HasMany(x => x.Objectives).WithOne().HasForeignKey(x => x.IncrementId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ProgramIncrement>().HasMany(x => x.Dependencies).WithOne().HasForeignKey(x => x.IncrementId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<PiIteration>().HasKey(x => x.Id);
+        b.Entity<PiObjective>().HasKey(x => x.Id);
+        b.Entity<PiDependency>().HasKey(x => x.Id);
+
         b.Entity<Project>().HasKey(x => x.Id);
         b.Entity<Project>().Property(x => x.Id).ValueGeneratedNever();
         b.Entity<Project>().Property(x => x.StartDate).HasDefaultValue("");

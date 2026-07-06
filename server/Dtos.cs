@@ -274,3 +274,18 @@ public record DashboardDto(
     List<ActivityEventDto> Activity,
     List<TaskRowDto> Tasks,
     List<ApprovalRowDto> Approvals);
+
+// ---- Program Increment Planning (PIP) -------------------------------------
+public record PiIterationDto(int Id, string Name, string StartDate, string EndDate, int Capacity, int Load);
+public record PiObjectiveDto(int Id, string Title, string Description, string EntityType, string EntityId,
+    string EntityName, int BusinessValue, int ActualValue, bool Committed, int Confidence, string Status);
+public record PiDependencyDto(int Id, string Title, string FromType, string FromId, string FromName,
+    string ToType, string ToId, string ToName, string Owner, string DueDate, string Status);
+public record IncrementSummaryDto(int Id, string Key, string Name, string StartDate, string EndDate,
+    string State, int Objectives, int Iterations, int Dependencies);
+public record IncrementDto(int Id, string Key, string Name, string StartDate, string EndDate, string State,
+    bool CanEdit, List<PiIterationDto> IterationList, List<PiObjectiveDto> ObjectiveList,
+    List<PiDependencyDto> DependencyList, List<PiLinkTargetDto> Targets);
+// A pickable deliverable for objective/dependency links (projects, programs, products, releases).
+public record PiLinkTargetDto(string Type, string Id, string Name);
+public record IncrementsDto(bool CanEdit, List<IncrementSummaryDto> Increments);
