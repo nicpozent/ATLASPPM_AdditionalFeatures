@@ -130,5 +130,36 @@ public static class GanttEndpoints
                 phases.Where(x => x.ProjectId == p.Id).Select(ToDto).ToList())).ToList();
             return Results.Ok(new ProgramGanttDto(rows, milestones.Select(ToDto).ToList()));
         });
+
+        // ---- Portfolio timeline (everything on one month grid) -------------
+        // One bar per project/program/product/release with dates, so the
+        // roadmap can be filtered by category. Undated items are omitted (they
+        // can't be placed). Reads are open.
+        api.MapGet("/portfolio/gantt", async (AtlasDbContext db) =>
+        {
+            var items = new List<PortfolioGanttItemDto>();
+
+            void Add(string type, string id, string name, string status, int? progress, string startRaw, string endRaw)
+            {
+                var s = MonthOf(startRaw);
+                var e = MonthOf(endRaw);
+                if (s is null && e is null) return;                 // no dates → can't place
+                var start = Math.Min(s ?? e!.Value, e ?? s!.Value);
+                var end = Math.Max(s ?? e!.Value, e ?? s!.Value);
+                items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress,
+                    string.IsNullOrWhiteSpace(startRaw) ? endRaw : startRaw, string.IsNullOrWhiteSpace(endRaw) ? startRaw : endRaw));
+            }
+
+            foreach (var p in await db.Projects.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
+                Add("project", p.Id, p.Name, p.Status, p.Progress, p.StartDate, string.IsNullOrWhiteSpace(p.Target) || p.Target == "TBD" ? p.Due : p.Target);
+            foreach (var g in await db.Programs.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
+                Add("program", g.Id, g.Name, g.Status, g.Progress, g.StartDate, g.EndDate);
+            foreach (var pr in await db.Products.OrderBy(x => x.Name).ToListAsync())
+                Add("product", pr.Id, pr.Name, pr.Status, null, pr.StartDate, pr.EndDate);
+            foreach (var r in await db.Releases.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
+                Add("release", r.Id, r.Name, r.Status, r.Progress, r.Date, r.Date);
+
+            return Results.Ok(new PortfolioGanttDto(items));
+        });
     }
 }

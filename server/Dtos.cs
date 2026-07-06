@@ -133,6 +133,10 @@ public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> M
 public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<PhaseDto> Phases);
 public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> Milestones);
 
+// Portfolio-wide timeline: one bar per entity on the 12-month grid.
+public record PortfolioGanttItemDto(string Type, string Id, string Name, string Status, int StartMonth, int EndMonth, int? Progress, string StartLabel, string EndLabel);
+public record PortfolioGanttDto(List<PortfolioGanttItemDto> Items);
+
 // ---- Ways of working (methodology-specific ceremonies & artifacts) ---------
 public record WowItemDto(string Label, string Detail);
 public record WaysOfWorkingDto(string Methodology, string Cadence, string Summary,
