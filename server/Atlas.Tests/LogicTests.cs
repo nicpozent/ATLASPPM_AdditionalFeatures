@@ -219,8 +219,8 @@ public class JiraBaseUrlTests
 public class JiraSyncMappingTests
 {
     [Theory]
-    [InlineData("active", "Active")]
-    [InlineData("closed", "Closed")]
+    [InlineData("active", "Started")]
+    [InlineData("closed", "Completed")]
     [InlineData("future", "Planned")]
     [InlineData("FUTURE", "Planned")]
     [InlineData("", "Planned")]

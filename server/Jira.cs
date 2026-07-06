@@ -347,8 +347,8 @@ public static class Jira
     // Jira sprint state (future|active|closed) → Atlas Sprint.Status.
     public static string MapSprintState(string? state) => (state ?? "").ToLowerInvariant() switch
     {
-        "active" => "Active",
-        "closed" => "Closed",
+        "active" => "Started",
+        "closed" => "Completed",
         _ => "Planned",
     };
 

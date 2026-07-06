@@ -19,6 +19,14 @@ interface Opt { id: string; name: string; }
 interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
 type PortfolioCat = "all" | "project" | "program" | "product" | "release";
 interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
+interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; }
+const TASK_BAR: Record<string, { bg: string; border: string }> = {
+  "To Do":       { bg: "#EEF1F6", border: "#8A93A6" },
+  "In Progress": { bg: "#E6EFFB", border: "#0F6CBD" },
+  "In Review":   { bg: "#FBF2D7", border: "#E0A100" },
+  Done:          { bg: "#E7F4EC", border: "#15A34A" },
+  Blocked:       { bg: "#FBE7E8", border: "#D13438" },
+};
 const monthOfIso = (s: string): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getMonth(); };
 
 const LABEL_W = 286;
@@ -61,17 +69,27 @@ export default function Gantt() {
     queryKey: ["gantt", "portfolio"], enabled: scope === "portfolio", retry: false, staleTime: 30_000,
     queryFn: async (): Promise<{ items: PortfolioItem[] }> => (await api<{ items: PortfolioItem[] }>("/portfolio/gantt")) ?? { items: [] },
   });
-  // Sprints for the selected project — rendered as a band on the schedule.
+  // Sprints (+ their tasks) for the selected project — a band on the schedule.
   const { data: sprintData } = useQuery({
     queryKey: ["sprints", activeProjectId], enabled: scope === "project" && !!activeProjectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<{ sprints: SprintT[] }> => (await api<{ sprints: SprintT[] }>(`/projects/${activeProjectId}/sprints`)) ?? { sprints: [] },
   });
-  const sprintBars = useMemo(() => (sprintData?.sprints ?? []).map((s) => {
+  const { data: taskData } = useQuery({
+    queryKey: ["tasks", activeProjectId], enabled: scope === "project" && !!activeProjectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ tasks: GTask[] }> => (await api<{ tasks: GTask[] }>(`/projects/${activeProjectId}/tasks`)) ?? { tasks: [] },
+  });
+  const sprintBars = useMemo<SprintBar[]>(() => (sprintData?.sprints ?? []).map((s) => {
     const a = monthOfIso(s.startDate), b = monthOfIso(s.endDate);
     if (a === null && b === null) return null;
     const start = Math.min(a ?? b!, b ?? a!), end = Math.max(a ?? b!, b ?? a!);
-    return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end };
-  }).filter(Boolean) as { id: number; name: string; status: string; startMonth: number; endMonth: number }[], [sprintData]);
+    // Tasks in this sprint, placed by their own dates (falling back to the sprint window).
+    const tasks = (taskData?.tasks ?? []).filter((t) => t.sprint === s.name).map((t) => {
+      const ta = monthOfIso(t.startDate), tb = monthOfIso(t.targetDate);
+      const ts = ta ?? tb ?? start, te = tb ?? ta ?? end;
+      return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te) };
+    });
+    return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks };
+  }).filter(Boolean) as SprintBar[], [sprintData, taskData]);
 
   const canEdit = scope === "project" && (gantt?.canEdit ?? false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gantt"] });
@@ -223,11 +241,17 @@ function NowLine() {
 }
 
 // ---- Project schedule ------------------------------------------------------
-interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
+interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
+interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; }
 const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
-  Active: { bg: "#D7EFE0", border: "#15A34A" },
-  Closed: { bg: "#E4E8F1", border: "#8A93A6" },
-  Planned: { bg: "#FBF2D7", border: "#E0A100" },
+  Started:   { bg: "#D7EFE0", border: "#15A34A" },
+  Completed: { bg: "#E6EFFB", border: "#0F6CBD" },
+  Halted:    { bg: "#FBF2D7", border: "#E0A100" },
+  Cancelled: { bg: "#FBE7E8", border: "#D13438" },
+  Planned:   { bg: "#EEF1F6", border: "#8A93A6" },
+  // legacy
+  Active:    { bg: "#D7EFE0", border: "#15A34A" },
+  Closed:    { bg: "#E6EFFB", border: "#0F6CBD" },
 };
 function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
@@ -237,6 +261,8 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
 }) {
   const rowsHeight = Math.max(200, phases.length * 38);
   const hasWindow = projectStart != null && projectEnd != null;
+  const [openSprints, setOpenSprints] = useState<Set<number>>(new Set());
+  const toggleSprint = (id: number) => setOpenSprints((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const winStart = Math.min(projectStart ?? 0, projectEnd ?? 0);
   const winEnd = Math.max(projectStart ?? 0, projectEnd ?? 0);
   return (
@@ -274,12 +300,25 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         {sprints.length > 0 && (
           <>
             <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>Sprints</div>
-            {sprints.map((s) => (
-              <div key={s.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
-                <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
-                <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
-              </div>
-            ))}
+            {sprints.map((s) => {
+              const open = openSprints.has(s.id);
+              return (
+                <div key={s.id}>
+                  <div onClick={() => toggleSprint(s.id)} title="Show tasks" style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 14px 0 18px", borderBottom: "1px solid #F4F6FA", cursor: "pointer" }}>
+                    <Icon name={open ? "chevronDown" : "chevronRight"} size={14} color={color.faint} />
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
+                  </div>
+                  {open && (s.tasks.length === 0
+                    ? <div style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", fontSize: 11, color: color.faint3, borderBottom: "1px solid #F4F6FA" }}>No tasks in this sprint</div>
+                    : s.tasks.map((t) => (
+                      <div key={t.id} style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", borderBottom: "1px solid #F7F9FC" }}>
+                        <span style={{ flex: 1, fontSize: 11, color: color.subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                      </div>
+                    )))}
+                </div>
+              );
+            })}
           </>
         )}
         <div style={{ height: 72, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
@@ -304,17 +343,28 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         {sprints.length > 0 && (
           <div>
             <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }} />
-            <div style={{ position: "relative", height: sprints.length * 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
-              {sprints.map((s) => {
-                const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
-                return (
-                  <div key={s.id} style={{ position: "relative", height: 34 }}>
+            {sprints.map((s) => {
+              const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
+              const open = openSprints.has(s.id);
+              return (
+                <div key={s.id}>
+                  <div style={{ position: "relative", height: 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
                     <div title={`${s.name} · ${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]} · ${s.status}`}
                       style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px solid ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
-                );
-              })}
-            </div>
+                  {open && (s.tasks.length === 0
+                    ? <div style={{ height: 28, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }} />
+                    : s.tasks.map((t) => {
+                      const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
+                      return (
+                        <div key={t.id} style={{ position: "relative", height: 28, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+                          <div title={`${t.name} · ${t.status}`} style={{ ...barStyle(t.startMonth, t.endMonth), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
+                        </div>
+                      );
+                    }))}
+                </div>
+              );
+            })}
           </div>
         )}
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>

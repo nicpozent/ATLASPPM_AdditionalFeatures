@@ -1136,11 +1136,16 @@ interface SprintItem {
   id: number; name: string; goal: string; startDate: string; endDate: string; status: string;
   committedPoints: number; taskCount: number; doneCount: number; points: number; donePoints: number; spilledCount: number;
 }
-const SPRINT_STATUSES = ["Planned", "Active", "Closed"];
+const SPRINT_STATUSES = ["Planned", "Started", "Halted", "Completed", "Cancelled"];
 const SPRINT_STATUS: Record<string, { ink: string; tint: string }> = {
-  Active:  { ink: "#0B6B37", tint: "#E7F4EC" },
-  Planned: { ink: "#56607A", tint: "#EEF1F6" },
-  Closed:  { ink: "#0C5798", tint: "#E6EFFB" },
+  Started:   { ink: "#0B6B37", tint: "#E7F4EC" },
+  Planned:   { ink: "#56607A", tint: "#EEF1F6" },
+  Halted:    { ink: "#8A6300", tint: "#FBF2D7" },
+  Completed: { ink: "#0C5798", tint: "#E6EFFB" },
+  Cancelled: { ink: "#A1282B", tint: "#FBE7E8" },
+  // legacy values from before the lifecycle expansion
+  Active:    { ink: "#0B6B37", tint: "#E7F4EC" },
+  Closed:    { ink: "#0C5798", tint: "#E6EFFB" },
 };
 
 // One task line — code, name, completion tick and a status pill. Shared by the
