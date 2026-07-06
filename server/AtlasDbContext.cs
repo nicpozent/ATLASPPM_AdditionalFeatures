@@ -25,6 +25,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<EntraGroup> EntraGroups => Set<EntraGroup>();
     public DbSet<TeamMemberRow> TeamMembers => Set<TeamMemberRow>();
     public DbSet<ManagerNode> ManagerNodes => Set<ManagerNode>();
+    public DbSet<SubTeam> SubTeams => Set<SubTeam>();
+    public DbSet<SubTeamMember> SubTeamMembers => Set<SubTeamMember>();
+    public DbSet<TeamAssignment> TeamAssignments => Set<TeamAssignment>();
+    public DbSet<TeamAssignmentMember> TeamAssignmentMembers => Set<TeamAssignmentMember>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<NotificationPref> NotificationPrefs => Set<NotificationPref>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -100,6 +104,14 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<DemandAttachment>().HasKey(x => x.Id);
         b.Entity<DemandComment>().HasKey(x => x.Id);
         b.Entity<DemandComment>().HasIndex(x => x.DemandId);
+
+        b.Entity<SubTeam>().HasKey(x => x.Id);
+        b.Entity<SubTeam>().HasMany(x => x.Members).WithOne().HasForeignKey(x => x.SubTeamId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<SubTeamMember>().HasKey(x => x.Id);
+        b.Entity<TeamAssignment>().HasKey(x => x.Id);
+        b.Entity<TeamAssignment>().HasIndex(x => new { x.EntityType, x.EntityId });
+        b.Entity<TeamAssignment>().HasMany(x => x.Members).WithOne().HasForeignKey(x => x.TeamAssignmentId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<TeamAssignmentMember>().HasKey(x => x.Id);
         // Defaults so adding these columns is safe on tables that already hold rows.
         var d = b.Entity<Demand>();
         d.Property(x => x.Description).HasDefaultValue("");

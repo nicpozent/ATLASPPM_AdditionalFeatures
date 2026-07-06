@@ -3,6 +3,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Card, EmptyBlock } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { SubTeamManager } from "@/components/TeamPanel";
 
 // ---------------------------------------------------------------------------
 // My Team — members come from Entra groups mapped to a manager slot in Admin →
@@ -83,6 +84,8 @@ export default function Teams() {
           ))}
         </div>
       )}
+
+      <SubTeamManager />
     </div>
   );
 }
