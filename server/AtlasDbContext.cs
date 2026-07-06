@@ -84,6 +84,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<PiDependency> PiDependencies => Set<PiDependency>();
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<SkillRating> SkillRatings => Set<SkillRating>();
+    public DbSet<RoadmapItem> RoadmapItems => Set<RoadmapItem>();
+    public DbSet<RoadmapMilestone> RoadmapMilestones => Set<RoadmapMilestone>();
+    public DbSet<RoadmapDependency> RoadmapDependencies => Set<RoadmapDependency>();
+    public DbSet<RoadmapLink> RoadmapLinks => Set<RoadmapLink>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -269,5 +273,15 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<ActivityEvent>().HasKey(x => x.Id);
         b.Entity<MyTask>().HasKey(x => x.Id);
         b.Entity<BudgetSnapshot>().HasKey(x => x.Id);
+
+        b.Entity<RoadmapItem>().HasKey(x => x.Id);
+        b.Entity<RoadmapItem>().HasMany(x => x.Milestones).WithOne().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<RoadmapItem>().HasMany(x => x.Links).WithOne().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<RoadmapMilestone>().HasKey(x => x.Id);
+        b.Entity<RoadmapMilestone>().HasIndex(x => x.ItemId);
+        b.Entity<RoadmapDependency>().HasKey(x => x.Id);
+        b.Entity<RoadmapDependency>().HasIndex(x => x.ItemId);
+        b.Entity<RoadmapLink>().HasKey(x => x.Id);
+        b.Entity<RoadmapLink>().HasIndex(x => x.ItemId);
     }
 }

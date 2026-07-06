@@ -1179,3 +1179,60 @@ public class AuditEvent
     public string Action { get; set; } = "";            // "Created role", "Advanced demand", …
     public string Target { get; set; } = "";            // affected object (id/name)
 }
+
+// ---- Roadmap ---------------------------------------------------------------
+// A strategic roadmap initiative. Lives in one of three horizon lanes
+// (Now/Next/Later) AND carries optional start/end dates so the same items
+// render on a time-based timeline. Confidence, effort & value support
+// prioritisation; milestones, dependencies and cross-entity links tie the
+// initiative to the delivery portfolio (OKRs, projects, programs, products,
+// releases). Locally authored — never fabricated seed data.
+public class RoadmapItem
+{
+    public int Id { get; set; }
+    public string Ref { get; set; } = default!;         // "RM-1" business key
+    public string Title { get; set; } = default!;
+    public string Description { get; set; } = "";
+    public string Lane { get; set; } = "Now";            // Now | Next | Later
+    public string Status { get; set; } = "Proposed";     // Proposed | Committed | In progress | Done | Cancelled
+    public string Theme { get; set; } = "";              // free-text strategic theme / swimlane
+    public string Owner { get; set; } = "";
+    public string StartDate { get; set; } = "";          // timeline start (ISO date, "" = undated)
+    public string EndDate { get; set; } = "";            // timeline end
+    public int Confidence { get; set; } = 60;            // 0..100 % delivery confidence
+    public int Effort { get; set; } = 3;                 // 1..5 (t-shirt-ish)
+    public int Value { get; set; } = 3;                  // 1..5 strategic value
+    public int Ord { get; set; }
+    public string CreatedAt { get; set; } = "";          // display date
+    public List<RoadmapMilestone> Milestones { get; set; } = new();
+    public List<RoadmapLink> Links { get; set; } = new();
+}
+
+public class RoadmapMilestone
+{
+    public int Id { get; set; }
+    public int ItemId { get; set; }
+    public string Title { get; set; } = default!;
+    public string Date { get; set; } = "";               // ISO date
+    public bool Done { get; set; }
+    public int Ord { get; set; }
+}
+
+// A directed dependency between two roadmap items (ItemId depends on DependsOnItemId).
+public class RoadmapDependency
+{
+    public int Id { get; set; }
+    public int ItemId { get; set; }
+    public int DependsOnItemId { get; set; }
+}
+
+// A link from a roadmap item to a portfolio entity (OKR, project, program,
+// product or release). Label snapshots the entity name for display.
+public class RoadmapLink
+{
+    public int Id { get; set; }
+    public int ItemId { get; set; }
+    public string EntityType { get; set; } = "";         // okr | project | program | product | release
+    public string EntityId { get; set; } = "";
+    public string Label { get; set; } = "";
+}

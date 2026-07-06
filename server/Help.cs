@@ -192,6 +192,11 @@ public static class Help
             "Ops services and work items, and their drag on delivery.",
             "The Ops section is for run-the-business work that isn't project delivery (support, maintenance, monitoring, infrastructure).\n1. Create an Ops service, then add work items (type, priority, status, assignee, and an allocation %).\n2. A work item's allocation rolls up into that person's Ops% on Resources — so BAU load counts against their capacity.\n3. Tag an item with an ‘impact project’ to show, on that project's Overview, the operational load pulling capacity off its delivery. Editing Ops needs the Operational-work capability."),
 
+        // ---- Roadmap ---------------------------------------------------------
+        ("pmo", "Plan the strategic roadmap",
+            "Now / Next / Later horizons and a time-based timeline.",
+            "The Roadmap section is for strategic, portfolio-level planning above individual projects.\n1. Add an initiative and place it on a horizon — Now, Next or Later. Give it a theme (swimlane), owner, status, and a confidence %, plus value and effort (1–5) for prioritisation.\n2. Set start/end dates to also see it on the ‘Timeline’ view (toggle top-left): dated initiatives are laid out by month in theme swimlanes, with milestone diamonds; undated ones stay on the board.\n3. Add milestones, mark dependencies on other initiatives (the board shows what blocks what), and link the initiative to OKRs, projects, programs, products or releases.\n4. On the board you can drag a card between horizons to re-plan it. Editing the roadmap needs the Roadmap capability; everyone can read it."),
+
         // ---- Platform admin: privacy & Jira ----------------------------------
         ("admin", "Handle a GDPR data-subject request",
             "Export, erase, and run retention from Administration.",
