@@ -35,8 +35,13 @@ public static class ResourcesData
     {
         // The capacity roster: everyone with an allocation (product or project) or
         // on the synced directory, with their rolled-up utilisation.
-        api.MapGet("/resources", async (AtlasDbContext db) =>
+        api.MapGet("/resources", async (AtlasDbContext db, string? asOf) =>
         {
+            // Utilisation is time-phased: count each dated allocation segment only
+            // if it's live on the reference day (default today). Segments without
+            // dates are always live, so pre-dates data is unchanged.
+            var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d)
+                ? d : DateOnly.FromDateTime(DateTime.UtcNow);
             var productAllocs = await db.ProductAllocations.ToListAsync();
             var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
             var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
@@ -55,8 +60,10 @@ public static class ResourcesData
             foreach (var t in projAssignments)
                 foreach (var m in t.Members)
                 {
+                    var live = (AllocMath.ActiveOn(m.StartDate, m.EndDate, on) ? m.Alloc : 0)
+                             + (m.ExtAlloc > 0 && AllocMath.ActiveOn(m.ExtStartDate, m.ExtEndDate, on) ? m.ExtAlloc : 0);
                     var p = Get(m.Name);
-                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4 + m.Alloc, p.Item5, p.Item6);
+                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4 + live, p.Item5, p.Item6);
                 }
             foreach (var g in groups)
                 foreach (var m in g.Members)

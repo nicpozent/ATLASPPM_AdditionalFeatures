@@ -295,7 +295,16 @@ public class TeamAssignmentMember
     public string Name { get; set; } = "";
     public string Email { get; set; } = "";
     public string Title { get; set; } = "";
-    public int Alloc { get; set; }                     // % of the person's capacity on this entity
+    public int Alloc { get; set; }                     // % of the person's capacity on this entity (canonical)
+    public int AllocHours { get; set; }                // weekly hours entered (0 ⇒ allocation set directly in %); % = hours ÷ 40
+    public string StartDate { get; set; } = "";        // ISO date the allocation begins ("" ⇒ open/always-on)
+    public string EndDate { get; set; } = "";          // ISO date it ends ("" ⇒ open)
+    // Optional extension segment — extra capacity when the work runs long, tracked
+    // and rolled up separately so the original plan stays intact.
+    public int ExtAlloc { get; set; }                  // % (canonical) of the extension; 0 ⇒ no extension
+    public int ExtHours { get; set; }                  // weekly hours entered for the extension
+    public string ExtStartDate { get; set; } = "";
+    public string ExtEndDate { get; set; } = "";
 }
 
 // ---- Roles & permissions (in-app RBAC) ------------------------------------
