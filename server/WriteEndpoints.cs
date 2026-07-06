@@ -11,6 +11,9 @@ public record CreateDemandReq(
     string? BusinessProblem, bool? ImprovementExisting, int? Criticality, int? Risk,
     string? ExpectedBenefits, int? BenefitValue, List<string>? Stakeholders, bool? AllStakeholders);
 public record UpdateDemandStageReq(string Stage);
+public record DemandCommentReq(string Body);
+public record DemandCommentDto(int Id, string Author, string Body, string CreatedAt);
+public record DemandCommentsDto(bool CanComment, List<DemandCommentDto> Comments);
 public record CreateBlockerReq(string Title, string ProjectId, string? Owner, string? Status, string? Description);
 public record UpdateBlockerReq(string? Title, string? Owner, string? Status, string? Description);
 public record CreateProjectReq(string Name, string? Dept, string? Owner, string? Methodology, bool? ApplyTemplate,
@@ -148,6 +151,9 @@ public static class WriteEndpoints
         {
             if (await Permissions.Deny(http, db, cfg, "cap-demand-scoring", "E") is { } denied) return denied;
             if (!Stages.Contains(req.Stage)) return Results.BadRequest(new { error = "Unknown stage." });
+            // Approval is reserved for Platform Admin & PMO (cap-approve). Other
+            // stage moves only need demand-scoring edit.
+            if (req.Stage == "approved" && await Permissions.Deny(http, db, cfg, "cap-approve", "E") is { } noApprove) return noApprove;
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
             var oldStage = d.Stage;
@@ -171,6 +177,46 @@ public static class WriteEndpoints
             if (!CanDelete(d, user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
             db.Demands.Remove(d);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Deleted demand", id));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // ---- Demand comments (Platform Admin, PMO & Chief Architect) --------
+        // Reading is open to anyone who can see the demand; posting/removing needs
+        // Edit on "Comment on demands" (cap-comment-demand).
+        api.MapGet("/demands/{id}/comments", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!await db.Demands.AnyAsync(x => x.Id == id)) return Results.NotFound();
+            var canComment = await Permissions.Allows(http, db, cfg, "cap-comment-demand", "E");
+            var items = await db.DemandComments.Where(c => c.DemandId == id).OrderBy(c => c.Id)
+                .Select(c => new DemandCommentDto(c.Id, c.Author, c.Body, c.CreatedAt)).ToListAsync();
+            return Results.Ok(new DemandCommentsDto(canComment, items));
+        });
+
+        api.MapPost("/demands/{id}/comments", async (string id, DemandCommentReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-comment-demand", "E") is { } denied) return denied;
+            if (!await db.Demands.AnyAsync(x => x.Id == id)) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(req.Body)) return Results.BadRequest(new { error = "A comment can't be empty." });
+            var c = new DemandComment
+            {
+                DemandId = id, Body = req.Body.Trim(),
+                Author = Permissions.ActorName(http, cfg),
+                CreatedAt = DateTime.UtcNow.ToString("o"),
+            };
+            db.DemandComments.Add(c);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Commented on demand", id));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/demands/{id}/comments/{c.Id}", new DemandCommentDto(c.Id, c.Author, c.Body, c.CreatedAt));
+        });
+
+        api.MapDelete("/demands/comments/{commentId:int}", async (int commentId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-comment-demand", "E") is { } denied) return denied;
+            var c = await db.DemandComments.FindAsync(commentId);
+            if (c is null) return Results.NotFound();
+            db.DemandComments.Remove(c);
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Deleted demand comment", c.DemandId));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });

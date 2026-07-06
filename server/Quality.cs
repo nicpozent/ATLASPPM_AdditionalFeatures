@@ -11,7 +11,7 @@ public record UpdatePlanTaskReq(string? Title, string? Status, string? Assignee)
 
 // ============================================================================
 //  Quality — test plans (execution breakdown) and defects for a project.
-//  Editing requires Edit on "Projects & tasks" (cap-projects). Totals are
+//  Editing requires Edit on "Quality, tests & defects" (cap-quality). Totals are
 //  computed from the plans and defects.
 // ============================================================================
 public static class Quality
@@ -28,7 +28,7 @@ public static class Quality
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var plans = await db.TestPlans.Where(p => p.ProjectId == id).Include(p => p.Tasks).OrderBy(p => p.Ord).ToListAsync();
             var defects = await db.Defects.Where(d => d.ProjectId == id).OrderBy(d => d.Ord).ToListAsync();
-            var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            var canEdit = await Permissions.Allows(http, db, cfg, "cap-quality", "E");
 
             var cases = plans.Sum(p => p.Cases);
             var executed = plans.Sum(p => p.Passed + p.Failed + p.Blocked);
@@ -47,7 +47,7 @@ public static class Quality
 
         api.MapPost("/projects/{id}/test-plans", async (string id, CreateTestPlanReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var cases = Math.Max(0, req.Cases ?? 0);
@@ -67,7 +67,7 @@ public static class Quality
 
         api.MapPost("/projects/{id}/defects", async (string id, CreateDefectReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var ord = (await db.Defects.Where(d => d.ProjectId == id).Select(d => (int?)d.Ord).MaxAsync() ?? 0) + 1;
@@ -88,7 +88,7 @@ public static class Quality
 
         api.MapPatch("/test-plans/{planId:int}", async (int planId, UpdateTestPlanReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var plan = await db.TestPlans.FindAsync(planId);
             if (plan is null) return Results.NotFound();
             if (req.Name is not null)
@@ -114,7 +114,7 @@ public static class Quality
 
         api.MapDelete("/test-plans/{planId:int}", async (int planId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var plan = await db.TestPlans.FindAsync(planId);
             if (plan is null) return Results.NotFound();
             db.TestPlans.Remove(plan);
@@ -125,7 +125,7 @@ public static class Quality
 
         api.MapPatch("/defects/{defectId:int}", async (int defectId, UpdateDefectReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var def = await db.Defects.FindAsync(defectId);
             if (def is null) return Results.NotFound();
             if (req.Title is not null)
@@ -152,7 +152,7 @@ public static class Quality
 
         api.MapDelete("/defects/{defectId:int}", async (int defectId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var def = await db.Defects.FindAsync(defectId);
             if (def is null) return Results.NotFound();
             db.Defects.Remove(def);
@@ -164,7 +164,7 @@ public static class Quality
         // ---- Test-plan tasks (test cases tracked under a plan) ------------
         api.MapPost("/test-plans/{planId:int}/tasks", async (int planId, CreatePlanTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             if (!await db.TestPlans.AnyAsync(p => p.Id == planId)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
             var ord = (await db.TestPlanTasks.Where(t => t.TestPlanId == planId).Select(t => (int?)t.Ord).MaxAsync() ?? 0) + 1;
@@ -182,7 +182,7 @@ public static class Quality
 
         api.MapPatch("/test-plan-tasks/{taskId:int}", async (int taskId, UpdatePlanTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var t = await db.TestPlanTasks.FindAsync(taskId);
             if (t is null) return Results.NotFound();
             if (req.Title is not null)
@@ -202,7 +202,7 @@ public static class Quality
 
         api.MapDelete("/test-plan-tasks/{taskId:int}", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
             var t = await db.TestPlanTasks.FindAsync(taskId);
             if (t is null) return Results.NotFound();
             db.TestPlanTasks.Remove(t);

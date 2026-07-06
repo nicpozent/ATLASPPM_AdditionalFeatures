@@ -54,4 +54,17 @@ public class RbacMatrixTests
         foreach (var cap in caps)
             Assert.Equal("F", adminPerms.GetValueOrDefault(cap)); // admin is Full everywhere
     }
+
+    [Fact]
+    public async Task QualityManager_views_everything_but_edits_only_quality()
+    {
+        using var db = await SeededAsync();
+        var caps = await db.Capabilities.Select(c => c.Key).ToListAsync();
+        var q = await db.RolePermissions.Where(p => p.RoleId == "qmgr").ToDictionaryAsync(p => p.CapabilityKey, p => p.Level);
+
+        Assert.NotEmpty(caps);
+        Assert.Equal("F", q.GetValueOrDefault("cap-quality"));   // full on quality
+        foreach (var cap in caps.Where(c => c != "cap-quality"))
+            Assert.Equal("V", q.GetValueOrDefault(cap));         // view-only everywhere else
+    }
 }

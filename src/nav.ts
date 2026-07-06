@@ -72,5 +72,6 @@ export const ROLES: RoleIdentity[] = [
   { value: "devmgr",      label: "Developers Manager",       name: "Johan Virtanen",   roleLabel: "Developers Manager",     initials: "JV" },
   { value: "inframgr",    label: "Infrastructure Manager",   name: "Erik Lindqvist",   roleLabel: "Infrastructure Manager", initials: "EL" },
   { value: "architect",   label: "Chief Architect",          name: "Ingrid Aalto",     roleLabel: "Chief Architect",        initials: "IA" },
+  { value: "qmgr",        label: "Quality Manager",          name: "Nina Koskinen",    roleLabel: "Quality Manager",        initials: "NK" },
   { value: "stakeholder", label: "Stakeholder",              name: "Sofia Berg",       roleLabel: "Business Stakeholder",   initials: "SB" },
 ];

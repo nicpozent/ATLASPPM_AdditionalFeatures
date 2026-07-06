@@ -10,6 +10,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<StakeholderEntry> StakeholderEntries => Set<StakeholderEntry>();
     public DbSet<Demand> Demands => Set<Demand>();
     public DbSet<DemandAttachment> DemandAttachments => Set<DemandAttachment>();
+    public DbSet<DemandComment> DemandComments => Set<DemandComment>();
     public DbSet<Program> Programs => Set<Program>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductTask> ProductTasks => Set<ProductTask>();
@@ -97,6 +98,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
             .HasForeignKey(x => x.DemandId)
             .OnDelete(DeleteBehavior.Cascade);
         b.Entity<DemandAttachment>().HasKey(x => x.Id);
+        b.Entity<DemandComment>().HasKey(x => x.Id);
+        b.Entity<DemandComment>().HasIndex(x => x.DemandId);
         // Defaults so adding these columns is safe on tables that already hold rows.
         var d = b.Entity<Demand>();
         d.Property(x => x.Description).HasDefaultValue("");

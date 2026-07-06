@@ -5,6 +5,7 @@ import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { toast } from "@/components/Toast";
 
 export { Overlay };
 
@@ -59,6 +60,8 @@ export default function Demands() {
   const qc = useQueryClient();
   const { can } = usePermissions();
   const maySubmit = can("cap-submit-demand", "E");
+  const mayScore = can("cap-demand-scoring", "E");   // move demands through the funnel
+  const mayApprove = can("cap-approve", "E");         // only Platform Admin & PMO approve
   const [modal, setModal] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const createDemand = useMutation({
@@ -102,7 +105,10 @@ export default function Demands() {
                 e.preventDefault();
                 const id = dragId.current; dragId.current = null; setOverStage(null);
                 const dragged = demands.find((x) => x.id === id);
-                if (id && dragged && dragged.stage !== s.key) advanceDemand.mutate({ id, stage: s.key });
+                if (!id || !dragged || dragged.stage === s.key) return;
+                if (!mayScore) { toast("Your role can't move demands through the funnel.", "error"); return; }
+                if (s.key === "approved" && !mayApprove) { toast("Only a Platform Administrator or PMO can approve demands.", "error"); return; }
+                advanceDemand.mutate({ id, stage: s.key });
               }}
               style={{ width: 280, flex: "none", background: over ? "#EAF2FB" : "#F4F6FA", border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : color.border}`, borderRadius: 14, padding: "13px 12px", transition: "background .1s" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 13, padding: "0 3px" }}>
@@ -206,6 +212,8 @@ function DemandDetailModal({ id, onClose }: { id: string; onClose: () => void })
           {data.businessProblem && <Block label="Business problem / opportunity">{data.businessProblem}</Block>}
           {data.expectedBenefits && <Block label="Expected benefits">{data.expectedBenefits}</Block>}
 
+          <DemandComments id={data.id} />
+
           {data.attachments.length > 0 && (
             <>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: color.text, margin: "16px 0 7px" }}>Attachments</div>
@@ -236,6 +244,60 @@ function DemandDetailModal({ id, onClose }: { id: string; onClose: () => void })
         </>
       )}
     </Overlay>
+  );
+}
+
+// Review thread — Platform Admin, PMO & Chief Architect discuss a demand.
+// Anyone who can open the demand reads it; posting needs cap-comment-demand.
+interface DemandCommentT { id: number; author: string; body: string; createdAt: string }
+function DemandComments({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const [text, setText] = useState("");
+  const { data } = useQuery({
+    queryKey: ["demand-comments", id], retry: false,
+    queryFn: async (): Promise<{ canComment: boolean; comments: DemandCommentT[] }> =>
+      (await api<{ canComment: boolean; comments: DemandCommentT[] }>(`/demands/${id}/comments`)) ?? { canComment: false, comments: [] },
+  });
+  const comments = data?.comments ?? [];
+  const canComment = data?.canComment ?? false;
+  const add = useMutation({
+    mutationFn: () => api(`/demands/${id}/comments`, { method: "POST", body: JSON.stringify({ body: text.trim() }) }),
+    onSuccess: () => { setText(""); qc.invalidateQueries({ queryKey: ["demand-comments", id] }); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const del = useMutation({
+    mutationFn: (cid: number) => api(`/demands/comments/${cid}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["demand-comments", id] }),
+  });
+  const when = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); };
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${color.border}` }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: color.text, marginBottom: 9 }}>Review comments <span style={{ color: color.faint3, fontWeight: 500 }}>· Platform Admin, PMO &amp; Chief Architect</span></div>
+      {comments.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: color.faint3, marginBottom: canComment ? 10 : 0 }}>No comments yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: canComment ? 12 : 0 }}>
+          {comments.map((c) => (
+            <div key={c.id} style={{ background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 9, padding: "9px 11px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: color.text }}>{c.author || "Someone"}</span>
+                <span style={{ fontSize: 11, color: color.faint3 }}>{when(c.createdAt)}</span>
+                <div style={{ flex: 1 }} />
+                {canComment && <button onClick={() => del.mutate(c.id)} title="Delete comment" style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 0 }}><Icon name="trash" size={13} /></button>}
+              </div>
+              <div style={{ fontSize: 12.5, color: color.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{c.body}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {canComment && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a review comment…" rows={2} style={{ flex: 1 }} />
+          <Button onClick={() => text.trim() && add.mutate()} disabled={add.isPending || !text.trim()}>{add.isPending ? "Posting…" : "Comment"}</Button>
+        </div>
+      )}
+    </div>
   );
 }
 
