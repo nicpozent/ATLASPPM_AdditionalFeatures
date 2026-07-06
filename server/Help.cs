@@ -172,6 +172,33 @@ public static class Help
         ("exec", "Export a board-ready status deck",
             "Branded organisation report.",
             "1. Go to Reports and choose the portfolio or delivery report.\n2. Export as PowerPoint for a branded, board-ready deck (or PDF/HTML to share).\n3. It reflects live data at the moment you export."),
+
+        // ---- Resourcing & allocation (PM / PMO) ------------------------------
+        ("pm", "Allocate people with dates and hours",
+            "Percent or hours, a start/end window, and extensions.",
+            "On a project/program/product/release, open the Team panel.\n1. Attach a sub-team, or use ‘Assign individual’ to add one person (from the directory or typed).\n2. For each person set allocation as a % or as weekly hours — 40 h/week = 100%, and the % preview updates live.\n3. Set a start and end date so the allocation is time-phased: it only counts while it's live, so utilisation and availability are correct per date, not a flat lifetime sum.\n4. If the work runs long, click ‘Add extension’ to log extra hours over its own dates — tracked separately so the original plan stays intact.\nEverything rolls up into Resources (Project %) and the project's Team capacity."),
+        ("pm", "Find who's free (availability finder)",
+            "Plan staffing by date or window.",
+            "Resources → Availability.\n1. Choose ‘On a date’ or ‘Across a window’ and pick the date(s).\n2. Each person shows a stacked bar of their load by project/program/release/product/ops, and their free %.\n3. Booked time-off (the vacation calendar) marks a person unavailable.\n4. In window mode, ‘free’ is the capacity free across the whole window (100% − peak load) — i.e. who you can staff for the entire period. Use the ‘min. free’ filter to shortlist."),
+        ("pmo", "Export the allocation histogram to Excel",
+            "Colour-graded utilisation by period.",
+            "Resources → pick a period (day/week/month/quarter/half/year) → ‘Export .xlsx’.\nYou get a colour-graded workbook: rows are people, columns are periods, each cell is the average % utilisation over that period (green→amber→red; over 100% is red), and the cell comment holds the underlying person-days. A ‘Total (days)’ column sums each person's effort. Use it for capacity planning and month/quarter reviews."),
+        ("team", "Keep the team skills matrix",
+            "Customizable competencies, 0–4, with Excel export.",
+            "My Team → Skills & competency matrix.\n1. Add your own skill columns (there's no fixed list).\n2. Rate each team member 0–4 per skill.\n3. It covers the people you manage; Platform Admin/PMO see everyone.\n4. ‘Export’ downloads a colour-graded Excel (blue ramp by level). Ratings feed skills-based staffing views."),
+
+        // ---- Ops (run-the-business) ------------------------------------------
+        ("pm", "Track operational (run-the-business) work",
+            "Ops services and work items, and their drag on delivery.",
+            "The Ops section is for run-the-business work that isn't project delivery (support, maintenance, monitoring, infrastructure).\n1. Create an Ops service, then add work items (type, priority, status, assignee, and an allocation %).\n2. A work item's allocation rolls up into that person's Ops% on Resources — so BAU load counts against their capacity.\n3. Tag an item with an ‘impact project’ to show, on that project's Overview, the operational load pulling capacity off its delivery. Editing Ops needs the Operational-work capability."),
+
+        // ---- Platform admin: privacy & Jira ----------------------------------
+        ("admin", "Handle a GDPR data-subject request",
+            "Export, erase, and run retention from Administration.",
+            "Administration → Data Privacy (Platform Admin only).\n• Export (DSAR): pick a person (or type a name/email/user key) and download every record Atlas holds about them as portable JSON (GDPR Art. 15 & 20).\n• Erase (right to be forgotten): irreversibly anonymises every record referencing that subject (Art. 17) — confirm-gated.\n• Run retention now: anonymises records past the retention window on demand (a daily background pass also runs).\nMatching is exact (case-insensitive) on name/email/key, and every action is audited."),
+        ("admin", "What syncs from Jira",
+            "Full issue import, comments and attachments.",
+            "Map a project to a Jira project key (and, for sprints, a board id) in the project's details. Sync pulls the full issue record — description, issue type, reporter, exact status, resolution, labels/components/fix-versions, parent & epic keys, logged time, timestamps and a deep link — plus comments and downloaded attachments, all shown in the task's ‘Jira details’ panel. Re-sync is idempotent (upserts by Jira id, never touches Atlas-created rows). Toggle comments/attachments and the file-size cap with the Jira import settings. Note: sprints are board-scoped — set a board id to pull past/current sprints."),
     };
 
     public static async Task SeedAsync(AtlasDbContext db)

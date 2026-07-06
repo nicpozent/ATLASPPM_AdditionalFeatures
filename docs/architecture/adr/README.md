@@ -19,5 +19,11 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0010](./0010-observability-otel.md) | Observability via OpenTelemetry (OTLP) | Accepted |
 | [0011](./0011-docs-as-code.md) | Documentation as code (Markdown + Mermaid + ADRs) | Accepted |
 | [0012](./0012-empty-states-derive-on-read.md) | Empty-by-default data with derive-on-read roll-ups | Accepted |
+| [0013](./0013-time-phased-allocation.md) | Time-phased resource allocation (dates, hours↔%, extensions) | Accepted |
+| [0014](./0014-ops-work-type.md) | Ops as a distinct work type with project-impact tagging | Accepted |
+| [0015](./0015-server-side-excel-exports.md) | Server-side colour-graded Excel exports (ClosedXML) | Accepted |
+| [0016](./0016-skills-matrix.md) | Customizable skills matrix, name-keyed ratings | Accepted |
+| [0017](./0017-gdpr-admin-surface.md) | GDPR data-subject actions surfaced in Administration | Accepted |
+| [0018](./0018-jira-full-field-import.md) | Jira full-field, comment & attachment import (extends 0006) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

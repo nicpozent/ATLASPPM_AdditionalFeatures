@@ -35,7 +35,7 @@ requirement → capability → implementation → decision.
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
 | SBB-07 | EF Core 8 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |
-| SBB-09 | Jira connector (agile + enhanced JQL, board-optional) | ABB-05 | ADR-0006 |
+| SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments) | ABB-05 | ADR-0006, ADR-0018 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
 | SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`) | ABB-06, ABB-10 | ADR-0007 |
 | SBB-12 | Notifications service + subscriptions + comments | ABB-07 | |
@@ -44,6 +44,11 @@ requirement → capability → implementation → decision.
 | SBB-15 | Governance modules (Gates, RAID, Architecture ADM/ARB, Security controls, Decisions, Quality) + GDPR/retention | ABB-10 | |
 | SBB-16 | `IConfiguration` env + Docker secrets tooling | ABB-11 | ADR-0009 |
 | SBB-17 | Docker + docker-compose + nginx edge; GitHub Actions CI | ABB-12 | ADR-0008 |
+| SBB-18 | Time-phased allocation (`TeamAssignmentMember` segments, `AllocMath`) + availability finder (`/resources/availability`) | ABB-06 | ADR-0013 |
+| SBB-19 | Ops module (`OpsService`/`OpsItem`, `cap-ops`, project-impact + Ops% roll-up) | ABB-06, ABB-10 | ADR-0014 |
+| SBB-20 | Skills & competency matrix (`Skill`/`SkillRating`, name-keyed) | ABB-06 | ADR-0016 |
+| SBB-21 | Colour-graded Excel exports (ClosedXML: allocation histogram, skills matrix) | ABB-06, ABB-01 | ADR-0015 |
+| SBB-22 | GDPR data-subject admin surface (DSAR export, erase, run-retention) | ABB-10 | ADR-0017 |
 
 ## 3. Traceability (ABB → SBB)
 

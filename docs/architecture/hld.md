@@ -104,12 +104,13 @@ flowchart LR
     direction TB
     delivery["Delivery\nProjects · Tasks · Sprints · Epics\nGantt/Phases/Milestones · PIP"]
     portfolio["Portfolio\nPrograms · Products · Releases · OKRs · Demands"]
-    people["People & capacity\nTeams/Entra · SubTeams · Resources · Assignments"]
+    ops["Ops (run-the-business)\nOpsService · OpsItem · project-impact"]
+    people["People & capacity\nTeams/Entra · SubTeams · time-phased Allocation · Resources · Availability · Skills"]
     govern["Governance\nGates · RAID · Architecture(ADM/ARB) · Security · Quality · Decisions"]
     finance["Financials\nBudgets · Costs · ROI"]
     comms["Comms\nNotifications · News · Delivery reports · Comments"]
-    platform["Platform\nRBAC · Audit · Backups · Help · GDPR · Retention · Secrets"]
-    integr["Integrations\nJira (sync + scheduled worker)"]
+    platform["Platform\nRBAC · Audit · Backups · Help · GDPR/Retention · Excel exports · Secrets"]
+    integr["Integrations\nJira (full-field sync + attachments + scheduled worker)"]
   end
   xcut["Cross-cutting:\nPermissions · Logging/correlation · RateLimiter · Telemetry · Health"]
   API --- xcut
