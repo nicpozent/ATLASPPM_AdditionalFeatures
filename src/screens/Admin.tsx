@@ -5,7 +5,8 @@ import { api, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
-import { toast } from "@/components/Toast";
+import { useRole } from "@/components/RoleContext";
+import { toast, toastError } from "@/components/Toast";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -18,13 +19,14 @@ import { toast } from "@/components/Toast";
 
 const GRADIENT = "linear-gradient(115deg,#11163A,#0F6CBD)";
 
-const ADMIN_TABS: { id: string; label: string }[] = [
+const ADMIN_TABS: { id: string; label: string; adminOnly?: boolean }[] = [
   { id: "roles", label: "Roles & Permissions" },
   { id: "users", label: "Users & Groups" },
   { id: "teams", label: "Teams" },
   { id: "stakeholders", label: "Stakeholders" },
   { id: "archive", label: "Archive & Deletions" },
   { id: "audit", label: "Audit Log" },
+  { id: "privacy", label: "Data Privacy", adminOnly: true },
   { id: "backups", label: "Backups & Restore" },
   { id: "install", label: "Installation Guides" },
   { id: "integrations", label: "Integration Setup" },
@@ -86,12 +88,17 @@ const BACKUP_COLS = "1.8fr 1fr 0.8fr 0.7fr 0.9fr 1.1fr";
 export default function Admin() {
   const [tab, setTab] = useState("roles");
   const [openGuide, setOpenGuide] = useState<string | null>(null);
+  const { role } = useRole();
+  // GDPR data-subject actions are Platform-Admin only on the API; hide the tab
+  // for everyone else (cosmetic — the endpoints stay authoritative).
+  const isPlatformAdmin = role === "admin";
+  const tabs = ADMIN_TABS.filter((t) => !t.adminOnly || isPlatformAdmin);
 
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* tab bar */}
       <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${color.border3}`, marginBottom: 22, overflowX: "auto" }}>
-        {ADMIN_TABS.map((t) => {
+        {tabs.map((t) => {
           const active = tab === t.id;
           return (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -110,6 +117,7 @@ export default function Admin() {
       {tab === "stakeholders" && <StakeholdersSection />}
       {tab === "archive" && <ArchiveSection />}
       {tab === "audit" && <AuditSection />}
+      {tab === "privacy" && isPlatformAdmin && <PrivacySection />}
       {tab === "backups" && <BackupsSection />}
       {tab === "install" && <GuidesSection kind="install" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
       {tab === "integrations" && <GuidesSection kind="int" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
@@ -710,6 +718,108 @@ function SecretRotationCard() {
       </Card>
     </div>
   );
+}
+
+// ---- DATA PRIVACY (GDPR) --------------------------------------------------
+// Platform-Admin surface for the data-subject rights already implemented on the
+// API: portability/access (DSAR export), erasure (anonymise a subject), and an
+// on-demand run of the age-based retention pass. All three are Platform-Admin
+// gated and audited server-side; this just wires them up.
+interface Subject { name: string; email: string; }
+
+function PrivacySection() {
+  const [subject, setSubject] = useState("");
+  const [confirmErase, setConfirmErase] = useState(false);
+
+  const { data: subjects } = useQuery({
+    queryKey: ["gdpr-subjects"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<Subject[]> => (await api<Subject[]>("/gdpr/subjects")) ?? [],
+  });
+
+  // A subject may be picked from the directory or typed (name, email or key).
+  const options = subjects ?? [];
+  const s = subject.trim();
+
+  const exporting = useMutation({
+    mutationFn: () => apiDownload(`/gdpr/export?subject=${encodeURIComponent(s)}`, `atlas-dsar-${slugify(s)}.json`),
+    onSuccess: () => toast("Data-subject export downloaded"),
+    onError: (e) => toastError(e),
+  });
+  const erasing = useMutation({
+    mutationFn: () => api<{ subject: string; anonymised: number }>(`/gdpr/erase?subject=${encodeURIComponent(s)}`, { method: "POST" }),
+    onSuccess: (r) => { setConfirmErase(false); toast(`Erased ${s} — ${r?.anonymised ?? 0} record(s) anonymised`); },
+    onError: (e) => toastError(e),
+  });
+  const retention = useMutation({
+    mutationFn: () => api<{ anonymised: number; cutoff: string }>(`/admin/retention/run`, { method: "POST" }),
+    onSuccess: (r) => toast(`Retention pass complete — ${r?.anonymised ?? 0} record(s) anonymised`),
+    onError: (e) => toastError(e),
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* Data-subject requests */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
+          <div style={sectionTitle}>Data-subject requests (GDPR Art. 15, 17 & 20)</div>
+          <div style={sectionSub}>Export or erase everything Atlas holds about one person. Matching is exact (case-insensitive) on name, email or user key. Every action is audited.</div>
+        </div>
+        <div style={{ padding: "18px 22px" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 260px", minWidth: 220 }}>
+              <label style={{ ...colHeadStyle, display: "block", marginBottom: 6 }}>Subject</label>
+              {options.length > 0 && (
+                <Select value={options.some((o) => (o.email || o.name) === subject) ? subject : ""} onChange={(e) => setSubject(e.target.value)} style={{ marginBottom: 8 }}>
+                  <option value="">Pick from directory…</option>
+                  {options.map((o) => {
+                    const val = o.email || o.name;
+                    return <option key={val} value={val}>{o.name}{o.email ? ` · ${o.email}` : ""}</option>;
+                  })}
+                </Select>
+              )}
+              <Input value={subject} onChange={(e) => { setSubject(e.target.value); setConfirmErase(false); }} placeholder="Name, email or user key" />
+            </div>
+            <Button variant="secondary" disabled={!s || exporting.isPending} onClick={() => exporting.mutate()}>
+              <Icon name="download" size={15} /> {exporting.isPending ? "Exporting…" : "Export data (DSAR)"}
+            </Button>
+          </div>
+
+          <div style={{ marginTop: 16, borderTop: `1px solid ${color.bg}`, paddingTop: 14 }}>
+            {!confirmErase ? (
+              <button onClick={() => setConfirmErase(true)} disabled={!s} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: s ? "#A1282B" : color.faint3, background: "none", border: "none", cursor: s ? "pointer" : "not-allowed", fontFamily: "inherit", padding: "4px 0" }}>
+                <Icon name="trash" size={15} /> Erase this subject (right to be forgotten)
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, color: "#A1282B", fontWeight: 600 }}>Anonymise every record referencing “{s}”? Rows are kept but identifiers are irreversibly pseudonymised.</span>
+                <Button onClick={() => erasing.mutate()} disabled={erasing.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{erasing.isPending ? "Erasing…" : "Confirm erasure"}</Button>
+                <Button variant="secondary" onClick={() => setConfirmErase(false)}>Cancel</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Retention */}
+      <Card padding={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}` }}>
+          <div style={sectionTitle}>Data retention</div>
+          <div style={sectionSub}>Records past the retention window (default 10 years) have their personal identifiers anonymised. A background pass runs daily; you can also run it on demand.</div>
+        </div>
+        <div style={{ padding: "18px 22px", display: "flex", alignItems: "center", gap: 14 }}>
+          <Button variant="secondary" disabled={retention.isPending} onClick={() => retention.mutate()}>
+            <Icon name="refresh" size={15} /> {retention.isPending ? "Running…" : "Run retention now"}
+          </Button>
+          <span style={{ fontSize: 12, color: color.faint2 }}>Anonymises expired audit actors and notification keys. Safe to run anytime — nothing within the window is touched.</span>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function slugify(s: string): string {
+  const out = s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return out || "subject";
 }
 
 function BackupsSection() {
