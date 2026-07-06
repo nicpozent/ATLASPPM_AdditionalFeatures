@@ -148,9 +148,10 @@ public static class Tasks
         {
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var epics = await db.Epics.Where(e => e.ProjectId == id).OrderBy(e => e.Ord).ToListAsync();
+            var tasks = await db.ProjectTasks.Where(t => t.ProjectId == id && t.Epic != "").ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
-            return Results.Ok(new EpicsDto(canEdit, epics.Select(e => ToEpicDto(e, epics)).ToList(), canCreate));
+            return Results.Ok(new EpicsDto(canEdit, epics.Select(e => ToEpicDto(e, epics, tasks)).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/epics", async (string id, CreateEpicReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -222,15 +223,20 @@ public static class Tasks
         });
     }
 
-    static EpicDto ToEpicDto(Epic e, List<Epic> all)
+    static EpicDto ToEpicDto(Epic e, List<Epic> all, List<ProjectTask>? tasks = null)
     {
-        var pct = e.Stories == 0 ? 0 : (int)Math.Round(100.0 * e.Done / e.Stories);
+        // Prefer aggregating from tasks linked to this epic (by name); fall back
+        // to the epic's manual Stories/Done when no tasks reference it.
+        var linked = tasks?.Where(t => t.Epic == e.Name).ToList();
+        var stories = linked is { Count: > 0 } ? linked.Count : e.Stories;
+        var done = linked is { Count: > 0 } ? linked.Count(t => t.Status == "Done") : e.Done;
+        var pct = stories == 0 ? 0 : (int)Math.Round(100.0 * done / stories);
         var deps = e.DependsOnIds
             .Select(depId => all.FirstOrDefault(x => x.Id == depId))
             .Where(x => x is not null)
             .Select(x => new EpicRefDto(x!.Id, x.Name))
             .ToList();
-        return new EpicDto(e.Id, e.Name, e.Stories, e.Done, pct, e.Status, e.DependsOn, deps);
+        return new EpicDto(e.Id, e.Name, stories, done, pct, e.Status, e.DependsOn, deps);
     }
 
     static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences)

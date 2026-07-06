@@ -614,7 +614,20 @@ function useAssigneeOptions(projectId: string | null): string[] {
       try { return await api<Assignments>(`/projects/${projectId}/assignments`); } catch { return null; }
     },
   });
-  return data?.options ?? [];
+  // Members of the sub-teams attached to this project (the people actually
+  // working on it) — the primary source for the assignee dropdown.
+  const { data: team } = useQuery({
+    queryKey: ["team-assignments", "project", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ assignments: { members: { name: string }[] }[] } | null> => {
+      try { return await api(`/teams/assignments/project/${projectId}`); } catch { return null; }
+    },
+  });
+  return useMemo(() => {
+    const set = new Set<string>();
+    (team?.assignments ?? []).forEach((a) => a.members.forEach((m) => { if (m.name?.trim()) set.add(m.name.trim()); }));
+    (data?.options ?? []).forEach((o) => { if (o?.trim()) set.add(o.trim()); });   // fallback pool
+    return Array.from(set);
+  }, [team, data]);
 }
 
 // Epic names for the task epic dropdown (tasks tie to an epic by name).
