@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -29,6 +30,67 @@ public static class Skills
                 .Where(r => known.Contains(r.Person))
                 .Select(r => new SkillRatingDto(r.SkillId, r.Person, r.Level)).ToList();
             return Results.Ok(new SkillsMatrixDto(canEdit, skills, people, ratings));
+        });
+
+        // Colour-graded Excel of the skills matrix (people × skills, cell = 0–4
+        // proficiency shaded on a blue ramp). Same roster/scope as GET /skills.
+        api.MapGet("/skills/export.xlsx", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var people = await RosterAsync(db, cfg, http);
+            var skills = await db.Skills.OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync();
+            var known = people.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var ratings = (await db.SkillRatings.ToListAsync()).Where(r => known.Contains(r.Person))
+                .ToDictionary(r => (r.SkillId, r.Person), r => r.Level);
+
+            // Blue ramp by level (0 blank, 1→4 light→dark).
+            string[] ramp = { "", "#EAF2FB", "#CFE0F4", "#93C0EA", "#4E97D9" };
+            static string LevelLabel(int l) => l switch { 1 => "1 · Aware", 2 => "2 · Working", 3 => "3 · Strong", 4 => "4 · Expert", _ => "" };
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Skills matrix");
+            ws.Cell(1, 1).Value = "Team skills matrix";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontSize = 13;
+            if (skills.Count > 0) ws.Range(1, 1, 1, skills.Count + 1).Merge();
+
+            var hdr = 2;
+            ws.Cell(hdr, 1).Value = "Person";
+            for (int i = 0; i < skills.Count; i++) ws.Cell(hdr, i + 2).Value = skills[i].Name;
+            var hRange = ws.Range(hdr, 1, hdr, Math.Max(1, skills.Count + 1));
+            hRange.Style.Font.Bold = true;
+            hRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#11163A");
+            hRange.Style.Font.FontColor = XLColor.White;
+
+            var r = hdr + 1;
+            foreach (var person in people)
+            {
+                ws.Cell(r, 1).Value = person;
+                for (int i = 0; i < skills.Count; i++)
+                {
+                    var lvl = ratings.TryGetValue((skills[i].Id, person), out var v) ? v : 0;
+                    var cell = ws.Cell(r, i + 2);
+                    cell.Value = lvl == 0 ? "" : lvl;
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    if (lvl > 0)
+                    {
+                        cell.Style.Fill.BackgroundColor = XLColor.FromHtml(ramp[lvl]);
+                        if (lvl == 4) cell.Style.Font.FontColor = XLColor.White;
+                        cell.GetComment().AddText(LevelLabel(lvl));
+                    }
+                }
+                r++;
+            }
+            if (people.Count == 0) ws.Cell(hdr + 1, 1).Value = "No team members in scope.";
+
+            ws.SheetView.FreezeRows(2);
+            ws.SheetView.FreezeColumns(1);
+            ws.Column(1).Width = 26;
+            for (int i = 0; i < skills.Count; i++) ws.Column(i + 2).Width = 14;
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return Results.File(ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "atlas-skills-matrix.xlsx");
         });
 
         api.MapPost("/skills", async (CreateSkillReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

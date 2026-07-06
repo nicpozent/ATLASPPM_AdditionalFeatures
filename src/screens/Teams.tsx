@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
-import { api } from "@/api";
+import { api, apiDownload } from "@/api";
 import { Card, EmptyBlock, Button, Input } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
@@ -139,13 +139,18 @@ function SkillsMatrix() {
           <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Skills &amp; competency matrix</div>
           <div style={{ fontSize: 12, color: color.faint2 }}>Proficiency 0–4 per person · add your own skill columns</div>
         </div>
-        {canEdit && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {(skills.length > 0 && people.length > 0) && (
+            <Button variant="secondary" onClick={() => apiDownload("/skills/export.xlsx", "atlas-skills-matrix.xlsx")} title="Download the matrix as a colour-graded Excel"><Icon name="download" size={15} /> Export</Button>
+          )}
+          {canEdit && (
+            <>
             <Input value={newSkill} onChange={(e) => setNewSkill(e.target.value)} placeholder="New skill…"
               onKeyDown={(e) => { if (e.key === "Enter" && newSkill.trim()) addSkill.mutate(newSkill.trim()); }} style={{ width: 160 }} />
             <Button variant="secondary" onClick={() => newSkill.trim() && addSkill.mutate(newSkill.trim())} disabled={!newSkill.trim() || addSkill.isPending}><Icon name="plus" size={15} /> Add skill</Button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {people.length === 0 ? (
