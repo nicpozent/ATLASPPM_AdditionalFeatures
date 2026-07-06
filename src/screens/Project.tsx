@@ -1783,6 +1783,7 @@ interface SecProfile {
   classification: string; residency: string; subjects: string; retention: string;
   personalData: boolean; specialCategory: boolean; automatedDecisions: boolean; cardholderData: boolean;
   gdpr: boolean; pci: boolean; iso: boolean; aiAct: boolean; soc2: boolean; nis2: boolean;
+  dpp?: boolean; ppwr?: boolean; eudr?: boolean;
 }
 interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
 interface SecReviewGate { id: number; name: string; type: string; reviewer: string; status: string; date: string; note: string; }
@@ -1799,7 +1800,7 @@ const SRG_STATUS: Record<string, { ink: string; tint: string }> = {
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
 const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
-const FRAMEWORK_OPTS = ["ISO 27001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "EU AI Act"];
+const FRAMEWORK_OPTS = ["ISO 27001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "EU AI Act", "Digital Product Passport (ESPR)", "Packaging (PPWR)", "EU Deforestation (EUDR)"];
 const CTL_STATUSES = ["Planned", "Partial", "Implemented", "Archived"];
 const CTL_STATUS: Record<string, { ink: string; tint: string }> = {
   Implemented: { ink: "#0B6B37", tint: "#E7F4EC" },
@@ -1814,6 +1815,31 @@ const SEC_FLAGS: { key: keyof SecProfile; label: string; desc: string }[] = [
   { key: "aiAct", label: "EU AI Act", desc: "Automated recommendation model" },
   { key: "soc2", label: "SOC 2", desc: "Vendor assurance for SaaS components" },
   { key: "nis2", label: "NIS2", desc: "Essential-entity operational resilience" },
+  { key: "dpp", label: "Digital Product Passport", desc: "ESPR product data & data carrier" },
+  { key: "ppwr", label: "Packaging (PPWR)", desc: "Packaging design, recyclability & EPR" },
+  { key: "eudr", label: "EU Deforestation (EUDR)", desc: "Due diligence for listed commodities" },
+];
+// Reference facts for the product & sustainability regulations (static domain
+// knowledge, verified against EU sources — not per-project data).
+const REG_GUIDE: { key: keyof SecProfile; name: string; scope: string; obligations: string[]; deadlines: { date: string; what: string }[] }[] = [
+  {
+    key: "dpp", name: "Digital Product Passport — ESPR (EU) 2024/1781",
+    scope: "A digital record of a product's sustainability data (materials, durability, repairability, recycled content, carbon footprint), reached via a data carrier (QR/RFID). Rolls out per product group through delegated acts.",
+    obligations: ["Unique product identifier + data carrier on product/packaging", "Machine-readable sustainability & circularity data", "Data kept accessible to authorities, consumers & the value chain", "Battery passport for EV/industrial/LMT batteries > 2 kWh"],
+    deadlines: [{ date: "18 Feb 2027", what: "Battery passport mandatory (Battery Reg. 2023/1542)" }, { date: "2027", what: "Textiles delegated act expected to be adopted" }, { date: "2027–2030", what: "First ESPR product groups (textiles, furniture, tyres, electronics) phase in" }],
+  },
+  {
+    key: "ppwr", name: "Packaging & Packaging Waste Regulation — PPWR (EU) 2025/40",
+    scope: "Directly-applicable EU regulation covering all packaging placed on the EU market: design, minimisation, recyclability, recycled content, reuse and producer responsibility.",
+    obligations: ["Declaration of conformity + technical documentation per packaging unit", "Packaging minimisation — e-commerce empty space ≤ 40%", "Restrictions on substances of concern (incl. PFAS in food-contact)", "Producer registration & extended producer responsibility (EPR)"],
+    deadlines: [{ date: "12 Aug 2026", what: "Most obligations apply (conformity, minimisation, substances)" }, { date: "2027", what: "Producer registers available per member state" }, { date: "1 Jan 2030", what: "Recyclability grades, recycled-content minima, reuse targets, SUP bans" }],
+  },
+  {
+    key: "eudr", name: "EU Deforestation Regulation — EUDR (EU) 2023/1115",
+    scope: "Due-diligence regime for cattle, cocoa, coffee, oil palm, rubber, soy and wood (and derived products) placed on or exported from the EU — must be deforestation-free (after 31 Dec 2020) and legal.",
+    obligations: ["Due-diligence statement per consignment via the EU Information System", "Geolocation coordinates of all plots of production", "Risk assessment & mitigation to negligible risk", "Deforestation-free (post-2020 cut-off) + legality evidence"],
+    deadlines: [{ date: "30 Dec 2026", what: "Application for large & medium operators/traders (Reg. 2025/2650)" }, { date: "30 Jun 2027", what: "Application for micro & small enterprises" }],
+  },
 ];
 const DPIA_COLOR: Record<string, { ink: string; tint: string }> = {
   Required:      { ink: "#A1282B", tint: "#FBE7E8" },
@@ -1918,6 +1944,50 @@ function Security({ projectId }: { projectId: string | null }) {
           })}
         </div>
       </Card>
+
+      {/* product & sustainability regulation reference — obligations + deadlines */}
+      {(() => {
+        const active = REG_GUIDE.filter((r) => !!p[r.key]);
+        const shown = active.length > 0 ? active : REG_GUIDE;   // guidance even before a toggle is on
+        return (
+          <Card padding={22} style={{ marginBottom: 16 }}>
+            <SectionTitle>Product &amp; sustainability regulations</SectionTitle>
+            <div style={{ fontSize: 12, color: color.faint2, margin: "3px 0 14px" }}>
+              {active.length > 0 ? "Obligations & key dates for the regulations enabled above." : "Reference for EU product & sustainability regulations. Toggle one on above when it applies to this project."}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {shown.map((r) => (
+                <div key={r.key} style={{ border: `1px solid ${color.border}`, borderRadius: 12, padding: "15px 17px", opacity: active.length > 0 || !!p[r.key] ? 1 : 0.92 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: color.ink }}>{r.name}</span>
+                    {!!p[r.key] && <span style={{ fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "2px 8px", borderRadius: 20 }}>Applies</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: color.subtle, lineHeight: 1.5, marginBottom: 11 }}>{r.scope}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Key obligations</div>
+                      <ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+                        {r.obligations.map((o, i) => <li key={i} style={{ fontSize: 12, color: color.text, lineHeight: 1.4 }}>{o}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Milestones</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                        {r.deadlines.map((d, i) => (
+                          <div key={i} style={{ display: "flex", gap: 9, alignItems: "baseline" }}>
+                            <span style={{ fontFamily: font.mono, fontSize: 11, fontWeight: 700, color: color.primary, flex: "none", minWidth: 78 }}>{d.date}</span>
+                            <span style={{ fontSize: 11.5, color: color.subtle, lineHeight: 1.4 }}>{d.what}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* security review gates */}
       <Card padding={0} style={{ overflow: "hidden", marginBottom: 16 }}>

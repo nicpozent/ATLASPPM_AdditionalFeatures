@@ -927,6 +927,10 @@ public class SecurityProfile
     public bool AiAct { get; set; }
     public bool Soc2 { get; set; }
     public bool Nis2 { get; set; }
+    // Product & sustainability regulations
+    public bool Dpp { get; set; }     // Digital Product Passport (ESPR)
+    public bool Ppwr { get; set; }    // Packaging & Packaging Waste Regulation
+    public bool Eudr { get; set; }    // EU Deforestation Regulation
 }
 
 public class SecurityControl
