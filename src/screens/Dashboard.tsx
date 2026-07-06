@@ -20,7 +20,7 @@ export default function Dashboard() {
   const d = data ?? EMPTY_DASHBOARD;
 
   const openProject = (id: string) => navigate(`${SCREENS.project.path}?id=${id}`);
-  const firstName = identity.name.split(" ")[0];
+  const firstName = (identity?.name || "").trim().split(" ")[0] || "there";
 
   const attentionCount = d.attention.length;
   const approvalCount = d.approvals.length;

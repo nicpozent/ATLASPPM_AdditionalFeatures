@@ -29,6 +29,9 @@ public static class Help
         ("INT", "An integration didn’t respond",
             "A connected system (Jira, Azure DevOps, Microsoft Graph, email) failed or timed out; you’ll see an INT-… code.",
             "1. The integration, not Atlas, is likely unavailable — retry shortly.\n2. Copy the error code (INT-…) for your administrator.\n3. Admins: check the connector’s credentials/consent and status in Integrations, then search the logs for the code to see the upstream response."),
+        ("APP", "‘Something went wrong on this screen’",
+            "A single screen shows a render error with a Try-again button (front-end code APP-…).",
+            "1. Click ‘Try again’, or navigate to another screen and back — the error no longer sticks and clears on navigation.\n2. If a specific screen keeps erroring, reload the page (the app refetches its data and re-renders).\n3. This is a display-only fault in your browser — your data is safe on the server and nothing was lost.\n4. Admins: the browser console logs the APP-… code with the failing component; share the code, the screen, and the time so it can be traced. The dashboard in particular now tolerates partial/empty data and renders empty states instead of failing."),
     };
 
     // Role-based guide catalogue: title, one-line summary, and a full step-by-step
