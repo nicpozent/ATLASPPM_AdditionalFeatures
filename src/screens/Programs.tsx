@@ -9,6 +9,7 @@ import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { TeamPanel } from "@/components/TeamPanel";
+import { SkillsPanel } from "@/components/SkillsPanel";
 import { DEPARTMENTS } from "@/departments";
 import { Overlay } from "./Demands";
 
@@ -345,6 +346,9 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
       {/* team (sub-teams + members) */}
       <div style={{ marginTop: 18 }}>
         <TeamPanel entityType="program" entityId={program.id} />
+      </div>
+      <div style={{ marginTop: 18 }}>
+        <SkillsPanel entityType="program" entityId={program.id} />
       </div>
 
       {/* stakeholder matrix (persisted) */}

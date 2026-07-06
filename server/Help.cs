@@ -185,7 +185,7 @@ public static class Help
             "Resources → pick a period (day/week/month/quarter/half/year) → ‘Export .xlsx’.\nYou get a colour-graded workbook: rows are people, columns are periods, each cell is the average % utilisation over that period (green→amber→red; over 100% is red), and the cell comment holds the underlying person-days. A ‘Total (days)’ column sums each person's effort. Use it for capacity planning and month/quarter reviews."),
         ("team", "Keep the team skills matrix",
             "Customizable competencies, 0–4, with Excel export.",
-            "My Team → Skills & competency matrix.\n1. Add your own skill columns (there's no fixed list).\n2. Rate each team member 0–4 per skill.\n3. It covers the people you manage; Platform Admin/PMO see everyone.\n4. ‘Export’ downloads a colour-graded Excel (blue ramp by level). Ratings feed skills-based staffing views."),
+            "My Team → Skills & competency matrix.\n1. Add your own skill columns (there's no fixed list).\n2. Rate each team member 0–4 per skill.\n3. It covers the people you manage; Platform Admin/PMO see everyone.\n4. ‘Export’ downloads a colour-graded Excel (blue ramp by level). Ratings feed skills-based staffing views.\n5. Each project/program/product/release Overview also shows a read-only ‘Team skills’ panel with the ratings of the people assigned there."),
 
         // ---- Ops (run-the-business) ------------------------------------------
         ("pm", "Track operational (run-the-business) work",
