@@ -82,7 +82,10 @@ function okrTiming(o: Objective, progress: number) {
 
 function useObjectives() {
   return useQuery({
-    queryKey: ["okrs"], retry: false, staleTime: 60_000,
+    // KR progress is derived server-side from the linked project/program/product,
+    // which changes on other screens. Always refetch on mount so opening OKRs
+    // reflects the current rollup without a manual page refresh.
+    queryKey: ["okrs"], retry: false, staleTime: 0, refetchOnMount: "always",
     queryFn: async (): Promise<Objective[]> => {
       try { return (await api<Objective[]>("/okrs")) ?? []; } catch { return []; }
     },

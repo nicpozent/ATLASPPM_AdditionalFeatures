@@ -156,12 +156,50 @@ function download(name: string, mime: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+// A real, editable PowerPoint deck — a branded title slide plus the report's
+// table (auto-paginated). pptxgenjs is loaded lazily so it stays out of the
+// main bundle. Colours mirror reportHtml's branding.
+async function reportPptx(r: Report, base: string) {
+  const PptxGenJS = (await import("pptxgenjs")).default;
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_WIDE";           // 13.33 × 7.5in (16:9)
+  pptx.author = "Atlas PPM";
+  pptx.company = "Birgma · Biltema";
+  pptx.title = r.title;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const cover = pptx.addSlide();
+  cover.background = { color: "11163A" };
+  cover.addText("BIRGMA · BILTEMA — ATLAS PPM", { x: 0.6, y: 1.7, fontSize: 12, color: "9FB4E6", charSpacing: 3 });
+  cover.addText(r.title, { x: 0.6, y: 2.15, w: 12, fontSize: 34, bold: true, color: "FFFFFF", fontFace: "Georgia" });
+  cover.addText(`${r.summary} · Generated ${today}`, { x: 0.6, y: 3.4, w: 12, fontSize: 14, color: "C9D6EE" });
+
+  const s = pptx.addSlide();
+  s.background = { color: "F4F6FB" };
+  s.addText(r.title, { x: 0.4, y: 0.3, fontSize: 18, bold: true, color: "11163A" });
+  if (r.rows.length === 0) {
+    s.addText("No data for this report yet.", { x: 0.4, y: 1.3, fontSize: 14, color: "6A7488" });
+  } else {
+    const header = r.columns.map((c) => ({ text: c, options: { bold: true, color: "FFFFFF", fill: { color: "0F6CBD" } } }));
+    const rows = r.rows.map((row) => row.map((cell) => ({ text: String(cell ?? ""), options: { color: "26324A" } })));
+    s.addTable([header, ...rows], {
+      x: 0.4, y: 0.9, w: 12.5, fontSize: 10, valign: "middle", color: "26324A",
+      border: { type: "solid", color: "E6EBF3", pt: 1 }, autoPage: true, autoPageRepeatHeader: true,
+      autoPageLineWeight: -0.5, newSlideStartY: 0.5,
+    });
+  }
+  s.addText("Atlas PPM · confidential · Birgma Group", { x: 0.4, y: 7.05, fontSize: 9, color: "8A93A6" });
+
+  await pptx.writeFile({ fileName: `${base}.pptx` });
+}
+
 async function exportReport(type: string, fmt: string) {
   const r = await buildReport(type);
   const base = r.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   if (fmt === "xlsx") { download(`${base}.csv`, "text/csv;charset=utf-8", reportCsv(r)); return; }
-  const html = reportHtml(r, fmt === "pptx");
-  if (fmt === "html" || fmt === "pptx") { download(`${base}.html`, "text/html;charset=utf-8", html); return; }
+  if (fmt === "pptx") { await reportPptx(r, base); return; }
+  const html = reportHtml(r, false);
+  if (fmt === "html") { download(`${base}.html`, "text/html;charset=utf-8", html); return; }
   if (fmt === "pdf") {
     const w = window.open("", "_blank");
     if (!w) { download(`${base}.html`, "text/html;charset=utf-8", html); return; }
