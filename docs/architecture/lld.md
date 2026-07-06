@@ -172,10 +172,37 @@ flowchart TB
 ### 7.4 Resources derivation
 `/resources` is computed from **real allocation sources** (not a standalone sheet):
 product allocations (`ProductAllocation.Alloc`) + project team-assignment members
-(`TeamAssignmentMember.Alloc`) + the Entra roster, keyed by name. Utilisation =
-Ops% + Project% + Product%; >100% flags over-allocation. `/resources/unonboarded`
-lists task assignees absent from the directory; `/resources/onboard` adds them to a
-manual directory group so they become "known" on the next read/sync.
+(`TeamAssignmentMember.Alloc`) + active ops items (`Ops.AllocByPersonAsync`) + the
+Entra roster, keyed by name. Utilisation = Ops% + Project% + Product%; >100% flags
+over-allocation. `/resources/unonboarded` lists task assignees absent from the
+directory; `/resources/onboard` adds them to a manual directory group so they
+become "known" on the next read/sync.
+
+### 7.5 Time-phased allocation & availability (ADR-0013)
+`TeamAssignmentMember` is a **dated segment**: base (`Alloc`/`AllocHours`,
+`StartDate`, `EndDate`) plus an optional extension (`Ext*`). `AllocMath` is the one
+capacity basis — `PctFromHours` (40 h/week = 100%) and `ActiveOn(start,end,day)`
+(empty bounds = open). `/resources?asOf=` and `/resources/availability` count only
+segments **live on the day**; availability slices each person's load by
+project/program/release/product/ops, nets **booked absences** to unavailable, and
+in window mode reports `free = 100 − peak load` across the window (peak evaluated
+at segment boundaries). Individuals attach directly via `SubTeamId 0`.
+
+### 7.6 Ops roll-up & project impact (ADR-0014)
+`OpsItem.Alloc` on active items sums per assignee into Ops% (above). Items tagged
+with `ImpactProjectId` surface on that project (`/projects/{id}/ops-impact`) and
+count toward its "operational load".
+
+### 7.7 Excel exports (ADR-0015)
+`AllocationReport` buckets `[from,to]` by period, accumulates per-person
+**person-days** over weekdays from the live allocations, and renders a ClosedXML
+workbook (util% heat + person-day comments). `Skills` exports the matrix as a
+proficiency ramp. Both stream `.xlsx` via the standard file result.
+
+### 7.8 Team capacity (project)
+`/projects/{id}/capacity` unions People & roles with the members of any team
+attached to the project (sub-teams **and** individuals) and reports each person's
+live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
 
 ## 8. Frontend design (salient points)
 - **State**: server state via TanStack Query (`useQuery`/`useMutation`) with
