@@ -16,6 +16,10 @@ interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; pr
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
+interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
+type PortfolioCat = "all" | "project" | "program" | "product" | "release";
+interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
+const monthOfIso = (s: string): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getMonth(); };
 
 const LABEL_W = 286;
 const nowLeft = `${(new Date().getMonth() + 0.5) / 12 * 100}%`;
@@ -28,7 +32,8 @@ function useOpts(path: string, key: string) {
 }
 
 export default function Gantt() {
-  const [scope, setScope] = useState<"project" | "program">("project");
+  const [scope, setScope] = useState<"project" | "program" | "portfolio">("project");
+  const [cat, setCat] = useState<PortfolioCat>("all");
   const [view, setView] = useState<ViewId>("schedule");
   const [projectId, setProjectId] = useState<string>("");
   const [programId, setProgramId] = useState<string>("");
@@ -52,6 +57,21 @@ export default function Gantt() {
     queryKey: ["gantt", "program", activeProgramId], enabled: scope === "program" && !!activeProgramId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<ProgramGantt> => (await api<ProgramGantt>(`/programs/${activeProgramId}/gantt`)) ?? { rows: [], milestones: [] },
   });
+  const { data: portfolio } = useQuery({
+    queryKey: ["gantt", "portfolio"], enabled: scope === "portfolio", retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ items: PortfolioItem[] }> => (await api<{ items: PortfolioItem[] }>("/portfolio/gantt")) ?? { items: [] },
+  });
+  // Sprints for the selected project — rendered as a band on the schedule.
+  const { data: sprintData } = useQuery({
+    queryKey: ["sprints", activeProjectId], enabled: scope === "project" && !!activeProjectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ sprints: SprintT[] }> => (await api<{ sprints: SprintT[] }>(`/projects/${activeProjectId}/sprints`)) ?? { sprints: [] },
+  });
+  const sprintBars = useMemo(() => (sprintData?.sprints ?? []).map((s) => {
+    const a = monthOfIso(s.startDate), b = monthOfIso(s.endDate);
+    if (a === null && b === null) return null;
+    const start = Math.min(a ?? b!, b ?? a!), end = Math.max(a ?? b!, b ?? a!);
+    return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end };
+  }).filter(Boolean) as { id: number; name: string; status: string; startMonth: number; endMonth: number }[], [sprintData]);
 
   const canEdit = scope === "project" && (gantt?.canEdit ?? false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gantt"] });
@@ -86,27 +106,37 @@ export default function Gantt() {
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* scope toggle */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
-        {(["project", "program"] as const).map((s) => (
-          <button key={s} onClick={() => setScope(s)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === s ? "#fff" : "transparent", color: scope === s ? color.primary : "#6A7488", boxShadow: scope === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{s === "project" ? "Project timeline" : "Program timeline"}</button>
+        {([["project", "Project timeline"], ["program", "Program timeline"], ["portfolio", "Portfolio timeline"]] as const).map(([s, label]) => (
+          <button key={s} onClick={() => setScope(s)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === s ? "#fff" : "transparent", color: scope === s ? color.primary : "#6A7488", boxShadow: scope === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{label}</button>
         ))}
       </div>
 
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 22px", borderBottom: `1px solid ${color.bg}`, flexWrap: "wrap" }}>
-          {scope === "program"
+          {scope === "portfolio"
+            ? <span style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="layers" size={20} /></span>
+            : scope === "program"
             ? <span style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="folders" size={20} /></span>
             : <span style={{ width: 11, height: 11, borderRadius: "50%", background: color.faint3 }} />}
           <div>
-            <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{scope === "program" ? "Program timeline" : "Project timeline"}</div>
-            <div style={{ fontSize: 12, color: color.faint2 }}>{scope === "program" ? "Project timelines aggregated across the program" : "Phases, milestones & dependencies for the selected project"}</div>
+            <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{scope === "portfolio" ? "Portfolio timeline" : scope === "program" ? "Program timeline" : "Project timeline"}</div>
+            <div style={{ fontSize: 12, color: color.faint2 }}>{scope === "portfolio" ? "Projects, programs, products & releases on one roadmap — filter by category" : scope === "program" ? "Project timelines aggregated across the program" : "Phases, milestones & dependencies for the selected project"}</div>
           </div>
           <div style={{ flex: 1 }} />
-          <select value={activeId} onChange={(e) => setActive(e.target.value)} style={selectStyle}>
-            {opts.length === 0
-              ? <option value="">{scope === "program" ? "No programs yet" : "No projects yet"}</option>
-              : opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
+          {scope === "portfolio" ? (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {([["all", "All"], ["project", "Projects"], ["program", "Programs"], ["product", "Products"], ["release", "Releases"]] as const).map(([c, label]) => (
+                <button key={c} onClick={() => setCat(c)} style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "5px 11px", borderRadius: 8, border: `1px solid ${cat === c ? color.primary : color.border}`, background: cat === c ? color.primary : "#fff", color: cat === c ? "#fff" : color.textMuted }}>{label}</button>
+              ))}
+            </div>
+          ) : (
+            <select value={activeId} onChange={(e) => setActive(e.target.value)} style={selectStyle}>
+              {opts.length === 0
+                ? <option value="">{scope === "program" ? "No programs yet" : "No projects yet"}</option>
+                : opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: color.subtle, flexWrap: "wrap" }}>
             <Legend swatch={<span style={{ width: 14, height: 10, borderRadius: 3, background: "#0F6CBD" }} />}>Complete</Legend>
             <Legend swatch={<span style={{ width: 14, height: 10, borderRadius: 3, background: "#DCEAF8", border: "1px solid #0F6CBD" }} />}>Planned</Legend>
@@ -115,21 +145,25 @@ export default function Gantt() {
           </div>
         </div>
 
-        {/* view tabs */}
-        <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
-          {VIEW_TABS.map(([vid, label]) => {
-            const active = view === vid;
-            return <button key={vid} onClick={() => setView(vid)} style={{ padding: "11px 16px", marginRight: 6, border: "none", borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: active ? color.primary : "#6A7488" }}>{label}</button>;
-          })}
-        </div>
+        {/* view tabs (project/program only) */}
+        {scope !== "portfolio" && (
+          <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+            {VIEW_TABS.map(([vid, label]) => {
+              const active = view === vid;
+              return <button key={vid} onClick={() => setView(vid)} style={{ padding: "11px 16px", marginRight: 6, border: "none", borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: active ? color.primary : "#6A7488" }}>{label}</button>;
+            })}
+          </div>
+        )}
 
-        {view === "schedule" ? (
+        {scope === "portfolio" ? (
+          <PortfolioSchedule items={(portfolio?.items ?? []).filter((i) => cat === "all" || i.type === cat)} cat={cat} />
+        ) : view === "schedule" ? (
           scope === "program"
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
             : <ProjectSchedule
                 phases={gantt?.phases ?? []} milestones={milestones} canEdit={canEdit} hasProject={!!activeProjectId}
                 projectStart={gantt?.projectStart ?? null} projectEnd={gantt?.projectEnd ?? null}
-                startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""}
+                startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""} sprints={sprintBars}
                 onAddPhase={() => setAddPhase(true)} onEditPhase={setEditPhase} onRemovePhase={(id) => removePhase.mutate(id)}
                 onAddMilestone={() => setAddMs(true)} onRemoveMilestone={(id) => removeMilestone.mutate(id)}
               />
@@ -189,9 +223,15 @@ function NowLine() {
 }
 
 // ---- Project schedule ------------------------------------------------------
-function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
+interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
+const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
+  Active: { bg: "#D7EFE0", border: "#15A34A" },
+  Closed: { bg: "#E4E8F1", border: "#8A93A6" },
+  Planned: { bg: "#FBF2D7", border: "#E0A100" },
+};
+function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
-  projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string;
+  projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string; sprints?: SprintBar[];
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
 }) {
@@ -231,6 +271,17 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             )}
           </div>
         ))}
+        {sprints.length > 0 && (
+          <>
+            <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>Sprints</div>
+            {sprints.map((s) => (
+              <div key={s.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+                <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
+              </div>
+            ))}
+          </>
+        )}
         <div style={{ height: 72, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
           Milestones
           {canEdit && <button onClick={onAddMilestone} style={addBtn}>+ Add</button>}
@@ -250,6 +301,22 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             {phases.map((p) => <PhaseBar key={p.id} phase={p} editable={canEdit} onEdit={() => onEditPhase(p)} />)}
           </div>
         </div>
+        {sprints.length > 0 && (
+          <div>
+            <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }} />
+            <div style={{ position: "relative", height: sprints.length * 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+              {sprints.map((s) => {
+                const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
+                return (
+                  <div key={s.id} style={{ position: "relative", height: 34 }}>
+                    <div title={`${s.name} · ${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]} · ${s.status}`}
+                      style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px solid ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
           {milestones.map((ms) => (
             <div key={ms.id} style={{ position: "absolute", top: 0, left: `${(ms.month + 0.5) / 12 * 100}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
@@ -259,6 +326,52 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               <span style={{ display: "block", fontSize: 9, color: color.faint3, textAlign: "center" }}>{ms.date}</span>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Portfolio schedule (all entity types on one grid) --------------------
+const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: string }> = {
+  project: { ink: "#7A3FB0", tint: "#F0E8F7", bar: "#7A3FB0", label: "Project" },
+  program: { ink: "#0C5798", tint: "#E6EFFB", bar: "#0F6CBD", label: "Program" },
+  product: { ink: "#0B6B37", tint: "#E7F4EC", bar: "#15A34A", label: "Product" },
+  release: { ink: "#8A6300", tint: "#FBF2D7", bar: "#E0A100", label: "Release" },
+};
+function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
+  if (items.length === 0) return <Note text={cat === "all" ? "Nothing with dates in the portfolio yet. Set start/end dates on projects, programs, products or releases to see them here." : "No dated items in this category."} />;
+  const rowsHeight = Math.max(120, items.length * 38);
+  return (
+    <div style={{ display: "flex" }}>
+      <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
+        <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Item</div>
+        {items.map((i) => {
+          const t = PF_TYPE[i.type] ?? PF_TYPE.project;
+          return (
+            <div key={`${i.type}-${i.id}`} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: t.ink, background: t.tint, padding: "2px 7px", borderRadius: 20, flex: "none" }}>{t.label}</span>
+              <span style={{ flex: 1, fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.name}</span>
+              {i.progress !== null && <span style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: color.faint3, flex: "none" }}>{i.progress}%</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
+        <MonthHeader />
+        <div style={{ position: "relative", height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+          <NowLine />
+          {items.map((i) => {
+            const t = PF_TYPE[i.type] ?? PF_TYPE.project;
+            return (
+              <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: "1px solid #F4F6FA" }}>
+                <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
+                  style={{ ...barStyle(i.startMonth, i.endMonth), borderRadius: 6, background: t.tint, border: `1px solid ${t.bar}`, overflow: "hidden" }}>
+                  {i.progress !== null && <div style={{ height: "100%", width: `${i.progress}%`, background: t.bar }} />}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
