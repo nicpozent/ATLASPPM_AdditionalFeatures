@@ -163,6 +163,117 @@ export default function Integrations() {
           );
         })}
       </div>
+
+      {jira?.configured && <DiscoverJira />}
+    </div>
+  );
+}
+
+// ---- Jira project discovery & import ---------------------------------------
+interface JiraProj { key: string; name: string; jiraId: string; mappedProjectId: string | null; mappedProjectName: string | null; mappedBoardId: number | null; }
+interface Opt { id: string; name: string; }
+
+function DiscoverJira() {
+  const qc = useQueryClient();
+  const [importing, setImporting] = useState<JiraProj | null>(null);
+  const { data } = useQuery({
+    queryKey: ["jira-projects"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ configured: boolean; canManage: boolean; projects: JiraProj[]; error?: string }> =>
+      (await api<{ configured: boolean; canManage: boolean; projects: JiraProj[] }>("/integrations/jira/projects")) ?? { configured: false, canManage: false, projects: [] },
+  });
+  const projects = data?.projects ?? [];
+  const canManage = data?.canManage ?? false;
+
+  return (
+    <div style={{ marginTop: 30 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 13 }}>Discover from Jira</div>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, overflow: "hidden" }}>
+        <div style={{ padding: "13px 18px", fontSize: 12.5, color: color.faint2, borderBottom: `1px solid ${color.border}` }}>
+          Every project in your Jira site. Import one to create — or link — an Atlas project (optionally under a program); it stays editable from the project's details.
+        </div>
+        {data?.error ? (
+          <div style={{ padding: "18px", fontSize: 13, color: "#A1282B" }}>{data.error}</div>
+        ) : projects.length === 0 ? (
+          <div style={{ padding: "26px 18px", fontSize: 13, color: color.faint3, textAlign: "center" }}>No Jira projects returned. Check the service account's Browse Projects permission.</div>
+        ) : projects.map((p) => (
+          <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: "1px solid #F2F4F9" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: "#0052CC", background: "#E6EEFB", padding: "3px 9px", borderRadius: 6, flex: "none" }}>{p.key}</span>
+            <span style={{ flex: 1, fontSize: 13.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+            {p.mappedProjectId ? (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
+            ) : (
+              <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Jira project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
+                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
+            )}
+          </div>
+        ))}
+      </div>
+      {importing && <ImportJiraModal proj={importing} onClose={() => setImporting(null)} onDone={() => { setImporting(null); qc.invalidateQueries({ queryKey: ["jira-projects"] }); qc.invalidateQueries({ queryKey: ["projects"] }); qc.invalidateQueries({ queryKey: ["programs"] }); }} />}
+    </div>
+  );
+}
+
+function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: () => void; onDone: () => void }) {
+  const [target, setTarget] = useState<"new" | "existing" | "program">("new");
+  const [board, setBoard] = useState("");
+  const [atlasId, setAtlasId] = useState("");
+  const { data: projects = [] } = useQuery({ queryKey: ["projects"], retry: false, staleTime: 30_000, queryFn: async (): Promise<Opt[]> => (await api<Opt[]>("/projects")) ?? [] });
+  const { data: programs = [] } = useQuery({ queryKey: ["programs"], retry: false, staleTime: 30_000, queryFn: async (): Promise<Opt[]> => (await api<Opt[]>("/programs")) ?? [] });
+
+  const doImport = useMutation({
+    mutationFn: () => api("/integrations/jira/import", {
+      method: "POST",
+      body: JSON.stringify({
+        jiraProjectKey: proj.key, name: proj.name,
+        boardId: Number(board) || 0,
+        target: target === "program" ? "program" : "project",
+        atlasId: target === "existing" || target === "program" ? atlasId : null,
+      }),
+    }),
+    onSuccess: () => { toast(`Imported ${proj.key} into Atlas.`, "info"); onDone(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const needsPick = target === "existing" || target === "program";
+  const opts = target === "program" ? programs : projects;
+  const valid = !needsPick || !!atlasId;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(17,22,60,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 22, width: 460, maxWidth: "92vw" }}>
+        <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Import {proj.key}</div>
+        <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>{proj.name}</div>
+
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Map to</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+          {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? "#EAF2FB" : "#F6F8FC", border: `1px solid ${target === v ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
+              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {needsPick && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{target === "program" ? "Program" : "Project"}</div>
+            <select value={atlasId} onChange={(e) => setAtlasId(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }}>
+              <option value="">{opts.length ? "— Select —" : (target === "program" ? "No programs yet" : "No projects yet")}</option>
+              {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Jira board id (optional)</div>
+          <input value={board} onChange={(e) => setBoard(e.target.value)} type="number" placeholder="e.g. 93" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }} />
+          <div style={{ fontSize: 11, color: color.faint3, marginTop: 5 }}>Needed to sync sprints & backlog. Find it in the board URL: …/boards/<b>93</b>/…. You can set it later in the project's details.</div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
+        </div>
+      </div>
     </div>
   );
 }

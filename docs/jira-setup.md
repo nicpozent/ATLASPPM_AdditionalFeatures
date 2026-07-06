@@ -59,13 +59,21 @@ capability (Platform Admin by default).
 
 ## 4. Map a project and sync
 
-1. Open a project (**Portfolio → a project**) and click **Edit** (top-right of
-   the detail header). Under **Jira sync (pull-only)**, set the project's **Jira
-   project key** (e.g. `GIT`) and **board id** (the number in the board URL:
-   `.../boards/93/...` → `93`). Save. Leave both blank to keep it unlinked.
-2. On the project's **Tasks** tab a **Sync from Jira** button appears. Click it
-   to pull that board. Or from **Integrations → Jira → Sync now** to pull every
-   mapped project at once.
+Two ways to link a Jira project to Atlas:
+
+**A. Discover & import (recommended).** On **Integrations → Jira → Discover from
+Jira**, Atlas lists every project in your Jira site. A Platform Admin, PMO or PM
+clicks **Import** on one and maps it to a **new** Atlas project, an **existing**
+project, or a **new project under a program** — optionally entering the board id.
+It stays editable afterwards from the project's details.
+
+**B. Manual mapping.** Open a project (**Portfolio → a project**) → **Edit**.
+Under **Jira sync (pull-only)**, set the **Jira project key** (e.g. `GIT`) and
+**board id** (the number in the board URL: `.../boards/93/...` → `93`). Leave both
+blank to unlink.
+
+Then pull the data: on the project's **Tasks** tab click **Sync from Jira**, or
+use **Integrations → Jira → Sync now** to pull every mapped project at once.
 
 What the sync maps, Jira → Atlas:
 

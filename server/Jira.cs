@@ -28,6 +28,8 @@ namespace Atlas.Api;
 //
 //  Auth is HTTP Basic with "email:api-token" — the standard Jira Cloud scheme.
 // ============================================================================
+public record JiraImportReq(string? JiraProjectKey, int? BoardId, string? Target, string? AtlasId, string? Name);
+
 public static class Jira
 {
     // A page cap so a huge board can't run the sync unbounded (50/page ⇒ 5000).
@@ -155,6 +157,90 @@ public static class Jira
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = errors.Count == 0, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
         });
+
+        // ---- Discovery & import --------------------------------------------
+        // List every Jira project, flagging which are already mapped in Atlas so
+        // an admin/PM/PMO can approve & import the rest. Read needs project Edit.
+        api.MapGet("/integrations/jira/projects", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var canManage = await Permissions.Allows(http, db, cfg, "cap-projects", "F");
+            if (!JiraConfigured(cfg))
+                return Results.Ok(new { configured = false, canManage, projects = Array.Empty<object>() });
+            try
+            {
+                using var c = Client(cfg);
+                var jira = await FetchPagedAsync(c, "rest/api/3/project/search", "values", () => { });
+                var mapped = await db.Projects.Where(p => p.JiraProjectKey != "").ToListAsync();
+                var byKey = new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in mapped) byKey[p.JiraProjectKey] = p;
+                var items = jira.Select(j =>
+                {
+                    var key = Str(j, "key");
+                    var has = byKey.TryGetValue(key, out var ap);
+                    return new { key, name = Str(j, "name"), jiraId = NumOrStr(j, "id"),
+                        mappedProjectId = has ? ap!.Id : null, mappedProjectName = has ? ap!.Name : null,
+                        mappedBoardId = has ? ap!.JiraBoardId : null };
+                }).ToList();
+                return Results.Ok(new { configured = true, canManage, projects = items });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { configured = true, canManage, error = $"Couldn't list Jira projects: {ex.Message}", projects = Array.Empty<object>() }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Approve & map a Jira project to a new/existing Atlas project, or to a
+        // new project placed under a program. Reserved for Platform Admin / PMO /
+        // PM (Full on Projects & tasks). Editable afterwards from project details.
+        api.MapPost("/integrations/jira/import", async (JiraImportReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
+            var key = (req.JiraProjectKey ?? "").Trim().ToUpperInvariant();
+            if (key.Length == 0) return Results.BadRequest(new { error = "A Jira project key is required." });
+            var board = req.BoardId is int b && b > 0 ? b : (int?)null;
+            var target = (req.Target ?? "project").Trim().ToLowerInvariant();
+
+            // Link an existing project.
+            if (target == "project" && !string.IsNullOrWhiteSpace(req.AtlasId))
+            {
+                var p = await db.Projects.FindAsync(req.AtlasId);
+                if (p is null) return Results.NotFound();
+                p.JiraProjectKey = key; p.JiraBoardId = board;
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Mapped Jira project to existing project", $"{key} → {p.Id}"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { ok = true, projectId = p.Id, created = false });
+            }
+
+            // Otherwise create a new project (optionally under a program).
+            var name = string.IsNullOrWhiteSpace(req.Name) ? key : req.Name!.Trim();
+            var proj = new Project
+            {
+                Id = await NextProjectIdAsync(db), Name = name, Dept = "Unassigned", Owner = "Unassigned",
+                Methodology = "Scrum", Status = "green", Health = "On track", Target = "TBD", Due = "TBD",
+                Phase = "Planning", JiraProjectKey = key, JiraBoardId = board,
+            };
+            db.Projects.Add(proj);
+            string? programId = null;
+            if (target == "program" && !string.IsNullOrWhiteSpace(req.AtlasId))
+            {
+                var pg = await db.Programs.FindAsync(req.AtlasId);
+                if (pg is null) return Results.NotFound();
+                if (!pg.Projects.Contains(proj.Id)) pg.Projects.Add(proj.Id);
+                programId = pg.Id;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Imported Jira project", $"{key} → {proj.Id}{(programId != null ? $" (program {programId})" : "")}"));
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/v1/projects/{proj.Id}", new { ok = true, projectId = proj.Id, programId, created = true });
+        });
+    }
+
+    // Next "PRJ-N" id (mirrors the create-project numbering).
+    static async Task<string> NextProjectIdAsync(AtlasDbContext db)
+    {
+        var ids = await db.Projects.Select(x => x.Id).ToListAsync();
+        var max = ids.Select(x => int.TryParse(x.Split('-').Last(), out var n) ? n : 0).DefaultIfEmpty(0).Max();
+        return $"PRJ-{max + 1}";
     }
 
     // -----------------------------------------------------------------------
