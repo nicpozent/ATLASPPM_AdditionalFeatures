@@ -67,6 +67,20 @@ public class PipTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Objective_links_to_an_okr_and_resolves_its_title()
+    {
+        var c = Admin();
+        var okrId = await StrId(await c.PostAsJsonAsync("/api/v1/okrs", new { title = "Grow Nordic revenue" }));
+        var incId = await IntId(await c.PostAsJsonAsync("/api/v1/increments", new { name = "PI okr link" }));
+        await c.PostAsJsonAsync($"/api/v1/increments/{incId}/objectives", new { title = "Ship unified checkout", objectiveLink = okrId });
+
+        var detail = await c.GetFromJsonAsync<JsonElement>($"/api/v1/increments/{incId}");
+        var o = detail.GetProperty("objectiveList").EnumerateArray().First();
+        Assert.Equal(okrId, o.GetProperty("objectiveLink").GetString());
+        Assert.Equal("Grow Nordic revenue", o.GetProperty("okrTitle").GetString());
+    }
+
+    [Fact]
     public async Task Iterations_and_dependencies_are_counted_on_the_increment()
     {
         var c = Admin();

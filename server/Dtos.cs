@@ -278,7 +278,8 @@ public record DashboardDto(
 // ---- Program Increment Planning (PIP) -------------------------------------
 public record PiIterationDto(int Id, string Name, string StartDate, string EndDate, int Capacity, int Load);
 public record PiObjectiveDto(int Id, string Title, string Description, string EntityType, string EntityId,
-    string EntityName, int BusinessValue, int ActualValue, bool Committed, int Confidence, string Status);
+    string EntityName, int BusinessValue, int ActualValue, bool Committed, int Confidence, string Status,
+    string ObjectiveLink = "", string OkrTitle = "");
 public record PiDependencyDto(int Id, string Title, string FromType, string FromId, string FromName,
     string ToType, string ToId, string ToName, string Owner, string DueDate, string Status);
 public record IncrementSummaryDto(int Id, string Key, string Name, string StartDate, string EndDate,

@@ -1036,6 +1036,7 @@ public class PiObjective
     public string Description { get; set; } = "";
     public string EntityType { get; set; } = "";         // ""|project|program|product|release
     public string EntityId { get; set; } = "";
+    public string ObjectiveLink { get; set; } = "";      // linked OKR objective id ("" ⇒ none)
     public int BusinessValue { get; set; }               // planned, 1–10
     public int ActualValue { get; set; }                 // achieved, 1–10 (set at close)
     public bool Committed { get; set; } = true;          // committed vs stretch
