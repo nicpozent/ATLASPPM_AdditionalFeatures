@@ -42,6 +42,21 @@ public static class SubTeams
 
     public static void MapSubTeamEndpoints(this RouteGroupBuilder api)
     {
+        // Candidate members the caller can add to a sub-team: everyone in the
+        // Entra groups mapped to a manager slot within the caller's scope.
+        api.MapGet("/subteams/candidates", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var scope = await Teams.ScopeAsync(db, cfg, http);
+            if (scope.Count == 0) return Results.Ok(new { members = Array.Empty<object>() });
+            var groups = await db.EntraGroups.Include(g => g.Members).Where(g => scope.Contains(g.ManagerKey)).ToListAsync();
+            var members = groups.SelectMany(g => g.Members)
+                .Select(m => new { name = m.DisplayName, email = m.Email, title = m.JobTitle })
+                .Where(m => !string.IsNullOrWhiteSpace(m.name))
+                .GroupBy(m => m.name).Select(g => g.First())
+                .OrderBy(m => m.name).ToList();
+            return Results.Ok(new { members });
+        });
+
         // ---- Sub-teams (manager-owned rosters) ------------------------------
         api.MapGet("/subteams", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
