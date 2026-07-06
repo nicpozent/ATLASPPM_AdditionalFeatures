@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@azure/msal-browser": "^3.10.0",
-    "@azure/msal-react": "^2.0.15",
+    "@azure/msal-react": "^5.5.1",
     "@tanstack/react-query": "^5.28.0",
     "pptxgenjs": "^3.12.0",
     "react": "^18.2.0",
