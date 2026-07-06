@@ -49,6 +49,7 @@ public static class Endpoints
         api.MapCommentEndpoints();
         api.MapStakeholderEndpoints();
         api.MapPipEndpoints();
+        api.MapResourceEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
         api.MapGet("/audit", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -185,11 +186,6 @@ public static class Endpoints
                     return new KrDto(k.Id, k.Title, k.Link, derived ?? k.Progress, k.LinkType, k.LinkId, derived is not null);
                 }).ToList(), o.Status, o.Health, o.StartDate, o.TargetDate)).ToList();
         });
-
-        api.MapGet("/resources", async (AtlasDbContext db) =>
-            await db.Resources.OrderBy(r => r.Id).Select(r => new ResourceDto(
-                r.Name, r.Role, r.Dept, r.Initials, r.Color, r.OpsPct, r.ProjectPct, r.ProductPct, r.Over))
-                .ToListAsync());
 
         api.MapGet("/releases", async (AtlasDbContext db) =>
             await db.Releases.OrderBy(r => r.Id).Select(r => new ReleaseDto(

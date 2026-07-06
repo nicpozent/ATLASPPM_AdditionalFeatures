@@ -111,7 +111,12 @@ export function useDashboard() {
   return useQuery({
     queryKey: ["dashboard"],
     retry: false,
-    staleTime: 60_000,
+    // Keep the dashboard live: project health/status changes on other screens,
+    // so always refetch on mount, on window focus, and on a light interval.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
     queryFn: async (): Promise<DashboardData> => {
       try {
         const data = await api<DashboardData>("/dashboard");

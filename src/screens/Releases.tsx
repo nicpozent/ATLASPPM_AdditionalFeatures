@@ -85,6 +85,7 @@ export default function Releases() {
   const [modal, setModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Release | null>(null);
+  const [editing, setEditing] = useState<Release | null>(null);
   const [teamFor, setTeamFor] = useState<Release | null>(null);
   const { data: releases = [] } = useReleases();
   const qc = useQueryClient();
@@ -108,6 +109,11 @@ export default function Releases() {
   const del = useMutation({
     mutationFn: (id: string) => api(`/releases/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["releases"] }); setConfirmDel(null); },
+  });
+  const editRelease = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<Release> }) =>
+      api(`/releases/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["releases"] }); setEditing(null); },
   });
 
   const live = releases.filter((r) => !r.archived);
@@ -242,6 +248,7 @@ export default function Releases() {
                     <RowMenu ariaLabel="Release actions" width={176}>
                       {(close) => (
                         <>
+                          {mayEdit && <MenuItem label="Edit details" icon={<Icon name="edit" size={15} />} onClick={() => { setEditing(r); close(); }} />}
                           <MenuItem label="Team" icon={<Icon name="users" size={15} />} onClick={() => { setTeamFor(r); close(); }} />
                           <MenuDivider />
                           {mayEdit && (r.archived
@@ -257,6 +264,12 @@ export default function Releases() {
             );
           })}
         </Card>
+      )}
+
+      {editing && (
+        <EditReleaseModal release={editing} submitting={editRelease.isPending}
+          onClose={() => setEditing(null)}
+          onSave={(body) => editRelease.mutate({ id: editing.id, body })} />
       )}
 
       {teamFor && (
@@ -343,6 +356,93 @@ function NewReleaseModal({ onClose, onCreate, submitting }: {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={submit} disabled={submitting || !name.trim()}>{submitting ? "Creating…" : "Create release"}</Button>
+      </div>
+    </Overlay>
+  );
+}
+
+function EditReleaseModal({ release, onClose, onSave, submitting }: {
+  release: Release; onClose: () => void; onSave: (body: Partial<Release>) => void; submitting?: boolean;
+}) {
+  const [name, setName] = useState(release.name);
+  const [owner, setOwner] = useState(release.owner);
+  const [link, setLink] = useState(release.link);
+  const [scope, setScope] = useState<ReleaseScope>(release.scope as ReleaseScope);
+  const [date, setDate] = useState(release.date);
+  const [env, setEnv] = useState(release.env);
+  const [risk, setRisk] = useState(release.risk);
+  const [status, setStatus] = useState<ReleaseStatus>(release.status as ReleaseStatus);
+  const [reqs, setReqs] = useState(release.reqs);
+  const [crs, setCrs] = useState(release.crs);
+  const [progress, setProgress] = useState(release.progress);
+  const submit = () => {
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), owner: owner.trim(), link: link.trim(), scope, date, env, risk, status, reqs, crs, progress });
+  };
+  return (
+    <Overlay onClose={onClose} label={`Edit ${release.name}`}>
+      <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.navy, marginBottom: 4 }}>Edit release</div>
+      <div style={{ fontSize: 12.5, color: color.faint3, marginBottom: 16 }}>{release.id}</div>
+      <RelLbl>Name</RelLbl>
+      <Input value={name} onChange={(e) => setName(e.target.value)} />
+      <RelLbl>Owner</RelLbl>
+      <Input value={owner} onChange={(e) => setOwner(e.target.value)} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <RelLbl>Scope</RelLbl>
+          <Select value={scope} onChange={(e) => setScope(e.target.value as ReleaseScope)}>
+            <option value="Product">Product</option>
+            <option value="Project">Project</option>
+            <option value="Program">Program</option>
+          </Select>
+        </div>
+        <div>
+          <RelLbl>Linked to</RelLbl>
+          <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="PRD-01 / PRJ-204" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div>
+          <RelLbl>Target date</RelLbl>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <RelLbl>Environment</RelLbl>
+          <Select value={env} onChange={(e) => setEnv(e.target.value)}>
+            <option value="Staging">Staging</option>
+            <option value="Production">Production</option>
+          </Select>
+        </div>
+        <div>
+          <RelLbl>Risk</RelLbl>
+          <Select value={risk} onChange={(e) => setRisk(e.target.value)}>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </Select>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div>
+          <RelLbl>Requirements</RelLbl>
+          <Input type="number" min={0} value={reqs} onChange={(e) => setReqs(Number(e.target.value))} />
+        </div>
+        <div>
+          <RelLbl>Change requests</RelLbl>
+          <Input type="number" min={0} value={crs} onChange={(e) => setCrs(Number(e.target.value))} />
+        </div>
+        <div>
+          <RelLbl>Progress %</RelLbl>
+          <Input type="number" min={0} max={100} value={progress} onChange={(e) => setProgress(Number(e.target.value))} />
+        </div>
+      </div>
+      <RelLbl>Status</RelLbl>
+      <Select value={status} onChange={(e) => setStatus(e.target.value as ReleaseStatus)}>
+        {RELEASE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={submitting || !name.trim()}>{submitting ? "Saving…" : "Save changes"}</Button>
       </div>
     </Overlay>
   );

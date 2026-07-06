@@ -24,6 +24,8 @@ public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate, string? Dept);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
+public record UpdateReleaseReq(string? Name, string? Owner, string? Link, string? Scope, string? Date, string? Env,
+    string? Risk, int? Reqs, int? Crs, int? Progress, string? Status);
 public record CreateObjectiveReq(string Title, string? Owner, string? Horizon, string? StartDate, string? TargetDate);
 public record CreateKrReq(string Title, string? Link, int? Progress, string? LinkType, string? LinkId);
 public record UpdateKrReq(int? Progress, string? LinkType, string? LinkId);
@@ -587,6 +589,43 @@ public static class WriteEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/releases/{r.Id}", new ReleaseDto(
                 r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status, r.Archived));
+        });
+
+        // Edit a release's fields. Anyone with Edit on "Projects & tasks" (which
+        // includes the service/engineering/dev/infra managers) can maintain a
+        // release from the Releases section. Only the fields sent are changed.
+        api.MapPatch("/releases/{id}", async (string id, UpdateReleaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var r = await db.Releases.FindAsync(id);
+            if (r is null) return Results.NotFound();
+            if (req.Name is not null)
+            {
+                if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
+                r.Name = req.Name.Trim();
+            }
+            if (req.Owner is not null) r.Owner = string.IsNullOrWhiteSpace(req.Owner) ? "Unassigned" : req.Owner.Trim();
+            if (req.Link is not null) r.Link = req.Link.Trim();
+            if (req.Scope is not null)
+            {
+                if (!new[] { "Product", "Project", "Program" }.Contains(req.Scope)) return Results.BadRequest(new { error = "Unknown scope." });
+                r.Scope = req.Scope;
+            }
+            if (req.Date is not null) r.Date = req.Date.Trim();
+            if (req.Env is not null) r.Env = req.Env.Trim();
+            if (req.Risk is not null) r.Risk = req.Risk.Trim();
+            if (req.Reqs is int rq) r.Reqs = Math.Max(0, rq);
+            if (req.Crs is int cr) r.Crs = Math.Max(0, cr);
+            if (req.Progress is int pg) r.Progress = Math.Clamp(pg, 0, 100);
+            if (req.Status is not null)
+            {
+                if (!new[] { "Planned", "In progress", "Deployed", "Rolled back", "Completed", "Cancelled" }.Contains(req.Status))
+                    return Results.BadRequest(new { error = "Unknown status." });
+                r.Status = req.Status;
+            }
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Releases", "Edited release", $"{r.Id} · {r.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new ReleaseDto(r.Id, r.Name, r.Reqs, r.Crs, r.Owner, r.Link, r.Scope, r.Date, r.Env, r.Progress, r.Risk, r.Status, r.Archived));
         });
 
         // Archive / restore a release. Requires Edit on "Create / edit projects".
