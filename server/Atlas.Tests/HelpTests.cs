@@ -43,6 +43,21 @@ public class HelpTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Install_and_ops_guides_cover_docker_and_postgres()
+    {
+        var help = await Client().GetFromJsonAsync<JsonElement>("/api/v1/help");
+        var install = help.GetProperty("guides").EnumerateArray()
+            .Where(g => g.GetProperty("audience").GetString() == "install").ToList();
+        Assert.NotEmpty(install);
+        var titles = install.Select(g => g.GetProperty("title").GetString() ?? "").ToList();
+        Assert.Contains(titles, t => t.Contains("Windows Server"));
+        Assert.Contains(titles, t => t.Contains("Linux VM"));
+        Assert.Contains(titles, t => t.Contains("PostgreSQL"));
+        // These are genuine step-by-step guides — bodies are substantial.
+        Assert.All(install, g => Assert.True((g.GetProperty("body").GetString() ?? "").Length > 200));
+    }
+
+    [Fact]
     public async Task All_error_code_categories_are_present()
     {
         var help = await Client().GetFromJsonAsync<JsonElement>("/api/v1/help");

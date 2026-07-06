@@ -18,6 +18,7 @@ interface HelpData { canManage: boolean; guides: Article[]; troubleshooting: Art
 
 const ROLE_TABS: { id: string; label: string }[] = [
   { id: "all", label: "Getting started" },
+  { id: "install", label: "Install & Ops" },
   { id: "admin", label: "Platform Admin" }, { id: "pmo", label: "PMO" }, { id: "pm", label: "Project Manager" },
   { id: "team", label: "Team Member" }, { id: "exec", label: "Executive" },
 ];
