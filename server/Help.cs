@@ -31,37 +31,118 @@ public static class Help
             "1. The integration, not Atlas, is likely unavailable — retry shortly.\n2. Copy the error code (INT-…) for your administrator.\n3. Admins: check the connector’s credentials/consent and status in Integrations, then search the logs for the code to see the upstream response."),
     };
 
-    // Role-based guide catalogue (title + one-line summary). Curated baseline —
-    // admins expand the body and add their own from Help & Support.
-    static readonly (string Audience, string Title, string Summary)[] Guides =
+    // Role-based guide catalogue: title, one-line summary, and a full step-by-step
+    // body. Curated baseline — admins edit or add their own from Help & Support.
+    // "all" guides orient everyone (shown under the Getting started tab).
+    static readonly (string Audience, string Title, string Summary, string Body)[] Guides =
     {
-        ("admin", "Install the application tier", "Step-by-step deployment of the API and web front end."),
-        ("admin", "Configure Entra ID SSO and enforce MFA", "Wire single sign-on and require multi-factor authentication."),
-        ("admin", "Schedule and test platform backups", "Set up snapshots and verify a restore."),
-        ("admin", "Map AD groups to Atlas roles", "Sync directory groups and assign the manager slots."),
-        ("admin", "Connect Jira & Azure DevOps", "Two-way sync and write-back configuration."),
-        ("admin", "Assign people as project stakeholders", "Give stakeholders their scoped view."),
-        ("admin", "Enable notification email", "Grant Mail.Send and set the sender mailbox."),
-        ("pmo", "How traffic-light health is calculated", "Status roll-up including dependency risk."),
-        ("pmo", "Build a custom dashboard", "Drag-and-drop widgets into your own layout."),
-        ("pmo", "Run a portfolio review export", "Branded PPTX/PDF/Excel/HTML packs."),
-        ("pmo", "Configure demand scoring & edit fields", "Tune the value-vs-effort intake model."),
-        ("pmo", "Map a risk to a control", "Framework → control → sub-control mapping."),
-        ("pmo", "Build the Weekly Updates news wall", "Themes, widgets and image uploads."),
-        ("pm", "Create a project from a template", "Auto-scaffold phases, gates, epics and tasks."),
-        ("pm", "Push a task to Jira or Azure DevOps", "Send a scaffolded task to your tracker."),
-        ("pm", "Read velocity, capacity & backlog", "By source (Jira/ADO/SDP/API)."),
-        ("pm", "Use the Resource & Sprint Gantt", "Views and filters for planning."),
-        ("pm", "Track dependencies & rolled-up risk", "How dependency risk affects status."),
-        ("pm", "Raise and resolve a blocker", "Log it and map it to a control."),
-        ("team", "Update task status and log progress", "Move work across the board."),
-        ("team", "@mention a teammate in a comment", "Collaborate and notify."),
-        ("team", "Raise a blocker on your task", "Flag an impediment for help."),
-        ("team", "Subscribe to notifications", "Follow the items you care about."),
-        ("exec", "Read the executive dashboard", "High-level portfolio health and spend."),
-        ("exec", "Approve a demand or stage gate", "Record your governance decision."),
-        ("exec", "Read delivery status by period", "Weekly to yearly stakeholder reporting."),
-        ("exec", "Export a board-ready status deck", "Branded organisation report."),
+        // ---- Getting started (everyone) --------------------------------------
+        ("all", "What Atlas is, in one minute",
+            "The single place to plan, run and report on the portfolio.",
+            "Atlas is Birgma’s portfolio & project management platform. It brings demands, projects, programs, products, releases, resources, financials and governance into one place so everyone works from the same picture.\n\n• The left sidebar is your map — Workspace (day-to-day delivery) at the top, Configuration (setup & admin) below.\n• The top bar shows your name and role. Switching role changes what you can see and do.\n• Most screens start empty and fill as real data arrives from the API and connected tools (Jira, Entra ID). Empty is normal on a fresh tenant — it is not an error."),
+        ("all", "Find your way around the sidebar",
+            "What each Workspace and Configuration section is for.",
+            "Workspace:\n• Dashboard — your at-a-glance view (Executive, Operational, Compact or a Custom layout you build).\n• Portfolio / Programs / Products — the things you deliver, grouped how leadership thinks about them.\n• OKRs — strategy: objectives and key results linked to the work that delivers them.\n• Demand Pipeline — new requests, scored on value vs effort, awaiting triage and approval.\n• Timeline/Gantt & PI Planning — scheduling: phases, milestones, sprints, and quarterly increment planning.\n• Resources & Financials — people/capacity and budget vs actual.\n• Delivery Status, Releases, Weekly Updates — reporting and communication.\n\nConfiguration:\n• My Team, Methodologies, Integrations, Reports, Administration, Help."),
+        ("all", "Understand your role and what you can do",
+            "Why some buttons are visible to others but not to you.",
+            "Atlas enforces permissions on the server, per capability (projects, schedule, approvals, integrations, quality, and so on). If you don’t see an edit or approve button, your role doesn’t have that capability — this is by design, not a fault.\n\nThe header role switcher changes your identity and the menu you see. Your actual rights come from the roles & permissions matrix a Platform Admin manages in Administration. To request more access, contact your PMO or a Platform Admin and name the exact action you need."),
+        ("all", "What the traffic lights and pills mean",
+            "Green / amber / red, and the common status chips.",
+            "Health: green = on track, amber = at risk, red = critical, grey = on hold. It reflects schedule, budget and rolled-up dependency/blocker risk.\n\nStatus chips vary by object: demands move Draft → Backlog → Approved → In progress → On hold; sprints are Planned/Started/Halted/Completed/Cancelled; gates run G0–G5. Hover a chip or open the item to see detail."),
+        ("all", "Getting help fast",
+            "Search here, use the error code, or contact the PMO.",
+            "1. Search this help centre (box at the top) — it covers every guide and troubleshooting entry.\n2. If you hit an error, note the code (e.g. SRV-… or INT-…). The message links straight to the matching troubleshooting entry here.\n3. Still stuck? Use ‘Contact the PMO’ on this page and include the error code, the screen you were on, the time, and what you expected — that gets you a faster answer."),
+
+        // ---- Platform Admin ---------------------------------------------------
+        ("admin", "Install the application tier",
+            "Step-by-step deployment of the API and web front end.",
+            "1. Provision PostgreSQL and set the connection string (Docker secret or env var) — see the deployment docs in the repo.\n2. Deploy the .NET API; it applies EF Core migrations automatically on start.\n3. Build the web front end (npm run build) and serve it behind nginx, same-origin with the API under /api.\n4. Confirm /health (liveness) and /health/ready (DB reachable) both return healthy.\n5. Set Seed:Enabled=true only for a demo/walkthrough tenant; leave it off in production so you start clean."),
+        ("admin", "Configure Entra ID SSO and enforce MFA",
+            "Wire single sign-on and require multi-factor authentication.",
+            "1. Register the app in Entra ID; add the SPA redirect URI and expose the API scope.\n2. Set VITE_AUTH_ENABLED=true and the VITE_AUTH_* client/tenant/scope values for the front end.\n3. On the API, enable auth and validate the audience/issuer.\n4. Require MFA via a Conditional Access policy in Entra — Atlas honours it automatically through the sign-in.\n5. Sign in end-to-end with a test account before rolling out."),
+        ("admin", "Schedule and test platform backups",
+            "Set up snapshots and verify a restore.",
+            "1. In Administration → Backups, run ‘Back up all now’ to confirm the job works and record a BackupRun.\n2. Schedule regular database snapshots at the infrastructure layer (managed Postgres or a cron’d pg_dump to secure storage).\n3. Quarterly, restore the latest snapshot into a scratch database and boot the API against it to prove the backup is usable.\n4. Keep retention aligned with the data-retention policy."),
+        ("admin", "Map AD groups to Atlas roles",
+            "Sync directory groups and assign the manager slots.",
+            "1. In Administration → Teams, run ‘Sync now’ to pull Entra ID groups and members.\n2. Map each directory group to its manager slot (Engineering, Service, Developers, Infrastructure).\n3. Confirm the hierarchy roll-up looks right on My Team.\n4. People then appear as onboarded; unmapped assignees are flagged so you can spot gaps."),
+        ("admin", "Connect Jira & Azure DevOps",
+            "Discovery, import and board-optional sync.",
+            "1. In Integrations, add the connector credentials (Jira: email + API token; ADO: PAT).\n2. Use ‘Test connection’ to confirm access.\n3. On a project, set its Jira project key. A board id is optional — with a board you also get sprints; without one, issues import by project key alone (a Jira ‘space’ maps fine).\n4. Run Discovery to preview what will import, then sync. Assignees not synced from Entra are flagged so you can onboard them."),
+        ("admin", "Assign people as project stakeholders",
+            "Give stakeholders their scoped view.",
+            "1. Open a project and add the person as a stakeholder, or mark the project stakeholder-visible.\n2. Stakeholders get the reduced navigation — only their own projects/demands plus Delivery, Releases, Weekly Updates and Help.\n3. Verify by switching to the Stakeholder identity in the header."),
+        ("admin", "Enable notification email",
+            "Grant Mail.Send and set the sender mailbox.",
+            "1. Grant the app the Microsoft Graph Mail.Send permission and admin-consent it.\n2. Set Graph:* credentials and Notifications:SenderUpn (the mailbox mail is sent from).\n3. Send a test notification and confirm delivery. Until this is configured, notifications still appear in-app; only email is skipped."),
+
+        // ---- PMO --------------------------------------------------------------
+        ("pmo", "How traffic-light health is calculated",
+            "Status roll-up including dependency risk.",
+            "Health combines schedule variance, budget burn vs plan, and rolled-up risk from open blockers and dependencies. A project with a blocked hard dependency is pulled toward amber/red even if its own tasks are on track. Programs and products roll up from their linked projects. You can set a manual RAG where judgement should override the formula (e.g. OKRs)."),
+        ("pmo", "Build a custom dashboard",
+            "Drag-and-drop widgets into your own layout.",
+            "1. On Dashboard, choose the Custom layout from the segmented control.\n2. Drag widgets from the palette into the canvas; rearrange or remove them.\n3. Your layout is remembered. Use Reset to return to the default set."),
+        ("pmo", "Run a portfolio review export",
+            "Branded PPTX/PDF/Excel/HTML packs.",
+            "1. Go to Reports and pick the report (portfolio, demand, blocker, audit).\n2. Choose the format — PowerPoint for a board pack, Excel for data, PDF/HTML for sharing.\n3. Generate and download. The pack is branded and reflects live data at export time."),
+        ("pmo", "Configure demand scoring & edit fields",
+            "Tune the value-vs-effort intake model.",
+            "1. On Demand Pipeline, open a demand to see its value and effort scores that position it in the funnel.\n2. Edit the scoring fields to reflect business value, criticality, risk and expected benefit.\n3. Approvals are restricted to Platform Admin and PMO; comments can be added by Platform Admin, PMO and the Chief Architect."),
+        ("pmo", "Map a risk to a control",
+            "Framework → control → sub-control mapping.",
+            "1. In the governance/security area, open the control framework (GDPR, ISO 27001, SOC 2, NIS2, EU AI Act, and the product regs DPP/PPWR/EUDR).\n2. Link the risk or RAID item to the relevant control and sub-control.\n3. Track the control’s lifecycle status so audit evidence stays current."),
+        ("pmo", "Build the Weekly Updates news wall",
+            "Themes, widgets and image uploads.",
+            "1. Open Weekly Updates and switch on edit mode.\n2. Add blocks — headline, highlight metric, shout-out, image, milestone, document — and arrange the masonry layout.\n3. Pick a theme and publish. Stakeholders see the curated wall read-only."),
+
+        // ---- Project Manager --------------------------------------------------
+        ("pm", "Create a project from a template",
+            "Auto-scaffold phases, gates, epics and tasks.",
+            "1. Go to Methodologies and start the create-project wizard.\n2. Pick a methodology (Waterfall, Scrum, SAFe, Stage-Gate, Kanban, …); the template scaffolds the right phases, gates and starter structure.\n3. Set name, department and owner, then wire any integration.\n4. The new project opens with its methodology-specific tabs ready to fill."),
+        ("pm", "Push a task to Jira or Azure DevOps",
+            "Send a scaffolded task to your tracker.",
+            "1. Ensure the project is connected (project key set in Integrations).\n2. Create or open a task and use the push action to send it to the tracker.\n3. Subsequent syncs reconcile status back into Atlas; assignees not onboarded from Entra are flagged."),
+        ("pm", "Read velocity, capacity & backlog",
+            "By source (Jira/ADO/SDP/API).",
+            "On the project’s Tasks/Sprint tabs you’ll see per-sprint points, completion and spillover. Velocity is the delivered points trend; capacity comes from resource allocations. The backlog is everything not yet assigned to a sprint — attach items to a sprint or an epic from there."),
+        ("pm", "Use the Resource & Sprint Gantt",
+            "Views and filters for planning.",
+            "1. Open Timeline/Gantt and choose the scope (Project or Program) and the view (Schedule, Resources, Sprints, category views).\n2. Sprints appear as a single duration bar you can expand to see their tasks.\n3. Add milestones and see dependency arrows across the month grid; export when you need a static copy."),
+        ("pm", "Track dependencies & rolled-up risk",
+            "How dependency risk affects status.",
+            "Log dependencies on the project and, for cross-team ones, on PI Planning → Dependencies. A blocked or at-risk dependency rolls up into the dependent item’s health, so a red upstream item can turn a downstream project amber. Keep owners and due dates current so the roll-up is meaningful."),
+        ("pm", "Raise and resolve a blocker",
+            "Log it and map it to a control.",
+            "1. On the project’s Blockers tab (or from a task), add the blocker with a clear title, description and owner.\n2. Move it through Active → In progress → Resolved; cancel or archive when appropriate.\n3. Blockers feed dashboards and delivery reports, so resolving them updates status automatically."),
+
+        // ---- Team Member ------------------------------------------------------
+        ("team", "Update task status and log progress",
+            "Move work across the board.",
+            "1. Open your project’s Tasks tab (board or list view).\n2. Drag a card between columns, or open it to change status, assignee, points, size and dates.\n3. Progress rolls up into the sprint, epic and project health automatically."),
+        ("team", "@mention a teammate in a comment",
+            "Collaborate and notify.",
+            "1. Open the item (task, demand, blocker) and add a comment.\n2. Type @ and pick a teammate to notify them.\n3. They’ll get a notification (and email, if configured) and can reply in thread."),
+        ("team", "Raise a blocker on your task",
+            "Flag an impediment for help.",
+            "1. From your task, raise a blocker describing what’s stopping you and who might help.\n2. It appears on the project’s Blockers tab and in reports so your PM can act.\n3. Update it as things change; mark it resolved when unblocked."),
+        ("team", "Subscribe to notifications",
+            "Follow the items you care about.",
+            "1. Use the subscribe control on a project or item to follow it.\n2. Tune what you receive in notification preferences.\n3. The bell in the top bar shows your notification centre; email is sent too when the admin has enabled it."),
+
+        // ---- Executive --------------------------------------------------------
+        ("exec", "Read the executive dashboard",
+            "High-level portfolio health and spend.",
+            "The Executive layout shows the portfolio-health donut, budget burn, KPI cards with sparklines, the active-projects table, what needs attention, the demand pipeline and recent activity. Use it for a 30-second read of where the portfolio stands; click through any card to the detail."),
+        ("exec", "Approve a demand or stage gate",
+            "Record your governance decision.",
+            "1. Open the demand awaiting approval, or the stage gate up for review.\n2. Review the scoring/criteria and the decision log.\n3. Record your decision — it’s captured in the audit log and moves the item forward. Demand approvals are limited to Platform Admin and PMO; gate reviews follow the governance model."),
+        ("exec", "Read delivery status by period",
+            "Weekly to yearly stakeholder reporting.",
+            "On Delivery Status, pick a reporting period (weekly through yearly). You’ll see completed/in-progress/planned work, velocity, on-time %, cleared vs open blockers, milestones and budget burn — the stakeholder view without project-level noise."),
+        ("exec", "Export a board-ready status deck",
+            "Branded organisation report.",
+            "1. Go to Reports and choose the portfolio or delivery report.\n2. Export as PowerPoint for a branded, board-ready deck (or PDF/HTML to share).\n3. It reflects live data at the moment you export."),
     };
 
     public static async Task SeedAsync(AtlasDbContext db)
@@ -69,27 +150,51 @@ public static class Help
         if (await db.HelpArticles.AnyAsync()) { await ReconcileAsync(db); return; }
         var ord = 0;
         foreach (var g in Guides)
-            db.HelpArticles.Add(new HelpArticle { Kind = "guide", Audience = g.Audience, Title = g.Title, Summary = g.Summary, Body = g.Summary, Ord = ord++ });
+            db.HelpArticles.Add(new HelpArticle { Kind = "guide", Audience = g.Audience, Title = g.Title, Summary = g.Summary, Body = g.Body, Ord = ord++ });
         ord = 0;
         foreach (var t in Troubleshooting)
             db.HelpArticles.Add(new HelpArticle { Kind = "troubleshooting", Code = t.Code, Title = t.Title, Summary = t.Symptom, Body = t.Body, Ord = ord++ });
         await db.SaveChangesAsync();
     }
 
-    // Add any troubleshooting categories missing from an already-seeded DB so the
-    // error-code deep links always resolve after an upgrade.
+    // Bring an already-seeded DB up to the current baseline after an upgrade:
+    //  • add any troubleshooting category missing (keeps error-code links resolving);
+    //  • add any new baseline guide missing (by audience + title);
+    //  • fill in the full body for baseline guides still holding only the one-line
+    //    summary (the old seed set Body = Summary) — WITHOUT touching a guide an
+    //    admin has already expanded or edited.
     public static async Task ReconcileAsync(AtlasDbContext db)
     {
+        var changed = false;
+
         var have = (await db.HelpArticles.Where(a => a.Kind == "troubleshooting").Select(a => a.Code).ToListAsync()).ToHashSet();
         var ord = 100;
-        var added = false;
         foreach (var t in Troubleshooting)
             if (!have.Contains(t.Code))
             {
                 db.HelpArticles.Add(new HelpArticle { Kind = "troubleshooting", Code = t.Code, Title = t.Title, Summary = t.Symptom, Body = t.Body, Ord = ord++ });
-                added = true;
+                changed = true;
             }
-        if (added) await db.SaveChangesAsync();
+
+        var guides = await db.HelpArticles.Where(a => a.Kind == "guide").ToListAsync();
+        var byKey = guides.GroupBy(g => (g.Audience, g.Title)).ToDictionary(k => k.Key, k => k.First());
+        var gOrd = 200;
+        foreach (var g in Guides)
+        {
+            if (!byKey.TryGetValue((g.Audience, g.Title), out var existing))
+            {
+                db.HelpArticles.Add(new HelpArticle { Kind = "guide", Audience = g.Audience, Title = g.Title, Summary = g.Summary, Body = g.Body, Ord = gOrd++ });
+                changed = true;
+            }
+            // Upgrade only untouched baseline rows (body never expanded past the summary).
+            else if (existing.Body == existing.Summary && existing.Body != g.Body)
+            {
+                existing.Body = g.Body;
+                changed = true;
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync();
     }
 
     static readonly string[] Kinds = { "guide", "troubleshooting" };
