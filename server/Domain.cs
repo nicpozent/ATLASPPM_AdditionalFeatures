@@ -38,6 +38,12 @@ public class Project
     // Stakeholder visibility (feeds /projects/my for the demo stakeholder).
     public bool StakeholderVisible { get; set; }
 
+    // Jira Cloud mapping (pull-only sync). Empty/null ⇒ this project isn't linked
+    // to Jira and is never touched by a sync. JiraProjectKey is the Jira project
+    // key (e.g. "GIT"); JiraBoardId is the agile board to pull sprints/backlog from.
+    public string JiraProjectKey { get; set; } = "";
+    public int? JiraBoardId { get; set; }
+
     // Lifecycle. IsSystem marks seeded/demo projects — they can be archived but
     // never hard-deleted. Archived projects drop out of the active portfolio,
     // dashboards and financials but are retained (soft delete).
@@ -602,6 +608,7 @@ public class ProjectTask
     public string Size { get; set; } = "";                // t-shirt: XS|S|M|L|XL|XXL
     public int EstimateHours { get; set; }                // estimated effort to complete
     public int Ord { get; set; }
+    public string JiraKey { get; set; } = "";             // Jira issue key when synced (e.g. "GIT-123"); "" ⇒ local
 }
 
 // A comment on a task's thread. Author/initials captured at post time.
@@ -629,6 +636,7 @@ public class Sprint
     public string Status { get; set; } = "Planned";       // Planned | Active | Closed
     public int CommittedPoints { get; set; }              // manual commitment; 0 ⇒ derive from tasks
     public int Ord { get; set; }
+    public string JiraKey { get; set; } = "";             // Jira sprint id when synced; "" ⇒ local
 }
 
 // ---- Financial cost lines (role-owned) ------------------------------------
@@ -846,6 +854,7 @@ public class Epic
     public string DependsOn { get; set; } = "";           // legacy free-text note (still shown)
     public List<int> DependsOnIds { get; set; } = new();  // other epics in this project this one depends on
     public int Ord { get; set; }
+    public string JiraKey { get; set; } = "";             // Jira epic id when synced; "" ⇒ local
 }
 
 // ---- Security, privacy & compliance ---------------------------------------

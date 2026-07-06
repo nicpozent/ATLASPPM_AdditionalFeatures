@@ -214,3 +214,46 @@ public class JiraBaseUrlTests
     [InlineData(null)]
     public void Blank_is_null(string? raw) => Assert.Null(Jira.NormalizeBaseUrl(raw));
 }
+
+// Jira → Atlas field mappings used by the pull sync.
+public class JiraSyncMappingTests
+{
+    [Theory]
+    [InlineData("active", "Active")]
+    [InlineData("closed", "Closed")]
+    [InlineData("future", "Planned")]
+    [InlineData("FUTURE", "Planned")]
+    [InlineData("", "Planned")]
+    [InlineData(null, "Planned")]
+    public void Sprint_state_maps(string? state, string expected) =>
+        Assert.Equal(expected, Jira.MapSprintState(state));
+
+    [Theory]
+    [InlineData("done", "Done")]
+    [InlineData("indeterminate", "In Progress")]
+    [InlineData("new", "To Do")]
+    [InlineData("", "To Do")]
+    [InlineData(null, "To Do")]
+    public void Issue_status_category_maps(string? cat, string expected) =>
+        Assert.Equal(expected, Jira.MapIssueStatus(cat));
+
+    [Theory]
+    [InlineData("Highest", "Critical")]
+    [InlineData("Blocker", "Critical")]
+    [InlineData("High", "High")]
+    [InlineData("Medium", "Medium")]
+    [InlineData("Low", "Low")]
+    [InlineData("Lowest", "Low")]
+    [InlineData("", "Medium")]
+    [InlineData(null, "Medium")]
+    public void Priority_maps(string? name, string expected) =>
+        Assert.Equal(expected, Jira.MapPriority(name));
+
+    [Theory]
+    [InlineData("2026-03-01T09:00:00.000+0000", "2026-03-01")]
+    [InlineData("2026-03-01", "2026-03-01")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void Date_part_keeps_calendar_day(string? iso, string expected) =>
+        Assert.Equal(expected, Jira.DatePart(iso));
+}

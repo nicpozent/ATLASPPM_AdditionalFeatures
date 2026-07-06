@@ -76,6 +76,10 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<Project>().HasKey(x => x.Id);
         b.Entity<Project>().Property(x => x.Id).ValueGeneratedNever();
         b.Entity<Project>().Property(x => x.StartDate).HasDefaultValue("");
+        b.Entity<Project>().Property(x => x.JiraProjectKey).HasDefaultValue("");
+        b.Entity<ProjectTask>().Property(x => x.JiraKey).HasDefaultValue("");
+        b.Entity<Sprint>().Property(x => x.JiraKey).HasDefaultValue("");
+        b.Entity<Epic>().Property(x => x.JiraKey).HasDefaultValue("");
         b.Entity<Project>()
             .HasMany(x => x.Blockers)
             .WithOne(x => x.Project!)

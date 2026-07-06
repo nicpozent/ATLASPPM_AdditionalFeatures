@@ -17,7 +17,7 @@ public record CreateProjectReq(string Name, string? Dept, string? Owner, string?
     string? StartDate, string? Target);
 public record UpdateProjectReq(string? Name, string? Dept, string? Owner, string? Methodology,
     string? Status, int? Progress, string? Phase, string? Target, decimal? Budget, decimal? Spent, decimal? Forecast,
-    string? StartDate, string? Summary);
+    string? StartDate, string? Summary, string? JiraProjectKey, int? JiraBoardId);
 public record CreateProgramReq(string Name, string? Owner, string? Goal, string? Status, List<string>? Projects, string? StartDate, string? EndDate, string? Dept);
 public record CreateProductReq(string Name, string? Owner, string? Source, List<string>? Projects, string? StartDate, string? EndDate, string? TeamKey, string? Dept);
 public record CreateReleaseReq(string Name, string? Owner, string? Link, string? Scope, string? Date, string? Env, string? Risk);
@@ -290,6 +290,9 @@ public static class WriteEndpoints
             if (req.Budget is decimal b && b >= 0) p.Budget = b;
             if (req.Spent is decimal s && s >= 0) p.Spent = s;
             if (req.Forecast is decimal fc && fc >= 0) p.Forecast = fc;
+            // Jira mapping (pull-only sync). Uppercase the key; a blank clears the link.
+            if (req.JiraProjectKey is not null) p.JiraProjectKey = req.JiraProjectKey.Trim().ToUpperInvariant();
+            if (req.JiraBoardId is int bid) p.JiraBoardId = bid > 0 ? bid : null;
 
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Projects", "Updated project", $"{p.Id} · {p.Name}"));
             await db.SaveChangesAsync();

@@ -17,6 +17,7 @@ interface ProjectDetail {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: string; health: string; progress: number; phase: string;
   budget: number; spent: number; due: string; startDate?: string; target?: string; summary?: string;
+  jiraProjectKey?: string; jiraBoardId?: number | null;
 }
 function useProject(id: string | null) {
   return useQuery({
@@ -160,6 +161,8 @@ function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; 
   const [target, setTarget] = useState(project.target ?? project.due ?? "");
   const [budget, setBudget] = useState(String(project.budget));
   const [spent, setSpent] = useState(String(project.spent));
+  const [jiraKey, setJiraKey] = useState(project.jiraProjectKey ?? "");
+  const [jiraBoard, setJiraBoard] = useState(project.jiraBoardId ? String(project.jiraBoardId) : "");
 
   // Owner options come from the project's team (lead + assigned architecture
   // roles + the candidate people pool), with the current owner always included.
@@ -183,6 +186,7 @@ function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; 
         progress: Math.max(0, Math.min(100, Number(progress) || 0)),
         startDate: startDate.trim(), target: target.trim(),
         budget: Number(budget) || 0, spent: Number(spent) || 0,
+        jiraProjectKey: jiraKey.trim(), jiraBoardId: Number(jiraBoard) || 0,
       }),
     }),
     onSuccess: () => {
@@ -220,6 +224,14 @@ function EditProjectDetailModal({ project, onClose }: { project: ProjectDetail; 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <PdField label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></PdField>
         <PdField label="Spent (€k)"><Input type="number" value={spent} onChange={(e) => setSpent(e.target.value)} /></PdField>
+      </div>
+      <div style={{ borderTop: `1px solid ${color.border}`, margin: "6px 0 14px", paddingTop: 14 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: color.faint, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 10 }}>Jira sync (pull-only)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <PdField label="Jira project key"><Input value={jiraKey} onChange={(e) => setJiraKey(e.target.value)} placeholder="e.g. GIT" /></PdField>
+          <PdField label="Jira board id"><Input type="number" value={jiraBoard} onChange={(e) => setJiraBoard(e.target.value)} placeholder="e.g. 93" /></PdField>
+        </div>
+        <div style={{ fontSize: 11.5, color: color.faint2, lineHeight: 1.5 }}>Link this project to a Jira board to pull its sprints, epics and issues into Tasks. Leave blank to keep it unlinked. Sync from the Tasks tab.</div>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -639,6 +651,8 @@ function LinkSelect({ value, options, placeholder, disabled, onChange }: { value
 
 function Tasks({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const { data: project } = useProject(projectId);
   const [view, setView] = useState<"board" | "table">("board");
   const [modal, setModal] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -647,6 +661,22 @@ function Tasks({ projectId }: { projectId: string | null }) {
   const assigneeOptions = useAssigneeOptions(projectId);
   const epicOptions = useEpicOptions(projectId);
   const sprintOptions = useSprintOptions(projectId);
+
+  // Jira pull-sync — only offered when this project is mapped to a Jira board and
+  // the role can manage integrations. Refreshes everything the sync writes.
+  const jiraMapped = !!project?.jiraProjectKey && !!project?.jiraBoardId;
+  const canSyncJira = can("cap-integrations", "E");
+  const syncJira = useMutation({
+    mutationFn: () => api<{ ok: boolean; sprints?: number; epics?: number; tasks?: number; backlog?: number; error?: string }>(`/projects/${projectId}/jira/sync`, { method: "POST" }),
+    onSuccess: (r) => {
+      if (r?.ok) {
+        toast(`Synced from Jira — ${r.tasks ?? 0} issues, ${r.epics ?? 0} epics, ${r.sprints ?? 0} sprints (${r.backlog ?? 0} in backlog).`, "info");
+        for (const k of ["tasks", "epics", "sprints", "spillover", "raid"]) qc.invalidateQueries({ queryKey: [k, projectId] });
+        qc.invalidateQueries({ queryKey: ["spillover-summary"] });
+      } else toast(r?.error ?? "Jira sync failed.", "error");
+    },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
@@ -685,6 +715,11 @@ function Tasks({ projectId }: { projectId: string | null }) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
+        {jiraMapped && (
+          <Button variant="secondary" onClick={() => syncJira.mutate()} disabled={syncJira.isPending || !canSyncJira} title={canSyncJira ? `Pull ${project?.jiraProjectKey} / board ${project?.jiraBoardId} from Jira` : "Needs Edit on Integrations & connectors"}>
+            <Icon name="refresh" size={15} /> {syncJira.isPending ? "Syncing…" : "Sync from Jira"}
+          </Button>
+        )}
         <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create tasks (needs the Project schedule right)"}><Icon name="plus" size={16} /> New task</Button>
       </div>
 

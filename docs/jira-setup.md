@@ -4,9 +4,11 @@ Atlas connects to **Jira Cloud** to pull delivery data (issues, epics, sprints,
 backlog, versions, worklogs) into the matching Atlas sections. This is **read-
 only** — Atlas never writes to Jira in this phase.
 
-This guide covers **Phase 1 — foundation**: configuring credentials and
-verifying the connection from **Integrations → Jira → Test connection**. Actual
-data sync lands in later phases; nothing moves until then.
+Two steps to get data flowing: (1) configure credentials once and verify from
+**Integrations → Jira → Test connection**; (2) map each Atlas project to a Jira
+project key + board id, then sync its **sprints, epics, issues and backlog** in.
+Sync is one-way and idempotent — it never touches locally-created rows and never
+writes to Jira.
 
 ---
 
@@ -35,7 +37,13 @@ JIRA_EMAIL=svc-atlas@birgma.com                 # the service account's email
 JIRA_API_TOKEN=<the token from step 1>
 ```
 
-Leave them empty to keep Jira dormant — the rest of Atlas is unaffected.
+Leave them empty to keep Jira dormant — the rest of Atlas is unaffected. The
+base URL is forgiving: a missing `https://` is added and a pasted full board URL
+is trimmed to the site origin.
+
+Optional — if your site uses a non-default **story points** custom field, set
+`JIRA_STORY_POINTS_FIELD` (env `Jira__StoryPointsField`) to its id. The default
+is `customfield_10016`, Jira Cloud's usual "Story point estimate" field.
 
 ## 3. Verify
 
@@ -49,24 +57,42 @@ Leave them empty to keep Jira dormant — the rest of Atlas is unaffected.
 Testing the connection requires **Edit** on the *Integrations & connectors*
 capability (Platform Admin by default).
 
----
+## 4. Map a project and sync
 
-## What comes next (later phases, not in this one)
+1. Open a project (**Portfolio → a project**) and click **Edit** (top-right of
+   the detail header). Under **Jira sync (pull-only)**, set the project's **Jira
+   project key** (e.g. `GIT`) and **board id** (the number in the board URL:
+   `.../boards/93/...` → `93`). Save. Leave both blank to keep it unlinked.
+2. On the project's **Tasks** tab a **Sync from Jira** button appears. Click it
+   to pull that board. Or from **Integrations → Jira → Sync now** to pull every
+   mapped project at once.
 
-Once the connection verifies, the planned pull sync maps Jira → Atlas like this:
+What the sync maps, Jira → Atlas:
 
 | Atlas section | Jira source |
 | ------------- | ----------- |
-| Project → Tasks | issues (`POST /rest/api/3/search/jql`) |
-| Project → Epics | epic issues |
-| Project → Sprints / Backlog | Agile boards, sprints, backlog (`/rest/agile/1.0/...`) |
+| Project → Sprints | board sprints (`/rest/agile/1.0/board/{id}/sprint`); state → Planned/Active/Closed |
+| Project → Epics | board epics (`/rest/agile/1.0/board/{id}/epic`); story rollup counted from issues |
+| Project → Tasks | board issues (`/rest/agile/1.0/board/{id}/issue`); status category, assignee, priority, due date, points |
+| Project → Backlog | issues with no sprint |
+
+**Idempotent & safe.** Each synced sprint/epic/task carries its Jira id. A
+re-sync upserts by that id, prunes synced rows that vanished from Jira, and
+**never touches locally-created rows** (those you added by hand in Atlas). Points
+come from the story-points custom field (see `JIRA_STORY_POINTS_FIELD` above).
+
+Syncing requires **Edit** on the *Integrations & connectors* capability.
+
+---
+
+## What comes next (later phases)
+
+| Atlas section | Jira source |
+| ------------- | ----------- |
 | Releases | project versions (`/rest/api/3/project/{key}/version`) |
 | Financials | issue worklogs → labour cost |
 | Quality | Xray (separate Marketplace app + API) |
-
-Each Atlas project will carry its **Jira project key** and **board id** so it
-knows which Jira project to pull from. Synced records are marked
-externally-owned so a re-sync won't clobber local edits.
+| (later) 2-way | webhooks + write-back to Jira |
 
 ## Security notes
 

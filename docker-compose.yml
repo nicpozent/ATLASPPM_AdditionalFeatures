@@ -53,6 +53,7 @@ services:
       Jira__BaseUrl: ${JIRA_BASE_URL:-}
       Jira__Email: ${JIRA_EMAIL:-}
       Jira__ApiToken: ${JIRA_API_TOKEN:-}
+      Jira__StoryPointsField: ${JIRA_STORY_POINTS_FIELD:-}
     depends_on:
       db:
         condition: service_healthy
