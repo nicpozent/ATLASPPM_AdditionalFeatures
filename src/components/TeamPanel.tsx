@@ -97,19 +97,32 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
   );
 }
 
-function MemberChecklist({ members, selected, onToggle }: { members: TeamMemberT[]; selected: Set<string>; onToggle: (name: string) => void }) {
+function MemberChecklist({ members, selected, onToggle, allocs, onAlloc }: {
+  members: TeamMemberT[]; selected: Set<string>; onToggle: (name: string) => void;
+  allocs?: Record<string, number>; onAlloc?: (name: string, alloc: number) => void;
+}) {
   if (members.length === 0) return <div style={{ fontSize: 12, color: color.faint3 }}>This sub-team has no members yet — add them in My Team.</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
       {members.map((m) => {
         const on = selected.has(m.name);
         return (
-          <button key={m.id} type="button" onClick={() => onToggle(m.name)}
-            style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: on ? "#EAF2FB" : color.surfaceAlt, border: `1px solid ${on ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "7px 10px" }}>
-            <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primary : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
-            <Avatar name={m.name} />
-            <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12.5, color: color.text }}>{m.name}</span>{m.title && <span style={{ fontSize: 11, color: color.faint3 }}> · {m.title}</span>}</span>
-          </button>
+          <div key={m.id}
+            style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#EAF2FB" : color.surfaceAlt, border: `1px solid ${on ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "7px 10px" }}>
+            <button type="button" onClick={() => onToggle(m.name)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: "none", border: "none", flex: 1, minWidth: 0, padding: 0 }}>
+              <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primary : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
+              <Avatar name={m.name} />
+              <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12.5, color: color.text }}>{m.name}</span>{m.title && <span style={{ fontSize: 11, color: color.faint3 }}> · {m.title}</span>}</span>
+            </button>
+            {on && allocs && onAlloc && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flex: "none" }} title="Allocation on this item">
+                <input type="number" min={0} max={100} value={allocs[m.name] ?? 0}
+                  onChange={(e) => onAlloc(m.name, Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                  style={{ width: 52, textAlign: "right", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "4px 6px", fontSize: 12, fontFamily: "inherit", color: color.text }} />
+                <span style={{ fontSize: 11, color: color.faint3 }}>%</span>
+              </span>
+            )}
+          </div>
         );
       })}
     </div>
@@ -120,12 +133,14 @@ function AttachModal({ entityType, entityId, available, onClose, invalidate }: {
   const [subId, setSubId] = useState(available[0]?.id ?? 0);
   const sub = available.find((s) => s.id === subId);
   const [selected, setSelected] = useState<Set<string>>(new Set(available[0]?.members.map((m) => m.name) ?? []));
+  const [allocs, setAllocs] = useState<Record<string, number>>({});
   const pick = (id: number) => { setSubId(id); setSelected(new Set(available.find((s) => s.id === id)?.members.map((m) => m.name) ?? [])); };
   const toggle = (n: string) => setSelected((prev) => { const s = new Set(prev); if (s.has(n)) s.delete(n); else s.add(n); return s; });
+  const setAlloc = (n: string, v: number) => setAllocs((prev) => ({ ...prev, [n]: v }));
   const attach = useMutation({
     mutationFn: () => api(`/teams/assignments/${entityType}/${entityId}`, {
       method: "POST",
-      body: JSON.stringify({ subTeamId: subId, members: (sub?.members ?? []).filter((m) => selected.has(m.name)).map((m) => ({ name: m.name, email: m.email, title: m.title })) }),
+      body: JSON.stringify({ subTeamId: subId, members: (sub?.members ?? []).filter((m) => selected.has(m.name)).map((m) => ({ name: m.name, email: m.email, title: m.title, alloc: allocs[m.name] ?? 0 })) }),
     }),
     onSuccess: () => { invalidate(); onClose(); },
     onError: (e) => toast((e as Error).message, "error"),
@@ -138,8 +153,9 @@ function AttachModal({ entityType, entityId, available, onClose, invalidate }: {
         {available.map((s) => <option key={s.id} value={s.id}>{s.name}{s.managerLabel ? ` · ${s.managerLabel}` : ""}</option>)}
       </Select>
       <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Who's working on this {entityType}? ({selected.size})</div>
-      <MemberChecklist members={sub?.members ?? []} selected={selected} onToggle={toggle} />
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+      <MemberChecklist members={sub?.members ?? []} selected={selected} onToggle={toggle} allocs={allocs} onAlloc={setAlloc} />
+      <div style={{ fontSize: 11, color: color.faint3, marginTop: 8 }}>Set each person's allocation % on this {entityType} (you can also fine-tune later on Resources → By project).</div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => subId && attach.mutate()} disabled={!subId || attach.isPending}>{attach.isPending ? "Attaching…" : "Attach"}</Button>
       </div>
