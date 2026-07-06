@@ -49,5 +49,27 @@ public class JiraTests : IClassFixture<AtlasApiFactory>
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
         Assert.Equal(HttpStatusCode.Forbidden, (await c.GetAsync("/api/v1/integrations/jira/status")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/jira/test", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/jira/sync", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Sync_all_reports_not_configured_gracefully()
+    {
+        var c = Admin();
+        var res = await c.PostAsync("/api/v1/integrations/jira/sync", null);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);   // graceful, not a 500
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Project_sync_reports_not_configured_gracefully()
+    {
+        var c = Admin();
+        var res = await c.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);   // not-configured reported before touching the DB
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
     }
 }
