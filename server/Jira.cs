@@ -25,10 +25,26 @@ public static class Jira
         !string.IsNullOrWhiteSpace(cfg["Jira:Email"]) &&
         !string.IsNullOrWhiteSpace(cfg["Jira:ApiToken"]);
 
+    // Normalise a configured site URL to a clean https origin: tolerate a missing
+    // scheme (default https) and a pasted full path/query (keep only scheme+host).
+    // Returns null when the value can't form an absolute http(s) URL.
+    public static string? NormalizeBaseUrl(string? raw)
+    {
+        var s = (raw ?? "").Trim();
+        if (s.Length == 0) return null;
+        if (!s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !s.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            s = "https://" + s;
+        return Uri.TryCreate(s, UriKind.Absolute, out var u) && (u.Scheme == "http" || u.Scheme == "https")
+            ? u.GetLeftPart(UriPartial.Authority)
+            : null;
+    }
+
     // An HttpClient pinned to the Jira site with Basic auth. Callers dispose it.
     public static HttpClient Client(IConfiguration cfg)
     {
-        var baseUrl = (cfg["Jira:BaseUrl"] ?? "").TrimEnd('/');
+        var baseUrl = NormalizeBaseUrl(cfg["Jira:BaseUrl"])
+            ?? throw new InvalidOperationException("Jira:BaseUrl isn't a valid site URL (expected e.g. https://yoursite.atlassian.net).");
         var http = new HttpClient { BaseAddress = new Uri(baseUrl + "/"), Timeout = TimeSpan.FromSeconds(20) };
         var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{cfg["Jira:Email"]}:{cfg["Jira:ApiToken"]}"));
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basic);

@@ -195,3 +195,22 @@ public class CorrelationCodeTests
         Assert.Equal(200, codes.Count);
     }
 }
+
+// Jira base-URL normalisation — tolerate a missing scheme and a pasted path.
+public class JiraBaseUrlTests
+{
+    [Theory]
+    [InlineData("https://biltema.atlassian.net", "https://biltema.atlassian.net")]
+    [InlineData("biltema.atlassian.net", "https://biltema.atlassian.net")]              // missing scheme
+    [InlineData("https://biltema.atlassian.net/", "https://biltema.atlassian.net")]      // trailing slash
+    [InlineData("https://biltema.atlassian.net/jira/software/projects/GIT/boards/93", "https://biltema.atlassian.net")] // pasted path
+    [InlineData("  biltema.atlassian.net  ", "https://biltema.atlassian.net")]           // whitespace
+    public void Normalizes_to_clean_origin(string raw, string expected) =>
+        Assert.Equal(expected, Jira.NormalizeBaseUrl(raw));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Blank_is_null(string? raw) => Assert.Null(Jira.NormalizeBaseUrl(raw));
+}
