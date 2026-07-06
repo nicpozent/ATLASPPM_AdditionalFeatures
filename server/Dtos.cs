@@ -295,3 +295,4 @@ public record IncrementsDto(bool CanEdit, List<IncrementSummaryDto> Increments);
 public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc);
 public record ResByProjectDto(string Id, string Name, bool CanEdit, List<ResAllocRowDto> Members);
 public record ResByProductDto(string Id, string Name, List<ResAllocRowDto> Members);
+public record UnonboardedDto(string Name, List<string> Projects);

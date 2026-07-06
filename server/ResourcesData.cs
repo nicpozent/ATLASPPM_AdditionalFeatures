@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Atlas.Api;
 
 public record SetAllocReq(int? Alloc);
+public record OnboardReq(string? Name, string? Email, string? Title);
 
 // ============================================================================
 //  Resources & capacity — derived from the REAL allocation data in the system
@@ -116,5 +117,60 @@ public static class ResourcesData
             await db.SaveChangesAsync();
             return Results.Ok(new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc));
         });
+
+        // Task assignees that aren't in the onboarded set (Resources + Entra members)
+        // — typically people imported from Jira. Surfaced so the name isn't lost and
+        // an admin can onboard them in one click. Grouped with the projects they're on.
+        api.MapGet("/resources/unonboarded", async (AtlasDbContext db) =>
+        {
+            var known = await KnownNamesAsync(db);
+            var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
+            var tasks = await db.ProjectTasks
+                .Where(t => t.Assignee != "" && t.Assignee != "Unassigned")
+                .Select(t => new { t.Assignee, t.ProjectId }).ToListAsync();
+            var rows = tasks
+                .Where(t => !known.Contains(t.Assignee.Trim()))
+                .GroupBy(t => t.Assignee.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new UnonboardedDto(g.Key,
+                    g.Select(x => projNames.TryGetValue(x.ProjectId, out var n) ? n : x.ProjectId).Distinct().OrderBy(n => n).ToList()))
+                .OrderBy(r => r.Name).ToList();
+            return Results.Ok(rows);
+        });
+
+        // Onboard a person by adding them to a manual directory group so they become
+        // "known" (they'll then match on the next task read / Jira resync). Managing
+        // the directory needs Edit on "Users, groups & roles" (cap-users-roles).
+        api.MapPost("/resources/onboard", async (OnboardReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-users-roles", "E") is { } denied) return denied;
+            if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "A name is required." });
+            const string groupId = "manual-onboarded";
+            var group = await db.EntraGroups.FindAsync(groupId);
+            if (group is null)
+            {
+                group = new EntraGroup { Id = groupId, DisplayName = "Onboarded (manual)", Manual = true, LastSynced = "" };
+                db.EntraGroups.Add(group);
+            }
+            var name = req.Name.Trim();
+            if (!await db.TeamMembers.AnyAsync(m => m.GroupId == groupId && m.DisplayName == name))
+                db.TeamMembers.Add(new TeamMemberRow { GroupId = groupId, DisplayName = name, Email = req.Email?.Trim() ?? "", JobTitle = req.Title?.Trim() ?? "" });
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Resources", "Onboarded person", name));
+            await db.SaveChangesAsync();
+            return Results.Ok(new TeamMemberDto(0, name, req.Email?.Trim() ?? "", req.Title?.Trim() ?? ""));
+        });
+    }
+
+    // The onboarded set: Resources sheet names + Entra member display names/emails
+    // (same basis the task list uses to flag unknown assignees).
+    static async Task<HashSet<string>> KnownNamesAsync(AtlasDbContext db)
+    {
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var n in await db.Resources.Select(r => r.Name).ToListAsync()) known.Add(n);
+        foreach (var m in await db.TeamMembers.Select(m => new { m.DisplayName, m.Email }).ToListAsync())
+        {
+            if (!string.IsNullOrWhiteSpace(m.DisplayName)) known.Add(m.DisplayName.Trim());
+            if (!string.IsNullOrWhiteSpace(m.Email)) known.Add(m.Email.Trim());
+        }
+        return known;
     }
 }

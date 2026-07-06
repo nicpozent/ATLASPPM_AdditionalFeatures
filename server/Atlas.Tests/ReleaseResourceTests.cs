@@ -92,4 +92,32 @@ public class ReleaseResourceTests : IClassFixture<AtlasApiFactory>
         var grace = roster.EnumerateArray().First(r => r.GetProperty("name").GetString() == "Grace Hopper");
         Assert.Equal(40, grace.GetProperty("projectPct").GetInt32());
     }
+
+    [Fact]
+    public async Task Unonboarded_assignees_are_surfaced_and_can_be_onboarded()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Imported project" }));
+        // A task with an assignee who isn't in the directory (as if synced from Jira).
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/tasks", new { name = "From Jira", assignee = "Ghost Person" });
+
+        var before = await c.GetFromJsonAsync<JsonElement>("/api/v1/resources/unonboarded");
+        var ghost = before.EnumerateArray().First(u => u.GetProperty("name").GetString() == "Ghost Person");
+        Assert.Contains("Imported project", ghost.GetProperty("projects").EnumerateArray().Select(p => p.GetString()));
+
+        // Onboard them → they drop off the unonboarded list.
+        var onboarded = await c.PostAsJsonAsync("/api/v1/resources/onboard", new { name = "Ghost Person" });
+        Assert.Equal(HttpStatusCode.OK, onboarded.StatusCode);
+
+        var after = await c.GetFromJsonAsync<JsonElement>("/api/v1/resources/unonboarded");
+        Assert.DoesNotContain("Ghost Person", after.EnumerateArray().Select(u => u.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task Onboarding_needs_directory_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "pm");   // no cap-users-roles Edit
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsJsonAsync("/api/v1/resources/onboard", new { name = "X" })).StatusCode);
+    }
 }
