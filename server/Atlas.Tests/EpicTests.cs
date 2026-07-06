@@ -32,6 +32,23 @@ public class EpicTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Epic_progress_aggregates_from_linked_tasks()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Epic rollup project" }));
+        // Manual epic with no stories; two tasks reference it, one Done.
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/epics", new { name = "Checkout", stories = 0, done = 0 });
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/tasks", new { name = "T1", epic = "Checkout", status = "Done" });
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/tasks", new { name = "T2", epic = "Checkout", status = "In Progress" });
+
+        using var doc = JsonDocument.Parse(await (await c.GetAsync($"/api/v1/projects/{projId}/epics")).Content.ReadAsStringAsync());
+        var e = doc.RootElement.GetProperty("epics")[0];
+        Assert.Equal(2, e.GetProperty("stories").GetInt32());   // counted from tasks
+        Assert.Equal(1, e.GetProperty("done").GetInt32());
+        Assert.Equal(50, e.GetProperty("pct").GetInt32());
+    }
+
+    [Fact]
     public async Task Epic_can_be_edited()
     {
         var c = Admin();
