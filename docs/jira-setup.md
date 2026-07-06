@@ -79,7 +79,7 @@ What the sync maps, Jira → Atlas:
 
 | Atlas section | Jira source |
 | ------------- | ----------- |
-| Project → Sprints | board sprints (`/rest/agile/1.0/board/{id}/sprint`); state → Planned/Active/Closed, plus goal, start/end and complete date, origin board |
+| Project → Sprints | board sprints (`/rest/agile/1.0/board/{id}/sprint`) when a board is mapped; **otherwise derived from the issues' own sprint/closedSprints fields** so past & current sprints show with just a project key. State → Planned/Started/Completed, plus goal, start/end and complete date, origin board |
 | Project → Epics | board epics (`/rest/agile/1.0/board/{id}/epic`); name, key, description, deep link; story rollup counted from issues |
 | Project → Tasks | board issues (`/rest/agile/1.0/board/{id}/issue`) — the **full field set** (see below) |
 | Project → Backlog | issues with no sprint |

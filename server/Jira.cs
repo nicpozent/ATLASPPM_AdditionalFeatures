@@ -264,31 +264,32 @@ public static class Jira
         var importComments = !string.Equals(cfg["Jira:ImportComments"], "false", StringComparison.OrdinalIgnoreCase);
         var maxAttachmentBytes = long.TryParse(cfg["Jira:MaxAttachmentBytes"], out var mb) && mb > 0 ? mb : 25L * 1024 * 1024;
 
-        // --- Sprints: only when a board is mapped (they live on a board) -----
+        // --- Sprints: from the board when one is mapped, else derived from the
+        // sprint / closedSprints fields on the issues themselves (so past &
+        // current sprints show even for board-less, key-only mappings). Upsert by
+        // Jira sprint id; pruning happens after the issue scan below.
         var existingSprints = await db.Sprints.Where(s => s.ProjectId == p.Id).ToListAsync();
         var sprintOrd = existingSprints.Select(s => s.Ord).DefaultIfEmpty(0).Max();
         var seenSprints = new HashSet<string>();
-        if (board is int bSprint)
+        void UpsertSprint(JsonElement js, int fallbackBoard)
         {
-            var jiraSprints = await FetchPagedAsync(c, $"rest/agile/1.0/board/{bSprint}/sprint", "values", () => truncated = true);
-            foreach (var js in jiraSprints)
-            {
-                var key = NumOrStr(js, "id");
-                if (key.Length == 0) continue;
-                seenSprints.Add(key);
-                var s = existingSprints.FirstOrDefault(x => x.JiraKey == key);
-                if (s is null) { s = new Sprint { ProjectId = p.Id, JiraKey = key, Ord = ++sprintOrd }; db.Sprints.Add(s); existingSprints.Add(s); }
-                s.Name = Str(js, "name");
-                s.Goal = Str(js, "goal");
-                s.StartDate = DatePart(Str(js, "startDate"));
-                s.EndDate = DatePart(Str(js, "endDate"));
-                s.CompleteDate = DatePart(Str(js, "completeDate"));
-                s.BoardId = IntProp(js, "originBoardId") is var ob && ob > 0 ? ob : bSprint;
-                s.Status = MapSprintState(Str(js, "state"));
-            }
-            if (seenSprints.Count > 0)
-                db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
+            var key = NumOrStr(js, "id");
+            if (key.Length == 0) return;
+            seenSprints.Add(key);
+            var s = existingSprints.FirstOrDefault(x => x.JiraKey == key);
+            if (s is null) { s = new Sprint { ProjectId = p.Id, JiraKey = key, Ord = ++sprintOrd }; db.Sprints.Add(s); existingSprints.Add(s); }
+            if (Str(js, "name") is { Length: > 0 } nm) s.Name = nm;
+            if (Str(js, "goal") is { Length: > 0 } gl) s.Goal = gl;
+            if (Str(js, "startDate") is { Length: > 0 } sd) s.StartDate = DatePart(sd);
+            if (Str(js, "endDate") is { Length: > 0 } ed) s.EndDate = DatePart(ed);
+            if (Str(js, "completeDate") is { Length: > 0 } cd) s.CompleteDate = DatePart(cd);
+            var ob = IntProp(js, "originBoardId");
+            s.BoardId = ob > 0 ? ob : (fallbackBoard > 0 ? fallbackBoard : s.BoardId);
+            if (Str(js, "state") is { Length: > 0 } st) s.Status = MapSprintState(st);
         }
+        if (board is int bSprint)
+            foreach (var js in await FetchPagedAsync(c, $"rest/agile/1.0/board/{bSprint}/sprint", "values", () => truncated = true))
+                UpsertSprint(js, bSprint);
 
         // --- Epics: board endpoint if available, else derived from issues ----
         var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
@@ -359,7 +360,10 @@ public static class Jira
             t.Priority = MapPriority(StrPath(f, "priority", "name"));
             t.TargetDate = DatePart(Str(f, "duedate"));
             t.Points = Math.Max(0, IntProp(f, pointsField));
-            var sprintName = board is null ? "" : SprintNameOf(f);   // no board ⇒ backlog
+            // Board-less: derive the project's sprints from the issues' own sprint
+            // fields so past/current sprints exist without a board.
+            if (board is null) foreach (var js in SprintsFromIssue(f)) UpsertSprint(js, 0);
+            var sprintName = SprintNameOf(f);
             t.Sprint = sprintName;
             if (sprintName.Length == 0) backlog++;
             t.Epic = EpicNameOf(f);
@@ -435,6 +439,8 @@ public static class Jira
             db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.JiraKey.Length > 0 && !seenTasks.Contains(t.JiraKey)));
         if (seenEpics.Count > 0)
             db.Epics.RemoveRange(existingEpics.Where(e => e.JiraKey.Length > 0 && !seenEpics.Contains(e.JiraKey)));
+        if (seenSprints.Count > 0)
+            db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
 
         // Recompute synced epics' story rollup from the project's surviving tasks
         // (by name) — manual tasks plus synced tasks still present — so the epic
@@ -540,6 +546,21 @@ public static class Jira
         if (Prop(fields, "closedSprints") is { ValueKind: JsonValueKind.Array } cs && cs.GetArrayLength() > 0)
             return Str(cs[cs.GetArrayLength() - 1], "name");
         return "";
+    }
+
+    // Every sprint object an issue references (current `sprint` — object or
+    // array — plus any `closedSprints`), used to derive a board-less project's
+    // sprints from its issues.
+    public static IEnumerable<JsonElement> SprintsFromIssue(JsonElement fields)
+    {
+        if (Prop(fields, "sprint") is { } s)
+        {
+            if (s.ValueKind == JsonValueKind.Object) yield return s;
+            else if (s.ValueKind == JsonValueKind.Array)
+                foreach (var x in s.EnumerateArray()) if (x.ValueKind == JsonValueKind.Object) yield return x;
+        }
+        if (Prop(fields, "closedSprints") is { ValueKind: JsonValueKind.Array } cs)
+            foreach (var x in cs.EnumerateArray()) if (x.ValueKind == JsonValueKind.Object) yield return x;
     }
 
     // The issue's epic name: the agile `epic` object (company-managed), else an
