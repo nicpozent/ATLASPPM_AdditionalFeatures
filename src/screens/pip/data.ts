@@ -13,6 +13,7 @@ export interface Iteration { id: number; name: string; startDate: string; endDat
 export interface Objective {
   id: number; title: string; description: string; entityType: string; entityId: string; entityName: string;
   businessValue: number; actualValue: number; committed: boolean; confidence: number; status: string;
+  objectiveLink?: string; okrTitle?: string;
 }
 export interface Dependency {
   id: number; title: string; fromType: string; fromId: string; fromName: string;

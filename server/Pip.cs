@@ -7,9 +7,9 @@ public record UpdateIncrementReq(string? Key, string? Name, string? StartDate, s
 public record CreateIterationReq(string? Name, string? StartDate, string? EndDate, int? Capacity, int? Load);
 public record UpdateIterationReq(string? Name, string? StartDate, string? EndDate, int? Capacity, int? Load);
 public record CreatePiObjectiveReq(string? Title, string? Description, string? EntityType, string? EntityId,
-    int? BusinessValue, int? ActualValue, bool? Committed, int? Confidence, string? Status);
+    int? BusinessValue, int? ActualValue, bool? Committed, int? Confidence, string? Status, string? ObjectiveLink);
 public record UpdatePiObjectiveReq(string? Title, string? Description, string? EntityType, string? EntityId,
-    int? BusinessValue, int? ActualValue, bool? Committed, int? Confidence, string? Status);
+    int? BusinessValue, int? ActualValue, bool? Committed, int? Confidence, string? Status, string? ObjectiveLink);
 public record CreateDependencyReq(string? Title, string? FromType, string? FromId, string? ToType, string? ToId,
     string? Owner, string? DueDate, string? Status);
 public record UpdateDependencyReq(string? Title, string? FromType, string? FromId, string? ToType, string? ToId,
@@ -52,12 +52,12 @@ public static class Pip
             if (inc is null) return Results.NotFound();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
             var names = await LoadTargetsAsync(db);
+            var okr = await LoadOkrTitlesAsync(db);
             string Name(string type, string eid) => names.TryGetValue((type, eid), out var n) ? n : eid;
 
             return Results.Ok(new IncrementDto(inc.Id, inc.Key, inc.Name, inc.StartDate, inc.EndDate, inc.State, canEdit,
                 inc.Iterations.OrderBy(x => x.Ord).Select(x => new PiIterationDto(x.Id, x.Name, x.StartDate, x.EndDate, x.Capacity, x.Load)).ToList(),
-                inc.Objectives.OrderBy(x => x.Ord).Select(x => new PiObjectiveDto(x.Id, x.Title, x.Description, x.EntityType, x.EntityId,
-                    Name(x.EntityType, x.EntityId), x.BusinessValue, x.ActualValue, x.Committed, x.Confidence, x.Status)).ToList(),
+                inc.Objectives.OrderBy(x => x.Ord).Select(x => ToObjectiveDto(x, names, okr)).ToList(),
                 inc.Dependencies.OrderBy(x => x.Ord).Select(x => new PiDependencyDto(x.Id, x.Title, x.FromType, x.FromId, Name(x.FromType, x.FromId),
                     x.ToType, x.ToId, Name(x.ToType, x.ToId), x.Owner, x.DueDate, x.Status)).ToList(),
                 names.Select(kv => new PiLinkTargetDto(kv.Key.Item1, kv.Key.Item2, kv.Value)).ToList()));
@@ -179,12 +179,12 @@ public static class Pip
                 EntityType = req.EntityType?.Trim() ?? "", EntityId = req.EntityId?.Trim() ?? "",
                 BusinessValue = Clamp(req.BusinessValue ?? 0, 0, 10), ActualValue = Clamp(req.ActualValue ?? 0, 0, 10),
                 Committed = req.Committed ?? true, Confidence = Clamp(req.Confidence ?? 0, 0, 5),
-                Status = ObjectiveStatuses.Contains(req.Status) ? req.Status! : "Planned", Ord = ord,
+                Status = ObjectiveStatuses.Contains(req.Status) ? req.Status! : "Planned",
+                ObjectiveLink = req.ObjectiveLink?.Trim() ?? "", Ord = ord,
             };
             db.PiObjectives.Add(o);
             await db.SaveChangesAsync();
-            var names = await LoadTargetsAsync(db);
-            return Results.Created($"/api/v1/increments/{id}", ToObjectiveDto(o, names));
+            return Results.Created($"/api/v1/increments/{id}", ToObjectiveDto(o, await LoadTargetsAsync(db), await LoadOkrTitlesAsync(db)));
         });
 
         api.MapPatch("/pi-objectives/{objId:int}", async (int objId, UpdatePiObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -213,9 +213,9 @@ public static class Pip
                 if (!ObjectiveStatuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
                 o.Status = req.Status;
             }
+            if (req.ObjectiveLink is not null) o.ObjectiveLink = req.ObjectiveLink.Trim();
             await db.SaveChangesAsync();
-            var names = await LoadTargetsAsync(db);
-            return Results.Ok(ToObjectiveDto(o, names));
+            return Results.Ok(ToObjectiveDto(o, await LoadTargetsAsync(db), await LoadOkrTitlesAsync(db)));
         });
 
         api.MapDelete("/pi-objectives/{objId:int}", async (int objId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -299,10 +299,11 @@ public static class Pip
 
     static int Clamp(int v, int lo, int hi) => Math.Max(lo, Math.Min(hi, v));
 
-    static PiObjectiveDto ToObjectiveDto(PiObjective o, Dictionary<(string, string), string> names) =>
+    static PiObjectiveDto ToObjectiveDto(PiObjective o, Dictionary<(string, string), string> names, Dictionary<string, string> okr) =>
         new(o.Id, o.Title, o.Description, o.EntityType, o.EntityId,
             names.TryGetValue((o.EntityType, o.EntityId), out var n) ? n : o.EntityId,
-            o.BusinessValue, o.ActualValue, o.Committed, o.Confidence, o.Status);
+            o.BusinessValue, o.ActualValue, o.Committed, o.Confidence, o.Status,
+            o.ObjectiveLink, okr.TryGetValue(o.ObjectiveLink, out var ot) ? ot : "");
 
     static PiDependencyDto ToDependencyDto(PiDependency d, Dictionary<(string, string), string> names) =>
         new(d.Id, d.Title, d.FromType, d.FromId, names.TryGetValue((d.FromType, d.FromId), out var fn) ? fn : d.FromId,
@@ -324,4 +325,9 @@ public static class Pip
             map[("release", r.Id)] = r.Name;
         return map;
     }
+
+    // OKR objectives, keyed by id → title, so a PI objective can name the strategic
+    // objective it advances.
+    static async Task<Dictionary<string, string>> LoadOkrTitlesAsync(AtlasDbContext db) =>
+        await db.Objectives.ToDictionaryAsync(o => o.Id, o => o.Title);
 }

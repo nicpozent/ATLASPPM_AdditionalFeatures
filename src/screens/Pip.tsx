@@ -218,6 +218,7 @@ function ObjectiveSection({ title, items, inc, onEdit, onVote, onDelete }: {
                       <span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>{o.title}</span>
                       <Pill label={o.status} ink={p.ink} tint={p.tint} />
                       {o.entityName && o.entityType && <Pill label={`${o.entityType}: ${o.entityName}`} ink={color.primary} tint={color.primaryTint} />}
+                      {o.okrTitle && <Pill label={`OKR: ${o.okrTitle}`} ink={color.accent} tint={color.accentTint} />}
                     </div>
                     {o.description && <div style={{ fontSize: 12.5, color: color.subtle, marginTop: 5 }}>{o.description}</div>}
                     <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 10, flexWrap: "wrap" }}>
@@ -475,13 +476,19 @@ function ObjectiveModal({ inc, obj, onClose }: { inc: IncrementDetail; obj?: Obj
   const [committed, setCommitted] = useState(obj?.committed ?? true);
   const [confidence, setConf] = useState(obj?.confidence ?? 0);
   const [status, setStatus] = useState(obj?.status ?? "Planned");
+  const [objectiveLink, setObjectiveLink] = useState(obj?.objectiveLink ?? "");
+  // Strategic OKR objectives this PI objective can advance (empty until the API has any).
+  const okrs = useQuery({
+    queryKey: ["okrs"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<{ id: string; title: string }[]> => { try { return (await api<{ id: string; title: string }[]>("/okrs")) ?? []; } catch { return []; } },
+  });
   const save = useMutation({
     mutationFn: (body: object) => obj
       ? api(`/pi-objectives/${obj.id}`, { method: "PATCH", body: JSON.stringify(body) })
       : api(`/increments/${inc.id}/objectives`, { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["increment", inc.id] }); onClose(); }, onError: toastError,
   });
-  const submit = () => { if (!title.trim()) { toast("Title is required", "error"); return; } save.mutate({ title, description, entityType, entityId, businessValue, actualValue, committed, confidence, status }); };
+  const submit = () => { if (!title.trim()) { toast("Title is required", "error"); return; } save.mutate({ title, description, entityType, entityId, businessValue, actualValue, committed, confidence, status, objectiveLink }); };
   return (
     <Modal onClose={onClose} width={500} label={obj ? "Edit objective" : "Add objective"}>
       <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 16 }}>{obj ? "Edit PI objective" : "Add PI objective"}</div>
@@ -489,6 +496,12 @@ function ObjectiveModal({ inc, obj, onClose }: { inc: IncrementDetail; obj?: Obj
         <Field label="Objective">{(id) => <Input id={id} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Launch unified checkout across Nordics" />}</Field>
         <Field label="Description">{(id) => <Textarea id={id} value={description} onChange={(e) => setDesc(e.target.value)} rows={2} />}</Field>
         <Field label="Linked deliverable">{() => <TargetPicker targets={inc.targets} type={entityType} id={entityId} onChange={(t, i) => { setType(t); setId(i); }} />}</Field>
+        <Field label="Strategic OKR (optional)">{(id) => (
+          <Select id={id} value={objectiveLink} onChange={(e) => setObjectiveLink(e.target.value)}>
+            <option value="">No OKR link</option>
+            {(okrs.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+          </Select>
+        )}</Field>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Business value (1–10)">{(id) => <Input id={id} type="number" min={0} max={10} value={businessValue} onChange={(e) => setBV(Number(e.target.value))} />}</Field>
           <Field label="Status">{(id) => <Select id={id} value={status} onChange={(e) => setStatus(e.target.value)}>{OBJ_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select>}</Field>

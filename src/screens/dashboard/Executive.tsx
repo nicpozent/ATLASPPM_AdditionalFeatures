@@ -2,6 +2,7 @@ import { color, font, chart, radius } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { Card, ProgressBar, HealthPill, statusDot } from "@/components/ui";
 import { Sparkline, HealthDonut, BudgetChart } from "./charts";
+import { PiSummaryCard } from "./PiSummaryCard";
 import {
   KPI_DEFS, HEALTH_SEGMENTS, PIPELINE_STAGES, type DashboardData,
 } from "./data";
@@ -165,6 +166,8 @@ export function Executive({ d, onProject, onPortfolio }: {
               })}
             </div>
           </Card>
+
+          <PiSummaryCard />
 
           <Card padding="18px 19px">
             <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink, marginBottom: 13 }}>Recent activity</div>
