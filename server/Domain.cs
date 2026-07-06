@@ -222,6 +222,45 @@ public class DemandComment
     public string CreatedAt { get; set; } = "";        // ISO timestamp
 }
 
+// A manager-owned roster of people. Managers create sub-teams that PMs then
+// attach to a project/program/product/release (see TeamAssignment).
+public class SubTeam
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string ManagerKey { get; set; } = "";       // owning manager slot (teammgr/svcmgr/…)
+    public string Description { get; set; } = "";
+    public List<SubTeamMember> Members { get; set; } = new();
+}
+
+public class SubTeamMember
+{
+    public int Id { get; set; }
+    public int SubTeamId { get; set; }
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Title { get; set; } = "";
+}
+
+// A sub-team attached to an entity, with the specific members working on it.
+public class TeamAssignment
+{
+    public int Id { get; set; }
+    public string EntityType { get; set; } = "";       // project|program|product|release
+    public string EntityId { get; set; } = "";
+    public int SubTeamId { get; set; }
+    public List<TeamAssignmentMember> Members { get; set; } = new();
+}
+
+public class TeamAssignmentMember
+{
+    public int Id { get; set; }
+    public int TeamAssignmentId { get; set; }
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Title { get; set; } = "";
+}
+
 // ---- Roles & permissions (in-app RBAC) ------------------------------------
 // The permission matrix on Admin → Roles & Permissions is DB-backed: the six
 // canonical roles + capability catalogue ship as reference data (IsSystem), and

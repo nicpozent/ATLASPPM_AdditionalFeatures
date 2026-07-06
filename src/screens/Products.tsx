@@ -7,6 +7,7 @@ import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { TeamPanel } from "@/components/TeamPanel";
 import { DEPARTMENTS } from "@/departments";
 
 type Source = "jira" | "ado" | "manual";
@@ -325,6 +326,9 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
 
       {/* team & allocation — members come from the Entra teams mapped in Admin → Teams */}
       <ProductTeamSection productId={product.id} />
+
+      {/* sub-teams working on this product */}
+      <div style={{ marginTop: 18 }}><TeamPanel entityType="product" entityId={product.id} /></div>
 
 
       {/* tasks → release mapping */}

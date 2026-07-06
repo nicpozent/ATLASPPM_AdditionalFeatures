@@ -5,6 +5,7 @@ import { api } from "@/api";
 import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
+import { TeamPanel } from "@/components/TeamPanel";
 
 // ---- data ----------------------------------------------------------------
 type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed" | "Cancelled";
@@ -84,6 +85,7 @@ export default function Releases() {
   const [modal, setModal] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Release | null>(null);
+  const [teamFor, setTeamFor] = useState<Release | null>(null);
   const { data: releases = [] } = useReleases();
   const qc = useQueryClient();
   const { can } = usePermissions();
@@ -240,6 +242,8 @@ export default function Releases() {
                     <RowMenu ariaLabel="Release actions" width={176}>
                       {(close) => (
                         <>
+                          <MenuItem label="Team" icon={<Icon name="users" size={15} />} onClick={() => { setTeamFor(r); close(); }} />
+                          <MenuDivider />
                           {mayEdit && (r.archived
                             ? <MenuItem label="Restore" icon={<Icon name="refresh" size={15} />} onClick={() => { archive.mutate({ id: r.id, on: false }); close(); }} />
                             : <MenuItem label="Archive" icon={<Icon name="archive" size={15} />} onClick={() => { archive.mutate({ id: r.id, on: true }); close(); }} />)}
@@ -253,6 +257,12 @@ export default function Releases() {
             );
           })}
         </Card>
+      )}
+
+      {teamFor && (
+        <Overlay onClose={() => setTeamFor(null)} width={520} label={`Team · ${teamFor.name}`}>
+          <TeamPanel entityType="release" entityId={teamFor.id} />
+        </Overlay>
       )}
 
       {confirmDel && (
