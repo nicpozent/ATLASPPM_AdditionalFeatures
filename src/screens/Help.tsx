@@ -17,9 +17,14 @@ interface Article { id: number; kind: string; audience: string; code: string; ti
 interface HelpData { canManage: boolean; guides: Article[]; troubleshooting: Article[]; }
 
 const ROLE_TABS: { id: string; label: string }[] = [
+  { id: "all", label: "Getting started" },
   { id: "admin", label: "Platform Admin" }, { id: "pmo", label: "PMO" }, { id: "pm", label: "Project Manager" },
   { id: "team", label: "Team Member" }, { id: "exec", label: "Executive" },
 ];
+const roleLabel = (id: string) => ROLE_TABS.find((r) => r.id === id)?.label ?? id;
+
+// Where "Contact the PMO" sends mail. UI chrome — a Platform Admin can change it.
+const SUPPORT_MAILBOX = "pmo-support@birgma.com";
 const CAT_TINT: Record<string, { ink: string; tint: string; icon: string }> = {
   NET: { ink: "#0C5798", tint: "#E6EFFB", icon: "cloud" }, AUTH: { ink: "#5E2E89", tint: "#F0E8F7", icon: "key" },
   VAL: { ink: "#8A6300", tint: "#FBF2D7", icon: "edit" }, SRV: { ink: "#A1282B", tint: "#FBE7E8", icon: "server" },
@@ -30,7 +35,8 @@ export default function Help() {
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const codePrefix = (params.get("code") ?? "").split("-")[0].toUpperCase();
-  const [role, setRole] = useState<string>("admin");
+  const [role, setRole] = useState<string>("all");
+  const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Article | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -39,8 +45,19 @@ export default function Help() {
     queryFn: async (): Promise<HelpData> => (await api<HelpData>("/help")) ?? { canManage: false, guides: [], troubleshooting: [] },
   });
   const canManage = data?.canManage ?? false;
-  const guides = useMemo(() => (data?.guides ?? []).filter((g) => g.audience === role), [data, role]);
-  const troubleshooting = data?.troubleshooting ?? [];
+
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+  // When searching, look across every role; otherwise show the selected role's guides.
+  const guides = useMemo(() => {
+    const hit = (a: Article) => !q || [a.title, a.summary, a.body].some((s) => (s ?? "").toLowerCase().includes(q));
+    const all = data?.guides ?? [];
+    return q ? all.filter(hit) : all.filter((g) => g.audience === role);
+  }, [data, role, q]);
+  const troubleshooting = useMemo(() => {
+    const hit = (a: Article) => !q || [a.title, a.summary, a.body].some((s) => (s ?? "").toLowerCase().includes(q));
+    return (data?.troubleshooting ?? []).filter(hit);
+  }, [data, q]);
 
   const del = useMutation({
     mutationFn: (id: number) => api(`/help/articles/${id}`, { method: "DELETE" }),
@@ -53,10 +70,27 @@ export default function Help() {
       <div style={{ background: "linear-gradient(115deg,#11163A,#0F6CBD)", borderRadius: 18, padding: "34px 32px", marginBottom: 24, color: "#fff", textAlign: "center" }}>
         <div style={{ fontFamily: font.head, fontSize: 25, fontWeight: 600, marginBottom: 7 }}>How can we help?</div>
         <div style={{ fontSize: 14, color: "#C9D6EE", marginBottom: 20 }}>Role guides, troubleshooting and release notes — or reach the PMO support team.</div>
-        <div style={{ maxWidth: 540, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 11, padding: "12px 16px" }}>
+        <div style={{ maxWidth: 540, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 11, padding: "10px 14px" }}>
           <span style={{ color: color.faint3, display: "flex" }}><Icon name="search" size={18} /></span>
-          <span style={{ fontSize: 14, color: color.faint3 }}>Search the help centre…</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search guides and troubleshooting…"
+            aria-label="Search the help centre"
+            style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", color: color.text, background: "transparent" }}
+          />
+          {query && (
+            <button onClick={() => setQuery("")} aria-label="Clear search" title="Clear"
+              style={{ border: "none", background: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 2 }}>
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
+        {searching && (
+          <div style={{ fontSize: 12.5, color: "#C9D6EE", marginTop: 12 }}>
+            {guides.length + troubleshooting.length} result{guides.length + troubleshooting.length === 1 ? "" : "s"} for “{query.trim()}”
+          </div>
+        )}
       </div>
 
       {/* Troubleshooting — surfaced first when arriving from an error link */}
@@ -83,38 +117,44 @@ export default function Help() {
             </Card>
           );
         })}
-        {troubleshooting.length === 0 && <div style={{ color: color.faint3, fontSize: 13 }}>No troubleshooting entries yet.</div>}
+        {troubleshooting.length === 0 && <div style={{ color: color.faint3, fontSize: 13 }}>{searching ? "No troubleshooting entries match your search." : "No troubleshooting entries yet."}</div>}
       </div>
 
-      {/* role selector for guides */}
+      {/* role selector for guides — hidden while searching (results span roles) */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>Guides</span>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
-          {ROLE_TABS.map((rt) => {
-            const active = role === rt.id;
-            return (
-              <button key={rt.id} onClick={() => setRole(rt.id)} style={{
-                padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488",
-                boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
-              }}>{rt.label}</button>
-            );
-          })}
-        </div>
+        {!searching && (
+          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
+            {ROLE_TABS.map((rt) => {
+              const active = role === rt.id;
+              return (
+                <button key={rt.id} onClick={() => setRole(rt.id)} style={{
+                  padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                  background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488",
+                  boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
+                }}>{rt.label}</button>
+              );
+            })}
+          </div>
+        )}
+        {searching && <span style={{ fontSize: 12.5, color: color.faint2 }}>matching “{query.trim()}” across all roles</span>}
         <div style={{ flex: 1 }} />
-        {canManage && <Button variant="secondary" onClick={() => setAdding(true)}><Icon name="plus" size={15} /> Add guide</Button>}
+        {canManage && !searching && <Button variant="secondary" onClick={() => setAdding(true)}><Icon name="plus" size={15} /> Add guide</Button>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 18, alignItems: "start" }}>
         <Card padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>{ROLE_TABS.find((r) => r.id === role)?.label} guides</div>
+          <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>{searching ? "Search results" : `${roleLabel(role)} guides`}</div>
           {guides.length === 0 ? (
-            <div style={{ padding: "28px 22px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No guides for this role yet.</div>
+            <div style={{ padding: "28px 22px", textAlign: "center", color: color.faint3, fontSize: 13 }}>{searching ? "No guides match your search." : "No guides for this role yet."}</div>
           ) : guides.map((art) => (
             <div key={art.id} style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
               <span style={{ color: color.primary, display: "flex", marginTop: 2 }}><Icon name="book" size={18} /></span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{art.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{art.title}</span>
+                  {searching && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#56607A", background: "#EEF1F6", padding: "2px 7px", borderRadius: 5 }}>{roleLabel(art.audience)}</span>}
+                </div>
                 {art.summary && <div style={{ fontSize: 12.5, color: color.faint2, marginTop: 2 }}>{art.summary}</div>}
                 {art.body && art.body !== art.summary && <div style={{ fontSize: 12.5, color: color.subtle, marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{art.body}</div>}
               </div>
@@ -130,9 +170,25 @@ export default function Help() {
         <Card padding={22}>
           <div style={{ width: 46, height: 46, borderRadius: 12, background: "#E7F4EC", color: "#0B6B37", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><Icon name="message" size={20} /></div>
           <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 6 }}>Contact the PMO</div>
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: color.subtle, marginBottom: 16 }}>Can't find an answer? Raise a ticket and the Atlas support team will respond within one business day.</div>
-          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>Open a support ticket</button>
-          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Chat with us</button>
+          <div style={{ fontSize: 13, lineHeight: 1.55, color: color.subtle, marginBottom: 12 }}>Can't find an answer here? Email the Atlas support team and we'll respond within one business day.</div>
+          <div style={{ fontSize: 12, lineHeight: 1.5, color: color.faint2, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+            <b style={{ color: color.textMuted }}>For the fastest answer, include:</b>
+            <ul style={{ margin: "6px 0 0", paddingLeft: 16 }}>
+              <li>the error code, if you saw one (e.g. SRV-… or INT-…)</li>
+              <li>the screen you were on and what you were doing</li>
+              <li>the approximate time it happened</li>
+            </ul>
+          </div>
+          <a
+            href={`mailto:${SUPPORT_MAILBOX}?subject=${encodeURIComponent("Atlas support request")}&body=${encodeURIComponent(
+              `Role: ${roleLabel(role)}\nScreen: \nError code (if any): ${params.get("code") ?? ""}\nWhen it happened: \n\nWhat I expected:\n\nWhat happened instead:\n`)}`}
+            style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", textDecoration: "none", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>
+            Email the PMO
+          </a>
+          <button onClick={() => { setQuery(""); setRole("all"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>
+            Browse getting-started guides
+          </button>
         </Card>
       </div>
 
