@@ -94,6 +94,7 @@ public static class Sprints
         // Spilled in = a task now in this sprint whose baseline was a different sprint.
         var spilled = inSprint.Count(t => !string.IsNullOrWhiteSpace(t.Baseline) && !string.Equals(t.Baseline, s.Name, StringComparison.OrdinalIgnoreCase));
         return new SprintDto(s.Id, s.Name, s.Goal, s.StartDate, s.EndDate, s.Status,
-            s.CommittedPoints > 0 ? s.CommittedPoints : points, inSprint.Count, done.Count, points, donePoints, spilled);
+            s.CommittedPoints > 0 ? s.CommittedPoints : points, inSprint.Count, done.Count, points, donePoints, spilled,
+            s.CompleteDate, s.BoardId, s.JiraKey);
     }
 }

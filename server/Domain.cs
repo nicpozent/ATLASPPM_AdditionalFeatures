@@ -657,12 +657,31 @@ public class ProjectTask
     public string TargetDate { get; set; } = "";          // ISO date
     public int Points { get; set; }                       // story points
     public string Size { get; set; } = "";                // t-shirt: XS|S|M|L|XL|XXL
-    public int EstimateHours { get; set; }                // estimated effort to complete
+    public int EstimateHours { get; set; }                // estimated effort to complete (Jira original estimate when synced)
     public int Ord { get; set; }
     public string JiraKey { get; set; } = "";             // Jira issue key when synced (e.g. "GIT-123"); "" ⇒ local
+
+    // ---- Rich fields carried across from Jira (empty for locally-created rows) ----
+    public string Description { get; set; } = "";         // plain text lifted from Jira's ADF description
+    public string IssueType { get; set; } = "";           // Story | Bug | Task | Sub-task | …
+    public string Reporter { get; set; } = "";            // Jira reporter display name
+    public string StatusName { get; set; } = "";          // exact Jira status name (e.g. "In Review", "Blocked")
+    public string Resolution { get; set; } = "";          // e.g. "Done", "Won't Do"
+    public List<string> Labels { get; set; } = new();
+    public List<string> Components { get; set; } = new();
+    public List<string> FixVersions { get; set; } = new();
+    public string ParentKey { get; set; } = "";           // parent issue key (sub-tasks / stories under an epic)
+    public string EpicKey { get; set; } = "";             // stable Jira epic key (survives epic renames)
+    public int TimeSpentHours { get; set; }               // logged work (Jira timespent, rounded to hours)
+    public string JiraCreated { get; set; } = "";         // ISO timestamp from Jira
+    public string JiraUpdated { get; set; } = "";         // ISO timestamp from Jira (drives "last synced" freshness)
+    public string JiraUrl { get; set; } = "";             // deep link, e.g. https://site/browse/GIT-123
+    public List<TaskComment> Comments { get; set; } = new();
+    public List<TaskAttachment> Attachments { get; set; } = new();
 }
 
-// A comment on a task's thread. Author/initials captured at post time.
+// A comment on a task's thread. Author/initials captured at post time; comments
+// pulled from Jira carry their JiraId so re-syncs upsert rather than duplicate.
 public class TaskComment
 {
     public int Id { get; set; }
@@ -671,6 +690,22 @@ public class TaskComment
     public string Initials { get; set; } = "";
     public string Body { get; set; } = "";
     public DateTime At { get; set; }
+    public string JiraId { get; set; } = "";              // Jira comment id when synced; "" ⇒ posted in Atlas
+}
+
+// A file attached to a task, mirrored from Jira. Bytes are stored in the DB
+// (bytea) exactly like ArtifactVersion / RequirementAttachment.
+public class TaskAttachment
+{
+    public int Id { get; set; }
+    public int TaskId { get; set; }
+    public string JiraId { get; set; } = "";              // Jira attachment id (for idempotent re-sync)
+    public string FileName { get; set; } = default!;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long Size { get; set; }
+    public string Author { get; set; } = "";              // who attached it in Jira
+    public string CreatedAt { get; set; } = "";           // ISO timestamp from Jira
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
 }
 
 // A sprint (iteration) on an agile-with-sprints project. Tasks are matched to a
@@ -688,6 +723,8 @@ public class Sprint
     public int CommittedPoints { get; set; }              // manual commitment; 0 ⇒ derive from tasks
     public int Ord { get; set; }
     public string JiraKey { get; set; } = "";             // Jira sprint id when synced; "" ⇒ local
+    public string CompleteDate { get; set; } = "";        // ISO date the sprint was actually closed (Jira)
+    public int BoardId { get; set; }                      // origin board id (Jira); 0 ⇒ unknown/local
 }
 
 // ---- Financial cost lines (role-owned) ------------------------------------
@@ -906,6 +943,9 @@ public class Epic
     public List<int> DependsOnIds { get; set; } = new();  // other epics in this project this one depends on
     public int Ord { get; set; }
     public string JiraKey { get; set; } = "";             // Jira epic id when synced; "" ⇒ local
+    public string Description { get; set; } = "";          // plain text lifted from Jira's ADF description
+    public string EpicKey { get; set; } = "";              // stable Jira epic key (e.g. "GIT-1")
+    public string JiraUrl { get; set; } = "";              // deep link into Jira
 }
 
 // ---- Security, privacy & compliance ---------------------------------------

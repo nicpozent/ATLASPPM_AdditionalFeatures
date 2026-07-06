@@ -54,6 +54,9 @@ services:
       Jira__Email: ${JIRA_EMAIL:-}
       Jira__ApiToken: ${JIRA_API_TOKEN:-}
       Jira__StoryPointsField: ${JIRA_STORY_POINTS_FIELD:-}
+      Jira__ImportComments: ${JIRA_IMPORT_COMMENTS:-}
+      Jira__ImportAttachments: ${JIRA_IMPORT_ATTACHMENTS:-}
+      Jira__MaxAttachmentBytes: ${JIRA_MAX_ATTACHMENT_BYTES:-}
     depends_on:
       db:
         condition: service_healthy

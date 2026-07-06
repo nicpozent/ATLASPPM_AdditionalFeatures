@@ -30,6 +30,13 @@ public static class Tasks
             var absences = await db.Absences.Where(a => a.ProjectId == id).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
+            var taskIds = tasks.Select(t => t.Id).ToList();
+            var attCounts = (await db.TaskAttachments.Where(a => taskIds.Contains(a.TaskId))
+                .GroupBy(a => a.TaskId).Select(g => new { g.Key, N = g.Count() }).ToListAsync())
+                .ToDictionary(x => x.Key, x => x.N);
+            var comCounts = (await db.TaskComments.Where(c => taskIds.Contains(c.TaskId))
+                .GroupBy(c => c.TaskId).Select(g => new { g.Key, N = g.Count() }).ToListAsync())
+                .ToDictionary(x => x.Key, x => x.N);
             // Onboarded people: resource pool + Entra-synced directory members.
             // A task assignee not in this set (e.g. pulled from Jira but never
             // onboarded) is flagged so the UI can warn.
@@ -37,7 +44,7 @@ public static class Tasks
             foreach (var r in await db.Resources.Select(x => x.Name).ToListAsync()) if (!string.IsNullOrWhiteSpace(r)) known.Add(r.Trim());
             foreach (var m in await db.TeamMembers.Select(x => new { x.DisplayName, x.Email }).ToListAsync())
             { if (!string.IsNullOrWhiteSpace(m.DisplayName)) known.Add(m.DisplayName.Trim()); if (!string.IsNullOrWhiteSpace(m.Email)) known.Add(m.Email.Trim()); }
-            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known)).ToList(), canCreate));
+            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known, attCounts, comCounts)).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -126,10 +133,25 @@ public static class Tasks
         api.MapGet("/tasks/{taskId:int}/comments", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (!await db.ProjectTasks.AnyAsync(t => t.Id == taskId)) return Results.NotFound();
-            var items = await db.TaskComments.Where(c => c.TaskId == taskId).OrderBy(c => c.Id)
-                .Select(c => new TaskCommentDto(c.Id, c.Author, c.Initials, c.Body, c.At.ToString("o"))).ToListAsync();
+            var items = await db.TaskComments.Where(c => c.TaskId == taskId).OrderBy(c => c.At).ThenBy(c => c.Id)
+                .Select(c => new TaskCommentDto(c.Id, c.Author, c.Initials, c.Body, c.At.ToString("o"), c.JiraId != "")).ToListAsync();
             var canPost = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             return Results.Ok(new { canPost, comments = items });
+        });
+
+        // ---- Task attachments (files mirrored from Jira) ------------------
+        api.MapGet("/tasks/{taskId:int}/attachments", async (int taskId, AtlasDbContext db) =>
+        {
+            if (!await db.ProjectTasks.AnyAsync(t => t.Id == taskId)) return Results.NotFound();
+            var items = await db.TaskAttachments.Where(a => a.TaskId == taskId).OrderBy(a => a.Id)
+                .Select(a => new TaskAttachmentDto(a.Id, a.FileName, a.ContentType, a.Size, a.Author, a.CreatedAt)).ToListAsync();
+            return Results.Ok(items);
+        });
+
+        api.MapGet("/task-attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        {
+            var a = await db.TaskAttachments.FindAsync(attId);
+            return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });
 
         api.MapPost("/tasks/{taskId:int}/comments", async (int taskId, CreateCommentReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -243,18 +265,25 @@ public static class Tasks
             .Where(x => x is not null)
             .Select(x => new EpicRefDto(x!.Id, x.Name))
             .ToList();
-        return new EpicDto(e.Id, e.Name, stories, done, pct, e.Status, e.DependsOn, deps);
+        return new EpicDto(e.Id, e.Name, stories, done, pct, e.Status, e.DependsOn, deps,
+            e.Description, e.EpicKey, e.JiraUrl, e.JiraKey);
     }
 
-    static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences, HashSet<string>? known = null)
+    static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences, HashSet<string>? known = null,
+        IReadOnlyDictionary<int, int>? attachmentCounts = null, IReadOnlyDictionary<int, int>? commentCounts = null)
     {
         var onLeave = absences is not null && OnLeave(t, absences);
         // Unknown only when we were given the onboarded set and the assignee
         // (a real person) isn't in it — otherwise assume known.
         var unassigned = string.IsNullOrWhiteSpace(t.Assignee) || t.Assignee == "Unassigned";
         var assigneeKnown = known is null || unassigned || known.Contains(t.Assignee.Trim());
+        var atts = attachmentCounts is not null && attachmentCounts.TryGetValue(t.Id, out var ac) ? ac : 0;
+        var coms = commentCounts is not null && commentCounts.TryGetValue(t.Id, out var cc) ? cc : 0;
         return new(t.Id, t.Code, t.Name, t.Epic, t.Assignee, t.Status, t.Sprint, t.Baseline, t.Priority,
-            t.StartDate, t.TargetDate, t.Points, t.Size, t.EstimateHours, onLeave, assigneeKnown);
+            t.StartDate, t.TargetDate, t.Points, t.Size, t.EstimateHours, onLeave, assigneeKnown,
+            t.Description, t.IssueType, t.Reporter, t.StatusName, t.Resolution,
+            t.Labels, t.Components, t.FixVersions, t.ParentKey, t.EpicKey,
+            t.TimeSpentHours, t.JiraKey, t.JiraUrl, t.JiraCreated, t.JiraUpdated, atts, coms);
     }
 
     // The assignee is "on leave" if any of their absences overlaps the task's
