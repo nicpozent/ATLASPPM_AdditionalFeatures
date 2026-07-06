@@ -47,6 +47,12 @@ services:
       Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
       # Optional: sync only groups assigned to the "Atlas Team Group" app role.
       Graph__SyncAppRoleId: ${GRAPH_SYNC_APP_ROLE_ID:-}
+      # Jira Cloud (pull-only). Site URL + a service-account email and API token
+      # (Basic auth). Empty ⇒ the Jira integration stays dormant. Prefer a Docker
+      # secret for JIRA_API_TOKEN in production. See docs/jira-setup.md.
+      Jira__BaseUrl: ${JIRA_BASE_URL:-}
+      Jira__Email: ${JIRA_EMAIL:-}
+      Jira__ApiToken: ${JIRA_API_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy

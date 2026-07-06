@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { toast } from "@/components/Toast";
 
 // ---- Identity, email & directory (Microsoft 365) — persisted via /settings --
 interface Identity { key: string; name: string; icon: string; detail: string; tint: string; ink: string }
@@ -52,6 +53,18 @@ export default function Integrations() {
   });
   const [connected, setConnected] = useState<Record<string, boolean>>({});
 
+  // Jira is a live connector (Phase 1: config + connection test, pull-only).
+  const { data: jira } = useQuery({
+    queryKey: ["jira-status"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ configured: boolean; baseUrl: string; canManage: boolean }> =>
+      (await api<{ configured: boolean; baseUrl: string; canManage: boolean }>("/integrations/jira/status")) ?? { configured: false, baseUrl: "", canManage: false },
+  });
+  const testJira = useMutation({
+    mutationFn: () => api<{ ok: boolean; displayName?: string; error?: string }>("/integrations/jira/test", { method: "POST" }),
+    onSuccess: (r) => toast(r?.ok ? `Jira connected${r.displayName ? " as " + r.displayName : ""}.` : (r?.error ?? "Jira test failed."), r?.ok ? "info" : "error"),
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* Identity & platform */}
@@ -88,6 +101,30 @@ export default function Integrations() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
         {APPS.map((a) => {
+          // Jira is wired to the real backend (config status + live test); the
+          // rest remain cosmetic connector chrome until each is built.
+          if (a.name === "Jira") {
+            const configured = !!jira?.configured;
+            const detail = configured && jira?.baseUrl ? jira.baseUrl : a.detail;
+            return (
+              <div key={a.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: a.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontFamily: font.head, fontSize: 15, fontWeight: 700 }}>{a.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                  <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : "#566077", background: configured ? "#E7F4EC" : "#EEF0F4", padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
+                  <button
+                    onClick={() => testJira.mutate()}
+                    disabled={testJira.isPending || !jira?.canManage}
+                    title={jira?.canManage ? (configured ? "Verify the Jira credentials" : "Set Jira credentials in config, then test") : "Needs Edit on Integrations & connectors"}
+                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testJira.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: testJira.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                  >{testJira.isPending ? "Testing…" : "Test connection"}</button>
+                </div>
+              </div>
+            );
+          }
           const on = !!connected[a.name];
           const toggle = () => setConnected((s) => ({ ...s, [a.name]: !s[a.name] }));
           return (

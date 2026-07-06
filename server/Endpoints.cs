@@ -39,6 +39,7 @@ public static class Endpoints
         api.MapGanttEndpoints();
         api.MapFinancialsEndpoints();
         api.MapTeamEndpoints();
+        api.MapJiraEndpoints();
         api.MapNotificationEndpoints();
         api.MapHelpEndpoints();
         api.MapGdprEndpoints();
