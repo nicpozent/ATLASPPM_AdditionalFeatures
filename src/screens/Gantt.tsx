@@ -7,7 +7,7 @@ import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
 import { Overlay } from "./Demands";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const VIEW_TABS = [["schedule", "Schedule"], ["resources", "Resource allocation"], ["sprints", "Sprints"]] as const;
+const VIEW_TABS = [["schedule", "Schedule"], ["tasks", "Tasks"], ["resources", "Resource allocation"], ["sprints", "Sprints"]] as const;
 type ViewId = (typeof VIEW_TABS)[number][0];
 
 interface Phase { id: number; name: string; startMonth: number; endMonth: number; progress: number; }
@@ -115,6 +115,13 @@ export default function Gantt() {
     onSuccess: invalidate,
   });
 
+  // Window fallback: if the project has no parseable start/end dates but has
+  // dated tasks, derive the window from the task date range so the Schedule
+  // isn't blank for imported projects that carry tasks but no phases/dates.
+  const taskMonths = (taskData?.tasks ?? []).flatMap((t) => [monthOfIso(t.startDate), monthOfIso(t.targetDate)]).filter((m): m is number => m !== null);
+  const effProjectStart = gantt?.projectStart ?? (taskMonths.length ? Math.min(...taskMonths) : null);
+  const effProjectEnd = gantt?.projectEnd ?? (taskMonths.length ? Math.max(...taskMonths) : null);
+
   const milestones = (scope === "program" ? programGantt?.milestones : gantt?.milestones) ?? [];
   const opts = scope === "program" ? programs : projects;
   const activeId = scope === "program" ? activeProgramId : activeProjectId;
@@ -180,11 +187,15 @@ export default function Gantt() {
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
             : <ProjectSchedule
                 phases={gantt?.phases ?? []} milestones={milestones} canEdit={canEdit} hasProject={!!activeProjectId}
-                projectStart={gantt?.projectStart ?? null} projectEnd={gantt?.projectEnd ?? null}
+                projectStart={effProjectStart} projectEnd={effProjectEnd}
                 startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""} sprints={sprintBars}
                 onAddPhase={() => setAddPhase(true)} onEditPhase={setEditPhase} onRemovePhase={(id) => removePhase.mutate(id)}
                 onAddMilestone={() => setAddMs(true)} onRemoveMilestone={(id) => removeMilestone.mutate(id)}
               />
+        ) : view === "tasks" ? (
+          scope === "program"
+            ? <Note text="Switch to a project to view its task timeline." />
+            : <TaskTimeline tasks={taskData?.tasks ?? []} hasProject={!!activeProjectId} />
         ) : view === "resources" ? (
           scope === "program"
             ? <Note text="Switch to a project to view resource allocation." />
@@ -572,6 +583,78 @@ function SprintView({ projectId }: { projectId: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ---- Task timeline (project tasks placed by their own dates) ---------------
+function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boolean }) {
+  const nowM = new Date().getMonth();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const statuses = useMemo(() => Array.from(new Set(tasks.map((t) => t.status).filter(Boolean))), [tasks]);
+  const rows = useMemo(() => tasks
+    .filter((t) => statusFilter === "all" || t.status === statusFilter)
+    .map((t) => {
+      const a = monthOfIso(t.startDate), b = monthOfIso(t.targetDate);
+      const scheduled = a !== null || b !== null;
+      const s = a ?? b ?? nowM, e = b ?? a ?? nowM;
+      return { ...t, startMonth: Math.min(s, e), endMonth: Math.max(s, e), scheduled };
+    })
+    .sort((x, y) => x.startMonth - y.startMonth || x.code.localeCompare(y.code)),
+  [tasks, statusFilter, nowM]);
+
+  if (!hasProject) return <Note text="Select a project." />;
+  if (tasks.length === 0) return <Note text="No tasks for this project yet. Tasks (created here or synced from Jira) will appear on this timeline." />;
+
+  const rowsHeight = Math.max(120, rows.length * 34);
+  return (
+    <div>
+      {/* status filter */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", padding: "12px 22px", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A", marginRight: 2 }}>Status</span>
+        {(["all", ...statuses]).map((s) => {
+          const active = statusFilter === s;
+          const c = s === "all" ? { bg: color.primary, border: color.primary } : (TASK_BAR[s] ?? TASK_BAR["To Do"]);
+          return (
+            <button key={s} onClick={() => setStatusFilter(s)} style={{
+              fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "4px 11px", borderRadius: 20,
+              border: `1px solid ${active ? c.border : color.border}`, background: active ? (s === "all" ? color.primary : c.bg) : "#fff",
+              color: active && s === "all" ? "#fff" : active ? c.border : color.textMuted,
+            }}>{s === "all" ? "All" : s} · {s === "all" ? tasks.length : tasks.filter((t) => t.status === s).length}</button>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex" }}>
+        {/* left labels */}
+        <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
+          <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Task</div>
+          {rows.map((t) => (
+            <div key={t.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+              <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
+              <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
+            </div>
+          ))}
+        </div>
+        {/* right grid */}
+        <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
+          <MonthHeader />
+          <div style={{ position: "relative", height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+            <NowLine />
+            {rows.map((t) => {
+              const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
+              return (
+                <div key={t.id} style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA" }}>
+                  <div title={`${t.code} ${t.name} · ${t.status}${t.scheduled ? "" : " · unscheduled"}`}
+                    style={{ ...barStyle(t.startMonth, t.endMonth), top: 8, height: 18, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}`, opacity: t.scheduled ? 1 : 0.5, display: "flex", alignItems: "center", paddingLeft: 7, fontSize: 10, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>
+                    {t.status}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
