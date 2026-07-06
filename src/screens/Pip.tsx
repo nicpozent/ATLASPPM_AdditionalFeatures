@@ -320,6 +320,55 @@ function CalendarView({ inc }: { inc: IncrementDetail }) {
   );
 }
 
+// Team availability across the whole PI window — reads the time-phased
+// allocation model (free = 100% − peak load over the window; absences net out).
+interface PiAvailSlice { type: string; entityName: string; pct: number }
+interface PiAvailRow { name: string; title: string; allocated: number; free: number; onLeave: boolean; leaveNote: string; slices: PiAvailSlice[] }
+function PiAvailability({ from, to }: { from: string; to: string }) {
+  const { data } = useQuery({
+    queryKey: ["availability", "pi", from, to], enabled: !!from && !!to, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ people: PiAvailRow[] }> =>
+      (await api<{ people: PiAvailRow[] }>(`/resources/availability?from=${from}&to=${to}`)) ?? { people: [] },
+  });
+  const people = data?.people ?? [];
+  if (!from || !to) return null;
+  const freeColor = (f: number) => (f >= 50 ? "#0B6B37" : f > 0 ? color.warningAlt : color.faint2);
+  return (
+    <Card padding={0} style={{ overflow: "hidden", marginTop: 14 }}>
+      <div style={{ padding: "14px 18px", borderBottom: `1px solid ${color.bg}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontFamily: font.head, fontSize: 14, fontWeight: 700, color: color.ink }}>Team availability across this PI</div>
+        <span style={{ fontSize: 11.5, color: color.faint2 }}>{from} → {to} · free = capacity free across the whole window; booked time-off shown</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37" }}>{people.filter((p) => p.free >= 50 && !p.onLeave).length} with ≥50% free</span>
+      </div>
+      {people.length === 0 ? (
+        <EmptyBlock message="No people to assess — attach a team to the increment's projects/programs, or check the PI dates." minHeight={80} />
+      ) : (
+        <div style={{ maxHeight: 260, overflowY: "auto" }}>
+          {people.map((p) => (
+            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 18px", borderBottom: "1px solid #F4F6FA" }}>
+              <div style={{ width: 190, flex: "none", minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                <div style={{ fontSize: 10.5, color: color.faint3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 80 }}>
+                <div style={{ height: 10, borderRadius: 4, background: "#EEF1F6", overflow: "hidden" }} title={p.slices.map((s) => `${s.entityName} ${s.pct}%`).join(" · ") || "unallocated"}>
+                  <div style={{ width: `${Math.min(100, p.allocated)}%`, height: "100%", background: p.allocated > 100 ? color.danger : color.primary }} />
+                </div>
+              </div>
+              <div style={{ width: 92, flex: "none", textAlign: "right" }}>
+                {p.onLeave
+                  ? <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B" }}>On leave</span>
+                  : <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: freeColor(p.free) }}>{p.free}% free</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // --- Capacity & Load --------------------------------------------------------
 function CapacityView({ inc }: { inc: IncrementDetail }) {
   const its = inc.iterationList;
@@ -352,6 +401,7 @@ function CapacityView({ inc }: { inc: IncrementDetail }) {
           </div>
         </Card>
       )}
+      <PiAvailability from={(inc.startDate || "").slice(0, 10)} to={(inc.endDate || "").slice(0, 10)} />
     </div>
   );
 }
