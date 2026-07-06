@@ -257,6 +257,29 @@ public class JiraSyncMappingTests
     public void Date_part_keeps_calendar_day(string? iso, string expected) =>
         Assert.Equal(expected, Jira.DatePart(iso));
 
+    [Fact]
+    public void Sprints_are_derived_from_an_issue_current_and_closed()
+    {
+        // An issue with a current sprint (array) plus one closed sprint — the
+        // board-less derivation should surface both.
+        var fields = System.Text.Json.JsonDocument.Parse("""
+        {
+          "sprint": [{"id":42,"name":"Sprint 7","state":"active","startDate":"2026-06-01T00:00:00.000Z"}],
+          "closedSprints": [{"id":41,"name":"Sprint 6","state":"closed","completeDate":"2026-05-31T00:00:00.000Z"}]
+        }
+        """).RootElement;
+        var ids = Jira.SprintsFromIssue(fields)
+            .Select(s => s.GetProperty("id").GetInt32()).OrderBy(x => x).ToArray();
+        Assert.Equal(new[] { 41, 42 }, ids);
+    }
+
+    [Fact]
+    public void Sprints_from_issue_tolerates_absent_fields()
+    {
+        var fields = System.Text.Json.JsonDocument.Parse("""{"summary":"x"}""").RootElement;
+        Assert.Empty(Jira.SprintsFromIssue(fields));
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(-5, 0)]
