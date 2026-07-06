@@ -296,3 +296,8 @@ public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc
 public record ResByProjectDto(string Id, string Name, bool CanEdit, List<ResAllocRowDto> Members);
 public record ResByProductDto(string Id, string Name, List<ResAllocRowDto> Members);
 public record UnonboardedDto(string Name, List<string> Projects);
+
+// ---- Skills matrix ---------------------------------------------------------
+public record SkillDto(int Id, string Name);
+public record SkillRatingDto(int SkillId, string Person, int Level);
+public record SkillsMatrixDto(bool CanEdit, List<SkillDto> Skills, List<string> People, List<SkillRatingDto> Ratings);

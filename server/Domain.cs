@@ -1063,6 +1063,24 @@ public class PiDependency
     public int Ord { get; set; }
 }
 
+// ---- Skills matrix (customizable competency grid, My Team) ----------------
+// Skills are the customizable columns; a rating is one person's level (0–4) on
+// one skill. Ratings key on the person's display name (the roster comes from the
+// Entra directory), so they survive a re-sync.
+public class Skill
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public int Ord { get; set; }
+}
+public class SkillRating
+{
+    public int Id { get; set; }
+    public int SkillId { get; set; }
+    public string Person { get; set; } = "";
+    public int Level { get; set; }                      // 0 none · 1–2 working · 3 proficient · 4 expert
+}
+
 // ---- Audit log ------------------------------------------------------------
 // Append-only record of governance-relevant actions (role & permission changes,
 // creates/deletes). Written from the write endpoints; read on Admin → Audit Log.
