@@ -202,15 +202,24 @@ export function SubTeamManager() {
   );
 }
 
+interface Candidate { name: string; email: string; title: string }
 function SubTeamCard({ team, onChange }: { team: SubTeamT; onChange: () => void }) {
   const [addName, setAddName] = useState("");
   const [addTitle, setAddTitle] = useState("");
+  const [manual, setManual] = useState(false);
   const [edit, setEdit] = useState(false);
+  // The manager's own directory members (Entra), scoped to what they manage.
+  const { data: cand } = useQuery({
+    queryKey: ["subteam-candidates"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<{ members: Candidate[] }> => (await api<{ members: Candidate[] }>("/subteams/candidates")) ?? { members: [] },
+  });
+  const candidates = (cand?.members ?? []).filter((m) => !team.members.some((tm) => tm.name === m.name));
   const addMember = useMutation({
-    mutationFn: () => api(`/subteams/${team.id}/members`, { method: "POST", body: JSON.stringify({ name: addName.trim(), title: addTitle.trim() }) }),
+    mutationFn: (body: { name: string; email?: string; title?: string }) => api(`/subteams/${team.id}/members`, { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => { setAddName(""); setAddTitle(""); onChange(); },
     onError: (e) => toast((e as Error).message, "error"),
   });
+  const addFromDirectory = (name: string) => { const m = candidates.find((c) => c.name === name); if (m) addMember.mutate({ name: m.name, email: m.email, title: m.title }); };
   const delMember = useMutation({
     mutationFn: (id: number) => api(`/subteams/members/${id}`, { method: "DELETE" }),
     onSuccess: onChange, onError: (e) => toast((e as Error).message, "error"),
@@ -238,11 +247,22 @@ function SubTeamCard({ team, onChange }: { team: SubTeamT; onChange: () => void 
           </span>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 7 }}>
-        <Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Add member — name" style={{ flex: 1 }} />
-        <Input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} placeholder="Title (optional)" style={{ flex: 1 }} />
-        <Button variant="secondary" onClick={() => addName.trim() && addMember.mutate()} disabled={!addName.trim() || addMember.isPending}>Add</Button>
-      </div>
+      {manual || candidates.length === 0 ? (
+        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+          <Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Add member — name" style={{ flex: 1 }} />
+          <Input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} placeholder="Title (optional)" style={{ flex: 1 }} />
+          <Button variant="secondary" onClick={() => addName.trim() && addMember.mutate({ name: addName.trim(), title: addTitle.trim() })} disabled={!addName.trim() || addMember.isPending}>Add</Button>
+          {candidates.length > 0 && <button onClick={() => setManual(false)} title="Pick from your team instead" style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11.5, fontFamily: "inherit" }}>from team</button>}
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+          <Select value="" onChange={(e) => { if (e.target.value) addFromDirectory(e.target.value); }} style={{ flex: 1 }}>
+            <option value="">Add a team member…</option>
+            {candidates.map((c) => <option key={c.name} value={c.name}>{c.name}{c.title ? ` · ${c.title}` : ""}</option>)}
+          </Select>
+          <button onClick={() => setManual(true)} title="Add someone not in your synced team" style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11.5, fontFamily: "inherit" }}>+ manual</button>
+        </div>
+      )}
       {edit && <SubTeamEditModal team={team} onClose={() => setEdit(false)} onDone={onChange} />}
     </div>
   );
