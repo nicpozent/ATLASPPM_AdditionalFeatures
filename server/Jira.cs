@@ -111,8 +111,8 @@ public static class Jira
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
-            if (string.IsNullOrWhiteSpace(p.JiraProjectKey) || p.JiraBoardId is null)
-                return Results.Ok(new { ok = false, error = "This project isn't mapped to Jira — set its Jira project key and board id first." });
+            if (string.IsNullOrWhiteSpace(p.JiraProjectKey))
+                return Results.Ok(new { ok = false, error = "This project isn't mapped to Jira — set its Jira project key first (a board id is optional and adds sprints)." });
             try
             {
                 using var c = Client(cfg);
@@ -135,7 +135,7 @@ public static class Jira
             if (!JiraConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
             var mapped = await db.Projects
-                .Where(p => !p.Archived && p.JiraProjectKey != "" && p.JiraBoardId != null)
+                .Where(p => !p.Archived && p.JiraProjectKey != "")
                 .ToListAsync();
             if (mapped.Count == 0)
                 return Results.Ok(new { ok = true, projects = 0, sprints = 0, epics = 0, tasks = 0, message = "No projects are mapped to Jira yet." });
@@ -254,53 +254,60 @@ public static class Jira
     // db; the caller owns SaveChanges (so a multi-project run can batch/rollback).
     public static async Task<SyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p)
     {
-        var board = p.JiraBoardId!.Value;
+        int? board = p.JiraBoardId;                     // optional: adds sprints/backlog ordering
+        var projectKey = p.JiraProjectKey.Trim();
         var pointsField = string.IsNullOrWhiteSpace(cfg["Jira:StoryPointsField"]) ? "customfield_10016" : cfg["Jira:StoryPointsField"]!.Trim();
         var truncated = false;
 
-        // --- Sprints: /board/{id}/sprint (values[] + isLast) -----------------
-        var jiraSprints = await FetchPagedAsync(c, $"rest/agile/1.0/board/{board}/sprint", "values", () => truncated = true);
+        // --- Sprints: only when a board is mapped (they live on a board) -----
         var existingSprints = await db.Sprints.Where(s => s.ProjectId == p.Id).ToListAsync();
         var sprintOrd = existingSprints.Select(s => s.Ord).DefaultIfEmpty(0).Max();
         var seenSprints = new HashSet<string>();
-        foreach (var js in jiraSprints)
+        if (board is int bSprint)
         {
-            var key = NumOrStr(js, "id");
-            if (key.Length == 0) continue;
-            seenSprints.Add(key);
-            var s = existingSprints.FirstOrDefault(x => x.JiraKey == key);
-            if (s is null) { s = new Sprint { ProjectId = p.Id, JiraKey = key, Ord = ++sprintOrd }; db.Sprints.Add(s); existingSprints.Add(s); }
-            s.Name = Str(js, "name");
-            s.Goal = Str(js, "goal");
-            s.StartDate = DatePart(Str(js, "startDate"));
-            s.EndDate = DatePart(Str(js, "endDate"));
-            s.Status = MapSprintState(Str(js, "state"));
+            var jiraSprints = await FetchPagedAsync(c, $"rest/agile/1.0/board/{bSprint}/sprint", "values", () => truncated = true);
+            foreach (var js in jiraSprints)
+            {
+                var key = NumOrStr(js, "id");
+                if (key.Length == 0) continue;
+                seenSprints.Add(key);
+                var s = existingSprints.FirstOrDefault(x => x.JiraKey == key);
+                if (s is null) { s = new Sprint { ProjectId = p.Id, JiraKey = key, Ord = ++sprintOrd }; db.Sprints.Add(s); existingSprints.Add(s); }
+                s.Name = Str(js, "name");
+                s.Goal = Str(js, "goal");
+                s.StartDate = DatePart(Str(js, "startDate"));
+                s.EndDate = DatePart(Str(js, "endDate"));
+                s.Status = MapSprintState(Str(js, "state"));
+            }
+            if (seenSprints.Count > 0)
+                db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
         }
-        if (seenSprints.Count > 0)
-            db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
 
-        // --- Epics: /board/{id}/epic (values[] + isLast) ---------------------
-        var jiraEpics = await FetchPagedAsync(c, $"rest/agile/1.0/board/{board}/epic", "values", () => truncated = true);
+        // --- Epics: board endpoint if available, else derived from issues ----
         var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
         var epicOrd = existingEpics.Select(e => e.Ord).DefaultIfEmpty(0).Max();
         var seenEpics = new HashSet<string>();
-        foreach (var je in jiraEpics)
+        void UpsertEpic(string ekey, string name, bool done)
         {
-            var key = NumOrStr(je, "id");
-            if (key.Length == 0) continue;
-            seenEpics.Add(key);
-            var e = existingEpics.FirstOrDefault(x => x.JiraKey == key);
-            if (e is null) { e = new Epic { ProjectId = p.Id, JiraKey = key, Ord = ++epicOrd }; db.Epics.Add(e); existingEpics.Add(e); }
-            var name = Str(je, "name");
-            e.Name = name.Length > 0 ? name : Str(je, "summary");
-            e.Status = Bool(je, "done") ? "Complete" : "In progress";
+            if (ekey.Length == 0) return;
+            seenEpics.Add(ekey);
+            var e = existingEpics.FirstOrDefault(x => x.JiraKey == ekey);
+            if (e is null) { e = new Epic { ProjectId = p.Id, JiraKey = ekey, Ord = ++epicOrd }; db.Epics.Add(e); existingEpics.Add(e); }
+            if (name.Length > 0) e.Name = name;
+            e.Status = done ? "Complete" : "In progress";
         }
-        if (seenEpics.Count > 0)
-            db.Epics.RemoveRange(existingEpics.Where(e => e.JiraKey.Length > 0 && !seenEpics.Contains(e.JiraKey)));
+        if (board is int bEpic)
+        {
+            var jiraEpics = await FetchPagedAsync(c, $"rest/agile/1.0/board/{bEpic}/epic", "values", () => truncated = true);
+            foreach (var je in jiraEpics)
+                UpsertEpic(NumOrStr(je, "id"), Str(je, "name").Length > 0 ? Str(je, "name") : Str(je, "summary"), Bool(je, "done"));
+        }
 
-        // --- Issues: /board/{id}/issue (issues[] + total paging) -------------
+        // --- Issues: board issue list, or a JQL project search (boardless) ---
         var fields = $"summary,status,issuetype,assignee,duedate,priority,sprint,closedSprints,epic,parent,{pointsField}";
-        var jiraIssues = await FetchIssuesAsync(c, $"rest/agile/1.0/board/{board}/issue", fields, () => truncated = true);
+        var jiraIssues = board is int bIssue
+            ? await FetchIssuesAsync(c, $"rest/agile/1.0/board/{bIssue}/issue", fields, () => truncated = true)
+            : await FetchJqlAsync(c, $"project = \"{projectKey}\" ORDER BY created ASC", fields, () => truncated = true);
         var existingTasks = await db.ProjectTasks.Where(t => t.ProjectId == p.Id).ToListAsync();
         var taskOrd = existingTasks.Select(t => t.Ord).DefaultIfEmpty(0).Max();
         var seenTasks = new HashSet<string>();
@@ -309,8 +316,15 @@ public static class Jira
         {
             var key = Str(ji, "key");
             if (key.Length == 0) continue;
-            seenTasks.Add(key);
             var f = Prop(ji, "fields") ?? default;
+            var itype = StrPath(f, "issuetype", "name");
+            // Epics are not tasks. With no board, derive them from Epic-type issues.
+            if (itype.Equals("Epic", StringComparison.OrdinalIgnoreCase))
+            {
+                if (board is null) UpsertEpic(key, Str(f, "summary"), MapIssueStatus(StrPath(f, "status", "statusCategory", "key")) == "Done");
+                continue;
+            }
+            seenTasks.Add(key);
             var t = existingTasks.FirstOrDefault(x => x.JiraKey == key);
             if (t is null) { t = new ProjectTask { ProjectId = p.Id, JiraKey = key, Code = key, Ord = ++taskOrd }; db.ProjectTasks.Add(t); existingTasks.Add(t); }
             t.Code = key;
@@ -320,13 +334,15 @@ public static class Jira
             t.Priority = MapPriority(StrPath(f, "priority", "name"));
             t.TargetDate = DatePart(Str(f, "duedate"));
             t.Points = Math.Max(0, IntProp(f, pointsField));
-            var sprintName = SprintNameOf(f);
+            var sprintName = board is null ? "" : SprintNameOf(f);   // no board ⇒ backlog
             t.Sprint = sprintName;
             if (sprintName.Length == 0) backlog++;
             t.Epic = EpicNameOf(f);
         }
         if (seenTasks.Count > 0)
             db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.JiraKey.Length > 0 && !seenTasks.Contains(t.JiraKey)));
+        if (seenEpics.Count > 0)
+            db.Epics.RemoveRange(existingEpics.Where(e => e.JiraKey.Length > 0 && !seenEpics.Contains(e.JiraKey)));
 
         // Recompute synced epics' story rollup from the project's surviving tasks
         // (by name) — manual tasks plus synced tasks still present — so the epic
@@ -493,6 +509,34 @@ public static class Jira
             var total = root.TryGetProperty("total", out var tt) && tt.ValueKind == JsonValueKind.Number ? tt.GetInt32() : startAt + n;
             startAt += n;
             if (n == 0 || startAt >= total) return all;
+        }
+        onTruncate();
+        return all;
+    }
+
+    // Page an enhanced JQL search (rest/api/3/search/jql) — used when a project
+    // has no board, so it can be synced by project key alone. Pages via the
+    // opaque nextPageToken the endpoint returns until it's absent.
+    static async Task<List<JsonElement>> FetchJqlAsync(HttpClient c, string jql, string fields, Action onTruncate)
+    {
+        var all = new List<JsonElement>();
+        var fq = Uri.EscapeDataString(fields);
+        var jq = Uri.EscapeDataString(jql);
+        string? token = null;
+        int page = 0;
+        while (page++ < MaxPages)
+        {
+            var url = $"rest/api/3/search/jql?jql={jq}&maxResults={PageSize}&fields={fq}"
+                + (token is not null ? $"&nextPageToken={Uri.EscapeDataString(token)}" : "");
+            var res = await c.GetAsync(url);
+            if (!res.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Jira returned {(int)res.StatusCode} {res.ReasonPhrase} searching the project. Check the project key and the service account's Browse Projects permission.");
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+            var root = doc.RootElement;
+            if (root.TryGetProperty("issues", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                foreach (var item in arr.EnumerateArray()) all.Add(item.Clone());
+            token = root.TryGetProperty("nextPageToken", out var nt) && nt.ValueKind == JsonValueKind.String ? nt.GetString() : null;
+            if (token is null) return all;
         }
         onTruncate();
         return all;

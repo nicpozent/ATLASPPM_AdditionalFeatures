@@ -605,6 +605,7 @@ interface Task {
   sprint: string; baseline: string; priority: string;
   startDate: string; targetDate: string; points: number; size: string; estimateHours: number;
   assigneeOnLeave: boolean;
+  assigneeKnown?: boolean;
 }
 
 function useAssigneeOptions(projectId: string | null): string[] {
@@ -772,7 +773,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
                           <span style={{ fontSize: 9.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "1px 6px", borderRadius: 20 }}>{t.priority}</span>
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: color.text, lineHeight: 1.35, marginBottom: 9 }}>{t.name}</div>
-                        {(isSpilled(t) || t.assigneeOnLeave) && (
+                        {(isSpilled(t) || t.assigneeOnLeave || t.assigneeKnown === false) && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
                             {isSpilled(t) && (
                               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
@@ -782,6 +783,11 @@ function Tasks({ projectId }: { projectId: string | null }) {
                             {t.assigneeOnLeave && (
                               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} is on leave during this task's scheduled window`}>
                                 <Icon name="alert" size={11} /> Assignee on leave
+                              </span>
+                            )}
+                            {t.assigneeKnown === false && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} isn't an onboarded team member (not synced from Entra).`}>
+                                <Icon name="alert" size={11} /> Assignee not onboarded
                               </span>
                             )}
                           </div>
@@ -817,6 +823,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
                   <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
                   <button onClick={() => setOpenId(t.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{t.name}</button>
                   {t.assigneeOnLeave && <span title={`${t.assignee} is on leave during this task's scheduled window`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 4, padding: "0 5px" }}>ON LEAVE</span>}
+                  {t.assigneeKnown === false && <span title={`${t.assignee} isn't an onboarded team member (not synced from Entra) — add them to a team or check the name.`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 4, padding: "0 5px" }}>⚠ NOT ONBOARDED</span>}
                 </div>
                 <div style={{ fontSize: 12.5, color: color.subtle }}>{t.epic || "—"}</div>
                 <div style={{ fontSize: 13, color: color.textMuted }}>{t.assignee}</div>
