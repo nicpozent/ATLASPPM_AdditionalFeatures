@@ -18,14 +18,14 @@ public static class ResourcesData
     static readonly string[] Palette =
         { "#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B" };
 
-    static string Initials(string name)
+    public static string Initials(string name)
     {
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0) return "?";
         return parts.Length == 1 ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant()
             : $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[^1][0])}";
     }
-    static string ColorFor(string name)
+    public static string ColorFor(string name)
     {
         var h = 0; foreach (var c in name) h = (h * 31 + c) & 0x7fffffff;
         return Palette[h % Palette.Length];

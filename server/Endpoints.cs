@@ -51,6 +51,7 @@ public static class Endpoints
         api.MapStakeholderEndpoints();
         api.MapPipEndpoints();
         api.MapResourceEndpoints();
+        api.MapAvailabilityEndpoints();
         api.MapSkillEndpoints();
 
         // Audit log — visible to roles with at least View on "Audit & activity log".
