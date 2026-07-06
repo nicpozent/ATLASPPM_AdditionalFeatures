@@ -319,7 +319,7 @@ public static class WriteEndpoints
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var p = await db.Projects.Include(x => x.Blockers).FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
-            var (oldStatus, oldTarget) = (p.Status, p.Target);
+            var (oldStatus, oldTarget, oldJiraKey) = (p.Status, p.Target, p.JiraProjectKey);
 
             if (!string.IsNullOrWhiteSpace(req.Name)) p.Name = req.Name!.Trim();
             if (!string.IsNullOrWhiteSpace(req.Dept)) p.Dept = req.Dept!.Trim();
@@ -352,6 +352,14 @@ public static class WriteEndpoints
                 await Notifications.EmitToEntityAsync(db, cfg, Notifications.Status, "project", p.Id, $"{p.Name} status changed", $"{p.Id} · status is now “{p.Health}”.", actor);
             if (p.Target != oldTarget && !string.IsNullOrWhiteSpace(oldTarget))
                 await Notifications.EmitToEntityAsync(db, cfg, Notifications.DateSlip, "project", p.Id, $"{p.Name} target date changed", $"{p.Id} · target moved from {oldTarget} to {p.Target}.", actor);
+            // Auto-pull once when the Jira link is newly set/changed — the manual
+            // "Sync" button stays as an on-demand force. Best-effort: a failure
+            // here never blocks saving the project (surface it via the button).
+            if (!string.IsNullOrEmpty(p.JiraProjectKey) && !string.Equals(p.JiraProjectKey, oldJiraKey, StringComparison.OrdinalIgnoreCase) && Jira.JiraConfigured(cfg))
+            {
+                try { using var jc = Jira.Client(cfg); await Jira.SyncProjectAsync(db, cfg, jc, p); }
+                catch { /* ignore — the manual Sync surfaces connector errors */ }
+            }
             return Results.Ok(new ProjectDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
                 p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate));
         });

@@ -45,6 +45,10 @@ builder.AddAtlasObservability();
 if (cfg.GetValue("Retention:Enabled", true))
     builder.Services.AddHostedService<RetentionHostedService>();
 
+// Scheduled Jira sync (on by default; idle until a Jira connector is configured).
+if (cfg.GetValue("Jira:ScheduledSync", true))
+    builder.Services.AddHostedService<JiraSyncService>();
+
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
 var corsOrigins = Hardening.CorsOrigins(cfg);

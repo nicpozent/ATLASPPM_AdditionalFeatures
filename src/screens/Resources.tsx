@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { api } from "@/api";
+import { usePermissions } from "@/components/usePermissions";
+import { toast, toastError } from "@/components/Toast";
 
 // ---------------------------------------------------------------------------
 // Structural chrome constants (lifted from the prototype's resource builder).
@@ -58,6 +60,15 @@ function useByProduct() {
     },
   });
 }
+interface Unonboarded { name: string; projects: string[] }
+function useUnonboarded() {
+  return useQuery({
+    queryKey: ["resources-unonboarded"], ...LIVE,
+    queryFn: async (): Promise<Unonboarded[]> => {
+      try { return (await api<Unonboarded[]>("/resources/unonboarded")) ?? []; } catch { return []; }
+    },
+  });
+}
 
 const CAP_COLS = "1.7fr 0.6fr 0.6fr 0.6fr 1.1fr 0.6fr 0.6fr";
 
@@ -69,12 +80,14 @@ export default function Resources() {
   const { data: resources = [] } = useResources();
   const { data: byProject = [] } = useByProject();
   const { data: byProduct = [] } = useByProduct();
+  const { data: unonboarded = [] } = useUnonboarded();
 
   const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? "Week";
   const overCount = resources.filter((r) => r.over).length;
 
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
+      {unonboarded.length > 0 && <UnonboardedPanel people={unonboarded} />}
       {/* view tabs + sync badge + over-allocation flag */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
@@ -296,6 +309,48 @@ function SkillsMatrix() {
         <span style={{ fontSize: 11, color: "#566077" }}>1–2 Working</span>
         <span style={{ fontSize: 11, color: "#566077" }}>3 Proficient</span>
         <span style={{ fontSize: 11, color: "#566077" }}>4 Expert</span>
+      </div>
+    </div>
+  );
+}
+
+// --- Not-onboarded assignees (imported from Jira, not in the directory) ------
+function UnonboardedPanel({ people }: { people: Unonboarded[] }) {
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const canOnboard = can("cap-users-roles", "E");
+  const onboard = useMutation({
+    mutationFn: (name: string) => api("/resources/onboard", { method: "POST", body: JSON.stringify({ name }) }),
+    onSuccess: (_r, name) => {
+      toast(`${name} onboarded`, "info");
+      qc.invalidateQueries({ queryKey: ["resources-unonboarded"] });
+      qc.invalidateQueries({ queryKey: ["resources"] });
+    },
+    onError: toastError,
+  });
+  return (
+    <div style={{ background: "#FBF6E8", border: "1px solid #F0DFB0", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ color: "#C98A00", display: "flex" }}><Icon name="alert" size={17} /></span>
+        <span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>{people.length} assignee{people.length === 1 ? "" : "s"} not onboarded</span>
+        <span style={{ fontSize: 12, color: color.subtle }}>— assigned on tasks (e.g. imported from Jira) but not in the directory.</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {people.map((p) => (
+          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 10, padding: "8px 12px" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: color.text, flex: "none" }}>{p.name}</span>
+            <span style={{ flex: 1, fontSize: 11.5, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.projects.join(", ")}</span>
+            {canOnboard
+              ? <button onClick={() => onboard.mutate(p.name)} disabled={onboard.isPending}
+                  style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", flex: "none" }}>
+                  <Icon name="userCheck" size={14} /> Onboard
+                </button>
+              : <span style={{ fontSize: 11, color: color.faint3, flex: "none" }}>Ask an admin to onboard</span>}
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11.5, color: color.faint2, marginTop: 8 }}>
+        Onboarding adds them to a manual directory group; re-sync Jira (or reopen the task) and they'll match as a known person.
       </div>
     </div>
   );
