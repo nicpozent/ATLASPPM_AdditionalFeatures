@@ -37,14 +37,14 @@ public class SprintTests : IClassFixture<AtlasApiFactory>
         var c = Admin();
         var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Sprint project" }));
 
-        var create = await c.PostAsJsonAsync($"/api/v1/projects/{projId}/sprints", new { name = "S1", goal = "Ship MVP", startDate = "2026-08-01", endDate = "2026-08-14", status = "Active" });
+        var create = await c.PostAsJsonAsync($"/api/v1/projects/{projId}/sprints", new { name = "S1", goal = "Ship MVP", startDate = "2026-08-01", endDate = "2026-08-14", status = "Started" });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var sprintId = await IntId(create);
 
-        var patch = await c.PatchAsJsonAsync($"/api/v1/sprints/{sprintId}", new { status = "Closed", goal = "Shipped" });
+        var patch = await c.PatchAsJsonAsync($"/api/v1/sprints/{sprintId}", new { status = "Completed", goal = "Shipped" });
         Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
         using var pd = JsonDocument.Parse(await patch.Content.ReadAsStringAsync());
-        Assert.Equal("Closed", pd.RootElement.GetProperty("status").GetString());
+        Assert.Equal("Completed", pd.RootElement.GetProperty("status").GetString());
         Assert.Equal("Shipped", pd.RootElement.GetProperty("goal").GetString());
 
         var del = await c.DeleteAsync($"/api/v1/sprints/{sprintId}");
@@ -105,7 +105,7 @@ public class SprintTests : IClassFixture<AtlasApiFactory>
     {
         var c = _factory.CreateClient();
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
-        Assert.Equal(HttpStatusCode.Forbidden, (await c.PatchAsJsonAsync("/api/v1/sprints/999", new { status = "Closed" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PatchAsJsonAsync("/api/v1/sprints/999", new { status = "Completed" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/sprints/999")).StatusCode);
     }
 

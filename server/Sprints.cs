@@ -14,7 +14,7 @@ public record UpdateSprintReq(string? Name, string? Goal, string? StartDate, str
 // ============================================================================
 public static class Sprints
 {
-    static readonly string[] Statuses = { "Planned", "Active", "Closed" };
+    static readonly string[] Statuses = { "Planned", "Started", "Halted", "Completed", "Cancelled" };
 
     public static void MapSprintEndpoints(this RouteGroupBuilder api)
     {
