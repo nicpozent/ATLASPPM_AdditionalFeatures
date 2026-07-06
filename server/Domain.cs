@@ -211,6 +211,17 @@ public class DemandAttachment
     public byte[] Bytes { get; set; } = Array.Empty<byte>();
 }
 
+// Review comment on a demand — Platform Admin, PMO and Chief Architect discuss a
+// demand before it's approved (gated by cap-comment-demand).
+public class DemandComment
+{
+    public int Id { get; set; }
+    public string DemandId { get; set; } = default!;
+    public string Author { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string CreatedAt { get; set; } = "";        // ISO timestamp
+}
+
 // ---- Roles & permissions (in-app RBAC) ------------------------------------
 // The permission matrix on Admin → Roles & Permissions is DB-backed: the six
 // canonical roles + capability catalogue ship as reference data (IsSystem), and

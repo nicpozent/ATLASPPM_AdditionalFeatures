@@ -208,10 +208,12 @@ public static class Rbac
         // New assignable rights. Sort continues after the 16 seeded capabilities.
         var extra = new (string Key, string Label, int Sort)[]
         {
-            ("cap-okrs",     "OKRs",             16),
-            ("cap-products", "Products",         17),
-            ("cap-ways",     "Ways of working",  18),
-            ("cap-schedule", "Project schedule", 19),
+            ("cap-okrs",           "OKRs",              16),
+            ("cap-products",       "Products",          17),
+            ("cap-ways",           "Ways of working",   18),
+            ("cap-schedule",       "Project schedule",  19),
+            ("cap-quality",        "Quality, tests & defects", 20),
+            ("cap-comment-demand", "Comment on demands",       21),
         };
         // Default level per role id for each new capability (absent role → "N").
         var defaults = new Dictionary<string, Dictionary<string, string>>
@@ -220,6 +222,10 @@ public static class Rbac
             ["cap-products"] = new() { ["admin"] = "F", ["pmo"] = "F" },
             ["cap-ways"]     = new() { ["admin"] = "F", ["pmo"] = "F" },
             ["cap-schedule"] = new() { ["admin"] = "F", ["pmo"] = "F", ["pm"] = "F" },
+            // Quality edit tracks who could already edit tasks (previously cap-projects).
+            ["cap-quality"]  = new() { ["admin"] = "F", ["pmo"] = "F", ["pm"] = "F", ["pmlead"] = "F", ["team"] = "E" },
+            // Demand comments: Platform Admin + PMO (Chief Architect resolves to pmo).
+            ["cap-comment-demand"] = new() { ["admin"] = "F", ["pmo"] = "E" },
         };
 
         var existingCaps = (await db.Capabilities.Select(c => c.Key).ToListAsync()).ToHashSet();
@@ -256,6 +262,25 @@ public static class Rbac
             var pmPerms = await db.RolePermissions.Where(p => p.RoleId == "pm").ToListAsync();
             foreach (var p in pmPerms)
                 db.RolePermissions.Add(new RolePermission { RoleId = "pmlead", CapabilityKey = p.CapabilityKey, Level = p.Level });
+            changed = true;
+        }
+        if (changed) { await db.SaveChangesAsync(); changed = false; }
+
+        // Quality Manager — sees everything (View on every capability) but may only
+        // modify quality: full on cap-quality (test plans, test tasks, defects).
+        // Added here so it lands on existing DBs too.
+        if (!await db.RoleDefs.AnyAsync(r => r.Id == "qmgr"))
+        {
+            var maxSort = await db.RoleDefs.MaxAsync(r => (int?)r.Sort) ?? 0;
+            db.RoleDefs.Add(new RoleDef
+            {
+                Id = "qmgr", Name = "Quality Manager", Short = "Quality", Who = "Quality & assurance",
+                Description = "Oversees quality across the portfolio — reviews everything, edits only quality plans, test tasks and defects.",
+                Icon = "check", Color = "#0B6B37", Tint = "#E7F4EC", IsSystem = true, Sort = maxSort + 1,
+            });
+            var allCaps = await db.Capabilities.Select(c => c.Key).ToListAsync();
+            foreach (var key in allCaps)
+                db.RolePermissions.Add(new RolePermission { RoleId = "qmgr", CapabilityKey = key, Level = key == "cap-quality" ? "F" : "V" });
             changed = true;
         }
         if (changed) await db.SaveChangesAsync();
