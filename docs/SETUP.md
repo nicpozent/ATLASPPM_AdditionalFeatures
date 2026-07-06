@@ -106,10 +106,33 @@ API rejects any request without a valid Entra token.
 - [ ] Conditional Access / MFA enforced on the Atlas PPM Web app as needed.
 - [ ] If the API misconfigures auth (enabled but no tenant/audience) it now
       **fails to start** by design — check `docker compose logs api`.
+- [ ] `Seed:Enabled` left unset/false in production (Atlas starts empty and fills
+      from the API/Jira/Entra; seed the demo portfolio only on a throwaway tenant).
 
-## 6. Not-yet-done (known scope)
+## 6. Notification email (optional)
 
-- The API is read-focused plus create endpoints for demands, blockers,
-  projects, programs and objectives (wired into the Demand and Blocker UIs).
-  Broader edit/delete flows and the remaining screens' writes are future work.
-- Seed data is the demo portfolio; it only loads into an empty database.
+In-app notifications work with no extra setup. To also send **email**, grant the
+API the Microsoft Graph `Mail.Send` application permission (admin-consented), then
+set `Graph:*` credentials and `Notifications:SenderUpn` (the mailbox mail is sent
+from). Until configured, notifications still appear in-app and only the email step
+is skipped. Step-by-step: in the app, **Help → Platform Admin → "Enable
+notification email"**.
+
+## 7. Scheduled Jira sync (optional)
+
+If a Jira connector is configured (`Jira:BaseUrl` / `Jira:Email` / `Jira:ApiToken`),
+Atlas re-pulls every Jira-linked project on a schedule — `Jira:SyncMinutes`
+(default 30), toggled by `Jira:ScheduledSync` (default on). Setting a project's Jira
+key also triggers a one-off sync; the manual **Sync** button remains an on-demand
+force. See **Help → Install & Ops** and [jira-setup.md](./jira-setup.md).
+
+## 8. Scope notes
+
+- The REST API supports full CRUD across the product (projects, tasks, sprints,
+  epics, requirements, RAID, releases, OKRs, demands, programs, products, PI
+  planning, governance, financials, resources, …) with server-authoritative RBAC.
+- Data is **empty by default**; the demo portfolio loads only when
+  `Seed:Enabled=true` on an empty database.
+- Roadmap: additional live connectors beyond Jira + Entra (Azure DevOps next);
+  deeper frontend test coverage + a formal accessibility pass. See
+  [architecture/building-blocks.md](./architecture/building-blocks.md) §4.

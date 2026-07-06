@@ -94,6 +94,22 @@ public class ReleaseResourceTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Allocation_can_be_set_when_attaching_a_team()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Attach-alloc project" }));
+        var subId = await IntId(await c.PostAsJsonAsync("/api/v1/subteams", new { name = "Squad B", managerKey = "teammgr" }));
+        // Attach with an allocation supplied up front (no separate PATCH).
+        await c.PostAsJsonAsync($"/api/v1/teams/assignments/project/{projId}",
+            new { subTeamId = subId, members = new[] { new { name = "Ada Lovelace", title = "Engineer", alloc = 55 } } });
+
+        var byProject = await c.GetFromJsonAsync<JsonElement>("/api/v1/resources/by-project");
+        var proj = byProject.EnumerateArray().First(p => p.GetProperty("id").GetString() == projId);
+        var member = proj.GetProperty("members").EnumerateArray().First(m => m.GetProperty("name").GetString() == "Ada Lovelace");
+        Assert.Equal(55, member.GetProperty("alloc").GetInt32());
+    }
+
+    [Fact]
     public async Task Unonboarded_assignees_are_surfaced_and_can_be_onboarded()
     {
         var c = Admin();

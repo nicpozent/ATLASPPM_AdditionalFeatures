@@ -15,7 +15,7 @@ namespace Atlas.Api;
 //  attaching a sub-team to an entity needs Edit on "Projects & tasks".
 // ============================================================================
 public record SubTeamReq(string? Name, string? Description, string? ManagerKey);
-public record SubTeamMemberReq(string Name, string? Email, string? Title);
+public record SubTeamMemberReq(string Name, string? Email, string? Title, int? Alloc = null);
 public record AttachTeamReq(int SubTeamId, List<SubTeamMemberReq>? Members);
 public record SetAssignmentMembersReq(List<SubTeamMemberReq> Members);
 
@@ -164,10 +164,12 @@ public static class SubTeams
                 return Results.Conflict(new { error = "That sub-team is already attached." });
             var a = new TeamAssignment { EntityType = type, EntityId = entityId, SubTeamId = req.SubTeamId };
             // Default to every member of the sub-team when a selection isn't given.
-            var chosen = (req.Members is { Count: > 0 } m ? m.Select(x => (x.Name, x.Email ?? "", x.Title ?? "")) : sub.Members.Select(x => (x.Name, x.Email, x.Title)))
+            var chosen = (req.Members is { Count: > 0 } m
+                    ? m.Select(x => (x.Name, x.Email ?? "", x.Title ?? "", x.Alloc ?? 0))
+                    : sub.Members.Select(x => (x.Name, x.Email, x.Title, 0)))
                 .Where(x => !string.IsNullOrWhiteSpace(x.Item1));
-            foreach (var (name, email, title) in chosen)
-                a.Members.Add(new TeamAssignmentMember { Name = name.Trim(), Email = email.Trim(), Title = title.Trim() });
+            foreach (var (name, email, title, alloc) in chosen)
+                a.Members.Add(new TeamAssignmentMember { Name = name.Trim(), Email = email.Trim(), Title = title.Trim(), Alloc = Math.Clamp(alloc, 0, 100) });
             db.TeamAssignments.Add(a);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", $"Attached sub-team to {type}", $"{entityId} · {sub.Name}"));
             await db.SaveChangesAsync();
@@ -181,7 +183,7 @@ public static class SubTeams
             if (a is null) return Results.NotFound();
             db.TeamAssignmentMembers.RemoveRange(a.Members);
             foreach (var x in req.Members.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
-                a.Members.Add(new TeamAssignmentMember { TeamAssignmentId = a.Id, Name = x.Name.Trim(), Email = x.Email?.Trim() ?? "", Title = x.Title?.Trim() ?? "" });
+                a.Members.Add(new TeamAssignmentMember { TeamAssignmentId = a.Id, Name = x.Name.Trim(), Email = x.Email?.Trim() ?? "", Title = x.Title?.Trim() ?? "", Alloc = Math.Clamp(x.Alloc ?? 0, 0, 100) });
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
