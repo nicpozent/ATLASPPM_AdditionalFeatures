@@ -1141,19 +1141,47 @@ const SPRINT_STATUS: Record<string, { ink: string; tint: string }> = {
   Closed:  { ink: "#0C5798", tint: "#E6EFFB" },
 };
 
+// One task line — code, name, completion tick and a status pill. Shared by the
+// Sprints cards and the Epic detail modal so both read the same way.
+function SprintTaskRow({ t }: { t: Task }) {
+  const col = BOARD_COLS.find((c) => c.label === t.status) ?? BOARD_COLS[0];
+  const done = t.status === "Done";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: 8, background: color.bg }}>
+      <span style={{ width: 16, height: 16, borderRadius: "50%", flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: done ? "#15A34A" : "transparent", border: done ? "none" : `2px solid ${col.color}` }}>
+        {done && <Icon name="check" size={11} color="#fff" />}
+      </span>
+      <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
+      <span style={{ fontSize: 12.5, color: color.text, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: done ? "line-through" : "none" }}>{t.name}</span>
+      {t.assignee && t.assignee !== "Unassigned" && <span style={{ fontSize: 11, color: color.faint2, flex: "none" }}>{t.assignee}</span>}
+      <span style={{ fontSize: 10, fontWeight: 700, color: col.ink, background: col.tint, padding: "2px 8px", borderRadius: 20, flex: "none" }}>{t.status}</span>
+    </div>
+  );
+}
+
 function Sprints({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<SprintItem | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const { data } = useQuery({
     queryKey: ["sprints", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<{ canEdit: boolean; canCreate: boolean; sprints: SprintItem[] }> =>
       (await api<{ canEdit: boolean; canCreate: boolean; sprints: SprintItem[] }>(`/projects/${projectId}/sprints`)) ?? { canEdit: false, canCreate: false, sprints: [] },
   });
+  // Tasks drive the per-sprint list (grouped by sprint name); dedupes with the
+  // Tasks/Backlog tabs' identical query.
+  const { data: taskData } = useQuery({
+    queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }> =>
+      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+  });
+  const allTasks = taskData?.tasks ?? [];
   const sprints = data?.sprints ?? [];
   const canEdit = data?.canEdit ?? false;
   const canCreate = data?.canCreate ?? false;
+  const toggle = (id: number) => setExpanded((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const del = useMutation({
     mutationFn: (id: number) => api(`/sprints/${id}`, { method: "DELETE" }),
@@ -1209,6 +1237,24 @@ function Sprints({ projectId }: { projectId: string | null }) {
                     </div>
                   </div>
                 </div>
+                {(() => {
+                  const sprintTasks = allTasks.filter((t) => t.sprint === s.name);
+                  const open = expanded.has(s.id);
+                  return (
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${color.bg}` }}>
+                      <button onClick={() => toggle(s.id)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                        <Icon name={open ? "chevronDown" : "chevronRight"} size={15} /> {sprintTasks.length} task{sprintTasks.length === 1 ? "" : "s"}
+                      </button>
+                      {open && (sprintTasks.length === 0 ? (
+                        <div style={{ fontSize: 12, color: color.faint3, marginTop: 8, paddingLeft: 4 }}>No tasks in this sprint yet.</div>
+                      ) : (
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 1 }}>
+                          {sprintTasks.map((t) => <SprintTaskRow key={t.id} t={t} />)}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </Card>
             );
           })}
@@ -2237,6 +2283,12 @@ function EpicModal({ projectId, epic, epics, canEdit = true, onClose }: { projec
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["epics", projectId] }); onClose(); },
     onError: (e) => toastError(e),
   });
+  // Tasks referencing this epic (linked by name), shown when viewing an epic.
+  const { data: taskData } = useQuery({
+    queryKey: ["tasks", projectId], enabled: !!projectId && !!epic, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ tasks: Task[] }> => (await api<{ tasks: Task[] }>(`/projects/${projectId}/tasks`)) ?? { tasks: [] },
+  });
+  const epicTasks = (taskData?.tasks ?? []).filter((t) => epic && t.epic === epic.name);
 
   return (
     <Modal onClose={onClose} width={480} label={epic ? "Epic" : "New epic"}>
@@ -2269,6 +2321,19 @@ function EpicModal({ projectId, epic, epics, canEdit = true, onClose }: { projec
       )}
       <DecLabel>Dependency note (optional)</DecLabel>
       <Input value={dependsOn} onChange={(e) => setDependsOn(e.target.value)} disabled={readOnly} placeholder="e.g. external vendor sign-off" />
+
+      {epic && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${color.bg}` }}>
+          <DecLabel>Tasks in this epic ({epicTasks.length})</DecLabel>
+          {epicTasks.length === 0 ? (
+            <div style={{ fontSize: 12, color: color.faint3 }}>No tasks reference this epic yet. Set a task's epic to “{epic.name}” to link it.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 240, overflowY: "auto" }}>
+              {epicTasks.map((t) => <SprintTaskRow key={t.id} t={t} />)}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 22 }}>
         {epic && canEdit && (
