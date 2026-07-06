@@ -6,7 +6,8 @@ namespace Atlas.Api;
 public record UpdateSecurityProfileReq(
     string? Classification, string? Residency, string? Subjects, string? Retention,
     bool? PersonalData, bool? SpecialCategory, bool? AutomatedDecisions, bool? CardholderData,
-    bool? Gdpr, bool? Pci, bool? Iso, bool? AiAct, bool? Soc2, bool? Nis2);
+    bool? Gdpr, bool? Pci, bool? Iso, bool? AiAct, bool? Soc2, bool? Nis2,
+    bool? Dpp, bool? Ppwr, bool? Eudr);
 public record CreateSecControlReq(string Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 public record UpdateSecControlReq(string? Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 public record CreateReviewGateReq(string Name, string? Type, string? Reviewer, string? Status, string? Date, string? Note);
@@ -41,7 +42,7 @@ public static class Security
     static SecurityProfileDto ToDto(SecurityProfile p) => new(
         p.Classification, p.Residency, p.Subjects, p.Retention,
         p.PersonalData, p.SpecialCategory, p.AutomatedDecisions, p.CardholderData,
-        p.Gdpr, p.Pci, p.Iso, p.AiAct, p.Soc2, p.Nis2);
+        p.Gdpr, p.Pci, p.Iso, p.AiAct, p.Soc2, p.Nis2, p.Dpp, p.Ppwr, p.Eudr);
 
     public static void MapSecurityEndpoints(this RouteGroupBuilder api)
     {
@@ -75,6 +76,9 @@ public static class Security
             if (req.AiAct is { } ai) p.AiAct = ai;
             if (req.Soc2 is { } soc) p.Soc2 = soc;
             if (req.Nis2 is { } nis) p.Nis2 = nis;
+            if (req.Dpp is { } dpp) p.Dpp = dpp;
+            if (req.Ppwr is { } ppwr) p.Ppwr = ppwr;
+            if (req.Eudr is { } eudr) p.Eudr = eudr;
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Updated security profile", id));
             await db.SaveChangesAsync();
             return Results.Ok(ToDto(p));
