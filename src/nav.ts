@@ -4,7 +4,7 @@
 // ============================================================================
 
 export type ScreenId =
-  | "dashboard" | "portfolio" | "programs" | "products" | "okrs"
+  | "dashboard" | "portfolio" | "programs" | "products" | "okrs" | "roadmap"
   | "demands" | "gantt" | "pip" | "project" | "resources" | "financials"
   | "delivery" | "releases" | "ops" | "news"
   | "teams" | "methodologies" | "integrations" | "reports" | "admin" | "help"
@@ -27,6 +27,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
   programs:      { id: "programs",      path: "/programs",      label: "Programs",         title: "Programs",                     subtitle: "Aggregate projects under strategic programs",        icon: "folders" },
   products:      { id: "products",      path: "/products",      label: "Products",         title: "Products",                     subtitle: "Product portfolio · Jira/ADO tasks mapped to releases", icon: "box" },
   okrs:          { id: "okrs",          path: "/okrs",          label: "OKRs",             title: "OKRs & Strategic Alignment",   subtitle: "Objectives linked to projects, programs & products", icon: "target" },
+  roadmap:       { id: "roadmap",       path: "/roadmap",       label: "Roadmap",          title: "Strategic Roadmap",            subtitle: "Now / Next / Later horizons & time-based timeline",  icon: "route" },
   demands:       { id: "demands",       path: "/demands",       label: "Demand Pipeline",  title: "Demand Pipeline",              subtitle: "Open demands awaiting triage & approval",            icon: "inbox" },
   gantt:         { id: "gantt",         path: "/timeline",      label: "Timeline / Gantt", title: "Timeline / Gantt",             subtitle: "Schedule, phases, milestones & dependencies",        icon: "gantt" },
   pip:           { id: "pip",           path: "/pi-planning",   label: "PI Planning",      title: "Program Increment Planning",   subtitle: "Quarterly PI objectives, calendar, capacity & dependencies", icon: "calendar" },
@@ -49,7 +50,7 @@ export const SCREENS: Record<ScreenId, ScreenMeta> = {
 
 // Sidebar groups per role family (mirrors the prototype's navMain / navConfig).
 export const NAV_MAIN: ScreenId[] = [
-  "dashboard", "portfolio", "programs", "products", "okrs",
+  "dashboard", "portfolio", "programs", "products", "okrs", "roadmap",
   "demands", "gantt", "pip", "project", "resources", "financials",
   "delivery", "releases", "ops", "news",
 ];

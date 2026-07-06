@@ -215,6 +215,7 @@ public static class Rbac
             ("cap-quality",        "Quality, tests & defects", 20),
             ("cap-comment-demand", "Comment on demands",       21),
             ("cap-ops",            "Operational work",  22),
+            ("cap-roadmap",        "Roadmap",           23),
         };
         // Default level per role id for each new capability (absent role → "N").
         var defaults = new Dictionary<string, Dictionary<string, string>>
@@ -230,6 +231,9 @@ public static class Rbac
             // Operational work: run-the-business owners (managers resolve to team),
             // plus PMO/PM/PM-lead; Quality Manager sees it (View) like everything.
             ["cap-ops"] = new() { ["admin"] = "F", ["pmo"] = "F", ["pm"] = "E", ["pmlead"] = "E", ["team"] = "E", ["qmgr"] = "V" },
+            // Roadmap: strategic planners own it (Platform Admin + PMO full),
+            // PMs & PM leads shape it; everyone else reads it (open GET).
+            ["cap-roadmap"] = new() { ["admin"] = "F", ["pmo"] = "F", ["pm"] = "E", ["pmlead"] = "E" },
         };
 
         var existingCaps = (await db.Capabilities.Select(c => c.Key).ToListAsync()).ToHashSet();

@@ -199,6 +199,19 @@ public record OpsImpactRowDto(int Id, string Title, string ServiceName, string T
     string Status, string Assignee, int Alloc, string ImpactNote);
 public record OpsImpactDto(int Alloc, List<OpsImpactRowDto> Items);
 
+// ---- Roadmap module (strategic initiatives · Now/Next/Later + timeline) ----
+public record RoadmapMilestoneDto(int Id, string Title, string Date, bool Done);
+public record RoadmapLinkDto(string EntityType, string EntityId, string Label);
+public record RoadmapItemDto(int Id, string Ref, string Title, string Description, string Lane,
+    string Status, string Theme, string Owner, string StartDate, string EndDate,
+    int Confidence, int Effort, int Value,
+    List<RoadmapMilestoneDto> Milestones, List<RoadmapLinkDto> Links,
+    List<int> DependsOn, List<int> Blocks);
+// A linkable portfolio entity offered in the item editor.
+public record RoadmapLinkOptionDto(string EntityType, string EntityId, string Label);
+public record RoadmapBoardDto(bool CanEdit, List<RoadmapItemDto> Items,
+    List<string> Themes, List<RoadmapLinkOptionDto> LinkOptions);
+
 // ---- People & roles (project assignments) ----------------------------------
 public record RoleAssignmentDto(string Key, string Label, string Person);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,

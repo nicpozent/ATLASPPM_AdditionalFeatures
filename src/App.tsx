@@ -7,6 +7,7 @@ import Portfolio from "@/screens/Portfolio";
 import Programs from "@/screens/Programs";
 import Products from "@/screens/Products";
 import Okrs from "@/screens/Okrs";
+import Roadmap from "@/screens/Roadmap";
 import Demands from "@/screens/Demands";
 import Gantt from "@/screens/Gantt";
 import Pip from "@/screens/Pip";
@@ -36,6 +37,7 @@ const router = createBrowserRouter([
       { path: SCREENS.programs.path.slice(1), element: <Programs /> },
       { path: SCREENS.products.path.slice(1), element: <Products /> },
       { path: SCREENS.okrs.path.slice(1), element: <Okrs /> },
+      { path: SCREENS.roadmap.path.slice(1), element: <Roadmap /> },
       { path: SCREENS.demands.path.slice(1), element: <Demands /> },
       { path: SCREENS.gantt.path.slice(1), element: <Gantt /> },
       { path: SCREENS.pip.path.slice(1), element: <Pip /> },
