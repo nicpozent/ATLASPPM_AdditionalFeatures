@@ -56,6 +56,24 @@ public class TaskTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Assignee_not_onboarded_is_flagged_on_the_task_list()
+    {
+        var c = Admin();
+        var projId = await Id(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Assignee flag project" }));
+        // No Resources/Entra members are seeded in tests, so a named assignee is
+        // "not onboarded"; an unassigned task is fine.
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/tasks", new { name = "From Jira", assignee = "Ghost Person" });
+        await c.PostAsJsonAsync($"/api/v1/projects/{projId}/tasks", new { name = "Unowned" });
+
+        using var doc = JsonDocument.Parse(await (await c.GetAsync($"/api/v1/projects/{projId}/tasks")).Content.ReadAsStringAsync());
+        var tasks = doc.RootElement.GetProperty("tasks").EnumerateArray().ToList();
+        var ghost = tasks.First(t => t.GetProperty("assignee").GetString() == "Ghost Person");
+        var unowned = tasks.First(t => t.GetProperty("assignee").GetString() == "Unassigned");
+        Assert.False(ghost.GetProperty("assigneeKnown").GetBoolean());   // flagged
+        Assert.True(unowned.GetProperty("assigneeKnown").GetBoolean());  // unassigned isn't flagged
+    }
+
+    [Fact]
     public async Task Task_fields_can_be_edited()
     {
         var c = Admin();

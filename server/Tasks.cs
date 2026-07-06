@@ -30,7 +30,14 @@ public static class Tasks
             var absences = await db.Absences.Where(a => a.ProjectId == id).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
-            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences)).ToList(), canCreate));
+            // Onboarded people: resource pool + Entra-synced directory members.
+            // A task assignee not in this set (e.g. pulled from Jira but never
+            // onboarded) is flagged so the UI can warn.
+            var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var r in await db.Resources.Select(x => x.Name).ToListAsync()) if (!string.IsNullOrWhiteSpace(r)) known.Add(r.Trim());
+            foreach (var m in await db.TeamMembers.Select(x => new { x.DisplayName, x.Email }).ToListAsync())
+            { if (!string.IsNullOrWhiteSpace(m.DisplayName)) known.Add(m.DisplayName.Trim()); if (!string.IsNullOrWhiteSpace(m.Email)) known.Add(m.Email.Trim()); }
+            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known)).ToList(), canCreate));
         });
 
         api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -239,11 +246,15 @@ public static class Tasks
         return new EpicDto(e.Id, e.Name, stories, done, pct, e.Status, e.DependsOn, deps);
     }
 
-    static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences)
+    static ProjectTaskDto ToDto(ProjectTask t, List<Absence>? absences, HashSet<string>? known = null)
     {
         var onLeave = absences is not null && OnLeave(t, absences);
+        // Unknown only when we were given the onboarded set and the assignee
+        // (a real person) isn't in it — otherwise assume known.
+        var unassigned = string.IsNullOrWhiteSpace(t.Assignee) || t.Assignee == "Unassigned";
+        var assigneeKnown = known is null || unassigned || known.Contains(t.Assignee.Trim());
         return new(t.Id, t.Code, t.Name, t.Epic, t.Assignee, t.Status, t.Sprint, t.Baseline, t.Priority,
-            t.StartDate, t.TargetDate, t.Points, t.Size, t.EstimateHours, onLeave);
+            t.StartDate, t.TargetDate, t.Points, t.Size, t.EstimateHours, onLeave, assigneeKnown);
     }
 
     // The assignee is "on leave" if any of their absences overlaps the task's

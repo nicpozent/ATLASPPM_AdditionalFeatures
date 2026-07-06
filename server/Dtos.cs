@@ -51,7 +51,7 @@ public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<Securit
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
     string Status, string Sprint, string Baseline, string Priority,
     string StartDate = "", string TargetDate = "", int Points = 0, string Size = "",
-    int EstimateHours = 0, bool AssigneeOnLeave = false);
+    int EstimateHours = 0, bool AssigneeOnLeave = false, bool AssigneeKnown = true);
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
 public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At);
 public record SprintDto(int Id, string Name, string Goal, string StartDate, string EndDate, string Status,
