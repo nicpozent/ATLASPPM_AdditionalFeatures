@@ -186,6 +186,30 @@ public static class Jira
         api.MapGet("/integrations/jira/sync/status/{jobId}", (string jobId, JiraSyncQueue queue) =>
             queue.TryGet(jobId, out var s) && s is not null ? Results.Ok(s) : Results.NotFound());
 
+        // Re-sync a Jira-mapped Ops service (pull its project's issues into items).
+        // The one-time import (target=ops) creates the mapping; this keeps it fresh.
+        api.MapPost("/ops/services/{id:int}/jira/sync", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            if (!JiraConfigured(cfg))
+                return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
+            var svc = await db.OpsServices.FindAsync(id);
+            if (svc is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(svc.JiraProjectKey))
+                return Results.Ok(new { ok = false, error = "This Ops service isn't mapped to Jira — import a Jira project into Ops from Integrations first." });
+            try
+            {
+                var n = await PullOpsItemsAsync(db, cfg, svc);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Ops service from Jira", $"{svc.Ref} · {svc.JiraProjectKey} · {n} items"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { ok = true, tasks = n });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { ok = false, error = $"Jira sync failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
         // ---- Discovery & import --------------------------------------------
         // List every Jira project, flagging which are already mapped in Atlas so
         // an admin/PM/PMO can approve & import the rest. Read needs project Edit.
@@ -386,9 +410,22 @@ public static class Jira
             await db.SaveChangesAsync();     // assign svc.Id
         }
 
+        var imported = await PullOpsItemsAsync(db, cfg, svc);
+        db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Imported Jira project as Ops service", $"{key} → {svc.Ref} · {imported} items"));
+        await db.SaveChangesAsync();
+        return Results.Ok(new { ok = true, serviceId = svc.Id, serviceRef = svc.Ref, items = imported });
+    }
+
+    // Pull a Jira project's issues into an Ops service's items, upserting by Jira
+    // key (idempotent). Shared by the one-time import and the per-service re-sync.
+    // Caller is responsible for SaveChanges + audit.
+    public static async Task<int> PullOpsItemsAsync(AtlasDbContext db, IConfiguration cfg, OpsService svc)
+    {
+        var key = svc.JiraProjectKey;
+        if (string.IsNullOrWhiteSpace(key)) return 0;
         var existing = await db.OpsItems.Where(i => i.ServiceId == svc.Id).ToListAsync();
         var itemOrd = existing.Select(i => i.Ord).DefaultIfEmpty(0).Max();
-        var fields = "summary,issuetype,assignee,priority,status";
+        const string fields = "summary,issuetype,assignee,priority,status";
         using var c = Client(cfg);
         var issues = await FetchJqlAsync(c, $"project = \"{key}\" ORDER BY created ASC", fields, () => { });
         int imported = 0;
@@ -407,9 +444,7 @@ public static class Jira
             item.Assignee = StrPath(f, "assignee", "displayName");
             imported++;
         }
-        db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Imported Jira project as Ops service", $"{key} → {svc.Ref} · {imported} items"));
-        await db.SaveChangesAsync();
-        return Results.Ok(new { ok = true, serviceId = svc.Id, serviceRef = svc.Ref, items = imported });
+        return imported;
     }
 
     // Jira issue type → Ops work-item type.

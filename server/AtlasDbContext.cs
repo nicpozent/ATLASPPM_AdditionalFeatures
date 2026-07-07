@@ -55,6 +55,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<TaskAttachment> TaskAttachments => Set<TaskAttachment>();
     public DbSet<OpsService> OpsServices => Set<OpsService>();
     public DbSet<OpsItem> OpsItems => Set<OpsItem>();
+    public DbSet<OpsTaskLink> OpsTaskLinks => Set<OpsTaskLink>();
     public DbSet<Sprint> Sprints => Set<Sprint>();
     public DbSet<Epic> Epics => Set<Epic>();
     public DbSet<Artifact> Artifacts => Set<Artifact>();

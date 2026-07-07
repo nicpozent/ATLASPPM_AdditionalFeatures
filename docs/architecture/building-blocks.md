@@ -45,7 +45,7 @@ requirement → capability → implementation → decision.
 | SBB-16 | `IConfiguration` env + Docker secrets tooling | ABB-11 | ADR-0009 |
 | SBB-17 | Docker + docker-compose + nginx edge; GitHub Actions CI | ABB-12 | ADR-0008 |
 | SBB-18 | Time-phased allocation (`TeamAssignmentMember` segments, `AllocMath`) + availability finder (`/resources/availability`) | ABB-06 | ADR-0013 |
-| SBB-19 | Ops module (`OpsService`/`OpsItem`, `cap-ops`, project-impact + Ops% roll-up) | ABB-06, ABB-10 | ADR-0014 |
+| SBB-19 | Ops module (`OpsService`/`OpsItem`, `cap-ops`, project-impact + Ops% roll-up; Jira import/re-sync + linked project tasks `OpsTaskLink`) | ABB-05, ABB-06, ABB-10 | ADR-0014, ADR-0034 |
 | SBB-20 | Skills & competency matrix (`Skill`/`SkillRating`, name-keyed) | ABB-06 | ADR-0016 |
 | SBB-21 | Colour-graded Excel exports (ClosedXML: allocation histogram, skills matrix) | ABB-06, ABB-01 | ADR-0015 |
 | SBB-22 | GDPR data-subject admin surface (DSAR export, erase, run-retention) | ABB-10 | ADR-0017 |
