@@ -25,6 +25,14 @@ re-syncs are cheap.
   each **linked, mapped** project (delta by default) and report a roll-up. A
   reusable `JiraSyncButton` on each entity's Overview does a delta on click and
   offers a "Full re-sync"; the project card shows its last-sync time.
+- **Import a Jira project as an Ops service.** The import endpoint gains an
+  `ops` target (gated on `cap-ops`, not `cap-projects`): it creates an
+  `OpsService` carrying the `JiraProjectKey` and upserts the project's issues as
+  `OpsItem`s keyed by Jira issue key (idempotent re-import; allocation left 0).
+  Issue type/status map to the Ops vocabulary. Ops services also gain
+  **archive/unarchive** (`Archived` flag; hidden from the board unless
+  `includeArchived`), completing service lifecycle alongside the existing
+  create/edit/delete and item CRUD.
 
 ## Consequences
 - **+** Re-syncs are fast (only changed issues) and can be triggered where the

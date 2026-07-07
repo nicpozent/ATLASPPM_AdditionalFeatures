@@ -23,6 +23,7 @@ interface OpsItem {
 interface OpsService {
   id: number; ref: string; name: string; category: string; dept: string; owner: string;
   status: string; description: string; items: OpsItem[]; activeCount: number; alloc: number;
+  archived: boolean; jiraProjectKey: string;
 }
 interface OpsSummary { services: number; openItems: number; blocked: number; impactedProjects: number; peopleEngaged: number; }
 interface OpsBoard { canEdit: boolean; services: OpsService[]; summary: OpsSummary; }
@@ -74,11 +75,13 @@ export default function Ops() {
   const [editService, setEditService] = useState<OpsService | null>(null);
   const [newItemFor, setNewItemFor] = useState<OpsService | null>(null);
   const [editItem, setEditItem] = useState<OpsItem | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["ops"], retry: false, staleTime: 30_000,
+    queryKey: ["ops", showArchived], retry: false, staleTime: 30_000,
     queryFn: async (): Promise<OpsBoard> =>
-      (await api<OpsBoard>("/ops")) ?? { canEdit: false, services: [], summary: { services: 0, openItems: 0, blocked: 0, impactedProjects: 0, peopleEngaged: 0 } },
+      (await api<OpsBoard>(`/ops?includeArchived=${showArchived}`)) ?? { canEdit: false, services: [], summary: { services: 0, openItems: 0, blocked: 0, impactedProjects: 0, peopleEngaged: 0 } },
   });
   const { data: projects = [] } = useQuery({
     queryKey: ["projects"], retry: false, staleTime: 60_000,
@@ -93,6 +96,11 @@ export default function Ops() {
   const delService = useMutation({
     mutationFn: (id: number) => api(`/ops/services/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ops"] }); toast("Service removed"); },
+    onError: (e) => toastError(e),
+  });
+  const archiveService = useMutation({
+    mutationFn: ({ id, on }: { id: number; on: boolean }) => api(`/ops/services/${id}/archive?on=${on}`, { method: "POST" }),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["ops"] }); toast(v.on ? "Service archived" : "Service restored"); },
     onError: (e) => toastError(e),
   });
 
@@ -117,7 +125,13 @@ export default function Ops() {
           <option value="all">All statuses</option>
           {SERVICE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.textMuted, cursor: "pointer" }}>
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
+        </label>
         <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={() => setImportOpen(true)} disabled={!mayEdit} title={mayEdit ? "Import a Jira project as an ops service" : "Your role can't edit operational work"}>
+          <Icon name="sync" size={15} /> Import from Jira
+        </Button>
         <Button onClick={() => setNewService(true)} disabled={!mayEdit} title={mayEdit ? undefined : "Your role can't edit operational work"}>
           <Icon name="plus" size={16} /> New service
         </Button>
@@ -134,6 +148,7 @@ export default function Ops() {
               key={s.id} service={s} mayEdit={mayEdit}
               onAddItem={() => setNewItemFor(s)} onEditService={() => setEditService(s)}
               onDeleteService={() => delService.mutate(s.id)} onEditItem={setEditItem}
+              onArchive={() => archiveService.mutate({ id: s.id, on: !s.archived })}
             />
           ))}
         </div>
@@ -143,12 +158,13 @@ export default function Ops() {
       {editService && <ServiceModal service={editService} onClose={() => setEditService(null)} />}
       {newItemFor && <ItemModal service={newItemFor} projects={projects} onClose={() => setNewItemFor(null)} />}
       {editItem && <ItemModal item={editItem} projects={projects} onClose={() => setEditItem(null)} />}
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
     </div>
   );
 }
 
-function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteService, onEditItem }: {
-  service: OpsService; mayEdit: boolean; onAddItem: () => void; onEditService: () => void; onDeleteService: () => void; onEditItem: (i: OpsItem) => void;
+function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteService, onEditItem, onArchive }: {
+  service: OpsService; mayEdit: boolean; onAddItem: () => void; onEditService: () => void; onDeleteService: () => void; onEditItem: (i: OpsItem) => void; onArchive: () => void;
 }) {
   return (
     <Card padding={0} style={{ overflow: "visible" }}>
@@ -159,6 +175,8 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
             <span style={{ fontFamily: font.head, fontSize: 15, fontWeight: 700, color: color.ink }}>{service.name}</span>
             <StatusPill value={service.status} />
             <span style={{ fontSize: 11, fontWeight: 600, color: color.textMuted, background: color.bg, borderRadius: 6, padding: "2px 8px" }}>{service.category}</span>
+            {service.jiraProjectKey && <span style={{ fontSize: 10.5, fontWeight: 600, color: color.primaryDark, background: color.primaryTint, borderRadius: 6, padding: "2px 8px" }} title="Imported from Jira">Jira · {service.jiraProjectKey}</span>}
+            {service.archived && <span style={{ fontSize: 10.5, fontWeight: 700, color: color.faint2, background: color.bg, borderRadius: 6, padding: "2px 8px" }}>ARCHIVED</span>}
           </div>
           <div style={{ fontSize: 12, color: color.faint2, marginTop: 4 }}>
             {service.dept}{service.owner ? ` · ${service.owner}` : ""} · {service.activeCount} active item{service.activeCount === 1 ? "" : "s"} · {service.alloc}% allocated
@@ -173,6 +191,7 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
             {(close) => (
               <>
                 <MenuItem label="Edit service" icon="edit" onClick={() => { close(); onEditService(); }} />
+                <MenuItem label={service.archived ? "Restore service" : "Archive service"} icon="archive" onClick={() => { close(); onArchive(); }} />
                 <MenuItem label="Delete service" icon="trash" danger onClick={() => { close(); onDeleteService(); }} />
               </>
             )}
@@ -321,6 +340,36 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : editing ? "Save changes" : "Add item"}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function ImportModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [key, setKey] = useState("");
+  const [name, setName] = useState("");
+  const imp = useMutation({
+    mutationFn: () => api<{ ok: boolean; items?: number; serviceRef?: string; error?: string }>(
+      `/integrations/jira/import`, { method: "POST", body: JSON.stringify({ jiraProjectKey: key.trim(), target: "ops", name: name.trim() }) }),
+    onSuccess: (r) => {
+      if (r && r.ok === false) { toast(r.error || "Import failed"); return; }
+      qc.invalidateQueries({ queryKey: ["ops"] });
+      toast(`Imported ${r?.items ?? 0} items into ${r?.serviceRef ?? "the service"}`);
+      onClose();
+    },
+    onError: (e) => toastError(e),
+  });
+  return (
+    <Modal onClose={onClose} width={480} label="Import a Jira project as an Ops service">
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Pull a Jira project's issues in as operational work items. Re-importing the same key tops up new issues (idempotent). Allocation stays at 0 until you set it.</div>
+      <DecLabel>Jira project key</DecLabel>
+      <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="e.g. OPS or SUPPORT" style={{ marginBottom: 14 }} />
+      <DecLabel>Service name (optional)</DecLabel>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Defaults to the Jira key" />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (key.trim()) imp.mutate(); }} disabled={imp.isPending || !key.trim()}>{imp.isPending ? "Importing…" : "Import"}</Button>
       </div>
     </Modal>
   );

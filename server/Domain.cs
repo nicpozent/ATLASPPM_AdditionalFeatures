@@ -175,6 +175,8 @@ public class OpsService
     public string Owner { get; set; } = "";
     public string Status { get; set; } = "Active";      // Active | Paused | Retired
     public string Description { get; set; } = "";
+    public bool Archived { get; set; }                   // hidden from the board unless archived filter is on
+    public string JiraProjectKey { get; set; } = "";     // set when the service was imported from a Jira project
     public int Ord { get; set; }
 }
 
@@ -193,6 +195,7 @@ public class OpsItem
     public string ImpactNote { get; set; } = "";         // how it affects the project
     public int Ord { get; set; }
     public string CreatedAt { get; set; } = "";          // display date
+    public string JiraKey { get; set; } = "";            // source Jira issue key when imported (idempotent re-import)
 }
 
 // A person assigned to a project role. RoleKey is "pm" (the project lead, set by
