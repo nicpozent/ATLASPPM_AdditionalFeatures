@@ -12,7 +12,7 @@ function quadrant(power: string, interest: string): { label: string; dot: string
   if (power === "High" && interest === "High") return { label: "Manage closely", dot: "#D13438", tint: "#FBE7E8" };
   if (power === "High") return { label: "Keep satisfied", dot: "#C98A00", tint: "#FBF2D7" };
   if (interest === "High") return { label: "Keep informed", dot: "#0F6CBD", tint: "#E6EFFB" };
-  return { label: "Monitor", dot: "#6A7488", tint: "#EEF1F6" };
+  return { label: "Monitor", dot: "#565F73", tint: "#EEF1F6" };
 }
 
 // Persisted power/interest stakeholder matrix for a project or program.

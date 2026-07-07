@@ -187,6 +187,61 @@ public static class AzureDevOps
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/projects/{proj.Id}", new { ok = true, projectId = proj.Id, programId, created = true });
         });
+
+        // ---- Work-item sync -------------------------------------------------
+        // Sync one mapped project: pull its Azure DevOps iterations → sprints and
+        // work items → epics / tasks / backlog. Idempotent by ADO id; full pull
+        // (prunes rows that vanished from ADO). Gated on Integrations (Edit).
+        api.MapPost("/projects/{id}/ado/sync", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            if (!AdoConfigured(cfg))
+                return Results.Ok(new { ok = false, error = "Azure DevOps isn't configured — set AzureDevOps:Organization and AzureDevOps:Pat (see docs/azure-devops-setup.md)." });
+            var p = await db.Projects.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(p.AdoProject))
+                return Results.Ok(new { ok = false, error = "This project isn't mapped to an Azure DevOps project. Import/map it first." });
+            try
+            {
+                using var c = Client(cfg);
+                var r = await SyncProjectAsync(db, cfg, c, p);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps project", $"{p.AdoProject} → {p.Id}: {r.Sprints} sprints, {r.Epics} epics, {r.Tasks} tasks"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { ok = true, r.Sprints, r.Epics, r.Tasks, r.Backlog, r.Truncated });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { ok = false, error = $"Azure DevOps sync failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Sync every ADO-mapped, non-archived project in one pass (best-effort:
+        // one project's failure doesn't stop the rest). Gated on Integrations.
+        api.MapPost("/integrations/ado/sync", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            if (!AdoConfigured(cfg))
+                return Results.Ok(new { ok = false, error = "Azure DevOps isn't configured — set AzureDevOps:Organization and AzureDevOps:Pat (see docs/azure-devops-setup.md)." });
+            var mapped = await db.Projects.Where(p => p.AdoProject != "" && !p.Archived).ToListAsync();
+            int sp = 0, ep = 0, tk = 0, ok = 0;
+            var errors = new List<string>();
+            try
+            {
+                using var c = Client(cfg);
+                foreach (var p in mapped)
+                {
+                    try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; }
+                    catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); }
+                }
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps (all mapped)", $"{ok} projects, {sp} sprints, {ep} epics, {tk} tasks"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { ok = true, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { ok = false, error = $"Azure DevOps sync failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
     }
 
     static async Task<string> NextProjectIdAsync(AtlasDbContext db)
@@ -195,4 +250,226 @@ public static class AzureDevOps
         var max = ids.Select(x => int.TryParse(x.Split('-').Last(), out var n) ? n : 0).DefaultIfEmpty(0).Max();
         return $"PRJ-{max + 1}";
     }
+
+    // -----------------------------------------------------------------------
+    //  Sync engine (Azure DevOps → Atlas)
+    //
+    //  One-way, idempotent by ADO id, mirroring the Jira engine's contract:
+    //  iterations → sprints (by identifier), work items → epics (type "Epic")
+    //  and tasks (all other types), issues with no iteration land in the
+    //  backlog, and rows whose ADO id vanished are pruned (full pull). Locally-
+    //  created rows (AdoId == "") are never touched. Bounded by MaxWorkItems.
+    // -----------------------------------------------------------------------
+    const int ApiPageBatch = 200;      // work-item detail batch size (ADO cap)
+    const int MaxWorkItems = 4000;     // safety cap so a huge project can't run unbounded
+
+    public record AdoSyncResult(int Sprints, int Epics, int Tasks, int Backlog, bool Truncated);
+
+    record AdoItem(string Id, string Type, string Title, string State, string Assignee,
+        string IterationLeaf, string ParentId, int Points, int Priority, string Description,
+        string Created, string Changed);
+
+    public static async Task<AdoSyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p)
+    {
+        var project = p.AdoProject.Trim();
+        var enc = Uri.EscapeDataString(project);
+        var truncated = false;
+
+        // --- Iterations → sprints (upsert by node identifier) ---------------
+        var existingSprints = await db.Sprints.Where(s => s.ProjectId == p.Id).ToListAsync();
+        var sprintOrd = existingSprints.Select(s => s.Ord).DefaultIfEmpty(0).Max();
+        var seenSprints = new HashSet<string>();
+        var iterRes = await c.GetAsync($"{enc}/_apis/wit/classificationnodes/iterations?$depth=5&api-version={ApiVersion}");
+        if (iterRes.IsSuccessStatusCode)
+        {
+            using var iterDoc = JsonDocument.Parse(await iterRes.Content.ReadAsStringAsync());
+            foreach (var node in FlattenIterations(iterDoc.RootElement))
+            {
+                var ident = node.TryGetProperty("identifier", out var idn) ? idn.GetString() ?? "" : "";
+                var name = node.TryGetProperty("name", out var nn) ? nn.GetString() ?? "" : "";
+                if (ident.Length == 0 || name.Length == 0) continue;
+                seenSprints.Add(ident);
+                var s = existingSprints.FirstOrDefault(x => x.AdoId == ident);
+                if (s is null) { s = new Sprint { ProjectId = p.Id, AdoId = ident, Ord = ++sprintOrd }; db.Sprints.Add(s); existingSprints.Add(s); }
+                s.Name = name;
+                if (node.TryGetProperty("attributes", out var at) && at.ValueKind == JsonValueKind.Object)
+                {
+                    if (at.TryGetProperty("startDate", out var sd) && sd.ValueKind == JsonValueKind.String) s.StartDate = DatePart(sd.GetString());
+                    if (at.TryGetProperty("finishDate", out var fd) && fd.ValueKind == JsonValueKind.String) s.EndDate = DatePart(fd.GetString());
+                }
+            }
+        }
+
+        // --- Work items: WIQL for ids, then batched detail fetch ------------
+        var ids = new List<string>();
+        var wiql = new StringContent(
+            JsonSerializer.Serialize(new { query = $"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project.Replace("'", "''")}' ORDER BY [System.ChangedDate] ASC" }),
+            Encoding.UTF8, "application/json");
+        var wiqlRes = await c.PostAsync($"{enc}/_apis/wit/wiql?api-version={ApiVersion}", wiql);
+        if (wiqlRes.IsSuccessStatusCode)
+        {
+            using var wiqlDoc = JsonDocument.Parse(await wiqlRes.Content.ReadAsStringAsync());
+            if (wiqlDoc.RootElement.TryGetProperty("workItems", out var wl) && wl.ValueKind == JsonValueKind.Array)
+                foreach (var w in wl.EnumerateArray())
+                    if (w.TryGetProperty("id", out var wid)) ids.Add(wid.GetRawText().Trim('"'));
+        }
+        if (ids.Count > MaxWorkItems) { ids = ids.Take(MaxWorkItems).ToList(); truncated = true; }
+
+        var items = new List<AdoItem>();
+        var fields = "System.Id,System.WorkItemType,System.Title,System.State,System.AssignedTo," +
+                     "System.IterationPath,System.Parent,System.Description,System.CreatedDate,System.ChangedDate," +
+                     "Microsoft.VSTS.Scheduling.StoryPoints,Microsoft.VSTS.Scheduling.Effort,Microsoft.VSTS.Common.Priority";
+        for (var i = 0; i < ids.Count; i += ApiPageBatch)
+        {
+            var batch = ids.Skip(i).Take(ApiPageBatch);
+            var res = await c.GetAsync($"_apis/wit/workitems?ids={string.Join(',', batch)}&fields={Uri.EscapeDataString(fields)}&api-version={ApiVersion}");
+            if (!res.IsSuccessStatusCode) { truncated = true; continue; }
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("value", out var arr) || arr.ValueKind != JsonValueKind.Array) continue;
+            foreach (var wi in arr.EnumerateArray())
+            {
+                var id = wi.TryGetProperty("id", out var idp) ? idp.GetRawText().Trim('"') : "";
+                if (id.Length == 0 || !wi.TryGetProperty("fields", out var f)) continue;
+                items.Add(new AdoItem(
+                    Id: id,
+                    Type: FStr(f, "System.WorkItemType"),
+                    Title: FStr(f, "System.Title"),
+                    State: FStr(f, "System.State"),
+                    Assignee: FStrPath(f, "System.AssignedTo", "displayName"),
+                    IterationLeaf: LastSegment(FStr(f, "System.IterationPath")),
+                    ParentId: FRaw(f, "System.Parent"),
+                    Points: (int)Math.Round(FNum(f, "Microsoft.VSTS.Scheduling.StoryPoints") is var sp2 && sp2 > 0 ? sp2 : FNum(f, "Microsoft.VSTS.Scheduling.Effort")),
+                    Priority: (int)FNum(f, "Microsoft.VSTS.Common.Priority"),
+                    Description: FStr(f, "System.Description"),
+                    Created: FStr(f, "System.CreatedDate"),
+                    Changed: FStr(f, "System.ChangedDate")));
+            }
+        }
+
+        // --- Epics (type "Epic") — first pass so tasks can link by parent ---
+        var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
+        var epicOrd = existingEpics.Select(e => e.Ord).DefaultIfEmpty(0).Max();
+        var seenEpics = new HashSet<string>();
+        var epicNameById = new Dictionary<string, string>();
+        foreach (var wi in items.Where(x => x.Type.Equals("Epic", StringComparison.OrdinalIgnoreCase)))
+        {
+            seenEpics.Add(wi.Id);
+            epicNameById[wi.Id] = wi.Title;
+            var e = existingEpics.FirstOrDefault(x => x.AdoId == wi.Id);
+            if (e is null) { e = new Epic { ProjectId = p.Id, AdoId = wi.Id, Ord = ++epicOrd }; db.Epics.Add(e); existingEpics.Add(e); }
+            e.Name = wi.Title;
+            e.Status = IsDoneState(wi.State) ? "Complete" : "In progress";
+            if (wi.Description.Length > 0) e.Description = StripHtml(wi.Description);
+        }
+
+        // --- Tasks (all other types) — upsert by ADO id ---------------------
+        var existingTasks = await db.ProjectTasks.Where(t => t.ProjectId == p.Id).ToListAsync();
+        var taskOrd = existingTasks.Select(t => t.Ord).DefaultIfEmpty(0).Max();
+        var seenTasks = new HashSet<string>();
+        int backlog = 0;
+        foreach (var wi in items.Where(x => !x.Type.Equals("Epic", StringComparison.OrdinalIgnoreCase)))
+        {
+            seenTasks.Add(wi.Id);
+            var code = $"ADO-{wi.Id}";
+            var t = existingTasks.FirstOrDefault(x => x.AdoId == wi.Id);
+            if (t is null) { t = new ProjectTask { ProjectId = p.Id, AdoId = wi.Id, Code = code, Ord = ++taskOrd }; db.ProjectTasks.Add(t); existingTasks.Add(t); }
+            t.Code = code;
+            t.Name = wi.Title;
+            t.Assignee = wi.Assignee.Length > 0 ? wi.Assignee : "Unassigned";
+            t.Status = MapAdoState(wi.State);
+            t.StatusName = wi.State;
+            t.Priority = MapAdoPriority(wi.Priority);
+            t.Points = Math.Max(0, wi.Points);
+            t.IssueType = wi.Type;
+            t.Description = StripHtml(wi.Description);
+            t.Sprint = wi.IterationLeaf.Equals(p.AdoProject, StringComparison.OrdinalIgnoreCase) ? "" : wi.IterationLeaf;
+            if (t.Sprint.Length == 0) backlog++;
+            t.ParentKey = wi.ParentId;
+            t.Epic = wi.ParentId.Length > 0 && epicNameById.TryGetValue(wi.ParentId, out var en) ? en : "";
+            t.JiraCreated = wi.Created;
+            t.JiraUpdated = wi.Changed;
+        }
+
+        // --- Prune rows that vanished from ADO (full pull) ------------------
+        if (seenTasks.Count > 0)
+            db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.AdoId.Length > 0 && !seenTasks.Contains(t.AdoId)));
+        if (seenEpics.Count > 0)
+            db.Epics.RemoveRange(existingEpics.Where(e => e.AdoId.Length > 0 && !seenEpics.Contains(e.AdoId)));
+        if (seenSprints.Count > 0)
+            db.Sprints.RemoveRange(existingSprints.Where(s => s.AdoId.Length > 0 && !seenSprints.Contains(s.AdoId)));
+
+        // Recompute synced epics' story rollup from surviving tasks (by name).
+        var liveTasks = existingTasks.Where(t => t.AdoId.Length == 0 || seenTasks.Contains(t.AdoId)).ToList();
+        foreach (var e in existingEpics.Where(e => e.AdoId.Length > 0 && seenEpics.Contains(e.AdoId)))
+        {
+            var its = liveTasks.Where(t => t.Epic == e.Name).ToList();
+            e.Stories = its.Count;
+            e.Done = its.Count(t => t.Status == "Done");
+        }
+
+        return new AdoSyncResult(seenSprints.Count, seenEpics.Count, seenTasks.Count, backlog, truncated);
+    }
+
+    // Flatten the iteration classification-node tree to its leaf iterations
+    // (nodes that carry a start date, i.e. real iterations not grouping folders).
+    static IEnumerable<JsonElement> FlattenIterations(JsonElement node)
+    {
+        var hasChildren = node.TryGetProperty("children", out var ch) && ch.ValueKind == JsonValueKind.Array && ch.GetArrayLength() > 0;
+        var hasStart = node.TryGetProperty("attributes", out var at) && at.ValueKind == JsonValueKind.Object &&
+                       at.TryGetProperty("startDate", out var sd) && sd.ValueKind == JsonValueKind.String;
+        if (hasStart && node.TryGetProperty("identifier", out _)) yield return node;
+        if (hasChildren)
+            foreach (var kid in ch.EnumerateArray())
+                foreach (var leaf in FlattenIterations(kid))
+                    yield return leaf;
+    }
+
+    // ADO work-item State → Atlas task status (To Do | In Progress | In Review |
+    // Done | Blocked). Covers Agile / Scrum / Basic process states.
+    public static string MapAdoState(string state) => (state ?? "").Trim().ToLowerInvariant() switch
+    {
+        "done" or "closed" or "completed" or "resolved" => "Done",
+        "active" or "committed" or "doing" or "in progress" or "inprogress" => "In Progress",
+        "removed" => "Blocked",
+        _ => "To Do",
+    };
+
+    static bool IsDoneState(string state) => MapAdoState(state) == "Done";
+
+    // ADO priority (1 highest … 4 lowest) → Atlas Critical|High|Medium|Low.
+    public static string MapAdoPriority(int p) => p switch { 1 => "Critical", 2 => "High", 3 => "Medium", 4 => "Low", _ => "Medium" };
+
+    // Last "\"-separated segment of an IterationPath, e.g. "Proj\\Rel 1\\Sprint 3" → "Sprint 3".
+    public static string LastSegment(string path) =>
+        string.IsNullOrEmpty(path) ? "" : path.Split('\\').Last().Trim();
+
+    // ISO date part (yyyy-MM-dd) of an ADO timestamp; "" when empty/unparseable.
+    static string DatePart(string? iso) =>
+        string.IsNullOrEmpty(iso) ? "" : (iso.Length >= 10 ? iso[..10] : iso);
+
+    // Rough HTML→text for System.Description (ADO stores rich text as HTML).
+    public static string StripHtml(string html)
+    {
+        if (string.IsNullOrEmpty(html)) return "";
+        var sb = new StringBuilder(html.Length);
+        var inTag = false;
+        foreach (var chr in html)
+        {
+            if (chr == '<') inTag = true;
+            else if (chr == '>') inTag = false;
+            else if (!inTag) sb.Append(chr);
+        }
+        return System.Net.WebUtility.HtmlDecode(sb.ToString()).Trim();
+    }
+
+    // ---- Work-item field readers (fields is the "fields" object) ----------
+    static string FStr(JsonElement fields, string name) =>
+        fields.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+    static string FRaw(JsonElement fields, string name) =>
+        fields.TryGetProperty(name, out var v) && v.ValueKind != JsonValueKind.Null ? v.GetRawText().Trim('"') : "";
+    static double FNum(JsonElement fields, string name) =>
+        fields.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0;
+    static string FStrPath(JsonElement fields, string name, string prop) =>
+        fields.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object && v.TryGetProperty(prop, out var pv) && pv.ValueKind == JsonValueKind.String
+            ? pv.GetString() ?? "" : "";
 }

@@ -437,7 +437,7 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
           <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
             {BLK_VIEWS.map((v) => (
-              <button key={v.key} onClick={() => setView(v.key)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: view === v.key ? "#fff" : "transparent", color: view === v.key ? color.primary : "#6A7488", boxShadow: view === v.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v.label}</button>
+              <button key={v.key} onClick={() => setView(v.key)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: view === v.key ? "#fff" : "transparent", color: view === v.key ? color.primary : "#565F73", boxShadow: view === v.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v.label}</button>
             ))}
           </div>
           <div style={{ flex: 1 }} />
@@ -560,7 +560,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button onClick={onClick} style={{
       padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-      background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
+      background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
     }}>{children}</button>
   );
 }

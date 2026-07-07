@@ -130,7 +130,7 @@ export default function Help() {
               return (
                 <button key={rt.id} onClick={() => setRole(rt.id)} style={{
                   padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                  background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488",
+                  background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
                   boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
                 }}>{rt.label}</button>
               );

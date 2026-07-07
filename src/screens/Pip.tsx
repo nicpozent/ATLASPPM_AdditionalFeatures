@@ -117,7 +117,7 @@ export default function Pip() {
               ["capacity", "Capacity & Load", inc.iterationList.length],
               ["dependencies", "Dependencies", inc.dependencyList.length],
             ] as const).map(([key, label, n]) => (
-              <button key={key} onClick={() => setTab(key)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: tab === key ? "#fff" : "transparent", color: tab === key ? color.primary : "#6A7488", boxShadow: tab === key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+              <button key={key} onClick={() => setTab(key)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: tab === key ? "#fff" : "transparent", color: tab === key ? color.primary : "#565F73", boxShadow: tab === key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
                 {label}{n ? ` · ${n}` : ""}
               </button>
             ))}

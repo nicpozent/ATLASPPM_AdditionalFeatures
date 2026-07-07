@@ -105,7 +105,7 @@ export default function Admin() {
               padding: "10px 4px", margin: "0 18px 0 0", border: "none",
               borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent",
               background: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 700 : 500,
-              color: active ? color.primary : "#6A7488", fontFamily: "inherit", whiteSpace: "nowrap",
+              color: active ? color.primary : "#565F73", fontFamily: "inherit", whiteSpace: "nowrap",
             }}>{t.label}</button>
           );
         })}
@@ -664,7 +664,7 @@ interface RotationStatus {
   warnDays: number; criticalDays: number; canManage: boolean;
 }
 const ROTATION_UI: Record<RotationStatus["status"], { label: string; fg: string; bg: string }> = {
-  unknown:  { label: "Not recorded", fg: "#6A7488", bg: "#EEF1F6" },
+  unknown:  { label: "Not recorded", fg: "#565F73", bg: "#EEF1F6" },
   ok:       { label: "Healthy",      fg: "#15A34A", bg: "#E7F4EC" },
   warn:     { label: "Rotate soon",  fg: "#9A6800", bg: "#FBF2D7" },
   critical: { label: "Change it now!", fg: "#A1282B", bg: "#FBE7E8" },

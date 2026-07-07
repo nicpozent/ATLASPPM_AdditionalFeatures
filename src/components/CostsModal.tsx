@@ -61,7 +61,7 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
       {/* Spent to date vs Forecast at completion — same taxonomy, separate figures */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 9, padding: 3, gap: 2, marginBottom: 14 }}>
         {([["actual", "Spent to date"], ["forecast", "Forecast at completion"]] as [CostKind, string][]).map(([k, lbl]) => (
-          <button key={k} onClick={() => setKind(k)} style={{ padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: kind === k ? "#fff" : "transparent", color: kind === k ? color.primary : "#6A7488", boxShadow: kind === k ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{lbl}</button>
+          <button key={k} onClick={() => setKind(k)} style={{ padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: kind === k ? "#fff" : "transparent", color: kind === k ? color.primary : "#565F73", boxShadow: kind === k ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{lbl}</button>
         ))}
       </div>
 

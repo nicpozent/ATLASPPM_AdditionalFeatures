@@ -133,7 +133,7 @@ function reportHtml(r: Report, slides: boolean): string {
     <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;margin:6px 0 4px">${esc(r.title)}</div>
     <div style="font-size:13px;opacity:.9">${esc(r.summary)} · Generated ${today}</div></div>`;
   const table = r.rows.length === 0
-    ? `<p style="color:#6A7488;font-size:14px">No data for this report yet.</p>`
+    ? `<p style="color:#565F73;font-size:14px">No data for this report yet.</p>`
     : `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr>${r.columns.map((c) => `<th style="text-align:left;padding:9px 10px;background:#EEF3FB;color:#11163A;border-bottom:2px solid #0F6CBD">${esc(c)}</th>`).join("")}</tr></thead>
         <tbody>${r.rows.map((row, i) => `<tr style="background:${i % 2 ? "#F8FAFD" : "#fff"}">${row.map((cell) => `<td style="padding:8px 10px;border-bottom:1px solid #EEF1F6;color:#26324A">${esc(cell)}</td>`).join("")}</tr>`).join("")}</tbody>

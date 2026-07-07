@@ -21,16 +21,21 @@ export const color = {
   sidebarBg: "#11163A",
   sidebarText: "#AEB6D0",
   sidebarMuted: "#7E88AD",
-  sidebarLabel: "#5C6589",
+  sidebarLabel: "#7C86AC", // AA on the navy sidebar/hero (#11163A); lifted from #5C6589 (ADR-0037)
 
   // Text
+  // Muted greys lifted to WCAG AA (≥4.5:1 on white AND on the light input/alt
+  // surfaces) so the browser axe contrast check can gate — see ADR-0037. The
+  // prototype's airier greys (faint #7B849A / #8A92A6 / #9AA2B4) failed AA as
+  // body text; these are the darkest values that stay visually close while
+  // passing on #F1F3F8 / #F8FAFD.
   ink: "#11163A",
   text: "#1C2233",
   textMuted: "#3A4358",
   subtle: "#5A6478",
-  faint: "#7B849A",
-  faint2: "#8A92A6",
-  faint3: "#9AA2B4",
+  faint: "#5B657B",
+  faint2: "#616A81",
+  faint3: "#636C83",
 
   // Surfaces
   bg: "#EEF1F6",

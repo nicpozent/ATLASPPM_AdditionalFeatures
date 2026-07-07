@@ -71,7 +71,7 @@ function PillBtn({ active, onClick, children }: { active: boolean; onClick: () =
     <button onClick={onClick} style={{
       padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer",
       fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-      background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488",
+      background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
       boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
     }}>{children}</button>
   );
