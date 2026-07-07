@@ -8,6 +8,7 @@ public record CreateOpsItemReq(string Title, string? Description, string? Type, 
     string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote, string? StartDate, string? EndDate);
 public record UpdateOpsItemReq(string? Title, string? Description, string? Type, string? Priority, string? Status,
     string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote, string? StartDate, string? EndDate);
+public record LinkOpsTaskReq(int TaskId);
 
 // ============================================================================
 //  Ops module — run-the-business work, a distinct TYPE from project delivery.
@@ -59,14 +60,26 @@ public static class Ops
             var items = await db.OpsItems.OrderBy(i => i.Ord).ThenBy(i => i.Id).ToListAsync();
             var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
 
+            // Linked project tasks per service (traceability rows alongside items).
+            var links = await db.OpsTaskLinks.ToListAsync();
+            var linkedTaskIds = links.Select(l => l.TaskId).Distinct().ToList();
+            var tasks = linkedTaskIds.Count == 0 ? new List<ProjectTask>()
+                : await db.ProjectTasks.Where(t => linkedTaskIds.Contains(t.Id)).ToListAsync();
+            var taskById = tasks.ToDictionary(t => t.Id);
+            var linksByService = links.GroupBy(l => l.ServiceId).ToDictionary(g => g.Key, g => g.ToList());
+
             var byService = items.GroupBy(i => i.ServiceId).ToDictionary(g => g.Key, g => g.ToList());
             var svcDtos = services.Select(s =>
             {
                 var its = byService.TryGetValue(s.Id, out var l) ? l : new List<OpsItem>();
                 var active = its.Where(IsActive).ToList();
+                var linked = (linksByService.TryGetValue(s.Id, out var ls) ? ls : new List<OpsTaskLink>())
+                    .Where(x => taskById.ContainsKey(x.TaskId))
+                    .Select(x => { var t = taskById[x.TaskId]; return new OpsLinkedTaskDto(t.Id, t.Code, t.Name, t.Status, t.Assignee, t.ProjectId, projNames.GetValueOrDefault(t.ProjectId, t.ProjectId)); })
+                    .ToList();
                 return new OpsServiceDto(s.Id, s.Ref, s.Name, s.Category, s.Dept, s.Owner, s.Status, s.Description,
                     its.Select(i => ToItemDto(i, s.Name, projNames)).ToList(),
-                    active.Count, active.Sum(i => i.Alloc), s.Archived, s.JiraProjectKey);
+                    active.Count, active.Sum(i => i.Alloc), s.Archived, s.JiraProjectKey, linked);
             }).ToList();
 
             var allActive = items.Where(IsActive).ToList();
@@ -219,6 +232,33 @@ public static class Ops
             db.OpsItems.Remove(item);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Removed ops work item", item.Title));
             await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // ---- Linked project tasks (traceability) --------------------------
+        // Link an existing project task to a service so its delivery tasks show
+        // alongside manual items. The task's allocation stays with its project.
+        api.MapPost("/ops/services/{id:int}/tasks", async (int id, LinkOpsTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-ops", "E") is { } denied) return denied;
+            var svc = await db.OpsServices.FindAsync(id);
+            if (svc is null) return Results.NotFound();
+            var task = await db.ProjectTasks.FindAsync(req.TaskId);
+            if (task is null) return Results.BadRequest(new { error = "No such task." });
+            if (!await db.OpsTaskLinks.AnyAsync(l => l.ServiceId == id && l.TaskId == req.TaskId))
+            {
+                db.OpsTaskLinks.Add(new OpsTaskLink { ServiceId = id, TaskId = req.TaskId });
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Linked task to service", $"{svc.Ref} · {task.Code} {task.Name}"));
+                await db.SaveChangesAsync();
+            }
+            return Results.NoContent();
+        });
+
+        api.MapDelete("/ops/services/{id:int}/tasks/{taskId:int}", async (int id, int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-ops", "E") is { } denied) return denied;
+            var links = await db.OpsTaskLinks.Where(l => l.ServiceId == id && l.TaskId == taskId).ToListAsync();
+            if (links.Count > 0) { db.OpsTaskLinks.RemoveRange(links); await db.SaveChangesAsync(); }
             return Results.NoContent();
         });
 

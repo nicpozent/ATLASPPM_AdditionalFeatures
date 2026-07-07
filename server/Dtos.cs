@@ -198,9 +198,13 @@ public record OpsItemDto(int Id, int ServiceId, string ServiceName, string Title
     string Type, string Priority, string Status, string Assignee, int Alloc,
     string? ImpactProjectId, string? ImpactProjectName, string ImpactNote, string CreatedAt,
     string StartDate = "", string EndDate = "");
+// A project task linked to an Ops service (traceability; allocation stays with
+// the task's own project).
+public record OpsLinkedTaskDto(int TaskId, string Code, string Name, string Status, string Assignee,
+    string ProjectId, string ProjectName);
 public record OpsServiceDto(int Id, string Ref, string Name, string Category, string Dept, string Owner,
     string Status, string Description, List<OpsItemDto> Items, int ActiveCount, int Alloc,
-    bool Archived = false, string JiraProjectKey = "");
+    bool Archived = false, string JiraProjectKey = "", List<OpsLinkedTaskDto>? LinkedTasks = null);
 public record OpsSummaryDto(int Services, int OpenItems, int Blocked, int ImpactedProjects, int PeopleEngaged);
 public record OpsBoardDto(bool CanEdit, List<OpsServiceDto> Services, OpsSummaryDto Summary);
 // Ops load impacting a single project (shown on Project Detail).

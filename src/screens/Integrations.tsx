@@ -206,13 +206,13 @@ function DiscoverJira() {
           </div>
         ))}
       </div>
-      {importing && <ImportJiraModal proj={importing} onClose={() => setImporting(null)} onDone={() => { setImporting(null); qc.invalidateQueries({ queryKey: ["jira-projects"] }); qc.invalidateQueries({ queryKey: ["projects"] }); qc.invalidateQueries({ queryKey: ["programs"] }); }} />}
+      {importing && <ImportJiraModal proj={importing} onClose={() => setImporting(null)} onDone={() => { setImporting(null); qc.invalidateQueries({ queryKey: ["jira-projects"] }); qc.invalidateQueries({ queryKey: ["projects"] }); qc.invalidateQueries({ queryKey: ["programs"] }); qc.invalidateQueries({ queryKey: ["ops"] }); }} />}
     </div>
   );
 }
 
 function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: () => void; onDone: () => void }) {
-  const [target, setTarget] = useState<"new" | "existing" | "program">("new");
+  const [target, setTarget] = useState<"new" | "existing" | "program" | "ops">("new");
   const [board, setBoard] = useState("");
   const [atlasId, setAtlasId] = useState("");
   const { data: projects = [] } = useQuery({ queryKey: ["projects"], retry: false, staleTime: 30_000, queryFn: async (): Promise<Opt[]> => (await api<Opt[]>("/projects")) ?? [] });
@@ -224,11 +224,11 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
       body: JSON.stringify({
         jiraProjectKey: proj.key, name: proj.name,
         boardId: Number(board) || 0,
-        target: target === "program" ? "program" : "project",
+        target: target === "program" ? "program" : target === "ops" ? "ops" : "project",
         atlasId: target === "existing" || target === "program" ? atlasId : null,
       }),
     }),
-    onSuccess: () => { toast(`Imported ${proj.key} into Atlas.`, "info"); onDone(); },
+    onSuccess: () => { toast(target === "ops" ? `Imported ${proj.key} as an Ops service.` : `Imported ${proj.key} into Atlas.`, "info"); onDone(); },
     onError: (e) => toast((e as Error).message, "error"),
   });
   const needsPick = target === "existing" || target === "program";
@@ -243,7 +243,7 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
 
         <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Map to</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
-          {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"]] as const).map(([v, label]) => (
+          {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"], ["ops", "A new Ops service (run-the-business)"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? "#EAF2FB" : "#F6F8FC", border: `1px solid ${target === v ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
               <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
               {label}
@@ -261,11 +261,15 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
           </div>
         )}
 
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Jira board id (optional)</div>
-          <input value={board} onChange={(e) => setBoard(e.target.value)} type="number" placeholder="e.g. 93" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }} />
-          <div style={{ fontSize: 11, color: color.faint3, marginTop: 5 }}>Needed to sync sprints & backlog. Find it in the board URL: …/boards/<b>93</b>/…. You can set it later in the project's details.</div>
-        </div>
+        {target === "ops" ? (
+          <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: 4 }}>Creates (or updates) an Ops service mapped to <b>{proj.key}</b> and pulls its issues in as work items. Re-sync anytime from the Ops board.</div>
+        ) : (
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Jira board id (optional)</div>
+            <input value={board} onChange={(e) => setBoard(e.target.value)} type="number" placeholder="e.g. 93" style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }} />
+            <div style={{ fontSize: 11, color: color.faint3, marginTop: 5 }}>Needed to sync sprints & backlog. Find it in the board URL: …/boards/<b>93</b>/…. You can set it later in the project's details.</div>
+          </div>
+        )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>

@@ -40,5 +40,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0031](./0031-internal-labour-costing.md) | Internal-labour costing: PM/PO cost lines + rate card & calculator | Accepted |
 | [0032](./0032-observability-reference-stack.md) | Reference observability stack (Grafana/Tempo/Prometheus/Loki) | Accepted |
 | [0033](./0033-browser-a11y-sweep-and-logic-tests.md) | Browser-based full-page axe sweep (structural-gated) + extracted screen-logic tests | Accepted |
+| [0034](./0034-ops-jira-sync-and-task-links.md) | Ops: Jira board/space re-sync + linked project tasks | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

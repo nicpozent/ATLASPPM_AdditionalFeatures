@@ -180,6 +180,16 @@ public class OpsService
     public int Ord { get; set; }
 }
 
+// Links an existing project task to an Ops service (traceability). The task's
+// allocation stays with its project — the link is for visibility, so an Ops
+// service can show the delivery tasks that feed it alongside manual items.
+public class OpsTaskLink
+{
+    public int Id { get; set; }
+    public int ServiceId { get; set; }      // OpsService.Id
+    public int TaskId { get; set; }         // ProjectTask.Id
+}
+
 public class OpsItem
 {
     public int Id { get; set; }

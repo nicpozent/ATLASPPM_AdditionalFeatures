@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input, Textarea, Select, Modal, RowMenu, Menu
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
+import { JiraSyncButton } from "@/components/JiraSyncButton";
 
 // ============================================================================
 //  Ops — run-the-business work, a distinct type from project delivery.
@@ -21,10 +22,11 @@ interface OpsItem {
   impactProjectId: string | null; impactProjectName: string | null; impactNote: string; createdAt: string;
   startDate: string; endDate: string;
 }
+interface OpsLinkedTask { taskId: number; code: string; name: string; status: string; assignee: string; projectId: string; projectName: string; }
 interface OpsService {
   id: number; ref: string; name: string; category: string; dept: string; owner: string;
   status: string; description: string; items: OpsItem[]; activeCount: number; alloc: number;
-  archived: boolean; jiraProjectKey: string;
+  archived: boolean; jiraProjectKey: string; linkedTasks?: OpsLinkedTask[];
 }
 interface OpsSummary { services: number; openItems: number; blocked: number; impactedProjects: number; peopleEngaged: number; }
 interface OpsBoard { canEdit: boolean; services: OpsService[]; summary: OpsSummary; }
@@ -167,6 +169,14 @@ export default function Ops() {
 function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteService, onEditItem, onArchive }: {
   service: OpsService; mayEdit: boolean; onAddItem: () => void; onEditService: () => void; onDeleteService: () => void; onEditItem: (i: OpsItem) => void; onArchive: () => void;
 }) {
+  const qc = useQueryClient();
+  const [linkOpen, setLinkOpen] = useState(false);
+  const linked = service.linkedTasks ?? [];
+  const unlink = useMutation({
+    mutationFn: (taskId: number) => api(`/ops/services/${service.id}/tasks/${taskId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ops"] }),
+    onError: toastError,
+  });
   return (
     <Card padding={0} style={{ overflow: "visible" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "16px 20px", borderBottom: `1px solid ${color.bg}` }}>
@@ -183,7 +193,15 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
             {service.dept}{service.owner ? ` · ${service.owner}` : ""} · {service.activeCount} active item{service.activeCount === 1 ? "" : "s"} · {service.alloc}% allocated
           </div>
           {service.description && <div style={{ fontSize: 12.5, color: color.subtle, marginTop: 6 }}>{service.description}</div>}
+          {service.jiraProjectKey && (
+            <div style={{ marginTop: 10 }}>
+              <JiraSyncButton path={`/ops/services/${service.id}/jira/sync`} invalidateKeys={["ops"]} />
+            </div>
+          )}
         </div>
+        {mayEdit && <Button variant="secondary" onClick={() => setLinkOpen(true)} title="Link an existing project task to this service">
+          <Icon name="link" size={15} /> Link task
+        </Button>}
         <Button variant="secondary" onClick={onAddItem} disabled={!mayEdit} title={mayEdit ? undefined : "Your role can't edit operational work"}>
           <Icon name="plus" size={15} /> Item
         </Button>
@@ -200,8 +218,26 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
         )}
       </div>
 
+      {/* Linked project tasks — traceability rows (allocation stays with their project). */}
+      {linked.length > 0 && (
+        <div style={{ borderBottom: `1px solid ${color.bg}` }}>
+          <div style={{ padding: "8px 20px 4px", fontSize: 10.5, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em" }}>Linked tasks</div>
+          {linked.map((t) => (
+            <div key={t.taskId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 20px", borderTop: "1px solid #F7F9FC" }}>
+              <Icon name="link" size={13} color={color.faint3} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.code} {t.name}</div>
+                <div style={{ fontSize: 11, color: color.faint2 }}>{t.projectName}{t.assignee ? ` · ${t.assignee}` : ""}</div>
+              </div>
+              <StatusPill value={t.status} />
+              {mayEdit && <button onClick={() => unlink.mutate(t.taskId)} title="Unlink" style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, display: "flex", padding: 2 }}><Icon name="x" size={14} /></button>}
+            </div>
+          ))}
+        </div>
+      )}
+
       {service.items.length === 0 ? (
-        <div style={{ padding: "14px 20px", fontSize: 12.5, color: color.faint3 }}>No work items yet.</div>
+        <div style={{ padding: "14px 20px", fontSize: 12.5, color: color.faint3 }}>{linked.length > 0 ? "No manual work items — linked tasks above." : "No work items yet."}</div>
       ) : (
         <div>
           {service.items.map((i) => (
@@ -221,7 +257,60 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
           ))}
         </div>
       )}
+      {linkOpen && <LinkTaskModal serviceId={service.id} serviceName={service.name} linkedIds={linked.map((t) => t.taskId)} onClose={() => setLinkOpen(false)} />}
     </Card>
+  );
+}
+
+// Pick a project, then one of its tasks, and link it to the Ops service.
+function LinkTaskModal({ serviceId, serviceName, linkedIds, onClose }: { serviceId: number; serviceName: string; linkedIds: number[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [projectId, setProjectId] = useState("");
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<ProjOpt[]> => (await api<ProjOpt[]>("/projects")) ?? [],
+  });
+  const { data: tasksData } = useQuery({
+    queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ tasks: { id: number; code: string; name: string }[] }> =>
+      (await api<{ tasks: { id: number; code: string; name: string }[] }>(`/projects/${projectId}/tasks`)) ?? { tasks: [] },
+  });
+  const link = useMutation({
+    mutationFn: (taskId: number) => api(`/ops/services/${serviceId}/tasks`, { method: "POST", body: JSON.stringify({ taskId }) }),
+    onSuccess: () => { toast("Task linked", "info"); qc.invalidateQueries({ queryKey: ["ops"] }); },
+    onError: toastError,
+  });
+  const tasks = (tasksData?.tasks ?? []).filter((t) => !linkedIds.includes(t.id));
+
+  return (
+    <Modal onClose={onClose} label={`Link a task to ${serviceName}`}>
+      <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink, marginBottom: 12 }}>Link a project task</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Project</div>
+      <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project" style={{ marginBottom: 14 }}>
+        <option value="">{projects.length ? "— Select a project —" : "No projects yet"}</option>
+        {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </Select>
+      {projectId && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Task</div>
+          {tasks.length === 0
+            ? <div style={{ fontSize: 12.5, color: color.faint3, padding: "8px 0" }}>No linkable tasks in this project.</div>
+            : <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+                {tasks.map((t) => (
+                  <button key={t.id} onClick={() => link.mutate(t.id)} disabled={link.isPending}
+                    style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left", background: "#F6F8FC", border: `1px solid ${color.border}`, borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: color.text }}>
+                    <Icon name="plus" size={14} color={color.primary} />
+                    <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{t.code}</span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>
+                  </button>
+                ))}
+              </div>}
+        </>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+        <Button variant="secondary" onClick={onClose}>Done</Button>
+      </div>
+    </Modal>
   );
 }
 
