@@ -116,6 +116,26 @@ public class RoadmapTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Planned_year_round_trips_and_can_be_moved()
+    {
+        var c = As("admin");
+        var id = await IntId(await c.PostAsJsonAsync("/api/v1/roadmap", new { title = "Year-planned initiative", plannedYear = 2027 }));
+        var created = await c.GetFromJsonAsync<JsonElement>("/api/v1/roadmap");
+        var item = created.GetProperty("items").EnumerateArray().First(i => i.GetProperty("id").GetInt32() == id);
+        Assert.Equal(2027, item.GetProperty("plannedYear").GetInt32());
+
+        // Move it to another year (the "By year" drag path).
+        await c.PatchAsJsonAsync($"/api/v1/roadmap/{id}", new { plannedYear = 2028 });
+        var moved = await c.GetFromJsonAsync<JsonElement>("/api/v1/roadmap");
+        Assert.Equal(2028, moved.GetProperty("items").EnumerateArray().First(i => i.GetProperty("id").GetInt32() == id).GetProperty("plannedYear").GetInt32());
+
+        // Out-of-range year is normalised to unscheduled (0).
+        await c.PatchAsJsonAsync($"/api/v1/roadmap/{id}", new { plannedYear = 1800 });
+        var reset = await c.GetFromJsonAsync<JsonElement>("/api/v1/roadmap");
+        Assert.Equal(0, reset.GetProperty("items").EnumerateArray().First(i => i.GetProperty("id").GetInt32() == id).GetProperty("plannedYear").GetInt32());
+    }
+
+    [Fact]
     public async Task Editing_roadmap_needs_the_roadmap_capability()
     {
         var stk = As("stakeholder");

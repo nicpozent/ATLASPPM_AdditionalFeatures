@@ -215,7 +215,7 @@ public record RoadmapItemDto(int Id, string Ref, string Title, string Descriptio
     string Status, string Theme, string Owner, string StartDate, string EndDate,
     int Confidence, int Effort, int Value,
     List<RoadmapMilestoneDto> Milestones, List<RoadmapLinkDto> Links,
-    List<int> DependsOn, List<int> Blocks);
+    List<int> DependsOn, List<int> Blocks, int PlannedYear);
 // A linkable portfolio entity offered in the item editor.
 public record RoadmapLinkOptionDto(string EntityType, string EntityId, string Label);
 public record RoadmapBoardDto(bool CanEdit, List<RoadmapItemDto> Items,
