@@ -48,6 +48,8 @@ export default function Pip() {
   const [selected, setSelected] = useState<number | null>(null);
   const [tab, setTab] = useState<"objectives" | "calendar" | "capacity" | "dependencies">("objectives");
   const [showNew, setShowNew] = useState(false);
+  const [quickCreate, setQuickCreate] = useState<null | "project" | "program">(null);
+  const canCreatePortfolio = can("cap-projects", "F");
 
   const list = useQuery({
     queryKey: ["increments"], retry: false, staleTime: 0, refetchOnMount: "always",
@@ -83,6 +85,12 @@ export default function Pip() {
           <Select value={String(activeId ?? "")} onChange={(e) => setSelected(Number(e.target.value))} style={{ width: 260 }}>
             {increments.map((i) => <option key={i.id} value={i.id}>{i.key ? `${i.key} · ` : ""}{i.name}</option>)}
           </Select>
+        )}
+        {canCreatePortfolio && (
+          <>
+            <Button variant="secondary" onClick={() => setQuickCreate("project")} style={{ padding: "9px 14px" }}><Icon name="plus" size={15} /> Project</Button>
+            <Button variant="secondary" onClick={() => setQuickCreate("program")} style={{ padding: "9px 14px" }}><Icon name="plus" size={15} /> Program</Button>
+          </>
         )}
         {canEdit && (
           <Button onClick={() => setShowNew(true)} style={{ padding: "9px 14px" }}><Icon name="plus" size={16} /> New increment</Button>
@@ -123,7 +131,44 @@ export default function Pip() {
       )}
 
       {showNew && <IncrementModal onClose={() => setShowNew(false)} onSave={(b) => createInc.mutate(b)} busy={createInc.isPending} />}
+      {quickCreate && (
+        <QuickCreateModal kind={quickCreate} onClose={() => setQuickCreate(null)}
+          onCreated={() => { qc.invalidateQueries({ queryKey: ["increment", activeId] }); }} />
+      )}
     </div>
+  );
+}
+
+// Quick-create a project or program without leaving PI Planning. The new entity
+// becomes available as a linkable deliverable on this increment's objectives and
+// dependencies (its `targets` list refreshes). Gated on Projects & tasks (Full).
+function QuickCreateModal({ kind, onClose, onCreated }: { kind: "project" | "program"; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
+  const [extra, setExtra] = useState("");   // methodology (project) or goal (program)
+  const create = useMutation({
+    mutationFn: () => kind === "project"
+      ? api("/projects", { method: "POST", body: JSON.stringify({ name: name.trim(), owner: owner.trim() || undefined, methodology: extra.trim() || "Scrum" }) })
+      : api("/programs", { method: "POST", body: JSON.stringify({ name: name.trim(), owner: owner.trim() || "Unassigned", goal: extra.trim() }) }),
+    onSuccess: () => { toast(`${kind === "project" ? "Project" : "Program"} created`); onCreated(); onClose(); },
+    onError: toastError,
+  });
+  return (
+    <Modal onClose={onClose} width={460} label={`New ${kind}`}>
+      <div style={{ fontFamily: font.head, fontSize: 17, fontWeight: 600, color: color.ink, marginBottom: 6 }}>New {kind}</div>
+      <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 16 }}>Created from PI Planning — you can then link it as a deliverable on this increment's objectives and dependencies.</div>
+      <div style={{ display: "grid", gap: 12 }}>
+        <Field label="Name">{(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "project" ? "Unified checkout" : "Nordic payments programme"} />}</Field>
+        <Field label="Owner">{(id) => <Input id={id} value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Accountable person" />}</Field>
+        {kind === "project"
+          ? <Field label="Methodology">{(id) => <Select id={id} value={extra || "Scrum"} onChange={(e) => setExtra(e.target.value)}>{["Scrum", "Kanban", "Waterfall", "SAFe", "Scrumban", "V-Model", "Stage-Gate"].map((m) => <option key={m} value={m}>{m}</option>)}</Select>}</Field>
+          : <Field label="Goal">{(id) => <Textarea id={id} value={extra} onChange={(e) => setExtra(e.target.value)} rows={2} placeholder="What this programme delivers" />}</Field>}
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (name.trim()) create.mutate(); }} disabled={create.isPending || !name.trim()}>{create.isPending ? "Creating…" : "Create"}</Button>
+      </div>
+    </Modal>
   );
 }
 

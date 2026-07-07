@@ -24,8 +24,6 @@ const ROLE_TABS: { id: string; label: string }[] = [
 ];
 const roleLabel = (id: string) => ROLE_TABS.find((r) => r.id === id)?.label ?? id;
 
-// Where "Contact the PMO" sends mail. UI chrome — a Platform Admin can change it.
-const SUPPORT_MAILBOX = "pmo-support@birgma.com";
 const CAT_TINT: Record<string, { ink: string; tint: string; icon: string }> = {
   NET: { ink: "#0C5798", tint: "#E6EFFB", icon: "cloud" }, AUTH: { ink: "#5E2E89", tint: "#F0E8F7", icon: "key" },
   VAL: { ink: "#8A6300", tint: "#FBF2D7", icon: "edit" }, SRV: { ink: "#A1282B", tint: "#FBE7E8", icon: "server" },
@@ -40,6 +38,7 @@ export default function Help() {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Article | null>(null);
   const [adding, setAdding] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["help"], retry: false, staleTime: 60_000,
@@ -180,12 +179,10 @@ export default function Help() {
               <li>the approximate time it happened</li>
             </ul>
           </div>
-          <a
-            href={`mailto:${SUPPORT_MAILBOX}?subject=${encodeURIComponent("Atlas support request")}&body=${encodeURIComponent(
-              `Role: ${roleLabel(role)}\nScreen: \nError code (if any): ${params.get("code") ?? ""}\nWhen it happened: \n\nWhat I expected:\n\nWhat happened instead:\n`)}`}
-            style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", textDecoration: "none", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>
-            Email the PMO
-          </a>
+          <button onClick={() => setContactOpen(true)}
+            style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>
+            Contact the PMO
+          </button>
           <button onClick={() => { setQuery(""); setRole("all"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>
             Browse getting-started guides
@@ -196,6 +193,7 @@ export default function Help() {
       {(editing || adding) && (
         <EditArticleModal article={editing} defaultAudience={role} onClose={() => { setEditing(null); setAdding(false); }} />
       )}
+      {contactOpen && <ContactModal role={roleLabel(role)} code={params.get("code") ?? ""} onClose={() => setContactOpen(false)} />}
     </div>
   );
 }
@@ -246,4 +244,33 @@ function EditArticleModal({ article, defaultAudience, onClose }: { article: Arti
 
 function Lbl({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+}
+
+function ContactModal({ role, code, onClose }: { role: string; code: string; onClose: () => void }) {
+  const [subject, setSubject] = useState("Atlas support request");
+  const [screen, setScreen] = useState("");
+  const [message, setMessage] = useState("");
+  const send = useMutation({
+    mutationFn: () => api<{ ok: boolean; emailed: boolean }>("/support/contact", {
+      method: "POST",
+      body: JSON.stringify({ subject: subject.trim(), message: message.trim(), role, screen: screen.trim(), code }),
+    }),
+    onSuccess: (r) => { toast(r?.emailed ? "Sent to the PMO — they'll be in touch." : "Logged for the PMO — they'll follow up."); onClose(); },
+    onError: () => toast("Couldn't send just now — please try again."),
+  });
+  return (
+    <Modal onClose={onClose} width={520} label="Contact the PMO">
+      <div style={{ fontSize: 12.5, color: "#56607A", marginBottom: 14 }}>Your role ({role}){code ? ` and error code ${code}` : ""} are included automatically.</div>
+      <Lbl>Subject</Lbl>
+      <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+      <Lbl>Screen you were on (optional)</Lbl>
+      <Input value={screen} onChange={(e) => setScreen(e.target.value)} placeholder="e.g. Financials" />
+      <Lbl>Message</Lbl>
+      <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="What happened, what you expected…" style={{ minHeight: 100 }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => { if (message.trim()) send.mutate(); }} disabled={send.isPending || !message.trim()}>{send.isPending ? "Sending…" : "Send"}</Button>
+      </div>
+    </Modal>
+  );
 }

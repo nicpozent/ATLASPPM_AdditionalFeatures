@@ -101,10 +101,24 @@ public static class Skills
         {
             var types = new[] { "project", "program", "product", "release" };
             if (!types.Contains(type)) return Results.BadRequest(new { error = "Unknown entity type." });
-            var members = (await db.TeamAssignments.Include(a => a.Members)
+            // People assigned here, however they were assigned: attached team /
+            // sub-team / individual members, plus (for projects) People & roles
+            // assignments and open, estimated task assignees. Name-keyed to match
+            // the ratings maintained in My Team.
+            var names = new List<string>();
+            names.AddRange((await db.TeamAssignments.Include(a => a.Members)
                     .Where(a => a.EntityType == type && a.EntityId == id).ToListAsync())
-                .SelectMany(a => a.Members).Select(m => m.Name)
-                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .SelectMany(a => a.Members).Select(m => m.Name));
+            if (type == "project")
+            {
+                names.AddRange(await db.RoleAssignments.Where(a => a.ProjectId == id).Select(a => a.Person).ToListAsync());
+                names.AddRange(await db.ProjectTasks
+                    .Where(t => t.ProjectId == id && t.Status != "Done" && t.Assignee != "" && t.Assignee != "Unassigned")
+                    .Select(t => t.Assignee).ToListAsync());
+            }
+            var members = names
+                .Where(n => !string.IsNullOrWhiteSpace(n) && n != "N/A" && n != "Unassigned")
+                .Select(n => n.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
             var skills = await db.Skills.OrderBy(s => s.Ord).ThenBy(s => s.Id)
                 .Select(s => new SkillDto(s.Id, s.Name)).ToListAsync();

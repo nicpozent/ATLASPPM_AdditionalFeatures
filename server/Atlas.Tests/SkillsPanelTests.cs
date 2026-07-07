@@ -44,4 +44,34 @@ public class SkillsPanelTests : IClassFixture<AtlasApiFactory>
             r => r.GetProperty("person").GetString() == "Grace Hopper" && r.GetProperty("level").GetInt32() == 4);
         Assert.False(panel.GetProperty("canEdit").GetBoolean());   // read-only here
     }
+
+    [Fact]
+    public async Task Entity_skills_include_people_assigned_via_roles_not_only_teams()
+    {
+        var c = Admin();
+        var pRes = await c.PostAsJsonAsync("/api/v1/integrations/jira/import", new { jiraProjectKey = "SKPR", target = "project", name = "Skills role target" });
+        using var pDoc = JsonDocument.Parse(await pRes.Content.ReadAsStringAsync());
+        var pid = pDoc.RootElement.GetProperty("projectId").GetString();
+
+        // Assign a project lead via People & roles (no sub-team attached at all).
+        await c.PutAsJsonAsync($"/api/v1/projects/{pid}/assignments/pm", new { person = "Katherine Johnson" });
+
+        // The skills panel still surfaces them (broadened member resolution).
+        var panel = await c.GetFromJsonAsync<JsonElement>($"/api/v1/skills/entity/project/{pid}");
+        Assert.Contains(panel.GetProperty("people").EnumerateArray(), p => p.GetString() == "Katherine Johnson");
+    }
+
+    [Fact]
+    public async Task Contact_the_pmo_records_the_request()
+    {
+        var c = Admin();
+        var res = await c.PostAsJsonAsync("/api/v1/support/contact",
+            new { subject = "Need help", message = "Can't export financials", role = "PMO", screen = "Financials", code = "" });
+        Assert.Equal(System.Net.HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.True(doc.RootElement.GetProperty("ok").GetBoolean());
+        // No message → rejected.
+        var bad = await c.PostAsJsonAsync("/api/v1/support/contact", new { subject = "x", message = "" });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, bad.StatusCode);
+    }
 }
