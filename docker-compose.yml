@@ -57,6 +57,8 @@ services:
       Jira__ImportComments: ${JIRA_IMPORT_COMMENTS:-}
       Jira__ImportAttachments: ${JIRA_IMPORT_ATTACHMENTS:-}
       Jira__MaxAttachmentBytes: ${JIRA_MAX_ATTACHMENT_BYTES:-}
+      AzureDevOps__Organization: ${ADO_ORG:-}
+      AzureDevOps__Pat: ${ADO_PAT:-}
     depends_on:
       db:
         condition: service_healthy

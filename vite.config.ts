@@ -14,10 +14,17 @@ export default defineConfig({
         // Split the big, rarely-changing vendor libraries into their own chunks
         // so they cache independently of app code and don't bloat the entry
         // bundle. Route screens are already split via React.lazy (see App.tsx).
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-msal": ["@azure/msal-browser", "@azure/msal-react"],
+        // Vite 8 (Rolldown) takes `manualChunks` as a function, not an object.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@azure/msal")) return "vendor-msal";
+          if (
+            /node_modules[\\/](react|react-dom|react-router|react-router-dom|@remix-run[\\/]router|scheduler)[\\/]/.test(
+              id,
+            )
+          )
+            return "vendor-react";
         },
       },
     },

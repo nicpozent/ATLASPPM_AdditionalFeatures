@@ -65,6 +65,19 @@ export default function Integrations() {
     onSuccess: (r) => toast(r?.ok ? `Jira connected${r.displayName ? " as " + r.displayName : ""}.` : (r?.error ?? "Jira test failed."), r?.ok ? "info" : "error"),
     onError: (e) => toast((e as Error).message, "error"),
   });
+
+  // Azure DevOps is a live connector scaffold (config + connection test +
+  // discovery/import). Board sync is a follow-up (see ADR-0035).
+  const { data: ado } = useQuery({
+    queryKey: ["ado-status"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ configured: boolean; orgUrl: string; canManage: boolean }> =>
+      (await api<{ configured: boolean; orgUrl: string; canManage: boolean }>("/integrations/ado/status")) ?? { configured: false, orgUrl: "", canManage: false },
+  });
+  const testAdo = useMutation({
+    mutationFn: () => api<{ ok: boolean; orgUrl?: string; error?: string }>("/integrations/ado/test", { method: "POST" }),
+    onSuccess: (r) => toast(r?.ok ? `Azure DevOps connected${r.orgUrl ? " · " + r.orgUrl : ""}.` : (r?.error ?? "Azure DevOps test failed."), r?.ok ? "info" : "error"),
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   // Pull every mapped project from Jira in one pass — runs in the background so a
   // large portfolio-wide sync can't 504 the request (see syncJira/ADR-0030).
   const syncAll = useMutation({
@@ -141,6 +154,30 @@ export default function Integrations() {
               </div>
             );
           }
+          // Azure DevOps is wired to the real backend (config status + live test);
+          // discovery & import follow below. Board sync is a follow-up (ADR-0035).
+          if (a.name === "Azure DevOps") {
+            const configured = !!ado?.configured;
+            const detail = configured && ado?.orgUrl ? ado.orgUrl : a.detail;
+            return (
+              <div key={a.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: a.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontFamily: font.head, fontSize: 15, fontWeight: 700 }}>{a.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                  <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : "#566077", background: configured ? "#E7F4EC" : "#EEF0F4", padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
+                  <button
+                    onClick={() => testAdo.mutate()}
+                    disabled={testAdo.isPending || !ado?.canManage}
+                    title={ado?.canManage ? (configured ? "Verify the Azure DevOps organisation & PAT" : "Set AzureDevOps:Organization and AzureDevOps:Pat in config, then test") : "Needs Edit on Integrations & connectors"}
+                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: testAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                  >{testAdo.isPending ? "Testing…" : "Test connection"}</button>
+                </div>
+              </div>
+            );
+          }
           const on = !!connected[a.name];
           const toggle = () => setConnected((s) => ({ ...s, [a.name]: !s[a.name] }));
           return (
@@ -163,6 +200,7 @@ export default function Integrations() {
       </div>
 
       {jira?.configured && <DiscoverJira />}
+      {ado?.configured && <DiscoverAdo />}
     </div>
   );
 }
@@ -270,6 +308,108 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
             <div style={{ fontSize: 11, color: color.faint3, marginTop: 5 }}>Needed to sync sprints & backlog. Find it in the board URL: …/boards/<b>93</b>/…. You can set it later in the project's details.</div>
           </div>
         )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Azure DevOps project discovery & import (scaffold, ADR-0035) ----------
+interface AdoProj { id: string; name: string; state: string; mappedProjectId: string | null; mappedProjectName: string | null; }
+
+function DiscoverAdo() {
+  const qc = useQueryClient();
+  const [importing, setImporting] = useState<AdoProj | null>(null);
+  const { data } = useQuery({
+    queryKey: ["ado-projects"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ configured: boolean; canManage: boolean; projects: AdoProj[]; error?: string }> =>
+      (await api<{ configured: boolean; canManage: boolean; projects: AdoProj[] }>("/integrations/ado/projects")) ?? { configured: false, canManage: false, projects: [] },
+  });
+  const projects = data?.projects ?? [];
+  const canManage = data?.canManage ?? false;
+
+  return (
+    <div style={{ marginTop: 30 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 13 }}>Discover from Azure DevOps</div>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, overflow: "hidden" }}>
+        <div style={{ padding: "13px 18px", fontSize: 12.5, color: color.faint2, borderBottom: `1px solid ${color.border}` }}>
+          Every project in your Azure DevOps organisation. Import one to create — or link — an Atlas project (optionally under a program); it stays editable from the project's details. Board &amp; work-item sync is a follow-up.
+        </div>
+        {data?.error ? (
+          <div style={{ padding: "18px", fontSize: 13, color: "#A1282B" }}>{data.error}</div>
+        ) : projects.length === 0 ? (
+          <div style={{ padding: "26px 18px", fontSize: 13, color: color.faint3, textAlign: "center" }}>No Azure DevOps projects returned. Check the PAT's Project &amp; Team (Read) scope.</div>
+        ) : projects.map((p) => (
+          <div key={p.id || p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: "1px solid #F2F4F9" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: "#0078D7", background: "#E4F0FB", padding: "3px 9px", borderRadius: 6, flex: "none" }}>AZ</span>
+            <span style={{ flex: 1, fontSize: 13.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+            {p.mappedProjectId ? (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
+            ) : (
+              <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Azure DevOps project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
+                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
+            )}
+          </div>
+        ))}
+      </div>
+      {importing && <ImportAdoModal proj={importing} onClose={() => setImporting(null)} onDone={() => { setImporting(null); qc.invalidateQueries({ queryKey: ["ado-projects"] }); qc.invalidateQueries({ queryKey: ["projects"] }); qc.invalidateQueries({ queryKey: ["programs"] }); }} />}
+    </div>
+  );
+}
+
+function ImportAdoModal({ proj, onClose, onDone }: { proj: AdoProj; onClose: () => void; onDone: () => void }) {
+  const [target, setTarget] = useState<"new" | "existing" | "program">("new");
+  const [atlasId, setAtlasId] = useState("");
+  const { data: projects = [] } = useQuery({ queryKey: ["projects"], retry: false, staleTime: 30_000, queryFn: async (): Promise<Opt[]> => (await api<Opt[]>("/projects")) ?? [] });
+  const { data: programs = [] } = useQuery({ queryKey: ["programs"], retry: false, staleTime: 30_000, queryFn: async (): Promise<Opt[]> => (await api<Opt[]>("/programs")) ?? [] });
+
+  const doImport = useMutation({
+    mutationFn: () => api("/integrations/ado/import", {
+      method: "POST",
+      body: JSON.stringify({
+        adoProject: proj.name, name: proj.name,
+        target: target === "program" ? "program" : "project",
+        atlasId: target === "existing" || target === "program" ? atlasId : null,
+      }),
+    }),
+    onSuccess: () => { toast(`Imported ${proj.name} into Atlas.`, "info"); onDone(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const needsPick = target === "existing" || target === "program";
+  const opts = target === "program" ? programs : projects;
+  const valid = !needsPick || !!atlasId;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(17,22,60,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 22, width: 460, maxWidth: "92vw" }}>
+        <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Import {proj.name}</div>
+        <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Azure DevOps project</div>
+
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Map to</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
+          {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"]] as const).map(([v, label]) => (
+            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? "#EAF2FB" : "#F6F8FC", border: `1px solid ${target === v ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
+              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {needsPick && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{target === "program" ? "Program" : "Project"}</div>
+            <select aria-label={target === "program" ? "Program to place the new project under" : "Existing project to link"} value={atlasId} onChange={(e) => setAtlasId(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }}>
+              <option value="">{opts.length ? "— Select —" : (target === "program" ? "No programs yet" : "No projects yet")}</option>
+              {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: 4 }}>Stores the mapping to <b>{proj.name}</b> on the Atlas project. Board &amp; work-item sync is a follow-up (see the connector docs).</div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
