@@ -22,7 +22,9 @@ builder.Services.AddDbContext<AtlasDbContext>(o =>
             // blips) instead of failing the request outright.
             npg.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
             npg.CommandTimeout(30);
-        }));
+        })
+        // Record DB command durations into the atlas.db.command.duration metric.
+        .AddInterceptors(new AtlasDbMetricsInterceptor()));
 
 // OpenAPI / Swagger — a machine-readable API surface + interactive docs at
 // /swagger. On by default; set OpenApi:Enabled=false to disable in production.
@@ -103,6 +105,10 @@ var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(
 startupLog.LogInformation("Atlas API starting — auth {AuthMode}", authEnabled ? "ENABLED (Entra bearer)" : "disabled (anonymous, dev)");
 // Give the static notification emit path a real logger for email diagnostics.
 Notifications.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
+// Expose background-sync queue depth as an observable gauge (per connector).
+AtlasTelemetry.RegisterQueueGauges(
+    () => app.Services.GetRequiredService<JiraSyncQueue>().Pending,
+    () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
 // Apply migrations on startup. Demo seed is OFF by default — production starts

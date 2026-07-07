@@ -268,8 +268,9 @@ public static class AzureDevOps
         using var c = Client(cfg);
         foreach (var p in projects)
         {
-            try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; }
-            catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); }
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; AtlasTelemetry.RecordSync("ado", sw.Elapsed.TotalSeconds, ok: true); }
+            catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); AtlasTelemetry.RecordSync("ado", sw.Elapsed.TotalSeconds, ok: false); }
         }
         return new AdoBulkResult(ok, sp, ep, tk, errors);
     }

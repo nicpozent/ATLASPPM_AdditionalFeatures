@@ -1,0 +1,126 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["atlas", "integrations", "operations"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "",
+  "title": "Atlas API — Integrations & Operations",
+  "uid": "atlas-api-operations",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Connector sync duration p95 (by connector)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, connector) (rate(atlas_sync_duration_seconds_bucket{service_name=\"atlas-api\"}[15m])))",
+          "legendFormat": "{{connector}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Connector sync outcomes / min (by connector · outcome)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (connector, outcome) (rate(atlas_sync_duration_seconds_count{service_name=\"atlas-api\"}[15m]) * 60)",
+          "legendFormat": "{{connector}} · {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Background sync queue depth (pending jobs)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max by (connector) (atlas_sync_queue_depth{service_name=\"atlas-api\"})",
+          "legendFormat": "{{connector}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Over-allocation alerts / day",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(atlas_capacity_alerts_total{service_name=\"atlas-api\"}[1d]))",
+          "legendFormat": "alerts delivered (24h)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "DB command latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(atlas_db_command_duration_seconds_bucket{service_name=\"atlas-api\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(atlas_db_command_duration_seconds_bucket{service_name=\"atlas-api\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(atlas_db_command_duration_seconds_bucket{service_name=\"atlas-api\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "DB command rate (ok vs error, /s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (outcome) (rate(atlas_db_command_duration_seconds_count{service_name=\"atlas-api\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    }
+  ]
+}

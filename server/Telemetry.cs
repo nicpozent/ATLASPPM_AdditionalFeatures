@@ -1,5 +1,7 @@
+using System.Data.Common;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Atlas.Api;
 
@@ -28,4 +30,89 @@ public static class AtlasTelemetry
 
     public static void RecordAudit(string category, string action) =>
         AuditEvents.Add(1, new KeyValuePair<string, object?>("area", category), new KeyValuePair<string, object?>("action", action));
+
+    // Connector sync duration (seconds) per project, tagged by connector + outcome
+    // — powers "Jira/ADO sync durations" and a sync-failure alert.
+    static readonly Histogram<double> SyncSeconds =
+        Meter.CreateHistogram<double>("atlas.sync.duration", unit: "s", description: "Connector work-item sync duration per project.");
+
+    public static void RecordSync(string connector, double seconds, bool ok) =>
+        SyncSeconds.Record(seconds,
+            new KeyValuePair<string, object?>("connector", connector),
+            new KeyValuePair<string, object?>("outcome", ok ? "ok" : "error"));
+
+    // Over-allocation alerts freshly delivered per capacity pass.
+    public static readonly Counter<long> CapacityAlerts =
+        Meter.CreateCounter<long>("atlas.capacity.alerts", unit: "{alert}", description: "Over-allocation alerts delivered.");
+
+    // DB command duration (seconds) — recorded by AtlasDbMetricsInterceptor so EF
+    // query timings show up as a Prometheus histogram (traces live in Tempo).
+    static readonly Histogram<double> DbSeconds =
+        Meter.CreateHistogram<double>("atlas.db.command.duration", unit: "s", description: "EF Core database command duration.");
+
+    public static void RecordDbCommand(double seconds, bool ok) =>
+        DbSeconds.Record(seconds, new KeyValuePair<string, object?>("outcome", ok ? "ok" : "error"));
+
+    // Background-sync queue depth (pending jobs) per connector — an observable
+    // gauge registered once at startup with accessors into the queue singletons.
+    static bool _gaugesRegistered;
+    public static void RegisterQueueGauges(Func<int> jiraDepth, Func<int> adoDepth)
+    {
+        if (_gaugesRegistered) return;
+        _gaugesRegistered = true;
+        Meter.CreateObservableGauge("atlas.sync.queue.depth",
+            () => new[]
+            {
+                new Measurement<int>(jiraDepth(), new KeyValuePair<string, object?>("connector", "jira")),
+                new Measurement<int>(adoDepth(), new KeyValuePair<string, object?>("connector", "ado")),
+            },
+            unit: "{job}", description: "Pending background sync jobs per connector.");
+    }
+}
+
+// Records every EF Core command's duration into the atlas.db.command.duration
+// histogram (see AtlasTelemetry). Cheap: a Stopwatch per command; the metric is
+// a no-op when OpenTelemetry isn't wired.
+public sealed class AtlasDbMetricsInterceptor : DbCommandInterceptor
+{
+    public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return await base.ReaderExecutedAsync(command, eventData, result, cancellationToken);
+    }
+    public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return base.ReaderExecuted(command, eventData, result);
+    }
+    public override async ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return await base.NonQueryExecutedAsync(command, eventData, result, cancellationToken);
+    }
+    public override int NonQueryExecuted(DbCommand command, CommandExecutedEventData eventData, int result)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return base.NonQueryExecuted(command, eventData, result);
+    }
+    public override async ValueTask<object?> ScalarExecutedAsync(DbCommand command, CommandExecutedEventData eventData, object? result, CancellationToken cancellationToken = default)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return await base.ScalarExecutedAsync(command, eventData, result, cancellationToken);
+    }
+    public override object? ScalarExecuted(DbCommand command, CommandExecutedEventData eventData, object? result)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: true);
+        return base.ScalarExecuted(command, eventData, result);
+    }
+    public override void CommandFailed(DbCommand command, CommandErrorEventData eventData)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: false);
+        base.CommandFailed(command, eventData);
+    }
+    public override async Task CommandFailedAsync(DbCommand command, CommandErrorEventData eventData, CancellationToken cancellationToken = default)
+    {
+        AtlasTelemetry.RecordDbCommand(eventData.Duration.TotalSeconds, ok: false);
+        await base.CommandFailedAsync(command, eventData, cancellationToken);
+    }
 }

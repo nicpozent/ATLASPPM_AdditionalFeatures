@@ -55,6 +55,7 @@ public static class CapacityAlerts
         else snap.Value = value;
         await db.SaveChangesAsync();
 
+        if (fresh.Count > 0) AtlasTelemetry.CapacityAlerts.Add(fresh.Count);
         return fresh.Select(p => p.Name).ToList();
     }
 

@@ -2,6 +2,11 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Atlas alert rules (see alerts.yml). They evaluate in Prometheus and show under
+# Alerts; wire an Alertmanager receiver to route them if you want notifications.
+rule_files:
+  - alerts.yml
+
 scrape_configs:
   # The OTel Collector re-exposes the API's OTLP metrics as a Prometheus
   # scrape target on :8889 (see otel-collector.yaml).
