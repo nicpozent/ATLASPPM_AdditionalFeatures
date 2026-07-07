@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { Button, Input, Modal } from "./ui";
+import { Button, Input, Modal, RowMenu, MenuItem } from "./ui";
 
 describe("Button", () => {
   it("renders its children and fires onClick", () => {
@@ -50,5 +50,49 @@ describe("Modal (accessibility)", () => {
     expect(document.body.style.overflow).toBe("hidden");
     unmount();
     expect(document.body.style.overflow).not.toBe("hidden");
+  });
+});
+
+describe("RowMenu (accessibility & interaction)", () => {
+  it("is a labelled menu trigger, opens/reveals items, runs an action and closes", () => {
+    const onEdit = vi.fn();
+    render(
+      <RowMenu ariaLabel="Row actions">
+        {(close) => <MenuItem label="Edit" onClick={() => { onEdit(); close(); }} />}
+      </RowMenu>
+    );
+    const trigger = screen.getByRole("button", { name: "Row actions" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const item = screen.getByRole("menuitem", { name: "Edit" });
+    fireEvent.click(item);
+    expect(onEdit).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull(); // closed after action
+  });
+
+  it("closes on Escape", () => {
+    render(
+      <RowMenu ariaLabel="Row actions">
+        {() => <MenuItem label="Delete" onClick={() => {}} />}
+      </RowMenu>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Row actions" }));
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+  });
+});
+
+describe("Button (keyboard focus)", () => {
+  it("shows a focus ring on focus and clears it on blur", () => {
+    render(<Button>Focusable</Button>);
+    const btn = screen.getByRole("button", { name: "Focusable" });
+    fireEvent.focus(btn);
+    expect(btn.style.boxShadow).not.toBe("");
+    fireEvent.blur(btn);
+    expect(btn.style.boxShadow).toBe("");
   });
 });
