@@ -7,6 +7,7 @@
 import React, { createContext, useContext } from "react";
 import { AUTH_ENABLED, currentUser, login, logout, type AuthUser } from "@/auth";
 import { LoginScreen } from "./LoginScreen";
+import { IdleLogout } from "./IdleLogout";
 
 interface AuthCtx { enabled: boolean; user: AuthUser | null; login: () => void; logout: () => void; }
 const Ctx = createContext<AuthCtx | null>(null);
@@ -25,7 +26,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       </Ctx.Provider>
     );
   }
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {/* Sign out an unattended, authenticated session after the idle window. */}
+      {AUTH_ENABLED && user && <IdleLogout onIdle={logout} />}
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useAuth() {
