@@ -32,6 +32,24 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  a11y:
+    name: Accessibility (Playwright + axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      # Only Chromium is needed for the full-page axe sweep.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Serves the built app (vite preview) with no backend → empty states —
+      # enough to run axe over the real DOM. Structural violations fail the job;
+      # colour-contrast is reported but not gated (see ADR-0033).
+      - run: npm run test:e2e
+
   backend:
     name: API (build · test)
     runs-on: ubuntu-latest

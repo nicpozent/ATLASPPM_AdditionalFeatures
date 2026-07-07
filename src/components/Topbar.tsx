@@ -65,6 +65,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
           value={role}
           onChange={(e) => setRole(e.target.value)}
           disabled={visibleRoles.length <= 1}
+          aria-label={t("common.role", "Role")}
           style={{
             border: "none", background: "transparent", fontSize: 13, fontWeight: 600,
             color: color.ink, fontFamily: "inherit", cursor: visibleRoles.length <= 1 ? "default" : "pointer", outline: "none",
