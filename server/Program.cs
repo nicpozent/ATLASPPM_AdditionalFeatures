@@ -49,6 +49,11 @@ if (cfg.GetValue("Retention:Enabled", true))
 if (cfg.GetValue("Jira:ScheduledSync", true))
     builder.Services.AddHostedService<JiraSyncService>();
 
+// Periodic over-allocation alerts (on by default; emits only to users who opt
+// into the "over_allocation" event, so it's silent until someone subscribes).
+if (cfg.GetValue("Capacity:Alerts", true))
+    builder.Services.AddHostedService<CapacityAlertService>();
+
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
 var corsOrigins = Hardening.CorsOrigins(cfg);

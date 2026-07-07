@@ -34,5 +34,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0025](./0025-accessibility-baseline.md) | Accessibility baseline in shared primitives (focus, dialogs, menus) | Accepted |
 | [0026](./0026-axe-automation-and-mobile-drawer.md) | Automated axe a11y sweep in CI + mobile navigation drawer | Accepted |
 | [0027](./0027-frontend-code-splitting.md) | Frontend route-level code-splitting + vendor chunking | Accepted |
+| [0028](./0028-over-allocation-alerts.md) | Over-allocation alerts (delivered, deduplicated via snapshot) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

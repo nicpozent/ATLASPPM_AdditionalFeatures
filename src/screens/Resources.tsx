@@ -346,11 +346,20 @@ function Avatar({ initials, color, size = 26 }: { initials: string; color: strin
 }
 
 function InsightsTab() {
+  const { can } = usePermissions();
+  const canAlert = can("cap-ops", "E");
   const { data } = useQuery({
     queryKey: ["capacity-insight"], retry: false, staleTime: 30_000,
     queryFn: async (): Promise<CapInsight | null> => { try { return await api<CapInsight>("/capacity/insight"); } catch { return null; } },
   });
   const d = data;
+  // Manual over-allocation alert run: emits a notification for each newly
+  // over-allocated person to everyone who opted into the "Over-allocation" event.
+  const runAlerts = useMutation({
+    mutationFn: () => api<{ flagged: string[]; count: number }>("/capacity/alerts/run", { method: "POST" }),
+    onSuccess: (r) => toast(!r || r.count === 0 ? "No new over-allocations to notify" : `Notified: ${r.flagged.join(", ")}`, "info"),
+    onError: toastError,
+  });
   const tile = (label: string, value: string | number, accent?: string) => (
     <div style={{ flex: 1, minWidth: 130, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 14, padding: "14px 16px" }}>
       <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: accent ?? color.ink }}>{value}</div>
@@ -394,6 +403,21 @@ function InsightsTab() {
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ padding: "13px 18px", borderBottom: `1px solid ${color.bg}`, display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="alert" size={16} /><span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Over-allocated ({d?.over.length ?? 0})</span>
+          <div style={{ flex: 1 }} />
+          {canAlert && (d?.over.length ?? 0) > 0 && (
+            <button
+              onClick={() => runAlerts.mutate()}
+              disabled={runAlerts.isPending}
+              title="Send an over-allocation notification to everyone who opted into that alert"
+              style={{
+                display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
+                color: color.primary, background: "transparent", border: `1px solid ${color.border3}`,
+                borderRadius: 8, padding: "6px 11px", cursor: runAlerts.isPending ? "default" : "pointer",
+              }}
+            >
+              <Icon name="bell" size={14} /> {runAlerts.isPending ? "Notifying…" : "Notify now"}
+            </button>
+          )}
         </div>
         {(d?.over.length ?? 0) === 0
           ? <div style={{ padding: "16px 18px", fontSize: 12.5, color: color.faint3 }}>Nobody is over 100% right now. 👍</div>
