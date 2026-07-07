@@ -165,6 +165,27 @@ flowchart TB
   triggers one best-effort sync inline, so tasks appear without a manual step; the
   manual **Sync** button remains the on-demand force and surfaces connector errors.
 
+### 7.2a `AzureDevOps.SyncProjectAsync` (pull-only, ADR-0035/0036)
+```mermaid
+flowchart TB
+  start([project with AdoProject]) --> iters["GET classification nodes\n(iterations) → upsert sprints by identifier"]
+  iters --> wiql["POST WIQL → work-item ids\n(TeamProject = AdoProject, capped at 4000)"]
+  wiql --> batch["GET work items (200/batch)\nfields: type, state, assignee, iteration, parent, points…"]
+  batch --> epics["Pass 1: type Epic → upsert epics by ADO id"]
+  epics --> tasks["Pass 2: others → upsert tasks by ADO id\nparent→epic name, iteration leaf→sprint"]
+  tasks --> prune["Prune ADO rows not seen"] --> rollup["Recompute epic story rollups"] --> done([AdoSyncResult])
+```
+- **Keys on `Project.AdoProject`** (org is global config). Idempotent by `AdoId`
+  on `Sprint`/`Epic`/`ProjectTask`; locally-created rows (`AdoId == ""`) untouched;
+  full pull prunes rows whose ADO id vanished (same contract as Jira).
+- **State mapping** (`MapAdoState`) covers Agile/Scrum/Basic processes; priority
+  1–4 → Critical/High/Medium/Low; `IterationPath` leaf → sprint; `System.Parent`
+  → epic name; `System.Description` HTML → text. Two entry points: per-project
+  (`/projects/{id}/ado/sync`) and all-mapped (`/integrations/ado/sync`).
+- **Bounded**: WIQL result capped at 4000 items, fetched 200/request; a `Truncated`
+  flag is returned when capped or a batch request fails. Background sync (à la
+  ADR-0030) is a future step if large orgs need it.
+
 ### 7.3 `RetentionHostedService`
 - Daily; anonymises/removes records past their retention window (GDPR). Off by
   config where not wanted; nothing is touched until records actually age out.
@@ -223,6 +244,7 @@ live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
 | `VITE_AUTH_ENABLED`, `VITE_AUTH_*` | SPA MSAL config |
 | `Jira:BaseUrl`, `Jira:Email`, `Jira:ApiToken` | Jira connector |
 | `Jira:ScheduledSync`, `Jira:SyncMinutes` | scheduled sync toggle/interval |
+| `AzureDevOps:Organization`, `AzureDevOps:Pat` | Azure DevOps connector (discovery, import, work-item sync) |
 | `Graph:*`, `Notifications:SenderUpn` | notification email via Graph |
 | `Seed:Enabled` | load demo portfolio (non-prod only) |
 | `Retention:Enabled` | retention/anonymisation worker |
@@ -250,6 +272,7 @@ trade-offs:
 | AuthZ | Server-authoritative capability matrix | Client duplicates checks cosmetically; security stays on the server | [0004](./adr/0004-rbac-capability-matrix.md) |
 | Identity | Entra SSO, fail-fast on misconfig | Local dev needs auth disabled explicitly | [0005](./adr/0005-entra-sso.md) |
 | Jira | Pull-only, board-optional | No write-back; simpler, safe, maps "spaces" | [0006](./adr/0006-jira-pull-only-board-optional.md) |
+| Azure DevOps | Pull-only; PAT auth; WIQL + iterations | No write-back; work-item sync bounded (4000), no attachments yet | [0035](./adr/0035-azure-devops-connector.md), [0036](./adr/0036-azure-devops-work-item-sync.md) |
 | Async work | In-process hosted services | No distributed scheduler; fine at this scale | [0007](./adr/0007-in-process-background-workers.md) |
 | Edge | Same-origin nginx + headers/CSP | Extra container; removes CORS + centralises headers | [0008](./adr/0008-same-origin-edge.md) |
 | Secrets | Docker secrets / env, never committed | Ops must inject; no secrets in VCS | [0009](./adr/0009-secrets-management.md) |

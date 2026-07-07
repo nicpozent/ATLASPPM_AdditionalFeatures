@@ -163,6 +163,27 @@ Three sync paths converge on `Jira.SyncProjectAsync`: the manual **Sync** button
 an automatic one-shot when a project's Jira key is set, and a scheduled background
 worker (`JiraSyncService`, default every 30 min). See [LLD §7](./lld.md).
 
+### 4.3 Azure DevOps sync (pull-only)
+
+```mermaid
+sequenceDiagram
+  participant Trigger as Trigger (Sync button, per-project or all-mapped)
+  participant A as Atlas API
+  participant D as Azure DevOps
+  Trigger->>A: sync project (has AdoProject)
+  A->>D: GET classification nodes (iterations) → sprints
+  A->>D: POST WIQL (ids for TeamProject) → GET work items (batched, 200/req)
+  D-->>A: iterations + work items (fields)
+  A->>A: Upsert epics (type Epic) & tasks by ADO id; parent→epic; iteration→sprint; prune removed
+  A-->>Trigger: counts (sprints, epics, tasks, backlog, truncated)
+```
+
+`AzureDevOps.SyncProjectAsync` mirrors the Jira engine's contract (one-way,
+idempotent by ADO id, prune-on-full-pull) but keys on `Project.AdoProject`.
+Two entry points: **per-project** (`POST /projects/{id}/ado/sync`) and
+**all-mapped** (`POST /integrations/ado/sync`). See [LLD §7](./lld.md) and
+[ADR-0036](./adr/0036-azure-devops-work-item-sync.md).
+
 ## 5. Quality attributes (how the design serves them)
 
 | Attribute | Approach |
@@ -184,12 +205,12 @@ worker (`JiraSyncService`, default every 30 min). See [LLD §7](./lld.md).
 | **Entra ID (directory)** | Atlas ← Graph | Graph, app credentials | Group + member sync → manager slots |
 | **Entra ID (mail)** | Atlas → Graph | Graph `Mail.Send` | Notification email (best-effort) |
 | **Jira Cloud** | Atlas ← Jira | REST, Basic (email + API token) | Pull-only; board-optional; discovery + import |
+| **Azure DevOps** | Atlas ← ADO | REST, Basic (`:PAT`) | Pull-only; discovery + import + work-item sync (WIQL → work items, iterations → sprints) |
 | **Observability** | Atlas → OTLP | OTLP gRPC/HTTP | Traces, metrics, logs |
 
 **Advertised-but-not-yet-implemented connectors** (config UI present, no backend
-sync): ServiceNow, ManageEngine SDP, GitHub, Confluence, Azure DevOps, Teams,
-Slack, Power BI. Tracked as roadmap; Azure DevOps is the next candidate (mirrors
-the Jira connector pattern).
+sync): ServiceNow, ManageEngine SDP, GitHub, Confluence, Teams, Slack, Power BI.
+Tracked as roadmap; each will mirror the Jira / Azure DevOps connector pattern.
 
 ## 7. Deployment topology
 

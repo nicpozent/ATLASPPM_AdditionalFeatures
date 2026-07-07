@@ -727,6 +727,7 @@ public class ProjectTask
     public int EstimateHours { get; set; }                // estimated effort to complete (Jira original estimate when synced)
     public int Ord { get; set; }
     public string JiraKey { get; set; } = "";             // Jira issue key when synced (e.g. "GIT-123"); "" ⇒ local
+    public string AdoId { get; set; } = "";               // Azure DevOps work-item id when synced; "" ⇒ not from ADO
 
     // ---- Rich fields carried across from Jira (empty for locally-created rows) ----
     public string Description { get; set; } = "";         // plain text lifted from Jira's ADF description
@@ -792,6 +793,7 @@ public class Sprint
     public string JiraKey { get; set; } = "";             // Jira sprint id when synced; "" ⇒ local
     public string CompleteDate { get; set; } = "";        // ISO date the sprint was actually closed (Jira)
     public int BoardId { get; set; }                      // origin board id (Jira); 0 ⇒ unknown/local
+    public string AdoId { get; set; } = "";               // Azure DevOps iteration identifier when synced; "" ⇒ not from ADO
 }
 
 // ---- Financial cost lines (role-owned) ------------------------------------
@@ -1013,6 +1015,7 @@ public class Epic
     public string Description { get; set; } = "";          // plain text lifted from Jira's ADF description
     public string EpicKey { get; set; } = "";              // stable Jira epic key (e.g. "GIT-1")
     public string JiraUrl { get; set; } = "";              // deep link into Jira
+    public string AdoId { get; set; } = "";               // Azure DevOps work-item id when synced; "" ⇒ not from ADO
 }
 
 // ---- Security, privacy & compliance ---------------------------------------

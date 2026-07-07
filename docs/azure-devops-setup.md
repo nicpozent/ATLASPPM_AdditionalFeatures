@@ -67,12 +67,36 @@ unaffected. In the Integrations screen the Azure DevOps card then reads
    (Platform Admin / PMO / PM); testing requires **Edit on Integrations &
    connectors**.
 
-## 5. What's not here yet
+## 5. Sync work items
 
-- **Board / work-item sync** (ADO work items → Atlas tasks, sprints & backlog).
-  The mapping laid down by import is what that sync will read.
+Once projects are mapped, pull their delivery data with **Sync now** on the
+Azure DevOps card (syncs every mapped project), or per-project via
+`POST /projects/{id}/ado/sync`.
+
+What the sync pulls (one-way, ADO → Atlas):
+- **Iterations → sprints** — each iteration becomes a sprint (name + start/finish
+  dates), matched to tasks by iteration.
+- **Work items → epics & tasks** — type **Epic** becomes an Atlas epic; every
+  other type (User Story, PBI, Task, Bug, Feature…) becomes a task. Work items
+  with no iteration land in the **backlog**.
+- **Field mapping** — `State` → To Do / In Progress / In Review / Done / Blocked
+  (Agile, Scrum and Basic processes handled); priority 1–4 → Critical / High /
+  Medium / Low; assignee, story points (or Effort), parent → epic, and the HTML
+  description as text.
+
+The sync is **idempotent** (keyed on the ADO work-item / iteration id): re-syncs
+update in place, never duplicate, and never touch manually-created rows. A full
+pull prunes rows that no longer exist in ADO. It's **bounded** to 4000 work items
+per project (fetched 200 per request); a `truncated` flag is returned if a very
+large project exceeds that.
+
+Needs the PAT's **Work Items → Read** scope (§2).
+
+## 6. What's not here yet
+
+- **Background sync** for very large orgs (Jira has this; ADO sync is currently
+  synchronous and bounded — see ADR-0036).
+- **Attachments, comments and delta sync** (Jira has these).
 - **Repos / pipelines** surfacing.
 
-These are tracked as the connector's next phase; the scaffold intentionally
-ships connect + discover + map first so the credential and mapping model are in
-place and verifiable.
+Tracked as the connector's next phase.

@@ -78,6 +78,12 @@ export default function Integrations() {
     onSuccess: (r) => toast(r?.ok ? `Azure DevOps connected${r.orgUrl ? " · " + r.orgUrl : ""}.` : (r?.error ?? "Azure DevOps test failed."), r?.ok ? "info" : "error"),
     onError: (e) => toast((e as Error).message, "error"),
   });
+  // Pull every ADO-mapped project's work items → tasks/epics/sprints in one pass.
+  const syncAllAdo = useMutation({
+    mutationFn: () => api<{ ok: boolean; projects?: number; tasks?: number; error?: string }>("/integrations/ado/sync", { method: "POST" }),
+    onSuccess: (r) => { toast(r?.ok ? `Azure DevOps synced · ${r.projects ?? 0} projects, ${r.tasks ?? 0} tasks.` : (r?.error ?? "Azure DevOps sync failed."), r?.ok ? "info" : "error"); qc.invalidateQueries({ queryKey: ["projects"] }); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   // Pull every mapped project from Jira in one pass — runs in the background so a
   // large portfolio-wide sync can't 504 the request (see syncJira/ADR-0030).
   const syncAll = useMutation({
@@ -174,6 +180,14 @@ export default function Integrations() {
                     title={ado?.canManage ? (configured ? "Verify the Azure DevOps organisation & PAT" : "Set AzureDevOps:Organization and AzureDevOps:Pat in config, then test") : "Needs Edit on Integrations & connectors"}
                     style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: testAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                   >{testAdo.isPending ? "Testing…" : "Test connection"}</button>
+                  {configured && (
+                    <button
+                      onClick={() => syncAllAdo.mutate()}
+                      disabled={syncAllAdo.isPending || !ado?.canManage}
+                      title={ado?.canManage ? "Pull all Azure DevOps-mapped projects (map a project from Discover below, or in its details)" : "Needs Edit on Integrations & connectors"}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    >{syncAllAdo.isPending ? "Syncing…" : "Sync now"}</button>
+                  )}
                 </div>
               </div>
             );
