@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api, apiDownload } from "@/api";
@@ -87,10 +87,152 @@ export default function Teams() {
         </div>
       )}
 
+      <div style={{ marginTop: 18 }}><LaborRateCard /></div>
+
       <div style={{ marginTop: 18 }}><SkillsMatrix /></div>
 
       <SubTeamManager />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Internal-labour rate card & cost calculator. Average blended cost/hour by
+// discipline (Dev, Infra) and seniority; PMO / PM Lead / Admin can edit. The
+// calculator turns effort (months/days/hours) into an internal-labour cost
+// using the selected rate. Rates persist server-side (/labor-rates).
+// ---------------------------------------------------------------------------
+const RATE_LEVEL_LABELS: Record<string, string> = {
+  junior: "Junior", semiSenior: "Semi-Senior", senior: "Senior", specialist: "Specialist", expert: "Expert",
+};
+const RATE_DISC_LABELS: Record<string, string> = { dev: "Dev", infra: "Infra" };
+const HOURS_PER_DAY = 8;
+const DAYS_PER_MONTH = 21;   // working days/month (≈ 168 h)
+
+interface RateCard { canEdit: boolean; disciplines: string[]; levels: string[]; rates: Record<string, number>; }
+
+function LaborRateCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["labor-rates"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<RateCard> => (await api<RateCard>("/labor-rates")) ?? { canEdit: false, disciplines: ["dev", "infra"], levels: ["junior", "semiSenior", "senior", "specialist", "expert"], rates: {} },
+  });
+  const disciplines = data?.disciplines ?? ["dev", "infra"];
+  const levels = data?.levels ?? ["junior", "semiSenior", "senior", "specialist", "expert"];
+  const rates = data?.rates ?? {};
+  const canEdit = data?.canEdit ?? false;
+
+  // Local editable copy of the rate grid (strings for the inputs).
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState(false);
+  const rateOf = (d: string, l: string) => (editing ? Number(draft[`${d}.${l}`] ?? 0) : (rates[`${d}.${l}`] ?? 0));
+
+  const save = useMutation({
+    mutationFn: () => {
+      const out: Record<string, number> = {};
+      for (const d of disciplines) for (const l of levels) out[`${d}.${l}`] = Number(draft[`${d}.${l}`] ?? 0) || 0;
+      return api("/labor-rates", { method: "PUT", body: JSON.stringify({ rates: out }) });
+    },
+    onSuccess: () => { toast("Rate card saved"); setEditing(false); qc.invalidateQueries({ queryKey: ["labor-rates"] }); },
+    onError: toastError,
+  });
+  const startEdit = () => {
+    const d: Record<string, string> = {};
+    for (const disc of disciplines) for (const l of levels) d[`${disc}.${l}`] = String(rates[`${disc}.${l}`] ?? 0);
+    setDraft(d); setEditing(true);
+  };
+
+  // Calculator state.
+  const [calcDisc, setCalcDisc] = useState("dev");
+  const [calcLevel, setCalcLevel] = useState("senior");
+  const [months, setMonths] = useState("0");
+  const [days, setDays] = useState("0");
+  const [hours, setHours] = useState("0");
+  const totalHours = (Number(months) || 0) * DAYS_PER_MONTH * HOURS_PER_DAY + (Number(days) || 0) * HOURS_PER_DAY + (Number(hours) || 0);
+  const calcRate = rateOf(calcDisc, calcLevel);
+  const cost = totalHours * calcRate;
+  const euro = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+  return (
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
+        <span style={{ width: 34, height: 34, borderRadius: 9, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 600, color: color.navy }}>Internal-labour rate card</div>
+          <div style={{ fontSize: 11.5, color: color.faint3 }}>Average blended cost / hour by discipline and seniority</div>
+        </div>
+        {canEdit && !editing && <Button variant="secondary" onClick={startEdit}><Icon name="edit" size={15} /> Edit rates</Button>}
+        {editing && <>
+          <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
+        </>}
+      </div>
+
+      {/* Rate grid */}
+      <div style={{ overflowX: "auto", padding: "6px 22px 16px" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 8px", fontWeight: 600 }}>Discipline</th>
+              {levels.map((l) => <th key={l} style={{ textAlign: "right", fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em", padding: "10px 8px", fontWeight: 600 }}>{RATE_LEVEL_LABELS[l] ?? l}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {disciplines.map((d) => (
+              <tr key={d} style={{ borderTop: "1px solid #F2F4F9" }}>
+                <td style={{ fontSize: 13, fontWeight: 600, color: color.text, padding: "10px 8px" }}>{RATE_DISC_LABELS[d] ?? d}</td>
+                {levels.map((l) => (
+                  <td key={l} style={{ textAlign: "right", padding: "8px" }}>
+                    {editing ? (
+                      <Input type="number" value={draft[`${d}.${l}`] ?? ""} onChange={(e) => setDraft((p) => ({ ...p, [`${d}.${l}`]: e.target.value }))} style={{ width: 82, textAlign: "right", padding: "6px 8px", fontSize: 12.5 }} />
+                    ) : (
+                      <span style={{ fontFamily: font.mono, fontSize: 13, color: (rates[`${d}.${l}`] ?? 0) > 0 ? color.text : color.faint3 }}>€{euro(rates[`${d}.${l}`] ?? 0)}</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!canEdit && <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 8 }}>Rates are set by PMO / PM Lead. €/hour.</div>}
+      </div>
+
+      {/* Calculator */}
+      <div style={{ borderTop: `1px solid ${color.bg}`, background: "#FBFCFE", padding: "16px 22px" }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: color.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Cost calculator</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <CalcField label="Discipline">
+            <select value={calcDisc} onChange={(e) => setCalcDisc(e.target.value)} style={selStyle}>
+              {disciplines.map((d) => <option key={d} value={d}>{RATE_DISC_LABELS[d] ?? d}</option>)}
+            </select>
+          </CalcField>
+          <CalcField label="Seniority">
+            <select value={calcLevel} onChange={(e) => setCalcLevel(e.target.value)} style={selStyle}>
+              {levels.map((l) => <option key={l} value={l}>{RATE_LEVEL_LABELS[l] ?? l}</option>)}
+            </select>
+          </CalcField>
+          <CalcField label="Months"><Input type="number" value={months} onChange={(e) => setMonths(e.target.value)} style={{ width: 80 }} /></CalcField>
+          <CalcField label="Days"><Input type="number" value={days} onChange={(e) => setDays(e.target.value)} style={{ width: 80 }} /></CalcField>
+          <CalcField label="Hours"><Input type="number" value={hours} onChange={(e) => setHours(e.target.value)} style={{ width: 80 }} /></CalcField>
+          <div style={{ flex: 1 }} />
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11.5, color: color.faint3 }}>{euro(totalHours)} h × €{euro(calcRate)}/h</div>
+            <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: cost > 0 ? color.navy : color.faint3 }}>€{euro(cost)}</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: color.faint3, marginTop: 10 }}>1 month = {DAYS_PER_MONTH} working days · 1 day = {HOURS_PER_DAY} h. {calcRate === 0 && "Set a rate above to compute a cost."}</div>
+      </div>
+    </Card>
+  );
+}
+
+const selStyle: CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: color.text };
+function CalcField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <span style={{ fontSize: 11, color: color.faint3, fontWeight: 600 }}>{label}</span>
+      {children}
+    </label>
   );
 }
 

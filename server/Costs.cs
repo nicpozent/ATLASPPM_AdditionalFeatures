@@ -19,6 +19,8 @@ public static class Costs
         ("laborDev",   "Internal labor · Dev",          "Eng. Manager / Developers Manager", new[] { "teammgr", "devmgr" }),
         ("laborArch",  "Internal labor · Architecture", "Chief Architect",                   new[] { "architect" }),
         ("laborInfra", "Internal labor · Infra",        "Global Service Mgr / Infra Manager",new[] { "svcmgr", "inframgr" }),
+        ("laborPM",    "Internal labor · PM",           "PMO / PM Lead",                     new[] { "pmlead" }),
+        ("laborPO",    "Internal labor · PO",           "PMO / PM Lead",                     new[] { "pmlead" }),
         ("licDev",     "License · Dev",                 "Eng. Manager / Developers Manager", new[] { "teammgr", "devmgr" }),
         ("licInfra",   "License · Infra",               "Infra Manager / Global Service Mgr",new[] { "inframgr", "svcmgr" }),
         ("paasDev",    "PaaS · Dev",                    "Eng. Manager / Developers Manager", new[] { "teammgr", "devmgr" }),
@@ -41,13 +43,22 @@ public static class Costs
 
     static async Task EnsureAsync(AtlasDbContext db, string scope, string ownerId, string kind)
     {
-        if (await db.CostLines.AnyAsync(c => c.Scope == scope && c.OwnerId == ownerId && c.Kind == kind)) return;
+        // Seed any standard (system) template line this owner is missing. This is
+        // idempotent and self-healing: owners created before a new template line
+        // (e.g. Internal labor · PM/PO) was added gain it on their next read,
+        // without disturbing existing amounts or custom lines.
+        var have = (await db.CostLines
+            .Where(c => c.Scope == scope && c.OwnerId == ownerId && c.Kind == kind && c.Key != "")
+            .Select(c => c.Key).ToListAsync()).ToHashSet();
+        var added = false;
         for (var i = 0; i < Template.Length; i++)
         {
             var t = Template[i];
+            if (have.Contains(t.Key)) continue;
             db.CostLines.Add(new CostLine { Scope = scope, OwnerId = ownerId, Kind = kind, Key = t.Key, Label = t.Label, Note = t.Note, OwnerRoles = t.Roles.ToList(), IsSystem = true, Amount = 0, Ord = i });
+            added = true;
         }
-        await db.SaveChangesAsync();
+        if (added) await db.SaveChangesAsync();
     }
 
     // Does the scoped owner (project / program / product) exist?
