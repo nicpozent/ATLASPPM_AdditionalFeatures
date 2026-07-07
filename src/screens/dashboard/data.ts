@@ -103,6 +103,37 @@ export const EMPTY_DASHBOARD: DashboardData = {
   projects: [], attention: [], activity: [], tasks: [], approvals: [],
 };
 
+// Coalesce an API payload into a fully-shaped, render-safe DashboardData. The
+// backend normally returns every collection non-null, but a partial/legacy
+// payload (or a null array field) would otherwise crash the render deep inside
+// a child (e.g. `d.projects.length`). Normalising once here keeps every
+// consumer free of defensive `?.`/`?? []` noise and can't throw.
+const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const rec = <T,>(v: unknown): Record<string, T> =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, T>) : {};
+
+export function normalizeDashboard(raw: Partial<DashboardData> | null | undefined): DashboardData {
+  const r = raw ?? {};
+  const b = r.budget;
+  return {
+    kpis: rec<KpiValue>(r.kpis),
+    health: rec<HealthSegment>(r.health),
+    pipeline: rec<PipelineStage>(r.pipeline),
+    budget: b
+      ? {
+          allocated: b.allocated ?? "", spent: b.spent ?? "", spentPct: b.spentPct ?? 0,
+          months: arr<string>(b.months), planned: arr<number>(b.planned),
+          actual: arr<number>(b.actual), max: b.max || 1,
+        }
+      : null,
+    projects: arr<ProjectRow>(r.projects),
+    attention: arr<AttentionItem>(r.attention),
+    activity: arr<ActivityEvent>(r.activity),
+    tasks: arr<TaskRow>(r.tasks),
+    approvals: arr<ApprovalRow>(r.approvals),
+  };
+}
+
 // ---- hook ------------------------------------------------------------------
 // Fetches the dashboard rollup. Until the endpoint exists (no backend) the
 // query resolves to the empty dataset rather than erroring, so the screen shows
@@ -119,8 +150,7 @@ export function useDashboard() {
     refetchInterval: 30_000,
     queryFn: async (): Promise<DashboardData> => {
       try {
-        const data = await api<DashboardData>("/dashboard");
-        return data ?? EMPTY_DASHBOARD;
+        return normalizeDashboard(await api<DashboardData>("/dashboard"));
       } catch {
         return EMPTY_DASHBOARD;
       }

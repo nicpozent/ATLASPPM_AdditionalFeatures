@@ -313,13 +313,17 @@ export function MenuDivider() {
 // ============================================================================
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode; fallback?: React.ReactNode },
-  { error: Error | null }
+  { error: Error | null; code: string }
 > {
-  state: { error: Error | null } = { error: null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
+  state: { error: Error | null; code: string } = { error: null, code: "" };
+  // APP- prefix marks a front-end (render) fault, distinct from server SRV-/INT-;
+  // it resolves to the "APP" troubleshooting entry in Help.
+  static getDerivedStateFromError(error: Error) {
+    return { error, code: `APP-${Math.random().toString(36).slice(2, 8).toUpperCase()}` };
+  }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // Surface to the console for diagnostics; a real deployment would report this.
-    console.error("Screen crashed:", error, info.componentStack);
+    // Surface with the code so support can correlate; a real deployment reports this.
+    console.error(`[Atlas ${this.state.code}] Screen crashed:`, error, info.componentStack);
   }
   render() {
     if (this.state.error) {
@@ -329,12 +333,17 @@ export class ErrorBoundary extends React.Component<
             <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.ink, marginBottom: 6 }}>
               Something went wrong on this screen
             </div>
-            <div style={{ fontSize: 13.5, color: color.subtle, marginBottom: 18 }}>
-              An unexpected error stopped this view from rendering. Try again, or reload the page.
+            <div style={{ fontSize: 13.5, color: color.subtle, marginBottom: 14 }}>
+              An unexpected error stopped this view from rendering. Your data is safe — try again, or reload the page.
             </div>
-            <Button variant="secondary" onClick={() => this.setState({ error: null })} style={{ margin: "0 auto" }}>
-              Try again
-            </Button>
+            {this.state.code && (
+              <div style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.textMuted, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 8, padding: "6px 10px", marginBottom: 18, display: "inline-block" }}>{this.state.code}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <Button variant="secondary" onClick={() => this.setState({ error: null, code: "" })}>
+                Try again
+              </Button>
+            </div>
           </Card>
         </div>
       );
