@@ -8,6 +8,20 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the big, rarely-changing vendor libraries into their own chunks
+        // so they cache independently of app code and don't bloat the entry
+        // bundle. Route screens are already split via React.lazy (see App.tsx).
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-msal": ["@azure/msal-browser", "@azure/msal-react"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
