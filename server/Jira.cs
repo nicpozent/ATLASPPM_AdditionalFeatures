@@ -327,6 +327,7 @@ public static class Jira
         using var c = Client(cfg);
         foreach (var p in projects)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
@@ -334,8 +335,9 @@ public static class Jira
                 p.LastJiraSync = watermark;
                 sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
                 await db.SaveChangesAsync();
+                AtlasTelemetry.RecordSync("jira", sw.Elapsed.TotalSeconds, ok: true);
             }
-            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); }
+            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); AtlasTelemetry.RecordSync("jira", sw.Elapsed.TotalSeconds, ok: false); }
         }
         return new BulkSyncResult(ok, sp, ep, tk, errors);
     }
@@ -373,6 +375,7 @@ public static class Jira
         using var c = Client(cfg);
         foreach (var p in projects)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
@@ -380,8 +383,9 @@ public static class Jira
                 p.LastJiraSync = watermark;
                 sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
                 await db.SaveChangesAsync();
+                AtlasTelemetry.RecordSync("jira", sw.Elapsed.TotalSeconds, ok: true);
             }
-            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); }
+            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); AtlasTelemetry.RecordSync("jira", sw.Elapsed.TotalSeconds, ok: false); }
         }
         db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", $"Synced {scope}'s projects from Jira",
             $"{ok}/{projects.Count} projects · {sp} sprints, {ep} epics, {tk} tasks"));

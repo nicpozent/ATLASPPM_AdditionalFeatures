@@ -40,6 +40,9 @@ public class AdoSyncQueue
 
     public ChannelReader<AdoSyncJob> Reader => _channel.Reader;
 
+    // Pending (unread) jobs — surfaced as a metric gauge (ADR-0040).
+    public int Pending => _channel.Reader.CanCount ? _channel.Reader.Count : 0;
+
     public AdoJobStatus Enqueue(string targetId, string actor, string role)
     {
         var id = Guid.NewGuid().ToString("n")[..12];

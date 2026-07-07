@@ -197,7 +197,30 @@ through the collector.
 
 ---
 
-## 5. Turn it off
+## 5. Domain metrics, dashboards & alerts (ADR-0040)
+
+Beyond the auto-instrumented HTTP/runtime metrics, Atlas emits application-level
+metrics on the `Atlas.Api` meter (Prometheus names shown):
+
+| Metric | Prometheus | What it tells you |
+| ------ | ---------- | ----------------- |
+| `atlas.audit.events` | `atlas_audit_events_total` | Domain write activity by area/action |
+| `atlas.sync.duration` | `atlas_sync_duration_seconds_*` | Connector sync time per project, by `connector`/`outcome` |
+| `atlas.sync.queue.depth` | `atlas_sync_queue_depth` | Pending background sync jobs, by `connector` |
+| `atlas.capacity.alerts` | `atlas_capacity_alerts_total` | Over-allocation alerts delivered |
+| `atlas.db.command.duration` | `atlas_db_command_duration_seconds_*` | EF Core command latency (via an interceptor) |
+
+**Dashboards** (`deploy/observability/grafana/dashboards/`, auto-provisioned):
+- **Atlas API — Overview** — HTTP RED (rate/errors/latency), audited writes, logs.
+- **Atlas API — Integrations & Operations** — sync duration p95 & outcomes by
+  connector, background-queue depth, capacity alerts/day, DB latency & rate.
+
+**Alerts** (`deploy/observability/alerts.yml`, loaded via `rule_files`):
+target-down, 5xx ratio > 5%, HTTP p95 > 2s, DB p95 > 1s, connector sync failures,
+sync-queue backlog. They evaluate in Prometheus (see the **Alerts** tab); attach
+an Alertmanager receiver to route notifications.
+
+## 6. Turn it off
 
 Unset `OTEL_EXPORTER_OTLP_ENDPOINT` and leave `OpenTelemetry:Enabled` unset (or
 `false`). Atlas then creates no exporters and adds no overhead.

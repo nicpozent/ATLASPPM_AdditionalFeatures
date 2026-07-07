@@ -39,7 +39,7 @@ requirement → capability → implementation → decision.
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
 | SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker`+`JiraSyncQueue`, `AdoSyncWorker`+`AdoSyncQueue`) | ABB-06, ABB-10 | ADR-0007, ADR-0028, ADR-0030, ADR-0039 |
 | SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts | ABB-07 | ADR-0028 |
-| SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs + reference Grafana/Tempo/Prometheus/Loki stack & dashboard | ABB-08 | ADR-0010, ADR-0032 |
+| SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs + reference Grafana/Tempo/Prometheus/Loki stack; domain metrics (sync duration, queue depth, capacity alerts, DB command duration) with tuned dashboards (overview + operations) & Prometheus alert rules | ABB-08 | ADR-0010, ADR-0032, ADR-0040 |
 | SBB-14 | Security headers/CSP, rate limiter, upload limits, least-privilege DB role | ABB-09 | ADR-0008, security-hardening.md |
 | SBB-15 | Governance modules (Gates, RAID, Architecture ADM/ARB, Security controls, Decisions, Quality) + GDPR/retention | ABB-10 | |
 | SBB-16 | `IConfiguration` env + Docker secrets tooling | ABB-11 | ADR-0009 |

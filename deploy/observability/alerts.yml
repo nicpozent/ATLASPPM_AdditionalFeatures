@@ -1,0 +1,62 @@
+# Atlas API — Prometheus alert rules (ADR-0040).
+# Metric names are the Prometheus form of the OTLP instruments the API emits
+# (dots → underscores; histograms expose _bucket/_count/_sum; counters _total).
+# These evaluate in Prometheus; attach an Alertmanager receiver to route them.
+groups:
+  - name: atlas-api
+    rules:
+      # --- Availability -------------------------------------------------------
+      - alert: AtlasApiTargetDown
+        expr: up{job="atlas-api"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Atlas API metrics target is down"
+          description: "Prometheus can't scrape atlas-api (via the OTel collector) for 5m — the API or collector may be down."
+
+      # --- HTTP RED -----------------------------------------------------------
+      - alert: AtlasHigh5xxRatio
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{service_name="atlas-api",http_response_status_code=~"5.."}[5m]))
+          / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name="atlas-api"}[5m])), 1) > 0.05
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Atlas API 5xx ratio above 5%"
+          description: "More than 5% of requests have returned 5xx for 10m — check logs (correlation SRV-… codes) and traces."
+
+      - alert: AtlasHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="atlas-api"}[5m]))) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Atlas API p95 latency above 2s"
+          description: "95th-percentile request latency has exceeded 2s for 10m."
+
+      # --- Database -----------------------------------------------------------
+      - alert: AtlasSlowDbP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(atlas_db_command_duration_seconds_bucket{service_name="atlas-api"}[5m]))) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Atlas DB command p95 above 1s"
+          description: "95th-percentile EF Core command duration has exceeded 1s for 10m — check Postgres load / missing indexes."
+
+      # --- Connector sync -----------------------------------------------------
+      - alert: AtlasConnectorSyncFailures
+        expr: sum by (connector) (rate(atlas_sync_duration_seconds_count{outcome="error"}[15m])) > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Atlas {{ $labels.connector }} sync is failing"
+          description: "One or more {{ $labels.connector }} project syncs have errored over the last 15m — check the connector credentials and upstream availability."
+
+      - alert: AtlasSyncQueueBacklog
+        expr: max by (connector) (atlas_sync_queue_depth{service_name="atlas-api"}) > 20
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Atlas {{ $labels.connector }} background-sync backlog"
+          description: "More than 20 {{ $labels.connector }} sync jobs have been queued for 10m — the worker may be stuck or overloaded."
