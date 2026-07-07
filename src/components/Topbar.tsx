@@ -8,7 +8,7 @@ import { LanguagePicker } from "./LanguagePicker";
 import { useT } from "@/i18n";
 import { ROLES, SCREENS } from "@/nav";
 
-export function Topbar() {
+export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
   const { role, setRole } = useRole();
   const { enabled, user } = useAuth();
   const t = useT();
@@ -27,6 +27,21 @@ export function Topbar() {
       borderBottom: `1px solid ${color.border3}`, display: "flex", alignItems: "center",
       gap: 18, padding: "0 26px", zIndex: 20,
     }}>
+      {/* Hamburger — only rendered by the shell on phone widths, where the
+          sidebar is off-canvas. Opens the navigation drawer. */}
+      {onMenu && (
+        <button
+          onClick={onMenu}
+          aria-label={t("common.openMenu", "Open navigation menu")}
+          style={{
+            flex: "none", display: "flex", alignItems: "center", justifyContent: "center",
+            width: 40, height: 40, marginLeft: -8, borderRadius: 9, cursor: "pointer",
+            color: color.ink, background: "transparent", border: `1px solid ${color.border3}`,
+          }}
+        >
+          <Icon name="menu" size={20} />
+        </button>
+      )}
       <div style={{ lineHeight: 1.15 }}>
         <div style={{ fontFamily: font.head, fontSize: 19, fontWeight: 600, color: color.ink, letterSpacing: "-0.01em" }}>
           {t(`screen.${screen.id}.title`, t(`screen.${screen.id}.label`, screen.title))}

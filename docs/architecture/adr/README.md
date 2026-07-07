@@ -32,5 +32,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0023](./0023-close-allocation-gaps.md) | Time-phased Ops, hours/dates in Resources editing, server-side custom dashboard | Accepted |
 | [0024](./0024-capacity-intelligence.md) | Capacity intelligence (insight + staffing) over the shared roster | Accepted |
 | [0025](./0025-accessibility-baseline.md) | Accessibility baseline in shared primitives (focus, dialogs, menus) | Accepted |
+| [0026](./0026-axe-automation-and-mobile-drawer.md) | Automated axe a11y sweep in CI + mobile navigation drawer | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

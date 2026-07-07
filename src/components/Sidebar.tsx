@@ -11,7 +11,7 @@ import {
   type ScreenId,
 } from "@/nav";
 
-function NavItem({ id, badge }: { id: ScreenId; badge?: string }) {
+function NavItem({ id, badge, onNavigate }: { id: ScreenId; badge?: string; onNavigate?: () => void }) {
   const s = SCREENS[id];
   const t = useT();
   const shown = badge ?? s.badge;
@@ -19,6 +19,7 @@ function NavItem({ id, badge }: { id: ScreenId; badge?: string }) {
     <NavLink
       to={s.path}
       end={s.path === "/"}
+      onClick={onNavigate}
       style={({ isActive }) => ({
         display: "flex", alignItems: "center", gap: 11,
         padding: "9px 12px", borderRadius: 9, cursor: "pointer",
@@ -67,7 +68,9 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Sidebar() {
+// `drawer` renders the sidebar as an off-canvas overlay for phone widths;
+// `onNavigate` lets the shell close that drawer once a link is followed.
+export function Sidebar({ drawer = false, onNavigate }: { drawer?: boolean; onNavigate?: () => void } = {}) {
   const { identity, role } = useRole();
   const { enabled: authEnabled, user, logout } = useAuth();
   const t = useT();
@@ -80,6 +83,7 @@ export function Sidebar() {
     <aside style={{
       width: layout.sidebarWidth, flex: "none", background: color.sidebarBg,
       display: "flex", flexDirection: "column", color: color.sidebarText,
+      ...(drawer ? { height: "100%" } : null),
     }}>
       {/* Brand */}
       <div style={{ padding: "18px 16px 15px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
@@ -100,9 +104,9 @@ export function Sidebar() {
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "4px 12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
         <GroupLabel>{t("group.workspace", "Workspace")}</GroupLabel>
-        {main.map((id) => <NavItem key={id} id={id} badge={id === "demands" ? demandBadge : undefined} />)}
+        {main.map((id) => <NavItem key={id} id={id} badge={id === "demands" ? demandBadge : undefined} onNavigate={onNavigate} />)}
         <GroupLabel>{t("group.configuration", "Configuration")}</GroupLabel>
-        {config.map((id) => <NavItem key={id} id={id} />)}
+        {config.map((id) => <NavItem key={id} id={id} onNavigate={onNavigate} />)}
       </nav>
 
       {/* User footer */}
