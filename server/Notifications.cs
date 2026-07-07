@@ -24,22 +24,23 @@ public static class Notifications
 
     // Event types and their human labels (used by the prefs UI and inbox).
     public const string Risk = "risk", DateSlip = "date_slip", Status = "status_change",
-        Approval = "approval", Created = "created";
+        Approval = "approval", Created = "created", OverAllocation = "over_allocation";
 
     public static readonly (string Key, string Label, string Detail, bool EntityScoped)[] EventTypes =
     {
-        (Risk,     "At risk",        "A subscribed item's health turns amber or red",         true),
-        (DateSlip, "Date slip",      "A target date is moved out or passes uncompleted",       true),
-        (Status,   "Status change",  "A subscribed item changes status or advances a stage",   true),
-        (Approval, "Approvals",      "An approval is requested, granted or rejected",          true),
-        (Created,  "New items",      "A project, program, product or demand is created",       false),
+        (Risk,           "At risk",           "A subscribed item's health turns amber or red",        true),
+        (DateSlip,       "Date slip",         "A target date is moved out or passes uncompleted",      true),
+        (Status,         "Status change",     "A subscribed item changes status or advances a stage",  true),
+        (Approval,       "Approvals",         "An approval is requested, granted or rejected",         true),
+        (Created,        "New items",         "A project, program, product or demand is created",      false),
+        (OverAllocation, "Over-allocation",   "A person's total allocation exceeds 100% for a period", false),
     };
 
     // Default channels when a user hasn't set a preference for an event type.
-    // Entity events default to in-app (for people who subscribed); "created" is
-    // opt-in (off) so it isn't a firehose.
+    // Entity events default to in-app (for people who subscribed); portfolio
+    // events ("created", over-allocation) are opt-in (off) so they aren't a firehose.
     internal static (bool InApp, bool Email) DefaultPref(string ev) =>
-        ev == Created ? (false, false) : (true, false);
+        (ev == Created || ev == OverAllocation) ? (false, false) : (true, false);
 
     static bool MailConfigured(IConfiguration cfg) =>
         !string.IsNullOrWhiteSpace(cfg["Graph:TenantId"]) &&

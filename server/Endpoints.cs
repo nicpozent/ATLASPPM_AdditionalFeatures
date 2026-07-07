@@ -34,6 +34,7 @@ public static class Endpoints
         api.MapRoadmapEndpoints();
         api.MapCapacityEndpoints();
         api.MapCapacityIntelEndpoints();
+        api.MapCapacityAlertEndpoints();
         api.MapDeletionEndpoints();
         api.MapLifecycleEndpoints();
         api.MapBackupEndpoints();
