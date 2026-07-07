@@ -139,7 +139,14 @@ public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Pr
 public record MilestoneDto(int Id, string Label, int Month, string Date);
 public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones,
     int? ProjectStart = null, int? ProjectEnd = null, string StartDate = "", string EndDate = "");
-public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<PhaseDto> Phases);
+// A sprint bar on a timeline (months on the year grid; Undated ⇒ dates TBD in Jira).
+public record GanttSprintDto(int Id, string Name, string Status, int StartMonth, int EndMonth, bool Undated);
+// A program row now carries the project's own window + sprint bars (not just
+// phases) so the program timeline shows a schedule derived from projects, tasks
+// and sprints — see ADR-0029.
+public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<PhaseDto> Phases,
+    int? StartMonth = null, int? EndMonth = null, string StartDate = "", string EndDate = "",
+    List<GanttSprintDto>? Sprints = null);
 public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> Milestones);
 
 // Portfolio-wide timeline: one bar per entity on the 12-month grid.
