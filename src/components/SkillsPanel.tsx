@@ -26,7 +26,10 @@ export function SkillsPanel({ entityType, entityId }: { entityType: string; enti
   const skills = data?.skills ?? [];
   const people = data?.people ?? [];
   const rating = new Map((data?.ratings ?? []).map((r) => [`${r.skillId}|${r.person}`, r.level]));
-  if (people.length === 0 || skills.length === 0) return null;
+  // Nothing assigned here yet → stay quiet. But once people are assigned, always
+  // show the panel — with a helpful nudge if no skills are defined yet — rather
+  // than vanishing (which read as "broken").
+  if (people.length === 0) return null;
 
   const NAME_COL = 200;
   return (
@@ -35,6 +38,12 @@ export function SkillsPanel({ entityType, entityId }: { entityType: string; enti
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 700, color: color.ink }}>Team skills</div>
         <div style={{ fontSize: 12, color: color.faint2, marginTop: 2 }}>Competency (0–4) of the people assigned here · maintained in My Team</div>
       </div>
+      {skills.length === 0 && (
+        <div style={{ padding: "18px 20px", fontSize: 12.5, color: color.faint3 }}>
+          {people.length} {people.length === 1 ? "person" : "people"} assigned. No skills defined yet — add skill columns and rate people in <b style={{ color: color.subtle }}>My Team → Skills &amp; competency matrix</b>, and their ratings will appear here.
+        </div>
+      )}
+      {skills.length > 0 && (
       <div style={{ overflowX: "auto" }}>
         <div style={{ minWidth: NAME_COL + skills.length * 64 }}>
           {/* header */}
@@ -60,6 +69,7 @@ export function SkillsPanel({ entityType, entityId }: { entityType: string; enti
           ))}
         </div>
       </div>
+      )}
     </Card>
   );
 }

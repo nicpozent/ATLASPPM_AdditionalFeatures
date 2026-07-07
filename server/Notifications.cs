@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api;
 
+public record ContactReq(string? Subject, string Message, string? Role, string? Screen, string? Code);
+
 // ============================================================================
 //  Notifications. Users subscribe to projects/programs/products and choose, per
 //  event type, whether to hear about it in-app and/or by email. Entity events
@@ -157,6 +159,28 @@ public static class Notifications
 
     public static void MapNotificationEndpoints(this RouteGroupBuilder api)
     {
+        // ---- Contact the PMO ----------------------------------------------
+        // A real in-app support action: records the request in the audit log
+        // (visible in Admin) and, when Graph mail is configured, emails the
+        // support/PMO mailbox. Any signed-in user may send one.
+        api.MapPost("/support/contact", async (ContactReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Message)) return Results.BadRequest(new { error = "Please include a message." });
+            var subject = string.IsNullOrWhiteSpace(req.Subject) ? "Atlas support request" : req.Subject.Trim();
+            var from = Permissions.CallerKey(http, cfg);
+            var context = $"From: {from}\nRole: {req.Role}\nScreen: {req.Screen}\nError code: {req.Code}\n\n{req.Message.Trim()}";
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Support", "Contacted the PMO", subject));
+            await db.SaveChangesAsync();
+            var mailbox = cfg["Notifications:SupportMailbox"] ?? cfg["Notifications:SenderUpn"];
+            var emailed = false;
+            if (!string.IsNullOrWhiteSpace(mailbox) && MailConfigured(cfg))
+            {
+                await SendEmailsAsync(cfg, new List<string> { mailbox! }, subject, context);
+                emailed = true;
+            }
+            return Results.Ok(new { ok = true, emailed });
+        });
+
         // ---- Inbox --------------------------------------------------------
         api.MapGet("/notifications", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
