@@ -36,6 +36,7 @@ public static class Backups
             ["assignments"] = await db.RoleAssignments.ToListAsync(),
             ["roles"] = await db.RoleDefs.ToListAsync(),
             ["permissions"] = await db.RolePermissions.ToListAsync(),
+            ["settings"] = await db.Settings.ToListAsync(),
             ["audit"] = await db.AuditEvents.ToListAsync(),
         };
         var records = data.Values.Sum(v => ((System.Collections.ICollection)v).Count);
@@ -110,6 +111,60 @@ public static class Backups
             var (bytes, _) = await SnapshotAsync(db);
             var name = $"atlas-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json";
             return Results.File(bytes, "application/json", name);
+        });
+
+        // Restore from an uploaded snapshot — a MERGE (upsert by id), never a wipe:
+        // it re-creates missing rows and updates existing ones for the string-keyed
+        // portfolio entities and settings, and can't delete anything. Child/identity
+        // rows and attachments are NOT restored here (use a PostgreSQL dump/PITR for
+        // a full recovery — see docs). Confirm-gated in the UI; Platform-Admin only.
+        api.MapPost("/backups/restore", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-backups", "F") is { } denied) return denied;
+            JsonElement root;
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(http.Request.Body);
+                root = doc.RootElement.Clone();
+            }
+            catch { return Results.BadRequest(new { error = "That file isn't valid JSON." }); }
+            if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object)
+                return Results.BadRequest(new { error = "Not an Atlas backup — expected a top-level “data” object." });
+
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var restored = new Dictionary<string, int>();
+
+            async Task Merge<T>(string key, Func<T, string> keyOf) where T : class
+            {
+                if (!data.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array) return;
+                var items = arr.Deserialize<List<T>>(opts) ?? new();
+                var set = db.Set<T>();
+                int n = 0;
+                foreach (var inc in items)
+                {
+                    var id = keyOf(inc);
+                    if (string.IsNullOrEmpty(id)) continue;
+                    var existing = await set.FindAsync(id);
+                    if (existing is null) { existing = (T)Activator.CreateInstance(typeof(T))!; set.Add(existing); }
+                    // SetValues copies scalar properties only — navigations are left
+                    // untouched, so no child rows are double-inserted.
+                    db.Entry(existing).CurrentValues.SetValues(inc);
+                    n++;
+                }
+                if (n > 0) restored[key] = n;
+            }
+
+            await Merge<Project>("projects", p => p.Id);
+            await Merge<Program>("programs", p => p.Id);
+            await Merge<Product>("products", p => p.Id);
+            await Merge<Release>("releases", r => r.Id);
+            await Merge<Objective>("objectives", o => o.Id);
+            await Merge<Setting>("settings", s => s.Key);
+
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Backups", "Restored from snapshot (merge)",
+                string.Join(", ", restored.Select(kv => $"{kv.Value} {kv.Key}"))));
+            await db.SaveChangesAsync();
+            return Results.Ok(new { ok = true, restored });
         });
 
         // ---- Operator settings (integration/backup toggles) ----------------
