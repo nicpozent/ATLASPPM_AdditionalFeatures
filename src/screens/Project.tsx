@@ -688,6 +688,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
   const [view, setView] = useState<"board" | "table">("board");
   const [modal, setModal] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [assignee, setAssignee] = useState("");   // "" ⇒ all assignees
   const dragId = useRef<number | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const assigneeOptions = useAssigneeOptions(projectId);
@@ -736,6 +737,9 @@ function Tasks({ projectId }: { projectId: string | null }) {
   const canEdit = data?.canEdit ?? false;
   const canCreate = data?.canCreate ?? false;
   const isSpilled = (t: Task) => !!t.sprint && !!t.baseline && t.sprint !== t.baseline;
+  // Assignee filter: options are the assignees actually present on the board.
+  const assignees = Array.from(new Set(tasks.map((t) => t.assignee).filter(Boolean))).sort();
+  const shown = assignee ? tasks.filter((t) => t.assignee === assignee) : tasks;
 
   if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its tasks." /></Card>;
 
@@ -747,6 +751,12 @@ function Tasks({ projectId }: { projectId: string | null }) {
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", textTransform: "capitalize", background: view === v ? "#fff" : "transparent", color: view === v ? color.primary : "#6A7488", boxShadow: view === v ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v}</button>
           ))}
         </div>
+        {assignees.length > 0 && (
+          <Select value={assignee} onChange={(e) => setAssignee(e.target.value)} title="Filter by assignee" style={{ maxWidth: 190, fontSize: 12.5, padding: "7px 10px" }}>
+            <option value="">All assignees</option>
+            {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </Select>
+        )}
         <div style={{ flex: 1 }} />
         {jiraMapped && (
           <Button variant="secondary" onClick={() => syncProject.mutate()} disabled={syncProject.isPending || !canSyncJira} title={canSyncJira ? `Pull ${project?.jiraProjectKey} / board ${project?.jiraBoardId} from Jira` : "Needs Edit on Integrations & connectors"}>
@@ -759,7 +769,7 @@ function Tasks({ projectId }: { projectId: string | null }) {
       {view === "board" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, alignItems: "start" }}>
           {BOARD_COLS.map((c) => {
-            const cards = tasks.filter((t) => t.status === c.label);
+            const cards = shown.filter((t) => t.status === c.label);
             const over = overCol === c.label;
             return (
               <div key={c.label}
@@ -830,9 +840,9 @@ function Tasks({ projectId }: { projectId: string | null }) {
           <div style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", padding: "14px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
             <div>Task</div><div>Epic</div><div>Assignee</div><div>Sprint</div><div>Baseline</div><div>Status</div>
           </div>
-          {tasks.length === 0 ? (
-            <EmptyBlock message="No tasks yet." minHeight={140} />
-          ) : tasks.map((t) => {
+          {shown.length === 0 ? (
+            <EmptyBlock message={assignee ? `No tasks for ${assignee}.` : "No tasks yet."} minHeight={140} />
+          ) : shown.map((t) => {
             const col = BOARD_COLS.find((c) => c.label === t.status) ?? BOARD_COLS[0];
             return (
               <div key={t.id} style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
@@ -1196,6 +1206,7 @@ function Backlog({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [assignee, setAssignee] = useState("");   // "" ⇒ all assignees
   const assigneeOptions = useAssigneeOptions(projectId);
   const epicOptions = useEpicOptions(projectId);
   const sprintOptions = useSprintOptions(projectId);
@@ -1219,13 +1230,21 @@ function Backlog({ projectId }: { projectId: string | null }) {
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
   const canCreate = data?.canCreate ?? false;
-  const backlog = tasks.filter((t) => !t.sprint);
+  const allBacklog = tasks.filter((t) => !t.sprint);
+  const assignees = Array.from(new Set(allBacklog.map((t) => t.assignee).filter(Boolean))).sort();
+  const backlog = assignee ? allBacklog.filter((t) => t.assignee === assignee) : allBacklog;
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div style={{ fontSize: 13.5, color: color.faint }}>Un-sprinted work. Assign a sprint to pull an item into an iteration.</div>
         <div style={{ flex: 1 }} />
+        {assignees.length > 0 && (
+          <Select value={assignee} onChange={(e) => setAssignee(e.target.value)} title="Filter by assignee" style={{ maxWidth: 190, fontSize: 12.5, padding: "7px 10px" }}>
+            <option value="">All assignees</option>
+            {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
+          </Select>
+        )}
         <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create tasks (needs the Project schedule right)"}><Icon name="plus" size={16} /> New backlog item</Button>
       </div>
       <Card padding={0} style={{ overflow: "hidden" }}>
@@ -1233,7 +1252,7 @@ function Backlog({ projectId }: { projectId: string | null }) {
           <div>Code</div><div>Task</div><div>Epic</div><div>Points</div><div>Priority</div><div>Assign sprint</div>
         </div>
         {backlog.length === 0 ? (
-          <EmptyBlock message="Backlog is empty — every task is assigned to a sprint." minHeight={140} />
+          <EmptyBlock message={assignee ? `No backlog items for ${assignee}.` : "Backlog is empty — every task is assigned to a sprint."} minHeight={140} />
         ) : backlog.map((t) => {
           const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
           return (
