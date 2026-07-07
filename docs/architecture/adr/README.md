@@ -45,5 +45,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0036](./0036-azure-devops-work-item-sync.md) | Azure DevOps work-item sync (iterations → sprints, work items → epics/tasks) | Accepted |
 | [0037](./0037-contrast-tokens-and-gate.md) | WCAG AA contrast tokens + gated colour-contrast in the axe sweep | Accepted |
 | [0038](./0038-idle-logout-policy.md) | Idle-logout policy (15-min inactivity sign-out, configurable) | Accepted |
+| [0039](./0039-ado-background-sync.md) | Background Azure DevOps sync (queue + worker + poll; cap raised) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

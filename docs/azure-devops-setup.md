@@ -86,17 +86,18 @@ What the sync pulls (one-way, ADO → Atlas):
 
 The sync is **idempotent** (keyed on the ADO work-item / iteration id): re-syncs
 update in place, never duplicate, and never touch manually-created rows. A full
-pull prunes rows that no longer exist in ADO. It's **bounded** to 4000 work items
-per project (fetched 200 per request); a `truncated` flag is returned if a very
-large project exceeds that.
+pull prunes rows that no longer exist in ADO.
 
-Needs the PAT's **Work Items → Read** scope (§2).
+**Background sync (ADR-0039).** "Sync now" runs the pull **off the request path**
+(returns a job id, polled to completion) so a large org can't time out the
+gateway. Work items are fetched 200 per request up to `AzureDevOps:MaxWorkItems`
+(default **20000**, WIQL's own ceiling); a `truncated` flag is returned only if a
+project exceeds that. Needs the PAT's **Work Items → Read** scope (§2).
 
 ## 6. What's not here yet
 
-- **Background sync** for very large orgs (Jira has this; ADO sync is currently
-  synchronous and bounded — see ADR-0036).
-- **Attachments, comments and delta sync** (Jira has these).
+- **Attachments, comments and delta sync** (Jira has these; ADO does a full pull
+  of the current field set).
 - **Repos / pipelines** surfacing.
 
 Tracked as the connector's next phase.
