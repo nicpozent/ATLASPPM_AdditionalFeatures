@@ -72,8 +72,18 @@ Under **Jira sync (pull-only)**, set the **Jira project key** (e.g. `GIT`) and
 **board id** (the number in the board URL: `.../boards/93/...` → `93`). Leave both
 blank to unlink.
 
-Then pull the data: on the project's **Tasks** tab click **Sync from Jira**, or
-use **Integrations → Jira → Sync now** to pull every mapped project at once.
+Then pull the data. Three ways:
+- On any **project / program / product Overview**, click **Sync from Jira** — a
+  fast **delta** pull (only issues changed since the last sync). A **Full
+  re-sync** link forces a complete reconcile. Program/product sync every mapped
+  project linked to them.
+- On the project's **Tasks** tab, **Sync from Jira**.
+- **Integrations → Jira → Sync now** pulls every mapped project at once.
+
+Delta sync appends `updated >= <last-sync>` to the query and skips pruning, so
+re-syncs are cheap. Because an "updated since" query can't see issues **deleted**
+in Jira, run a **Full re-sync** (or the global Sync now) periodically to
+reconcile deletions.
 
 What the sync maps, Jira → Atlas:
 
