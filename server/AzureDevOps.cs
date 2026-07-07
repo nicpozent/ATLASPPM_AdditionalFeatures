@@ -192,7 +192,9 @@ public static class AzureDevOps
         // Sync one mapped project: pull its Azure DevOps iterations → sprints and
         // work items → epics / tasks / backlog. Idempotent by ADO id; full pull
         // (prunes rows that vanished from ADO). Gated on Integrations (Edit).
-        api.MapPost("/projects/{id}/ado/sync", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        // With ?background=true the pull runs off the request path (202 + jobId)
+        // so a large project can't 504 — mirrors Jira (ADR-0030/0039).
+        api.MapPost("/projects/{id}/ado/sync", async (string id, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!AdoConfigured(cfg))
@@ -201,6 +203,7 @@ public static class AzureDevOps
             if (p is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(p.AdoProject))
                 return Results.Ok(new { ok = false, error = "This project isn't mapped to an Azure DevOps project. Import/map it first." });
+            if (background == true) return QueueSync(queue, http, cfg, id);
             try
             {
                 using var c = Client(cfg);
@@ -217,31 +220,67 @@ public static class AzureDevOps
 
         // Sync every ADO-mapped, non-archived project in one pass (best-effort:
         // one project's failure doesn't stop the rest). Gated on Integrations.
-        api.MapPost("/integrations/ado/sync", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        // ?background=true queues the pass and returns 202 + jobId to poll.
+        api.MapPost("/integrations/ado/sync", async (bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!AdoConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Azure DevOps isn't configured — set AzureDevOps:Organization and AzureDevOps:Pat (see docs/azure-devops-setup.md)." });
+            if (background == true) return QueueSync(queue, http, cfg, "all");
             var mapped = await db.Projects.Where(p => p.AdoProject != "" && !p.Archived).ToListAsync();
-            int sp = 0, ep = 0, tk = 0, ok = 0;
-            var errors = new List<string>();
             try
             {
-                using var c = Client(cfg);
-                foreach (var p in mapped)
-                {
-                    try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; }
-                    catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); }
-                }
-                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps (all mapped)", $"{ok} projects, {sp} sprints, {ep} epics, {tk} tasks"));
+                var r = await SyncProjectsCoreAsync(db, cfg, mapped);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps (all mapped)", $"{r.Projects} projects, {r.Sprints} sprints, {r.Epics} epics, {r.Tasks} tasks"));
                 await db.SaveChangesAsync();
-                return Results.Ok(new { ok = true, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
+                return Results.Ok(new { ok = true, projects = r.Projects, sprints = r.Sprints, epics = r.Epics, tasks = r.Tasks, errors = r.Errors });
             }
             catch (Exception ex)
             {
                 return Results.Json(new { ok = false, error = $"Azure DevOps sync failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
             }
         });
+
+        // Poll a background ADO sync job (the 202 responses above).
+        api.MapGet("/integrations/ado/sync/status/{jobId}", (string jobId, AdoSyncQueue queue) =>
+            queue.TryGet(jobId, out var s) && s is not null
+                ? Results.Ok(new { s.Id, s.TargetId, s.State, s.Projects, s.Sprints, s.Epics, s.Tasks, s.Errors, s.Error })
+                : Results.NotFound());
+    }
+
+    // Enqueue a background sync under the caller's identity; 202 + pollable id.
+    static IResult QueueSync(AdoSyncQueue queue, HttpContext http, IConfiguration cfg, string targetId)
+    {
+        var who = Permissions.Audit(http, cfg, "Integrations", "Queued Azure DevOps sync", "");
+        var status = queue.Enqueue(targetId, who.Actor, who.Role);
+        return Results.Accepted($"/api/v1/integrations/ado/sync/status/{status.Id}",
+            new { ok = true, queued = true, jobId = status.Id, state = status.State });
+    }
+
+    // Roll-up counts for a multi-project sync pass. Shared by the synchronous
+    // sync-all endpoint and the background worker (best-effort per project).
+    public record AdoBulkResult(int Projects, int Sprints, int Epics, int Tasks, List<string> Errors);
+
+    public static async Task<AdoBulkResult> SyncProjectsCoreAsync(AtlasDbContext db, IConfiguration cfg, List<Project> projects)
+    {
+        int sp = 0, ep = 0, tk = 0, ok = 0;
+        var errors = new List<string>();
+        using var c = Client(cfg);
+        foreach (var p in projects)
+        {
+            try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; }
+            catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); }
+        }
+        return new AdoBulkResult(ok, sp, ep, tk, errors);
+    }
+
+    // The projects a background job targets: "all" mapped, or one project id.
+    public static async Task<List<Project>> ResolveSyncTargetsAsync(AtlasDbContext db, string targetId)
+    {
+        if (string.Equals(targetId, "all", StringComparison.OrdinalIgnoreCase))
+            return await db.Projects.Where(p => p.AdoProject != "" && !p.Archived).ToListAsync();
+        var one = await db.Projects.FindAsync(targetId);
+        return one is not null && !string.IsNullOrWhiteSpace(one.AdoProject) ? new List<Project> { one } : new List<Project>();
     }
 
     static async Task<string> NextProjectIdAsync(AtlasDbContext db)
@@ -260,8 +299,14 @@ public static class AzureDevOps
     //  backlog, and rows whose ADO id vanished are pruned (full pull). Locally-
     //  created rows (AdoId == "") are never touched. Bounded by MaxWorkItems.
     // -----------------------------------------------------------------------
-    const int ApiPageBatch = 200;      // work-item detail batch size (ADO cap)
-    const int MaxWorkItems = 4000;     // safety cap so a huge project can't run unbounded
+    const int ApiPageBatch = 200;          // work-item detail batch size (ADO cap)
+    const int DefaultMaxWorkItems = 20000; // WIQL's own reference ceiling; the pull runs
+                                           // in the background (ADR-0039) so this is the
+                                           // real bound, not a low anti-504 cap. Override
+                                           // with AzureDevOps:MaxWorkItems.
+
+    static int MaxWorkItems(IConfiguration cfg) =>
+        int.TryParse(cfg["AzureDevOps:MaxWorkItems"], out var n) && n > 0 ? n : DefaultMaxWorkItems;
 
     public record AdoSyncResult(int Sprints, int Epics, int Tasks, int Backlog, bool Truncated);
 
@@ -313,7 +358,8 @@ public static class AzureDevOps
                 foreach (var w in wl.EnumerateArray())
                     if (w.TryGetProperty("id", out var wid)) ids.Add(wid.GetRawText().Trim('"'));
         }
-        if (ids.Count > MaxWorkItems) { ids = ids.Take(MaxWorkItems).ToList(); truncated = true; }
+        var cap = MaxWorkItems(cfg);
+        if (ids.Count > cap) { ids = ids.Take(cap).ToList(); truncated = true; }
 
         var items = new List<AdoItem>();
         var fields = "System.Id,System.WorkItemType,System.Title,System.State,System.AssignedTo," +

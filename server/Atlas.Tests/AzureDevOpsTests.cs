@@ -117,6 +117,25 @@ public class AzureDevOpsTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/ado/sync", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/projects/PRJ-1/ado/sync", null)).StatusCode);
     }
+
+    [Fact]
+    public async Task Background_sync_reports_not_configured_gracefully()
+    {
+        // The not-configured check runs before queueing, so ?background=true is
+        // still a graceful ok:false rather than a phantom queued job.
+        var c = Admin();
+        var res = await c.PostAsync("/api/v1/integrations/ado/sync?background=true", null);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Sync_status_is_not_found_for_an_unknown_job()
+    {
+        var c = Admin();
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/api/v1/integrations/ado/sync/status/nope")).StatusCode);
+    }
 }
 
 // Pure mapping helpers for the ADO sync engine — no HTTP, no DB.

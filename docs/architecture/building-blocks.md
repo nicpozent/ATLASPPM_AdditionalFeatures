@@ -37,7 +37,7 @@ requirement → capability → implementation → decision.
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |
 | SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments) | ABB-05 | ADR-0006, ADR-0018 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
-| SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker` + `JiraSyncQueue`) | ABB-06, ABB-10 | ADR-0007, ADR-0028, ADR-0030 |
+| SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker`+`JiraSyncQueue`, `AdoSyncWorker`+`AdoSyncQueue`) | ABB-06, ABB-10 | ADR-0007, ADR-0028, ADR-0030, ADR-0039 |
 | SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts | ABB-07 | ADR-0028 |
 | SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs + reference Grafana/Tempo/Prometheus/Loki stack & dashboard | ABB-08 | ADR-0010, ADR-0032 |
 | SBB-14 | Security headers/CSP, rate limiter, upload limits, least-privilege DB role | ABB-09 | ADR-0008, security-hardening.md |
@@ -51,7 +51,7 @@ requirement → capability → implementation → decision.
 | SBB-22 | GDPR data-subject admin surface (DSAR export, erase, run-retention) | ABB-10 | ADR-0017 |
 | SBB-23 | Strategic roadmap (`RoadmapItem` + milestones/links/deps, `cap-roadmap`, Now/Next/Later board + **By-year board** + timeline) | ABB-06 | ADR-0019 |
 | SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity) | ABB-06 | ADR-0020 |
-| SBB-25 | Azure DevOps connector (`AzureDevOps.cs`: PAT auth, status/test, discovery + import/map `Project.AdoProject`, **work-item sync** — WIQL work items → epics/tasks, iterations → sprints, idempotent by `AdoId`) | ABB-05 | ADR-0035, ADR-0036 |
+| SBB-25 | Azure DevOps connector (`AzureDevOps.cs`: PAT auth, status/test, discovery + import/map `Project.AdoProject`, **work-item sync** — WIQL work items → epics/tasks, iterations → sprints, idempotent by `AdoId`; **background queue/worker**) | ABB-05, ABB-06 | ADR-0035, ADR-0036, ADR-0039 |
 
 ## 3. Traceability (ABB → SBB)
 

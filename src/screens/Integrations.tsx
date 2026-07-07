@@ -5,6 +5,7 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { toast } from "@/components/Toast";
 import { syncJira, syncToast } from "@/lib/jiraSync";
+import { syncAdo, adoSyncToast } from "@/lib/adoSync";
 
 // ---- Identity, email & directory (Microsoft 365) — persisted via /settings --
 interface Identity { key: string; name: string; icon: string; detail: string; tint: string; ink: string }
@@ -79,9 +80,10 @@ export default function Integrations() {
     onError: (e) => toast((e as Error).message, "error"),
   });
   // Pull every ADO-mapped project's work items → tasks/epics/sprints in one pass.
+  // Runs in the background (202 + jobId polling) so a large org can't 504 (ADR-0039).
   const syncAllAdo = useMutation({
-    mutationFn: () => api<{ ok: boolean; projects?: number; tasks?: number; error?: string }>("/integrations/ado/sync", { method: "POST" }),
-    onSuccess: (r) => { toast(r?.ok ? `Azure DevOps synced · ${r.projects ?? 0} projects, ${r.tasks ?? 0} tasks.` : (r?.error ?? "Azure DevOps sync failed."), r?.ok ? "info" : "error"); qc.invalidateQueries({ queryKey: ["projects"] }); },
+    mutationFn: () => syncAdo("/integrations/ado/sync"),
+    onSuccess: (o) => { toast(adoSyncToast(o), o.ok || o.state === "running" ? "info" : "error"); qc.invalidateQueries({ queryKey: ["projects"] }); },
     onError: (e) => toast((e as Error).message, "error"),
   });
   // Pull every mapped project from Jira in one pass — runs in the background so a

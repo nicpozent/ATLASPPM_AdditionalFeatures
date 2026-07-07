@@ -182,9 +182,12 @@ flowchart TB
   1–4 → Critical/High/Medium/Low; `IterationPath` leaf → sprint; `System.Parent`
   → epic name; `System.Description` HTML → text. Two entry points: per-project
   (`/projects/{id}/ado/sync`) and all-mapped (`/integrations/ado/sync`).
-- **Bounded**: WIQL result capped at 4000 items, fetched 200/request; a `Truncated`
-  flag is returned when capped or a batch request fails. Background sync (à la
-  ADR-0030) is a future step if large orgs need it.
+- **Background** (ADR-0039): `?background=true` on either sync endpoint enqueues
+  an `AdoSyncQueue` job (202 + jobId) drained by `AdoSyncWorker`; poll
+  `/integrations/ado/sync/status/{jobId}`. The synchronous path stays the
+  default. Off the request path, the cap is `AzureDevOps:MaxWorkItems`
+  (default 20000, WIQL's ceiling), fetched 200/request; `Truncated` flags an
+  exceed.
 
 ### 7.3 `RetentionHostedService`
 - Daily; anonymises/removes records past their retention window (GDPR). Off by
@@ -245,6 +248,7 @@ live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
 | `Jira:BaseUrl`, `Jira:Email`, `Jira:ApiToken` | Jira connector |
 | `Jira:ScheduledSync`, `Jira:SyncMinutes` | scheduled sync toggle/interval |
 | `AzureDevOps:Organization`, `AzureDevOps:Pat` | Azure DevOps connector (discovery, import, work-item sync) |
+| `AzureDevOps:MaxWorkItems` | ADO work-item pull ceiling (default 20000) |
 | `Graph:*`, `Notifications:SenderUpn` | notification email via Graph |
 | `Seed:Enabled` | load demo portfolio (non-prod only) |
 | `Retention:Enabled` | retention/anonymisation worker |

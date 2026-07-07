@@ -53,6 +53,9 @@ if (cfg.GetValue("Jira:ScheduledSync", true))
 // path so a large re-sync can't 504 the browser (ADR-0030).
 builder.Services.AddSingleton<JiraSyncQueue>();
 builder.Services.AddHostedService<JiraSyncWorker>();
+// Same background pattern for Azure DevOps work-item pulls (ADR-0039).
+builder.Services.AddSingleton<AdoSyncQueue>();
+builder.Services.AddHostedService<AdoSyncWorker>();
 
 // Periodic over-allocation alerts (on by default; emits only to users who opt
 // into the "over_allocation" event, so it's silent until someone subscribes).
