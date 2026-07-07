@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, radius } from "@/theme";
-import { api } from "@/api";
+import { api, apiDownload } from "@/api";
 import { Card, EmptyBlock, Button, Input, Textarea, Select, Modal, RowMenu, MenuItem } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
@@ -21,7 +21,17 @@ interface OpsItem {
   type: string; priority: string; status: string; assignee: string; alloc: number;
   impactProjectId: string | null; impactProjectName: string | null; impactNote: string; createdAt: string;
   startDate: string; endDate: string;
+  // Jira provenance + rich fields (empty/0 for locally-created items).
+  jiraKey?: string; jiraUrl?: string; issueType?: string; reporter?: string;
+  statusName?: string; resolution?: string; parentKey?: string; epicKey?: string; epicName?: string;
+  points?: number; estimateHours?: number; timeSpentHours?: number;
+  targetDate?: string; jiraCreated?: string; jiraUpdated?: string;
+  labels?: string[]; components?: string[]; fixVersions?: string[];
+  commentCount?: number; attachmentCount?: number;
 }
+interface OpsComment { id: number; author: string; initials: string; body: string; at: string; fromJira: boolean; }
+interface OpsAttachment { id: number; fileName: string; contentType: string; size: number; author: string; createdAt: string; }
+interface OpsItemDetail { item: OpsItem; comments: OpsComment[]; attachments: OpsAttachment[]; }
 interface OpsLinkedTask { taskId: number; code: string; name: string; status: string; assignee: string; projectId: string; projectName: string; }
 interface OpsService {
   id: number; ref: string; name: string; category: string; dept: string; owner: string;
@@ -34,7 +44,7 @@ interface ProjOpt { id: string; name: string; }
 
 const CATEGORIES = ["Support", "Maintenance", "Monitoring", "Infrastructure", "Incident response", "Other"];
 const SERVICE_STATUSES = ["Active", "Paused", "Retired"];
-const ITEM_TYPES = ["Incident", "Request", "Maintenance", "Monitoring", "Change", "Other"];
+const ITEM_TYPES = ["Incident", "Request", "Maintenance", "Monitoring", "Change", "Epic", "Other"];
 const PRIORITIES = ["Critical", "High", "Medium", "Low"];
 const ITEM_STATUSES = ["Open", "In progress", "Blocked", "Done"];
 
@@ -80,6 +90,8 @@ export default function Ops() {
   const [editItem, setEditItem] = useState<OpsItem | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // Multi-select for bulk delete — a flat set of item ids across all services.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const { data } = useQuery({
     queryKey: ["ops", showArchived], retry: false, staleTime: 30_000,
@@ -93,8 +105,17 @@ export default function Ops() {
 
   const services = data?.services ?? [];
   const summary = data?.summary;
+  // Category filters services; status filters *work items* by their Jira status
+  // (Open / In progress / Blocked / Done) — not the service lifecycle. A service
+  // is shown when it matches the category and (all statuses, or has a matching item).
   const filtered = services.filter((s) =>
-    (category === "all" || s.category === category) && (status === "all" || s.status === status));
+    (category === "all" || s.category === category)
+    && (status === "all" || s.items.some((i) => i.status === status)));
+
+  const toggleSelect = (id: number) => setSelected((prev) => {
+    const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next;
+  });
+  const clearSelection = () => setSelected(new Set());
 
   const delService = useMutation({
     mutationFn: (id: number) => api(`/ops/services/${id}`, { method: "DELETE" }),
@@ -104,6 +125,11 @@ export default function Ops() {
   const archiveService = useMutation({
     mutationFn: ({ id, on }: { id: number; on: boolean }) => api(`/ops/services/${id}/archive?on=${on}`, { method: "POST" }),
     onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ["ops"] }); toast(v.on ? "Service archived" : "Service restored"); },
+    onError: (e) => toastError(e),
+  });
+  const bulkDelete = useMutation({
+    mutationFn: (ids: number[]) => api<{ deleted: number }>(`/ops/items/bulk-delete`, { method: "POST", body: JSON.stringify({ ids }) }),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["ops"] }); qc.invalidateQueries({ queryKey: ["resources"] }); toast(`Removed ${r?.deleted ?? 0} item${(r?.deleted ?? 0) === 1 ? "" : "s"}`); clearSelection(); },
     onError: (e) => toastError(e),
   });
 
@@ -124,9 +150,9 @@ export default function Ops() {
           <option value="all">All categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle} aria-label="Filter by work-item status">
           <option value="all">All statuses</option>
-          {SERVICE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {ITEM_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.textMuted, cursor: "pointer" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
@@ -140,6 +166,18 @@ export default function Ops() {
         </Button>
       </div>
 
+      {/* Bulk-select action bar — appears when one or more items are ticked. */}
+      {mayEdit && selected.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", marginBottom: 14, background: color.primaryTint, border: `1px solid ${color.primary}`, borderRadius: radius.md }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: color.primaryDark }}>{selected.size} item{selected.size === 1 ? "" : "s"} selected</span>
+          <div style={{ flex: 1 }} />
+          <Button variant="secondary" onClick={clearSelection}>Clear</Button>
+          <Button onClick={() => bulkDelete.mutate([...selected])} disabled={bulkDelete.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>
+            <Icon name="trash" size={15} /> {bulkDelete.isPending ? "Deleting…" : `Delete ${selected.size} selected`}
+          </Button>
+        </div>
+      )}
+
       {services.length === 0 ? (
         <Card><EmptyBlock message="No operational services yet. Add a service (support, maintenance, monitoring, infrastructure…) to track run-the-business work and its impact on projects." minHeight={140} /></Card>
       ) : filtered.length === 0 ? (
@@ -148,7 +186,8 @@ export default function Ops() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {filtered.map((s) => (
             <ServiceCard
-              key={s.id} service={s} mayEdit={mayEdit}
+              key={s.id} service={s} mayEdit={mayEdit} statusFilter={status}
+              selected={selected} onToggleSelect={toggleSelect}
               onAddItem={() => setNewItemFor(s)} onEditService={() => setEditService(s)}
               onDeleteService={() => delService.mutate(s.id)} onEditItem={setEditItem}
               onArchive={() => archiveService.mutate({ id: s.id, on: !s.archived })}
@@ -166,12 +205,14 @@ export default function Ops() {
   );
 }
 
-function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteService, onEditItem, onArchive }: {
-  service: OpsService; mayEdit: boolean; onAddItem: () => void; onEditService: () => void; onDeleteService: () => void; onEditItem: (i: OpsItem) => void; onArchive: () => void;
+function ServiceCard({ service, mayEdit, statusFilter, selected, onToggleSelect, onAddItem, onEditService, onDeleteService, onEditItem, onArchive }: {
+  service: OpsService; mayEdit: boolean; statusFilter: string; selected: Set<number>; onToggleSelect: (id: number) => void;
+  onAddItem: () => void; onEditService: () => void; onDeleteService: () => void; onEditItem: (i: OpsItem) => void; onArchive: () => void;
 }) {
   const qc = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
   const linked = service.linkedTasks ?? [];
+  const items = service.items.filter((i) => statusFilter === "all" || i.status === statusFilter);
   const unlink = useMutation({
     mutationFn: (taskId: number) => api(`/ops/services/${service.id}/tasks/${taskId}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ops"] }),
@@ -238,22 +279,39 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
 
       {service.items.length === 0 ? (
         <div style={{ padding: "14px 20px", fontSize: 12.5, color: color.faint3 }}>{linked.length > 0 ? "No manual work items — linked tasks above." : "No work items yet."}</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: "14px 20px", fontSize: 12.5, color: color.faint3 }}>No items match the status filter.</div>
       ) : (
         <div>
-          {service.items.map((i) => (
-            <button key={i.id} onClick={() => mayEdit && onEditItem(i)}
-              style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", background: "none", border: "none", borderBottom: "1px solid #F4F6FA", cursor: mayEdit ? "pointer" : "default", fontFamily: "inherit" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: PRIORITY_COLOR[i.priority] ?? color.faint2 }} title={i.priority} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</div>
-                <div style={{ fontSize: 11, color: color.faint2, marginTop: 1 }}>
-                  {i.type} · {i.assignee}{i.alloc > 0 ? ` · ${i.alloc}%` : ""}
-                  {(i.startDate || i.endDate) ? ` · ${i.startDate || "?"}→${i.endDate || "?"}` : ""}
-                  {i.impactProjectName && <span style={{ color: color.warningAlt, fontWeight: 600 }}> · impacts {i.impactProjectName}</span>}
+          {items.map((i) => (
+            <div key={i.id} style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #F4F6FA", background: selected.has(i.id) ? color.primaryTint : "none" }}>
+              {mayEdit && (
+                <label style={{ display: "flex", alignItems: "center", padding: "0 4px 0 16px", cursor: "pointer" }} title="Select for bulk delete" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={selected.has(i.id)} onChange={() => onToggleSelect(i.id)} aria-label={`Select ${i.title}`} />
+                </label>
+              )}
+              <button onClick={() => mayEdit && onEditItem(i)}
+                style={{ flex: 1, minWidth: 0, textAlign: "left", display: "flex", alignItems: "center", gap: 12, padding: mayEdit ? "11px 20px 11px 8px" : "11px 20px", background: "none", border: "none", cursor: mayEdit ? "pointer" : "default", fontFamily: "inherit" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: PRIORITY_COLOR[i.priority] ?? color.faint2 }} title={i.priority} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                    {i.type === "Epic" && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#6B4CC4", background: "#EDE7F9", borderRadius: 5, padding: "1px 6px", flex: "none" }}>EPIC</span>}
+                    {i.jiraKey && <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{i.jiraKey}</span>}
+                    <span style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: color.faint2, marginTop: 1 }}>
+                    {i.type} · {i.assignee}{i.alloc > 0 ? ` · ${i.alloc}%` : ""}
+                    {i.epicName && i.type !== "Epic" ? ` · epic: ${i.epicName}` : ""}
+                    {(i.points ?? 0) > 0 ? ` · ${i.points} pts` : ""}
+                    {(i.startDate || i.endDate) ? ` · ${i.startDate || "?"}→${i.endDate || "?"}` : ""}
+                    {i.impactProjectName && <span style={{ color: color.warningAlt, fontWeight: 600 }}> · impacts {i.impactProjectName}</span>}
+                  </div>
                 </div>
-              </div>
-              <StatusPill value={i.status} />
-            </button>
+                {(i.commentCount ?? 0) > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 11, color: color.faint3, flex: "none" }} title={`${i.commentCount} comment(s)`}><Icon name="message" size={12} />{i.commentCount}</span>}
+                {(i.attachmentCount ?? 0) > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 11, color: color.faint3, flex: "none" }} title={`${i.attachmentCount} attachment(s)`}><Icon name="paperclip" size={12} />{i.attachmentCount}</span>}
+                <StatusPill value={i.status} />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -387,6 +445,14 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ops"] }); qc.invalidateQueries({ queryKey: ["resources"] }); toast("Item removed"); onClose(); },
     onError: (e) => toastError(e),
   });
+  // Jira-imported items carry rich metadata, a comment thread and attachments —
+  // fetched lazily when the item is opened.
+  const fromJira = editing && !!item?.jiraKey;
+  const hasThread = (item?.commentCount ?? 0) > 0 || (item?.attachmentCount ?? 0) > 0;
+  const { data: detail } = useQuery({
+    queryKey: ["ops-item", item?.id], enabled: editing && (fromJira || hasThread), retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<OpsItemDetail | null> => api<OpsItemDetail>(`/ops/items/${item!.id}`),
+  });
 
   return (
     <Modal onClose={onClose} width={560} label={editing ? "Edit work item" : `New item · ${service?.name ?? ""}`}>
@@ -424,6 +490,8 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
         <div style={{ fontSize: 11, color: color.faint2, marginTop: 8 }}>Tagging a project surfaces this ops load on that project's Overview as capacity pulled off delivery.</div>
       </div>
 
+      {fromJira && <JiraDetailPanel item={item!} detail={detail ?? undefined} />}
+
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {editing && (
           confirmDel ? (
@@ -444,6 +512,74 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
   );
 }
 
+// Read-only Jira provenance for an imported item: rich metadata, the comment
+// thread and downloadable attachments (mirrors the project-task import).
+function JiraDetailPanel({ item, detail }: { item: OpsItem; detail?: OpsItemDetail }) {
+  const meta: [string, string][] = [
+    ["Issue type", item.issueType || ""],
+    ["Jira status", item.statusName || ""],
+    ["Reporter", item.reporter || ""],
+    ["Resolution", item.resolution || ""],
+    ["Epic", item.epicName || ""],
+    ["Parent", item.parentKey || ""],
+    ["Story points", (item.points ?? 0) > 0 ? String(item.points) : ""],
+    ["Estimate", (item.estimateHours ?? 0) > 0 ? `${item.estimateHours}h` : ""],
+    ["Logged", (item.timeSpentHours ?? 0) > 0 ? `${item.timeSpentHours}h` : ""],
+    ["Due", item.targetDate || ""],
+    ["Labels", (item.labels ?? []).join(", ")],
+    ["Components", (item.components ?? []).join(", ")],
+    ["Fix versions", (item.fixVersions ?? []).join(", ")],
+    ["Updated", item.jiraUpdated ? item.jiraUpdated.slice(0, 10) : ""],
+  ].filter(([, v]) => v.length > 0) as [string, string][];
+  const comments = detail?.comments ?? [];
+  const attachments = detail?.attachments ?? [];
+  return (
+    <div style={{ marginTop: 14, background: color.primaryTint, border: `1px solid ${color.border2}`, borderRadius: radius.md, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: color.primaryDark, letterSpacing: "0.03em" }}>JIRA · {item.jiraKey}</span>
+        {item.jiraUrl && <a href={item.jiraUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="link" size={12} /> Open in Jira</a>}
+      </div>
+      {meta.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "6px 16px", marginBottom: comments.length || attachments.length ? 12 : 0 }}>
+          {meta.map(([k, v]) => (
+            <div key={k}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.03em" }}>{k}</div>
+              <div style={{ fontSize: 12, color: color.text }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {attachments.length > 0 && (
+        <div style={{ marginBottom: comments.length ? 12 : 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 5 }}>Attachments</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {attachments.map((a) => (
+              <button key={a.id} onClick={() => apiDownload(`/ops/item-attachments/${a.id}`, a.fileName)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: 0 }}>
+                <Icon name="download" size={13} /> {a.fileName} <span style={{ color: color.faint3, fontWeight: 400 }}>({Math.max(1, Math.round(a.size / 1024))} KB)</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {comments.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 6 }}>Comments ({comments.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 200, overflowY: "auto" }}>
+            {comments.map((c) => (
+              <div key={c.id} style={{ fontSize: 12, color: color.text }}>
+                <span style={{ fontWeight: 700 }}>{c.author}</span>
+                <span style={{ color: color.faint3, marginLeft: 6, fontSize: 11 }}>{c.at ? c.at.slice(0, 10) : ""}</span>
+                <div style={{ color: color.subtle, whiteSpace: "pre-wrap", marginTop: 2 }}>{c.body}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ImportModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [key, setKey] = useState("");
@@ -461,7 +597,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   });
   return (
     <Modal onClose={onClose} width={480} label="Import a Jira project as an Ops service">
-      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Pull a Jira project's issues in as operational work items. Re-importing the same key tops up new issues (idempotent). Allocation stays at 0 until you set it.</div>
+      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Pull a Jira project's issues in as operational work items — full-fidelity, like a project import: descriptions, people, labels, components, versions, story points, time tracking, epics (as items) and each issue's comments and attachments. Re-importing the same key tops up new issues (idempotent). Allocation stays at 0 until you set it.</div>
       <DecLabel>Jira project key</DecLabel>
       <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="e.g. OPS or SUPPORT" style={{ marginBottom: 14 }} />
       <DecLabel>Service name (optional)</DecLabel>

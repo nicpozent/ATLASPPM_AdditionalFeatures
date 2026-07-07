@@ -55,6 +55,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<TaskAttachment> TaskAttachments => Set<TaskAttachment>();
     public DbSet<OpsService> OpsServices => Set<OpsService>();
     public DbSet<OpsItem> OpsItems => Set<OpsItem>();
+    public DbSet<OpsItemComment> OpsItemComments => Set<OpsItemComment>();
+    public DbSet<OpsItemAttachment> OpsItemAttachments => Set<OpsItemAttachment>();
     public DbSet<OpsTaskLink> OpsTaskLinks => Set<OpsTaskLink>();
     public DbSet<Sprint> Sprints => Set<Sprint>();
     public DbSet<Epic> Epics => Set<Epic>();
@@ -229,6 +231,12 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<OpsItem>().HasKey(x => x.Id);
         b.Entity<OpsItem>().HasIndex(x => x.ServiceId);
         b.Entity<OpsItem>().HasIndex(x => x.ImpactProjectId);
+        b.Entity<OpsItem>().HasMany(x => x.Comments).WithOne().HasForeignKey(x => x.OpsItemId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<OpsItem>().HasMany(x => x.Attachments).WithOne().HasForeignKey(x => x.OpsItemId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<OpsItemComment>().HasKey(x => x.Id);
+        b.Entity<OpsItemComment>().HasIndex(x => x.OpsItemId);
+        b.Entity<OpsItemAttachment>().HasKey(x => x.Id);
+        b.Entity<OpsItemAttachment>().HasIndex(x => x.OpsItemId);
         b.Entity<Epic>().HasKey(x => x.Id);
         b.Entity<Epic>().HasIndex(x => x.ProjectId);
         b.Entity<Artifact>().HasKey(x => x.Id);

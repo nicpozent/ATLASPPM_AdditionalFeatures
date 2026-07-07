@@ -198,7 +198,17 @@ public record OperationalDto(bool CanEdit, List<OperationalItemDto> Items);
 public record OpsItemDto(int Id, int ServiceId, string ServiceName, string Title, string Description,
     string Type, string Priority, string Status, string Assignee, int Alloc,
     string? ImpactProjectId, string? ImpactProjectName, string ImpactNote, string CreatedAt,
-    string StartDate = "", string EndDate = "");
+    string StartDate = "", string EndDate = "",
+    // Jira provenance + rich fields (empty/0 for locally-created items).
+    string JiraKey = "", string JiraUrl = "", string IssueType = "", string Reporter = "",
+    string StatusName = "", string Resolution = "", string ParentKey = "", string EpicKey = "",
+    string EpicName = "", int Points = 0, int EstimateHours = 0, int TimeSpentHours = 0,
+    string TargetDate = "", string JiraCreated = "", string JiraUpdated = "",
+    List<string>? Labels = null, List<string>? Components = null, List<string>? FixVersions = null,
+    int CommentCount = 0, int AttachmentCount = 0);
+// Full work-item detail incl. comment thread and attachment metadata (fetched
+// lazily when a Jira-imported item is opened).
+public record OpsItemDetailDto(OpsItemDto Item, List<TaskCommentDto> Comments, List<TaskAttachmentDto> Attachments);
 // A project task linked to an Ops service (traceability; allocation stays with
 // the task's own project).
 public record OpsLinkedTaskDto(int TaskId, string Code, string Name, string Status, string Assignee,

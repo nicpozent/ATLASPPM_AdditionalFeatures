@@ -9,6 +9,7 @@ public record CreateOpsItemReq(string Title, string? Description, string? Type, 
 public record UpdateOpsItemReq(string? Title, string? Description, string? Type, string? Priority, string? Status,
     string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote, string? StartDate, string? EndDate);
 public record LinkOpsTaskReq(int TaskId);
+public record BulkDeleteOpsItemsReq(List<int>? Ids);
 
 // ============================================================================
 //  Ops module — run-the-business work, a distinct TYPE from project delivery.
@@ -23,7 +24,7 @@ public static class Ops
 {
     static readonly string[] Categories = { "Support", "Maintenance", "Monitoring", "Infrastructure", "Incident response", "Other" };
     static readonly string[] ServiceStatuses = { "Active", "Paused", "Retired" };
-    static readonly string[] ItemTypes = { "Incident", "Request", "Maintenance", "Monitoring", "Change", "Other" };
+    static readonly string[] ItemTypes = { "Incident", "Request", "Maintenance", "Monitoring", "Change", "Epic", "Other" };
     static readonly string[] Priorities = { "Critical", "High", "Medium", "Low" };
     static readonly string[] ItemStatuses = { "Open", "In progress", "Blocked", "Done" };
 
@@ -59,6 +60,15 @@ public static class Ops
                 .OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync();
             var items = await db.OpsItems.OrderBy(i => i.Ord).ThenBy(i => i.Id).ToListAsync();
             var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
+            // Comment / attachment counts (badges on each row; full thread fetched
+            // lazily via the detail endpoint when an item is opened).
+            var itemIds = items.Select(i => i.Id).ToList();
+            var comCounts = (await db.OpsItemComments.Where(c => itemIds.Contains(c.OpsItemId))
+                    .GroupBy(c => c.OpsItemId).Select(g => new { g.Key, N = g.Count() }).ToListAsync())
+                .ToDictionary(x => x.Key, x => x.N);
+            var attCounts = (await db.OpsItemAttachments.Where(a => itemIds.Contains(a.OpsItemId))
+                    .GroupBy(a => a.OpsItemId).Select(g => new { g.Key, N = g.Count() }).ToListAsync())
+                .ToDictionary(x => x.Key, x => x.N);
 
             // Linked project tasks per service (traceability rows alongside items).
             var links = await db.OpsTaskLinks.ToListAsync();
@@ -78,7 +88,7 @@ public static class Ops
                     .Select(x => { var t = taskById[x.TaskId]; return new OpsLinkedTaskDto(t.Id, t.Code, t.Name, t.Status, t.Assignee, t.ProjectId, projNames.GetValueOrDefault(t.ProjectId, t.ProjectId)); })
                     .ToList();
                 return new OpsServiceDto(s.Id, s.Ref, s.Name, s.Category, s.Dept, s.Owner, s.Status, s.Description,
-                    its.Select(i => ToItemDto(i, s.Name, projNames)).ToList(),
+                    its.Select(i => ToItemDto(i, s.Name, projNames, comCounts.GetValueOrDefault(i.Id), attCounts.GetValueOrDefault(i.Id))).ToList(),
                     active.Count, active.Sum(i => i.Alloc), s.Archived, s.JiraProjectKey, linked);
             }).ToList();
 
@@ -235,6 +245,45 @@ public static class Ops
             return Results.NoContent();
         });
 
+        // Bulk-delete work items in one call (multi-select on the board). Skips
+        // ids that don't exist; reports how many were removed.
+        api.MapPost("/ops/items/bulk-delete", async (BulkDeleteOpsItemsReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-ops", "E") is { } denied) return denied;
+            var ids = (req.Ids ?? new()).Distinct().ToList();
+            if (ids.Count == 0) return Results.Ok(new { deleted = 0 });
+            var items = await db.OpsItems.Where(i => ids.Contains(i.Id)).ToListAsync();
+            if (items.Count > 0)
+            {
+                db.OpsItems.RemoveRange(items);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Bulk-removed ops work items", $"{items.Count} item{(items.Count == 1 ? "" : "s")}"));
+                await db.SaveChangesAsync();
+            }
+            return Results.Ok(new { deleted = items.Count });
+        });
+
+        // Full work-item detail incl. Jira comment thread + attachment metadata.
+        api.MapGet("/ops/items/{id:int}", async (int id, AtlasDbContext db) =>
+        {
+            var item = await db.OpsItems.FindAsync(id);
+            if (item is null) return Results.NotFound();
+            var svc = await db.OpsServices.FindAsync(item.ServiceId);
+            var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
+            var comments = await db.OpsItemComments.Where(c => c.OpsItemId == id).OrderBy(c => c.At).ThenBy(c => c.Id)
+                .Select(c => new TaskCommentDto(c.Id, c.Author, c.Initials, c.Body, c.At.ToString("o"), c.JiraId != "")).ToListAsync();
+            var attachments = await db.OpsItemAttachments.Where(a => a.OpsItemId == id).OrderBy(a => a.Id)
+                .Select(a => new TaskAttachmentDto(a.Id, a.FileName, a.ContentType, a.Size, a.Author, a.CreatedAt)).ToListAsync();
+            var dto = ToItemDto(item, svc?.Name ?? "", projNames, comments.Count, attachments.Count);
+            return Results.Ok(new OpsItemDetailDto(dto, comments, attachments));
+        });
+
+        // Download an Ops work-item attachment (bytes stored in the DB).
+        api.MapGet("/ops/item-attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        {
+            var a = await db.OpsItemAttachments.FindAsync(attId);
+            return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
+        });
+
         // ---- Linked project tasks (traceability) --------------------------
         // Link an existing project task to a service so its delivery tasks show
         // alongside manual items. The task's allocation stays with its project.
@@ -285,11 +334,16 @@ public static class Ops
         return await db.Projects.AnyAsync(p => p.Id == id) ? id : null;
     }
 
-    static OpsItemDto ToItemDto(OpsItem i, string serviceName, IReadOnlyDictionary<string, string> projNames) =>
+    static OpsItemDto ToItemDto(OpsItem i, string serviceName, IReadOnlyDictionary<string, string> projNames,
+        int commentCount = 0, int attachmentCount = 0) =>
         new(i.Id, i.ServiceId, serviceName, i.Title, i.Description, i.Type, i.Priority, i.Status,
             string.IsNullOrEmpty(i.Assignee) ? "Unassigned" : i.Assignee, i.Alloc,
             i.ImpactProjectId, i.ImpactProjectId is not null && projNames.TryGetValue(i.ImpactProjectId, out var pn) ? pn : null,
-            i.ImpactNote, i.CreatedAt, i.StartDate, i.EndDate);
+            i.ImpactNote, i.CreatedAt, i.StartDate, i.EndDate,
+            i.JiraKey, i.JiraUrl, i.IssueType, i.Reporter, i.StatusName, i.Resolution,
+            i.ParentKey, i.EpicKey, i.EpicName, i.Points, i.EstimateHours, i.TimeSpentHours,
+            i.TargetDate, i.JiraCreated, i.JiraUpdated,
+            i.Labels, i.Components, i.FixVersions, commentCount, attachmentCount);
 
     // Blank for empty/unparseable; else ISO yyyy-MM-dd.
     static string NormDate(string? s)
