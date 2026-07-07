@@ -39,6 +39,7 @@ const en: Catalog = {
   "group.configuration": "Configuration",
   "common.role": "Role",
   "common.export": "Export",
+  "common.openMenu": "Open navigation menu",
   "common.signOut": "Sign out",
   "common.language": "Language",
 
@@ -102,6 +103,7 @@ const sv: Catalog = {
   "group.configuration": "Konfiguration",
   "common.role": "Roll",
   "common.export": "Exportera",
+  "common.openMenu": "Öppna navigeringsmeny",
   "common.signOut": "Logga ut",
   "common.language": "Språk",
 
@@ -165,6 +167,7 @@ const fi: Catalog = {
   "group.configuration": "Määritykset",
   "common.role": "Rooli",
   "common.export": "Vie",
+  "common.openMenu": "Avaa navigointivalikko",
   "common.signOut": "Kirjaudu ulos",
   "common.language": "Kieli",
 
@@ -228,6 +231,7 @@ const da: Catalog = {
   "group.configuration": "Konfiguration",
   "common.role": "Rolle",
   "common.export": "Eksportér",
+  "common.openMenu": "Åbn navigationsmenu",
   "common.signOut": "Log ud",
   "common.language": "Sprog",
 
@@ -291,6 +295,7 @@ const no: Catalog = {
   "group.configuration": "Konfigurasjon",
   "common.role": "Rolle",
   "common.export": "Eksporter",
+  "common.openMenu": "Åpne navigasjonsmeny",
   "common.signOut": "Logg ut",
   "common.language": "Språk",
 
@@ -354,6 +359,7 @@ const fr: Catalog = {
   "group.configuration": "Configuration",
   "common.role": "Rôle",
   "common.export": "Exporter",
+  "common.openMenu": "Ouvrir le menu de navigation",
   "common.signOut": "Se déconnecter",
   "common.language": "Langue",
 
