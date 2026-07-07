@@ -5,9 +5,9 @@ namespace Atlas.Api;
 public record CreateOpsServiceReq(string Name, string? Category, string? Dept, string? Owner, string? Description);
 public record UpdateOpsServiceReq(string? Name, string? Category, string? Dept, string? Owner, string? Status, string? Description);
 public record CreateOpsItemReq(string Title, string? Description, string? Type, string? Priority, string? Status,
-    string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote);
+    string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote, string? StartDate, string? EndDate);
 public record UpdateOpsItemReq(string? Title, string? Description, string? Type, string? Priority, string? Status,
-    string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote);
+    string? Assignee, int? Alloc, string? ImpactProjectId, string? ImpactNote, string? StartDate, string? EndDate);
 
 // ============================================================================
 //  Ops module — run-the-business work, a distinct TYPE from project delivery.
@@ -30,13 +30,16 @@ public static class Ops
     public static bool IsActive(OpsItem i) => i.Status != "Done";
 
     // Ops allocation per person from active ops items — the source for Resources'
-    // Ops%. Keyed case-insensitively by assignee name.
-    public static async Task<Dictionary<string, int>> AllocByPersonAsync(AtlasDbContext db)
+    // Ops%. Time-phased: an item only counts if its date window is live on `asOf`
+    // (default today); items with no dates are always live. Keyed case-insensitively.
+    public static async Task<Dictionary<string, int>> AllocByPersonAsync(AtlasDbContext db, DateOnly? asOf = null)
     {
+        var on = asOf ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var items = await db.OpsItems.Where(i => i.Status != "Done" && i.Assignee != "" && i.Alloc > 0).ToListAsync();
         var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var i in items)
         {
+            if (!AllocMath.ActiveOn(i.StartDate, i.EndDate, on)) continue;
             var name = i.Assignee.Trim();
             if (name.Length == 0 || name.Equals("Unassigned", StringComparison.OrdinalIgnoreCase)) continue;
             map[name] = (map.TryGetValue(name, out var v) ? v : 0) + i.Alloc;
@@ -167,6 +170,7 @@ public static class Ops
                 Assignee = string.IsNullOrWhiteSpace(req.Assignee) ? "" : req.Assignee!.Trim(),
                 Alloc = Math.Clamp(req.Alloc ?? 0, 0, 100),
                 ImpactProjectId = impact, ImpactNote = req.ImpactNote?.Trim() ?? "",
+                StartDate = NormDate(req.StartDate), EndDate = NormDate(req.EndDate),
                 CreatedAt = DateTime.UtcNow.ToString("dd MMM yyyy"),
             };
             db.OpsItems.Add(item);
@@ -198,6 +202,8 @@ public static class Ops
             if (req.Alloc is not null) item.Alloc = Math.Clamp(req.Alloc.Value, 0, 100);
             if (req.ImpactProjectId is not null) item.ImpactProjectId = await ResolveImpactAsync(db, req.ImpactProjectId);
             if (req.ImpactNote is not null) item.ImpactNote = req.ImpactNote.Trim();
+            if (req.StartDate is not null) item.StartDate = NormDate(req.StartDate);
+            if (req.EndDate is not null) item.EndDate = NormDate(req.EndDate);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Updated ops work item", $"{item.Title} · {item.Status}"));
             await db.SaveChangesAsync();
             var svc = await db.OpsServices.FindAsync(item.ServiceId);
@@ -243,5 +249,13 @@ public static class Ops
         new(i.Id, i.ServiceId, serviceName, i.Title, i.Description, i.Type, i.Priority, i.Status,
             string.IsNullOrEmpty(i.Assignee) ? "Unassigned" : i.Assignee, i.Alloc,
             i.ImpactProjectId, i.ImpactProjectId is not null && projNames.TryGetValue(i.ImpactProjectId, out var pn) ? pn : null,
-            i.ImpactNote, i.CreatedAt);
+            i.ImpactNote, i.CreatedAt, i.StartDate, i.EndDate);
+
+    // Blank for empty/unparseable; else ISO yyyy-MM-dd.
+    static string NormDate(string? s)
+    {
+        var v = (s ?? "").Trim();
+        if (v.Length == 0) return "";
+        return DateOnly.TryParse(v, out var d) ? d.ToString("yyyy-MM-dd") : v;
+    }
 }

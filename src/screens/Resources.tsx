@@ -29,7 +29,12 @@ interface Resource {
   name: string; role: string; dept: string; initials: string; color: string;
   opsPct: number; projectPct: number; productPct: number; over?: boolean;
 }
-interface AllocRow { memberId: number | null; name: string; title: string; alloc: number }
+interface AllocRow {
+  memberId: number | null; name: string; title: string; alloc: number;
+  allocHours?: number; startDate?: string; endDate?: string;
+  extAlloc?: number; extHours?: number; extStartDate?: string; extEndDate?: string;
+}
+interface AllocPatch { alloc?: number; allocHours?: number; startDate?: string; endDate?: string }
 interface ByProject { id: string; name: string; canEdit: boolean; members: AllocRow[] }
 interface ByProduct { id: string; name: string; members: AllocRow[] }
 
@@ -215,8 +220,8 @@ function ByPersonTab({ resources, periodLabel, person }: { resources: Resource[]
 function ByProjectTab({ projects, person }: { projects: ByProject[]; person: string }) {
   const qc = useQueryClient();
   const setAlloc = useMutation({
-    mutationFn: ({ memberId, alloc }: { memberId: number; alloc: number }) =>
-      api(`/resources/project-members/${memberId}`, { method: "PATCH", body: JSON.stringify({ alloc }) }),
+    mutationFn: ({ memberId, patch }: { memberId: number; patch: AllocPatch }) =>
+      api(`/resources/project-members/${memberId}`, { method: "PATCH", body: JSON.stringify(patch) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["resources-by-project"] });
       qc.invalidateQueries({ queryKey: ["resources"] });
@@ -233,7 +238,7 @@ function ByProjectTab({ projects, person }: { projects: ByProject[]; person: str
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {shown.map((p) => (
         <AllocGroup key={p.id} title={p.name} members={p.members} canEdit={p.canEdit}
-          onSet={(memberId, alloc) => setAlloc.mutate({ memberId, alloc })} />
+          onSet={(memberId, patch) => setAlloc.mutate({ memberId, patch })} />
       ))}
     </div>
   );
@@ -255,10 +260,10 @@ function ByProductTab({ products, person }: { products: ByProduct[]; person: str
   );
 }
 
-// Shared card: a titled group of people with their allocation %, editable inline
-// when canEdit and the member carries an id (project team members).
+// Shared card: a titled group of people with their allocation, editable inline
+// (% or weekly hours + a date window) when canEdit and the member has an id.
 function AllocGroup({ title, members, canEdit, onSet }: {
-  title: string; members: AllocRow[]; canEdit: boolean; onSet?: (memberId: number, alloc: number) => void;
+  title: string; members: AllocRow[]; canEdit: boolean; onSet?: (memberId: number, patch: AllocPatch) => void;
 }) {
   const total = members.reduce((s, m) => s + m.alloc, 0);
   return (
@@ -268,27 +273,61 @@ function AllocGroup({ title, members, canEdit, onSet }: {
         <span style={{ fontSize: 12, color: color.faint2 }}>{members.length} {members.length === 1 ? "person" : "people"} · {total}% allocated</span>
       </div>
       {members.map((m, i) => (
-        <div key={(m.memberId ?? m.name) + String(i)} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 120px", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: "1px solid #F2F4F9" }}>
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{m.name}</div>
-            {m.title && <div style={{ fontSize: 11.5, color: color.faint3 }}>{m.title}</div>}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ flex: 1, height: 8, background: color.bg, borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${Math.min(m.alloc, 100)}%`, background: m.alloc > 100 ? "#D13438" : color.primary, borderRadius: 4 }} />
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            {canEdit && onSet && m.memberId != null ? (
-              <input type="number" min={0} max={100} defaultValue={m.alloc}
-                onBlur={(e) => { const v = Math.max(0, Math.min(100, Number(e.target.value) || 0)); if (v !== m.alloc) onSet(m.memberId!, v); }}
-                style={{ width: 84, textAlign: "right", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 8px", fontFamily: font.mono, fontSize: 12.5, color: color.text }} />
-            ) : (
-              <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.textMuted }}>{m.alloc}%</span>
-            )}
+        <AllocMemberRow key={(m.memberId ?? m.name) + String(i)} m={m} canEdit={canEdit} onSet={onSet} />
+      ))}
+    </div>
+  );
+}
+
+function AllocMemberRow({ m, canEdit, onSet }: { m: AllocRow; canEdit: boolean; onSet?: (memberId: number, patch: AllocPatch) => void }) {
+  const editable = canEdit && !!onSet && m.memberId != null;
+  const [open, setOpen] = useState(false);
+  const range = m.startDate || m.endDate ? `${m.startDate || "?"} → ${m.endDate || "?"}` : "open-ended";
+  return (
+    <div style={{ padding: "12px 20px", borderBottom: "1px solid #F2F4F9" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 120px", alignItems: "center", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{m.name}</div>
+          <div style={{ fontSize: 11.5, color: color.faint3 }}>{m.title || "Team member"} · {range}{m.allocHours ? ` · ${m.allocHours}h/wk` : ""}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{ flex: 1, height: 8, background: color.bg, borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(m.alloc, 100)}%`, background: m.alloc > 100 ? "#D13438" : color.primary, borderRadius: 4 }} />
           </div>
         </div>
-      ))}
+        <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+          {editable ? (
+            <input type="number" min={0} max={100} defaultValue={m.alloc}
+              onBlur={(e) => { const v = Math.max(0, Math.min(100, Number(e.target.value) || 0)); if (v !== m.alloc) onSet!(m.memberId!, { alloc: v, allocHours: 0 }); }}
+              style={{ width: 70, textAlign: "right", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 8px", fontFamily: font.mono, fontSize: 12.5, color: color.text }} />
+          ) : (
+            <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.textMuted }}>{m.alloc}%</span>
+          )}
+          {editable && (
+            <button onClick={() => setOpen((v) => !v)} title="Edit hours & dates" aria-label="Edit hours & dates"
+              style={{ background: "none", border: "none", cursor: "pointer", color: open ? color.primary : color.faint3, padding: 2 }}>
+              <Icon name="calendar" size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+      {open && editable && (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10, padding: "10px 12px", background: color.surfaceAlt, border: `1px solid ${color.border2}`, borderRadius: 10 }}>
+          <label style={{ fontSize: 11, color: color.faint2 }}>Weekly hours (40 = 100%)
+            <input type="number" min={0} max={80} defaultValue={m.allocHours || ""} placeholder="—"
+              onBlur={(e) => { const h = Math.max(0, Number(e.target.value) || 0); onSet!(m.memberId!, { allocHours: h }); }}
+              style={{ display: "block", width: 90, marginTop: 3, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 8px", fontFamily: font.mono, fontSize: 12.5 }} />
+          </label>
+          <label style={{ fontSize: 11, color: color.faint2 }}>From
+            <input type="date" defaultValue={m.startDate || ""} onBlur={(e) => onSet!(m.memberId!, { startDate: e.target.value })}
+              style={{ display: "block", marginTop: 3, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 8px", fontSize: 12.5 }} />
+          </label>
+          <label style={{ fontSize: 11, color: color.faint2 }}>Until
+            <input type="date" defaultValue={m.endDate || ""} onBlur={(e) => onSet!(m.memberId!, { endDate: e.target.value })}
+              style={{ display: "block", marginTop: 3, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 8px", fontSize: 12.5 }} />
+          </label>
+        </div>
+      )}
     </div>
   );
 }

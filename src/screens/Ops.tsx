@@ -19,6 +19,7 @@ interface OpsItem {
   id: number; serviceId: number; serviceName: string; title: string; description: string;
   type: string; priority: string; status: string; assignee: string; alloc: number;
   impactProjectId: string | null; impactProjectName: string | null; impactNote: string; createdAt: string;
+  startDate: string; endDate: string;
 }
 interface OpsService {
   id: number; ref: string; name: string; category: string; dept: string; owner: string;
@@ -211,6 +212,7 @@ function ServiceCard({ service, mayEdit, onAddItem, onEditService, onDeleteServi
                 <div style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</div>
                 <div style={{ fontSize: 11, color: color.faint2, marginTop: 1 }}>
                   {i.type} · {i.assignee}{i.alloc > 0 ? ` · ${i.alloc}%` : ""}
+                  {(i.startDate || i.endDate) ? ` · ${i.startDate || "?"}→${i.endDate || "?"}` : ""}
                   {i.impactProjectName && <span style={{ color: color.warningAlt, fontWeight: 600 }}> · impacts {i.impactProjectName}</span>}
                 </div>
               </div>
@@ -275,11 +277,14 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
   const [alloc, setAlloc] = useState(String(item?.alloc || ""));
   const [impact, setImpact] = useState(item?.impactProjectId ?? "");
   const [impactNote, setImpactNote] = useState(item?.impactNote ?? "");
+  const [startDate, setStartDate] = useState(item?.startDate ?? "");
+  const [endDate, setEndDate] = useState(item?.endDate ?? "");
   const [confirmDel, setConfirmDel] = useState(false);
 
   const body = () => JSON.stringify({
     title: title.trim(), description: description.trim(), type, priority, status,
     assignee: assignee.trim(), alloc: Number(alloc) || 0, impactProjectId: impact, impactNote: impactNote.trim(),
+    startDate, endDate,
   });
   const save = useMutation({
     mutationFn: () => editing
@@ -306,6 +311,11 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 2 }}><DecLabel>Assignee</DecLabel><Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Who's doing it" /></div>
         <div style={{ flex: 1 }}><DecLabel>Allocation %</DecLabel><Input type="number" min={0} max={100} value={alloc} onChange={(e) => setAlloc(e.target.value)} placeholder="0" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Active from</DecLabel><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+        <div style={{ flex: 1 }}><DecLabel>Active until</DecLabel><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+        <div style={{ flex: 2, display: "flex", alignItems: "flex-end" }}><div style={{ fontSize: 11, color: color.faint3, paddingBottom: 8 }}>Leave blank for open-ended. The allocation only counts against capacity while active.</div></div>
       </div>
       <DecLabel>Description</DecLabel>
       <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Details…" style={{ minHeight: 60, marginBottom: 14 }} />

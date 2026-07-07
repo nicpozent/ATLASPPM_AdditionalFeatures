@@ -196,6 +196,8 @@ public class OpsItem
     public int Ord { get; set; }
     public string CreatedAt { get; set; } = "";          // display date
     public string JiraKey { get; set; } = "";            // source Jira issue key when imported (idempotent re-import)
+    public string StartDate { get; set; } = "";          // ISO date — allocation window start ("" = open)
+    public string EndDate { get; set; } = "";            // ISO date — allocation window end ("" = open)
 }
 
 // A person assigned to a project role. RoleKey is "pm" (the project lead, set by
@@ -1182,6 +1184,14 @@ public class AuditEvent
     public string Category { get; set; } = "";          // "Roles" | "Demands" | "Projects" | …
     public string Action { get; set; } = "";            // "Created role", "Advanced demand", …
     public string Target { get; set; } = "";            // affected object (id/name)
+}
+
+// A user's saved Custom-dashboard widget layout (per person, server-side so it
+// follows them across devices instead of living in one browser's localStorage).
+public class DashboardLayout
+{
+    public string UserKey { get; set; } = default!;   // Permissions.CallerKey
+    public string Widgets { get; set; } = "";          // JSON array of { uid, key }
 }
 
 // ---- Roadmap ---------------------------------------------------------------
