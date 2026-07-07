@@ -45,6 +45,12 @@ public class Project
     public int? JiraBoardId { get; set; }
     public string LastJiraSync { get; set; } = "";      // UTC "yyyy-MM-dd HH:mm" of last successful sync; drives delta pulls
 
+    // Azure DevOps mapping (connector scaffold). AdoProject is the ADO project
+    // name/id this Atlas project is linked to (org is global config: AzureDevOps:
+    // Organization). Empty ⇒ not linked. Work-item sync is a follow-up; the
+    // mapping is stored now so the discovery importer can wire it (see ADR-0035).
+    public string AdoProject { get; set; } = "";
+
     // Lifecycle. IsSystem marks seeded/demo projects — they can be archived but
     // never hard-deleted. Archived projects drop out of the active portfolio,
     // dashboards and financials but are retained (soft delete).

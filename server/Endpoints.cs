@@ -46,6 +46,7 @@ public static class Endpoints
         api.MapTeamEndpoints();
         api.MapSubTeamEndpoints();
         api.MapJiraEndpoints();
+        api.MapAzureDevOpsEndpoints();
         api.MapNotificationEndpoints();
         api.MapHelpEndpoints();
         api.MapGdprEndpoints();
@@ -115,7 +116,7 @@ public static class Endpoints
             var progress = derived.TryGetValue(id, out var pr) ? pr : p.Progress;
             return Results.Ok(new ProjectDetailDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology,
                     p.Status, p.Health, progress, p.Phase, p.Budget, p.Spent, p.Due, p.StartDate, p.Target, p.Summary,
-                    p.JiraProjectKey, p.JiraBoardId, p.LastJiraSync));
+                    p.JiraProjectKey, p.JiraBoardId, p.LastJiraSync, p.AdoProject));
         });
 
         api.MapGet("/blockers", async (AtlasDbContext db) =>

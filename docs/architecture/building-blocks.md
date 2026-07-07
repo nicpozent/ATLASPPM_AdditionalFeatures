@@ -51,6 +51,7 @@ requirement → capability → implementation → decision.
 | SBB-22 | GDPR data-subject admin surface (DSAR export, erase, run-retention) | ABB-10 | ADR-0017 |
 | SBB-23 | Strategic roadmap (`RoadmapItem` + milestones/links/deps, `cap-roadmap`, Now/Next/Later board + **By-year board** + timeline) | ABB-06 | ADR-0019 |
 | SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity) | ABB-06 | ADR-0020 |
+| SBB-25 | Azure DevOps connector scaffold (`AzureDevOps.cs`: PAT auth, status/test, project discovery + import/map `Project.AdoProject`; board sync deferred) | ABB-05 | ADR-0035 |
 
 ## 3. Traceability (ABB → SBB)
 
@@ -74,7 +75,7 @@ flowchart LR
 
 | ABB | Gap | Planned SBB |
 |-----|-----|-------------|
-| ABB-05 Integration | Only Jira + Graph implemented | Azure DevOps connector (next), then ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI |
+| ABB-05 Integration | Jira + Graph implemented; **Azure DevOps connector scaffold** (connect · discover · map, ADR-0035) — its board/work-item sync is the next step | Azure DevOps board sync, then ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI |
 | ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep** (Playwright, structural-gated) & extracted per-screen logic tests (ADR-0033); remaining: **gate colour-contrast** once the token greys are lifted to WCAG AA | Token-contrast pass, then flip the contrast gate on |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
