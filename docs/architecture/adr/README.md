@@ -26,5 +26,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0017](./0017-gdpr-admin-surface.md) | GDPR data-subject actions surfaced in Administration | Accepted |
 | [0018](./0018-jira-full-field-import.md) | Jira full-field, comment & attachment import (extends 0006) | Accepted |
 | [0019](./0019-roadmap-lane-and-timeline.md) | Strategic roadmap: dual lane (Now/Next/Later) + timeline model | Accepted |
+| [0020](./0020-task-estimate-allocation.md) | Task estimate hours count toward allocation (max vs planned) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
