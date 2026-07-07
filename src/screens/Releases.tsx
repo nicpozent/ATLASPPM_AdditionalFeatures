@@ -301,6 +301,38 @@ function RelLbl({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
 }
 
+interface LinkOpt { id: string; name: string }
+
+// The linkable entities for a release scope. Fed by the same list endpoints the
+// rest of the app uses, so the dropdown carries BOTH connector-mapped (Jira/ADO
+// imported) and manually-created projects/products/programs — they live in one
+// table per type, with no origin filter.
+function useLinkOptions(scope: ReleaseScope): LinkOpt[] {
+  const path = scope === "Product" ? "/products" : scope === "Program" ? "/programs" : "/projects";
+  const key = scope === "Product" ? "products" : scope === "Program" ? "programs" : "projects";
+  const { data = [] } = useQuery({
+    queryKey: [key], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<LinkOpt[]> => { try { return (await api<LinkOpt[]>(path)) ?? []; } catch { return []; } },
+  });
+  return data;
+}
+
+// Scope-aware "Linked to" picker. Stores the entity id. If the current value
+// isn't in the list (e.g. a legacy free-text link), it's kept as a "(current)"
+// option so editing never silently drops it.
+function LinkTargetSelect({ scope, value, onChange }: { scope: ReleaseScope; value: string; onChange: (v: string) => void }) {
+  const opts = useLinkOptions(scope);
+  const known = value !== "" && opts.some((o) => o.id === value);
+  const noun = scope === "Product" ? "product" : scope === "Program" ? "program" : "project";
+  return (
+    <Select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Linked to">
+      <option value="">{opts.length ? `— Select a ${noun} —` : `No ${noun}s yet`}</option>
+      {value !== "" && !known && <option value={value}>{value} (current)</option>}
+      {opts.map((o) => <option key={o.id} value={o.id}>{o.id} · {o.name}</option>)}
+    </Select>
+  );
+}
+
 function NewReleaseModal({ onClose, onCreate, submitting }: {
   onClose: () => void; onCreate: (r: NewRelease) => void; submitting?: boolean;
 }) {
@@ -323,7 +355,7 @@ function NewReleaseModal({ onClose, onCreate, submitting }: {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
           <RelLbl>Scope</RelLbl>
-          <Select value={scope} onChange={(e) => setScope(e.target.value as ReleaseScope)}>
+          <Select value={scope} onChange={(e) => { setScope(e.target.value as ReleaseScope); setLink(""); }}>
             <option value="Product">Product</option>
             <option value="Project">Project</option>
             <option value="Program">Program</option>
@@ -331,7 +363,7 @@ function NewReleaseModal({ onClose, onCreate, submitting }: {
         </div>
         <div>
           <RelLbl>Linked to</RelLbl>
-          <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="PRD-01 / PRJ-204" />
+          <LinkTargetSelect scope={scope} value={link} onChange={setLink} />
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -392,7 +424,7 @@ function EditReleaseModal({ release, onClose, onSave, submitting }: {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
           <RelLbl>Scope</RelLbl>
-          <Select value={scope} onChange={(e) => setScope(e.target.value as ReleaseScope)}>
+          <Select value={scope} onChange={(e) => { setScope(e.target.value as ReleaseScope); setLink(""); }}>
             <option value="Product">Product</option>
             <option value="Project">Project</option>
             <option value="Program">Program</option>
@@ -400,7 +432,7 @@ function EditReleaseModal({ release, onClose, onSave, submitting }: {
         </div>
         <div>
           <RelLbl>Linked to</RelLbl>
-          <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="PRD-01 / PRJ-204" />
+          <LinkTargetSelect scope={scope} value={link} onChange={setLink} />
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
