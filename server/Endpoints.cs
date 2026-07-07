@@ -35,6 +35,7 @@ public static class Endpoints
         api.MapCapacityEndpoints();
         api.MapCapacityIntelEndpoints();
         api.MapCapacityAlertEndpoints();
+        api.MapLaborRateEndpoints();
         api.MapDeletionEndpoints();
         api.MapLifecycleEndpoints();
         api.MapBackupEndpoints();
