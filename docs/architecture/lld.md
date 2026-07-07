@@ -236,6 +236,9 @@ live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
   (ADR-0003). Shared primitives in `components/ui.tsx`.
 - **Testable logic** lives in `screens/<screen>/data.ts` (pure funcs, unit-tested);
   components stay thin (e.g. `pip/data.ts`, `portfolio/data.ts`).
+- **Large screens are decomposed** into a folder of per-tab modules with a
+  `shared.tsx` (presentational helpers) + `util.ts` (non-component helpers) —
+  see `screens/project/` and `screens/resources/` (ADR-0041).
 - **Auth**: MSAL redirect flow in `auth.ts`; disabled cleanly when `VITE_AUTH_ENABLED=false`.
 
 ## 9. Configuration keys (selected)
