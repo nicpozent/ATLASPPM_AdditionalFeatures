@@ -37,7 +37,7 @@ requirement → capability → implementation → decision.
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |
 | SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments) | ABB-05 | ADR-0006, ADR-0018 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
-| SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`) | ABB-06, ABB-10 | ADR-0007, ADR-0028 |
+| SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker` + `JiraSyncQueue`) | ABB-06, ABB-10 | ADR-0007, ADR-0028, ADR-0030 |
 | SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts | ABB-07 | ADR-0028 |
 | SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs | ABB-08 | ADR-0010 |
 | SBB-14 | Security headers/CSP, rate limiter, upload limits, least-privilege DB role | ABB-09 | ADR-0008, security-hardening.md |

@@ -49,6 +49,11 @@ if (cfg.GetValue("Retention:Enabled", true))
 if (cfg.GetValue("Jira:ScheduledSync", true))
     builder.Services.AddHostedService<JiraSyncService>();
 
+// Background Jira sync queue + worker — lets manual syncs run off the request
+// path so a large re-sync can't 504 the browser (ADR-0030).
+builder.Services.AddSingleton<JiraSyncQueue>();
+builder.Services.AddHostedService<JiraSyncWorker>();
+
 // Periodic over-allocation alerts (on by default; emits only to users who opt
 // into the "over_allocation" event, so it's silent until someone subscribes).
 if (cfg.GetValue("Capacity:Alerts", true))
