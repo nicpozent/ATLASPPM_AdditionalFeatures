@@ -26,6 +26,20 @@ public static class GanttEndpoints
         return DateTime.TryParse(display, out var d) ? d.Month - 1 : (int?)null;
     }
 
+    // Map a sprint to a bar on the year grid. Jira often omits dates on
+    // future/closed sprints — flag those `undated` and fall back to the project
+    // window (else the current month) so past & current sprints still show.
+    static GanttSprintDto SprintBar(Sprint s, int? winStart, int? winEnd)
+    {
+        var a = MonthOf(s.StartDate);
+        var b = MonthOf(s.EndDate);
+        var undated = a is null && b is null;
+        if (undated) { a = winStart ?? DateTime.UtcNow.Month - 1; b = winEnd ?? a; }
+        var start = Math.Min(a ?? b!.Value, b ?? a!.Value);
+        var end = Math.Max(a ?? b!.Value, b ?? a!.Value);
+        return new GanttSprintDto(s.Id, s.Name, s.Status, start, end, undated);
+    }
+
     static PhaseDto ToDto(Phase p) => new(p.Id, p.Name, p.StartMonth, p.EndMonth, p.Progress);
     static MilestoneDto ToDto(Milestone m) => new(m.Id, m.Label, m.Month, m.Date);
 
@@ -116,6 +130,10 @@ public static class GanttEndpoints
         });
 
         // ---- Program timeline (aggregate) ---------------------------------
+        // Each project row carries not just its phases but its window (from the
+        // project dates, else derived from its sprints/tasks) and its sprint bars,
+        // so the program timeline shows a real schedule built from projects, tasks
+        // and sprints rather than an empty "No phases" grid (ADR-0029).
         api.MapGet("/programs/{id}/gantt", async (string id, AtlasDbContext db) =>
         {
             var pg = await db.Programs.FindAsync(id);
@@ -125,9 +143,32 @@ public static class GanttEndpoints
             var ids = projects.Select(p => p.Id).ToList();
             var phases = await db.Phases.Where(p => ids.Contains(p.ProjectId)).OrderBy(p => p.Ord).ThenBy(p => p.Id).ToListAsync();
             var milestones = await db.Milestones.Where(m => ids.Contains(m.ProjectId)).OrderBy(m => m.Month).ThenBy(m => m.Id).ToListAsync();
-            var rows = projects.Select(p => new ProgramGanttRowDto(
-                p.Id, p.Name,
-                phases.Where(x => x.ProjectId == p.Id).Select(ToDto).ToList())).ToList();
+            var sprints = await db.Sprints.Where(s => ids.Contains(s.ProjectId)).OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync();
+            var tasks = await db.ProjectTasks.Where(t => ids.Contains(t.ProjectId)).ToListAsync();
+
+            var rows = projects.Select(p =>
+            {
+                var end = string.IsNullOrWhiteSpace(p.Target) || p.Target == "TBD" ? p.Due : p.Target;
+                int? ws = MonthOf(p.StartDate);
+                int? we = MonthOf(end);
+                var mySprints = sprints.Where(s => s.ProjectId == p.Id).ToList();
+                var myPhases = phases.Where(x => x.ProjectId == p.Id).ToList();
+
+                // No explicit project dates → derive the window from the months its
+                // phases, sprints and dated tasks actually span.
+                if (ws is null && we is null)
+                {
+                    var months = new List<int>();
+                    months.AddRange(myPhases.SelectMany(x => new[] { x.StartMonth, x.EndMonth }));
+                    foreach (var s in mySprints) { if (MonthOf(s.StartDate) is int a) months.Add(a); if (MonthOf(s.EndDate) is int b) months.Add(b); }
+                    foreach (var t in tasks.Where(t => t.ProjectId == p.Id)) { if (MonthOf(t.StartDate) is int a) months.Add(a); if (MonthOf(t.TargetDate) is int b) months.Add(b); }
+                    if (months.Count > 0) { ws = months.Min(); we = months.Max(); }
+                }
+
+                var sprintBars = mySprints.Select(s => SprintBar(s, ws, we)).ToList();
+                return new ProgramGanttRowDto(p.Id, p.Name, myPhases.Select(ToDto).ToList(),
+                    ws, we, p.StartDate, end, sprintBars);
+            }).ToList();
             return Results.Ok(new ProgramGanttDto(rows, milestones.Select(ToDto).ToList()));
         });
 
@@ -149,9 +190,40 @@ public static class GanttEndpoints
                 items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress,
                     string.IsNullOrWhiteSpace(startRaw) ? endRaw : startRaw, string.IsNullOrWhiteSpace(endRaw) ? startRaw : endRaw));
             }
+            // Place an item by month indices directly, when its window was derived
+            // (not from an explicit date) — labels show the month names.
+            void AddMonths(string type, string id, string name, string status, int? progress, int startMonth, int endMonth)
+            {
+                var start = Math.Clamp(Math.Min(startMonth, endMonth), 0, 11);
+                var end = Math.Clamp(Math.Max(startMonth, endMonth), 0, 11);
+                items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress, MonthLabel(start), MonthLabel(end)));
+            }
+
+            // Preload month spans of phases/sprints/tasks so an undated project can
+            // still be placed by what its schedule actually covers (matches the
+            // program timeline's derivation).
+            var allPhases = await db.Phases.ToListAsync();
+            var allSprints = await db.Sprints.ToListAsync();
+            var allTasks = await db.ProjectTasks.ToListAsync();
+            List<int> DerivedMonths(string projectId)
+            {
+                var m = new List<int>();
+                m.AddRange(allPhases.Where(x => x.ProjectId == projectId).SelectMany(x => new[] { x.StartMonth, x.EndMonth }));
+                foreach (var s in allSprints.Where(x => x.ProjectId == projectId)) { if (MonthOf(s.StartDate) is int a) m.Add(a); if (MonthOf(s.EndDate) is int b) m.Add(b); }
+                foreach (var t in allTasks.Where(x => x.ProjectId == projectId)) { if (MonthOf(t.StartDate) is int a) m.Add(a); if (MonthOf(t.TargetDate) is int b) m.Add(b); }
+                return m;
+            }
 
             foreach (var p in await db.Projects.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
-                Add("project", p.Id, p.Name, p.Status, p.Progress, p.StartDate, string.IsNullOrWhiteSpace(p.Target) || p.Target == "TBD" ? p.Due : p.Target);
+            {
+                var pend = string.IsNullOrWhiteSpace(p.Target) || p.Target == "TBD" ? p.Due : p.Target;
+                if (MonthOf(p.StartDate) is null && MonthOf(pend) is null)
+                {
+                    var m = DerivedMonths(p.Id);
+                    if (m.Count > 0) AddMonths("project", p.Id, p.Name, p.Status, p.Progress, m.Min(), m.Max());
+                }
+                else Add("project", p.Id, p.Name, p.Status, p.Progress, p.StartDate, pend);
+            }
             foreach (var g in await db.Programs.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
                 Add("program", g.Id, g.Name, g.Status, g.Progress, g.StartDate, g.EndDate);
             foreach (var pr in await db.Products.OrderBy(x => x.Name).ToListAsync())
