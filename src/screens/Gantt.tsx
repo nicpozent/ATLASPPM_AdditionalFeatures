@@ -12,7 +12,7 @@ type ViewId = (typeof VIEW_TABS)[number][0];
 
 interface Phase { id: number; name: string; startMonth: number; endMonth: number; progress: number; }
 interface Milestone { id: number; label: string; month: number; date: string; }
-interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; projectStart?: number | null; projectEnd?: number | null; startDate?: string; endDate?: string; }
+interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; projectStart?: number | null; projectEnd?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
 interface ProgramSprint { id: number; name: string; status: string; startMonth: number; endMonth: number; undated: boolean; }
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; startMonth?: number | null; endMonth?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
@@ -89,6 +89,18 @@ export default function Gantt() {
         const ts = ta ?? tb ?? start, te = tb ?? ta ?? end;
         return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te) };
       });
+
+    // Prefer the server-computed sprint bars from the gantt endpoint — the same
+    // authoritative source (the Sprint table + window fallback) the program
+    // timeline uses, so any synced sprint (Jira board/board-less, ADO iteration)
+    // or manual sprint shows in the Schedule. Attach each sprint's tasks by name.
+    const serverBars = gantt?.sprints ?? [];
+    if (serverBars.length > 0) {
+      return serverBars.map((s) => ({
+        id: s.id, name: s.name, status: s.status, startMonth: s.startMonth, endMonth: s.endMonth,
+        tasks: taskBars(s.name, s.startMonth, s.endMonth), undated: s.undated,
+      }));
+    }
 
     if (rows.length > 0) {
       return rows.map((s) => {
