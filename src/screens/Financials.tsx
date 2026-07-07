@@ -91,7 +91,7 @@ export default function Financials() {
       {/* scope tabs — overall figures for the selected object type */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
         {SCOPE_TABS.map((t) => (
-          <button key={t.key} onClick={() => setScope(t.key)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === t.key ? "#fff" : "transparent", color: scope === t.key ? color.primary : "#6A7488", boxShadow: scope === t.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{t.label}</button>
+          <button key={t.key} onClick={() => setScope(t.key)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === t.key ? "#fff" : "transparent", color: scope === t.key ? color.primary : "#565F73", boxShadow: scope === t.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{t.label}</button>
         ))}
       </div>
 

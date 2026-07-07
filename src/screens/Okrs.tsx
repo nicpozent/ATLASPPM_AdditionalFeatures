@@ -166,7 +166,7 @@ export default function Okrs() {
       {/* Objectives aren't deleted — a completed objective moves to Completed. */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
         {(["Active", "Completed"] as OkrStatus[]).map((s) => (
-          <button key={s} onClick={() => setOkrStatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: okrStatus === s ? "#fff" : "transparent", color: okrStatus === s ? color.primary : "#6A7488", boxShadow: okrStatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+          <button key={s} onClick={() => setOkrStatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: okrStatus === s ? "#fff" : "transparent", color: okrStatus === s ? color.primary : "#565F73", boxShadow: okrStatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
             {s} · {countBy(s)}
           </button>
         ))}

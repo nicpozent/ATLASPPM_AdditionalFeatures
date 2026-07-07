@@ -117,7 +117,7 @@ export default function Programs() {
       {(archivedCount > 0 || showArchived) && (
         <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
           {[["Active", false, activeCount], ["Archived", true, archivedCount]].map(([label, arch, n]) => (
-            <button key={label as string} onClick={() => setShowArchived(arch as boolean)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: showArchived === arch ? "#fff" : "transparent", color: showArchived === arch ? color.primary : "#6A7488", boxShadow: showArchived === arch ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+            <button key={label as string} onClick={() => setShowArchived(arch as boolean)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: showArchived === arch ? "#fff" : "transparent", color: showArchived === arch ? color.primary : "#565F73", boxShadow: showArchived === arch ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
               {label as string} · {n as number}
             </button>
           ))}

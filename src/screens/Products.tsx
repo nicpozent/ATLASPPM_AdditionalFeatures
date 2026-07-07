@@ -100,7 +100,7 @@ export default function Products() {
       {/* Products aren't deleted — they move through Active / Retired / Replaced. */}
       <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
         {(["Active", "Retired", "Replaced"] as ProductStatus[]).map((s) => (
-          <button key={s} onClick={() => setPstatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: pstatus === s ? "#fff" : "transparent", color: pstatus === s ? color.primary : "#6A7488", boxShadow: pstatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+          <button key={s} onClick={() => setPstatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: pstatus === s ? "#fff" : "transparent", color: pstatus === s ? color.primary : "#565F73", boxShadow: pstatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
             {s} · {countBy(s)}
           </button>
         ))}

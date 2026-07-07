@@ -34,7 +34,7 @@ export default function Dashboard() {
           <h1 style={{ fontFamily: font.head, fontSize: 30, fontWeight: 600, color: color.ink, margin: 0, letterSpacing: "-0.02em" }}>Welcome back, {firstName}</h1>
           <p style={{ margin: "7px 0 0", fontSize: 14.5, color: color.subtle }}>
             You have <b style={{ color: color.primary }}>{approvalCount} approval{approvalCount === 1 ? "" : "s"}</b> waiting and{" "}
-            <b style={{ color: color.danger }}>{attentionCount} project{attentionCount === 1 ? "" : "s"}</b> need attention across the Biltema portfolio.
+            <b style={{ color: color.dangerInk }}>{attentionCount} project{attentionCount === 1 ? "" : "s"}</b> need attention across the Biltema portfolio.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -51,7 +51,7 @@ export default function Dashboard() {
             return (
               <button key={t.id} onClick={() => setLayout(t.id)} style={{
                 padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488",
+                background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
                 boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
               }}>{t.label}</button>
             );

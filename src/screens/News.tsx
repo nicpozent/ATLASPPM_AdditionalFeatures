@@ -320,7 +320,7 @@ export default function News() {
             return (
               <button key={lo.key} onClick={() => chooseLayout(lo.key)} disabled={!canEdit} style={{
                 padding: "5px 11px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-                background: a ? "#fff" : "transparent", color: a ? color.primary : "#6A7488",
+                background: a ? "#fff" : "transparent", color: a ? color.primary : "#565F73",
               }}>{lo.label}</button>
             );
           })}

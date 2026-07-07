@@ -104,7 +104,7 @@ export default function Resources() {
             return (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: active ? "#fff" : "transparent", color: active ? color.primary : "#6A7488", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
+                background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
               }}>{t.label}</button>
             );
           })}
@@ -136,7 +136,7 @@ export default function Resources() {
             return (
               <button key={p.id} onClick={() => setPeriod(p.id)} style={{
                 padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                background: active ? color.primary : "transparent", color: active ? "#fff" : "#6A7488",
+                background: active ? color.primary : "transparent", color: active ? "#fff" : "#565F73",
               }}>{p.label}</button>
             );
           })}
@@ -668,7 +668,7 @@ function AvailabilityTab() {
 
   const pill = (active: boolean): React.CSSProperties => ({
     padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-    fontFamily: "inherit", background: active ? color.primary : "transparent", color: active ? "#fff" : "#6A7488",
+    fontFamily: "inherit", background: active ? color.primary : "transparent", color: active ? "#fff" : "#565F73",
   });
   const dateBox: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 9px", fontSize: 12.5, fontFamily: "inherit", color: color.text };
 
