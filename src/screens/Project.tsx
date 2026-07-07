@@ -10,6 +10,7 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { TeamPanel } from "@/components/TeamPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { JiraSyncButton } from "@/components/JiraSyncButton";
 import { DEPARTMENTS } from "@/departments";
 import { toast, toastError } from "@/components/Toast";
 import { SCREENS } from "@/nav";
@@ -19,7 +20,7 @@ interface ProjectDetail {
   id: string; name: string; dept: string; owner: string; methodology: string;
   status: string; health: string; progress: number; phase: string;
   budget: number; spent: number; due: string; startDate?: string; target?: string; summary?: string;
-  jiraProjectKey?: string; jiraBoardId?: number | null;
+  jiraProjectKey?: string; jiraBoardId?: number | null; lastJiraSync?: string;
 }
 function useProject(id: string | null) {
   return useQuery({
@@ -301,9 +302,22 @@ function Overview({ projectId }: { projectId: string | null }) {
     queryKey: ["spillover", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
     queryFn: async (): Promise<SpilledTask[]> => (await api<SpilledTask[]>(`/projects/${projectId}/spillover`)) ?? [],
   });
+  const { data: detail } = useQuery({
+    queryKey: ["project", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<ProjectDetail | null> => { try { return await api<ProjectDetail>(`/projects/${projectId}`); } catch { return null; } },
+  });
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {projectId && detail?.jiraProjectKey && (
+          <Card padding="14px 18px" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12.5, color: color.textMuted }}>
+              Linked to Jira <b style={{ color: color.ink }}>{detail.jiraProjectKey}</b>{detail.jiraBoardId ? ` · board ${detail.jiraBoardId}` : ""}
+            </div>
+            <JiraSyncButton path={`/projects/${projectId}/jira/sync`} lastSync={detail.lastJiraSync}
+              invalidateKeys={["tasks", "sprints", "epics", "backlog", "project"]} />
+          </Card>
+        )}
         <PeopleRoles projectId={projectId} />
         {projectId && <TeamPanel entityType="project" entityId={projectId} />}
         {projectId && <SkillsPanel entityType="project" entityId={projectId} />}

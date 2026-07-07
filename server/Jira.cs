@@ -104,7 +104,7 @@ public static class Jira
 
         // Sync one project from its mapped Jira board. Managing integrations
         // requires Edit on "Integrations & connectors".
-        api.MapPost("/projects/{id}/jira/sync", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
@@ -116,8 +116,10 @@ public static class Jira
             try
             {
                 using var c = Client(cfg);
-                var r = await SyncProjectAsync(db, cfg, c, p);
-                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced project from Jira",
+                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var r = await SyncProjectAsync(db, cfg, c, p, delta ?? false);
+                p.LastJiraSync = watermark;             // stamp AFTER a successful pull
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", (delta ?? false) ? "Delta-synced project from Jira" : "Synced project from Jira",
                     $"{p.Id} · {p.JiraProjectKey}/board {p.JiraBoardId} · {r.Sprints} sprints, {r.Epics} epics, {r.Tasks} tasks"));
                 await db.SaveChangesAsync();
                 return Results.Ok(new { ok = true, r.Sprints, r.Epics, r.Tasks, r.Backlog, truncated = r.Truncated });
@@ -129,7 +131,7 @@ public static class Jira
         });
 
         // Sync every mapped project in one pass — the Integrations "Sync now".
-        api.MapPost("/integrations/jira/sync", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/integrations/jira/sync", async (bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
@@ -146,7 +148,9 @@ public static class Jira
             {
                 try
                 {
-                    var r = await SyncProjectAsync(db, cfg, c, p);
+                    var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                    var r = await SyncProjectAsync(db, cfg, c, p, delta ?? false);
+                    p.LastJiraSync = watermark;
                     sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
                     await db.SaveChangesAsync();
                 }
@@ -156,6 +160,22 @@ public static class Jira
                 $"{ok}/{mapped.Count} projects · {sp} sprints, {ep} epics, {tk} tasks"));
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = errors.Count == 0, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
+        });
+
+        // Sync a program's / product's mapped projects in one pass — powers the
+        // "Sync from Jira" button on those entities' Overview. Syncs each linked
+        // project (delta by default) and reports the roll-up.
+        api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var pg = await db.Programs.FindAsync(id);
+            if (pg is null) return Results.NotFound();
+            return await SyncLinkedProjectsAsync(db, cfg, http, "program", pg.Projects, delta ?? true);
+        });
+        api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var pr = await db.Products.FindAsync(id);
+            if (pr is null) return Results.NotFound();
+            return await SyncLinkedProjectsAsync(db, cfg, http, "product", pr.Projects, delta ?? true);
         });
 
         // ---- Discovery & import --------------------------------------------
@@ -235,6 +255,41 @@ public static class Jira
         });
     }
 
+    // Sync the mapped, non-archived projects linked to a program/product and
+    // return a roll-up. Skips unmapped links silently; requires Jira configured
+    // and Edit on Integrations (checked here so both callers share the gate).
+    static async Task<IResult> SyncLinkedProjectsAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http,
+        string scope, List<string> projectIds, bool delta)
+    {
+        if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+        if (!JiraConfigured(cfg))
+            return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
+        var projects = await db.Projects
+            .Where(p => projectIds.Contains(p.Id) && !p.Archived && p.JiraProjectKey != "")
+            .ToListAsync();
+        if (projects.Count == 0)
+            return Results.Ok(new { ok = true, projects = 0, sprints = 0, epics = 0, tasks = 0, message = $"No Jira-mapped projects are linked to this {scope} yet." });
+        int sp = 0, ep = 0, tk = 0, ok = 0;
+        var errors = new List<string>();
+        using var c = Client(cfg);
+        foreach (var p in projects)
+        {
+            try
+            {
+                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var r = await SyncProjectAsync(db, cfg, c, p, delta);
+                p.LastJiraSync = watermark;
+                sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); }
+        }
+        db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", $"Synced {scope}'s projects from Jira",
+            $"{ok}/{projects.Count} projects · {sp} sprints, {ep} epics, {tk} tasks"));
+        await db.SaveChangesAsync();
+        return Results.Ok(new { ok = errors.Count == 0, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
+    }
+
     // Next "PRJ-N" id (mirrors the create-project numbering).
     static async Task<string> NextProjectIdAsync(AtlasDbContext db)
     {
@@ -252,10 +307,15 @@ public static class Jira
 
     // Pull one project's board into Atlas. Adds/updates entities on the tracked
     // db; the caller owns SaveChanges (so a multi-project run can batch/rollback).
-    public static async Task<SyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p)
+    public static async Task<SyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p, bool delta = false)
     {
         int? board = p.JiraBoardId;                     // optional: adds sprints/backlog ordering
         var projectKey = p.JiraProjectKey.Trim();
+        // Delta sync only pulls issues changed since the last successful sync, so
+        // it must NOT prune (unchanged rows aren't returned) and can't recompute
+        // full epic rollups. First delta (no watermark) behaves like a full pull.
+        var deltaActive = delta && !string.IsNullOrEmpty(p.LastJiraSync);
+        var deltaClause = DeltaClause(delta, p.LastJiraSync);
         var pointsField = string.IsNullOrWhiteSpace(cfg["Jira:StoryPointsField"]) ? "customfield_10016" : cfg["Jira:StoryPointsField"]!.Trim();
         var truncated = false;
         var browseBase = NormalizeBaseUrl(cfg["Jira:BaseUrl"]) ?? "";
@@ -321,9 +381,12 @@ public static class Jira
                      "labels,components,fixVersions,resolution,resolutiondate,created,updated," +
                      "timetracking,timespent,timeoriginalestimate,sprint,closedSprints,epic,parent,comment,attachment," +
                      pointsField;
-        var jiraIssues = board is int bIssue
+        // A delta run always uses the JQL search (with the updated-since filter),
+        // even when a board is mapped, so the watermark applies; a full run with a
+        // board keeps the board issue endpoint for its backlog ordering.
+        var jiraIssues = board is int bIssue && !deltaActive
             ? await FetchIssuesAsync(c, $"rest/agile/1.0/board/{bIssue}/issue", fields, () => truncated = true)
-            : await FetchJqlAsync(c, $"project = \"{projectKey}\" ORDER BY created ASC", fields, () => truncated = true);
+            : await FetchJqlAsync(c, $"project = \"{projectKey}\"{deltaClause} ORDER BY updated ASC", fields, () => truncated = true);
         var existingTasks = await db.ProjectTasks.Where(t => t.ProjectId == p.Id).ToListAsync();
         var taskOrd = existingTasks.Select(t => t.Ord).DefaultIfEmpty(0).Max();
         // Which Jira attachment/comment ids each existing task already holds — so a
@@ -435,26 +498,37 @@ public static class Jira
                 }
             }
         }
-        if (seenTasks.Count > 0)
-            db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.JiraKey.Length > 0 && !seenTasks.Contains(t.JiraKey)));
-        if (seenEpics.Count > 0)
-            db.Epics.RemoveRange(existingEpics.Where(e => e.JiraKey.Length > 0 && !seenEpics.Contains(e.JiraKey)));
-        if (seenSprints.Count > 0)
-            db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
-
-        // Recompute synced epics' story rollup from the project's surviving tasks
-        // (by name) — manual tasks plus synced tasks still present — so the epic
-        // progress bar reflects real issue counts and excludes just-pruned rows.
-        var liveTasks = existingTasks.Where(t => t.JiraKey.Length == 0 || seenTasks.Contains(t.JiraKey)).ToList();
-        foreach (var e in existingEpics.Where(e => e.JiraKey.Length > 0 && seenEpics.Contains(e.JiraKey)))
+        // Pruning + full rollup only on a full sync — a delta doesn't list every
+        // issue, so removing "unseen" rows would wrongly delete unchanged ones.
+        if (!deltaActive)
         {
-            var its = liveTasks.Where(t => t.Epic == e.Name).ToList();
-            e.Stories = its.Count;
-            e.Done = its.Count(t => t.Status == "Done");
+            if (seenTasks.Count > 0)
+                db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.JiraKey.Length > 0 && !seenTasks.Contains(t.JiraKey)));
+            if (seenEpics.Count > 0)
+                db.Epics.RemoveRange(existingEpics.Where(e => e.JiraKey.Length > 0 && !seenEpics.Contains(e.JiraKey)));
+            if (seenSprints.Count > 0)
+                db.Sprints.RemoveRange(existingSprints.Where(s => s.JiraKey.Length > 0 && !seenSprints.Contains(s.JiraKey)));
+
+            // Recompute synced epics' story rollup from the project's surviving tasks
+            // (by name) — manual tasks plus synced tasks still present — so the epic
+            // progress bar reflects real issue counts and excludes just-pruned rows.
+            var liveTasks = existingTasks.Where(t => t.JiraKey.Length == 0 || seenTasks.Contains(t.JiraKey)).ToList();
+            foreach (var e in existingEpics.Where(e => e.JiraKey.Length > 0 && seenEpics.Contains(e.JiraKey)))
+            {
+                var its = liveTasks.Where(t => t.Epic == e.Name).ToList();
+                e.Stories = its.Count;
+                e.Done = its.Count(t => t.Status == "Done");
+            }
         }
 
         return new SyncResult(seenSprints.Count, seenEpics.Count, seenTasks.Count, backlog, truncated);
     }
+
+    // The JQL fragment appended to a project search for a delta pull — only when
+    // delta is requested AND there's a watermark to filter from (first delta with
+    // no watermark behaves as a full pull). Pure; unit-tested.
+    public static string DeltaClause(bool delta, string? lastSync) =>
+        delta && !string.IsNullOrEmpty(lastSync) ? $" AND updated >= \"{lastSync}\"" : "";
 
     // ---- Jira → Atlas field mappings (pure; unit-tested) --------------------
 

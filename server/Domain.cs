@@ -43,6 +43,7 @@ public class Project
     // key (e.g. "GIT"); JiraBoardId is the agile board to pull sprints/backlog from.
     public string JiraProjectKey { get; set; } = "";
     public int? JiraBoardId { get; set; }
+    public string LastJiraSync { get; set; } = "";      // UTC "yyyy-MM-dd HH:mm" of last successful sync; drives delta pulls
 
     // Lifecycle. IsSystem marks seeded/demo projects — they can be archived but
     // never hard-deleted. Archived projects drop out of the active portfolio,

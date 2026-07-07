@@ -7,6 +7,7 @@ import { Button, Input, Select, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { JiraSyncButton } from "@/components/JiraSyncButton";
 import { TeamPanel } from "@/components/TeamPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
 import { DEPARTMENTS } from "@/departments";
@@ -286,6 +287,12 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
           <SubscribeButton targetType="product" targetId={product.id} />
           <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
         </div>
+        {product.projects.length > 0 && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12.5, color: color.faint2 }}>Pull the latest from Jira for every mapped project linked to this product.</div>
+            <JiraSyncButton path={`/products/${product.id}/jira/sync`} invalidateKeys={["products", "product", "tasks", "sprints", "epics"]} />
+          </div>
+        )}
       </div>
 
       {/* linked projects */}

@@ -7,6 +7,7 @@ import { Button, Input, Select, RowMenu, MenuItem, MenuDivider } from "@/compone
 import { usePermissions } from "@/components/usePermissions";
 import { CostsModal } from "@/components/CostsModal";
 import { SubscribeButton } from "@/components/SubscribeButton";
+import { JiraSyncButton } from "@/components/JiraSyncButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { TeamPanel } from "@/components/TeamPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
@@ -263,6 +264,12 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
             <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
           </div>
         </div>
+        {program.projects.length > 0 && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12.5, color: color.faint2 }}>Pull the latest from Jira for every mapped project in this program.</div>
+            <JiraSyncButton path={`/programs/${program.id}/jira/sync`} invalidateKeys={["programs", "program", "tasks", "sprints", "epics"]} />
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 18, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${color.bg}` }}>
           {kpi("Projects", <div style={{ fontFamily: font.head, fontSize: 20, fontWeight: 700, color: color.navy }}>{program.projects.length}</div>)}
           {kpi("Avg progress", (
