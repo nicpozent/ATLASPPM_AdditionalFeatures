@@ -29,7 +29,7 @@ requirement → capability → implementation → decision.
 |----|------------------------------|----------|-------------|
 | SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL) | ABB-01, ABB-02 | ADR-0003 |
 | SBB-02 | i18n message catalogue (6 locales) | ABB-01 | completeness test |
-| SBB-03 | Microsoft Entra ID (OIDC) + MSAL | ABB-02 | ADR-0005 |
+| SBB-03 | Microsoft Entra ID (OIDC) + MSAL, with a client-side idle-logout policy (default 15 min, `VITE_AUTH_IDLE_MINUTES`) | ABB-02, ABB-09 | ADR-0005, ADR-0038 |
 | SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`) | ABB-02 | ADR-0004 |
 | SBB-05 | .NET 8 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
