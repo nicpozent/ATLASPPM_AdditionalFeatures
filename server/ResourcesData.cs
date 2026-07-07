@@ -4,6 +4,10 @@ namespace Atlas.Api;
 
 public record SetAllocReq(int? Alloc, int? AllocHours, string? StartDate, string? EndDate,
     int? ExtAlloc, int? ExtHours, string? ExtStartDate, string? ExtEndDate);
+public record RosterRow(string Name, string Title, string Dept, int Project, int Product, int Ops)
+{
+    public int Total => Project + Product + Ops;
+}
 public record OnboardReq(string? Name, string? Email, string? Title);
 
 // ============================================================================
@@ -40,6 +44,57 @@ public static class ResourcesData
         return DateOnly.TryParse(v, out var d) ? d.ToString("yyyy-MM-dd") : v;
     }
 
+    // The capacity roster as-of a day: everyone with an allocation (product or
+    // project/task or ops) or on the synced directory, with their rolled-up
+    // time-phased utilisation. Shared by /resources and the capacity-intelligence
+    // endpoints so they can't drift.
+    public static async Task<List<RosterRow>> RosterAsync(AtlasDbContext db, DateOnly on)
+    {
+        var productAllocs = await db.ProductAllocations.ToListAsync();
+        var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
+        var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
+        var opsByPerson = await Ops.AllocByPersonAsync(db, on);
+        var projectByPerson = await AllocationEngine.ProjectLoadByPersonAsync(db, on);
+
+        var people = new Dictionary<string, (string Name, string Title, string Dept, int Project, int Product, int Ops)>(StringComparer.OrdinalIgnoreCase);
+        (string, string, string, int, int, int) Get(string name) =>
+            people.TryGetValue(name, out var v) ? v : (name, "", "", 0, 0, 0);
+
+        foreach (var a in productAllocs)
+        {
+            var p = Get(a.MemberName);
+            people[a.MemberName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? a.MemberTitle : p.Item2, p.Item3, p.Item4, p.Item5 + a.Alloc, p.Item6);
+        }
+        foreach (var t in projAssignments)
+            foreach (var m in t.Members)
+            {
+                var p = Get(m.Name);
+                people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4, p.Item5, p.Item6);
+            }
+        foreach (var (name, projPct) in projectByPerson)
+        {
+            var p = Get(name);
+            people[name] = (p.Item1, p.Item2, p.Item3, projPct, p.Item5, p.Item6);
+        }
+        foreach (var g in groups)
+            foreach (var m in g.Members)
+            {
+                var p = Get(m.DisplayName);
+                people[m.DisplayName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.JobTitle : p.Item2,
+                    string.IsNullOrEmpty(p.Item3) ? g.DisplayName : p.Item3, p.Item4, p.Item5, p.Item6);
+            }
+        foreach (var (name, ops) in opsByPerson)
+        {
+            var p = Get(name);
+            people[name] = (p.Item1, p.Item2, p.Item3, p.Item4, p.Item5, p.Item6 + ops);
+        }
+
+        return people.Values
+            .Select(p => new RosterRow(p.Name, string.IsNullOrEmpty(p.Title) ? "Team member" : p.Title,
+                string.IsNullOrEmpty(p.Dept) ? "Unassigned" : p.Dept, p.Project, p.Product, p.Ops))
+            .OrderByDescending(p => p.Project + p.Product + p.Ops).ThenBy(p => p.Name).ToList();
+    }
+
     public static void MapResourceEndpoints(this RouteGroupBuilder api)
     {
         // The capacity roster: everyone with an allocation (product or project) or
@@ -47,58 +102,11 @@ public static class ResourcesData
         api.MapGet("/resources", async (AtlasDbContext db, string? asOf) =>
         {
             // Utilisation is time-phased: count each dated allocation segment only
-            // if it's live on the reference day (default today). Segments without
-            // dates are always live, so pre-dates data is unchanged.
+            // if it's live on the reference day (default today).
             var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d)
                 ? d : DateOnly.FromDateTime(DateTime.UtcNow);
-            var productAllocs = await db.ProductAllocations.ToListAsync();
-            var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
-            var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
-            var opsByPerson = await Ops.AllocByPersonAsync(db, on);   // Ops% source: active ops work items (time-phased)
-            // Combined project load per person: max(planned team %, task-estimate %)
-            // per project, summed (ADR-0020). Includes people with only tasks.
-            var projectByPerson = await AllocationEngine.ProjectLoadByPersonAsync(db, on);
-
-            // Accumulate per person (keyed case-insensitively by name).
-            var people = new Dictionary<string, (string Name, string Title, string Dept, int Project, int Product, int Ops)>(StringComparer.OrdinalIgnoreCase);
-            (string, string, string, int, int, int) Get(string name) =>
-                people.TryGetValue(name, out var v) ? v : (name, "", "", 0, 0, 0);
-
-            foreach (var a in productAllocs)
-            {
-                var p = Get(a.MemberName);
-                people[a.MemberName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? a.MemberTitle : p.Item2, p.Item3, p.Item4, p.Item5 + a.Alloc, p.Item6);
-            }
-            // Ensure everyone with a project team assignment is listed (at 0% when
-            // their allocation isn't live today) and carries a title — the numbers
-            // come from the engine below so planned + task load never double-count.
-            foreach (var t in projAssignments)
-                foreach (var m in t.Members)
-                {
-                    var p = Get(m.Name);
-                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4, p.Item5, p.Item6);
-                }
-            foreach (var (name, projPct) in projectByPerson)
-            {
-                var p = Get(name);
-                people[name] = (p.Item1, p.Item2, p.Item3, projPct, p.Item5, p.Item6);
-            }
-            foreach (var g in groups)
-                foreach (var m in g.Members)
-                {
-                    var p = Get(m.DisplayName);
-                    people[m.DisplayName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.JobTitle : p.Item2,
-                        string.IsNullOrEmpty(p.Item3) ? g.DisplayName : p.Item3, p.Item4, p.Item5, p.Item6);
-                }
-            foreach (var (name, ops) in opsByPerson)
-            {
-                var p = Get(name);
-                people[name] = (p.Item1, p.Item2, p.Item3, p.Item4, p.Item5, p.Item6 + ops);
-            }
-
-            var rows = people.Values
-                .OrderByDescending(p => p.Project + p.Product + p.Ops).ThenBy(p => p.Name)
-                .Select(p => new ResourceDto(p.Name, string.IsNullOrEmpty(p.Title) ? "Team member" : p.Title, p.Dept,
+            var rows = (await RosterAsync(db, on))
+                .Select(p => new ResourceDto(p.Name, p.Title, p.Dept == "Unassigned" ? "" : p.Dept,
                     Initials(p.Name), ColorFor(p.Name), p.Ops, p.Project, p.Product, p.Project + p.Product + p.Ops > 100))
                 .ToList();
             return Results.Ok(rows);

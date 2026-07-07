@@ -328,6 +328,17 @@ public record PiLinkTargetDto(string Type, string Id, string Name);
 public record IncrementsDto(bool CanEdit, List<IncrementSummaryDto> Increments);
 
 // ---- Resources & allocation (derived from real product/project allocations) --
+// ---- Capacity intelligence -------------------------------------------------
+public record CapPersonDto(string Name, string Title, string Dept, string Initials, string Color,
+    int Ops, int Project, int Product, int Total, int Free);
+public record CapDeptDto(string Dept, int Headcount, int Capacity, int Allocated, int LoadedPct, int OverCount);
+public record CapacityInsightDto(int Headcount, int TotalCapacity, int TotalAllocated, int LoadedPct,
+    int OverCount, int FreeCount, int UnallocatedCount,
+    List<CapPersonDto> Over, List<CapPersonDto> Under, List<CapDeptDto> ByDept);
+public record StaffCandidateDto(string Name, string Title, string Dept, string Initials, string Color,
+    int Level, int Total, int Free);
+public record StaffingDto(string Skill, List<StaffCandidateDto> Candidates);
+
 public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc,
     int AllocHours = 0, string StartDate = "", string EndDate = "",
     int ExtAlloc = 0, int ExtHours = 0, string ExtStartDate = "", string ExtEndDate = "");

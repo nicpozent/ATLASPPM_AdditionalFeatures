@@ -30,5 +30,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0021](./0021-jira-delta-and-per-entity-sync.md) | Jira delta sync + per-entity (project/program/product) sync | Accepted |
 | [0022](./0022-json-backup-merge-restore.md) | JSON backup is a logical export; restore is a merge (pg_dump authoritative) | Accepted |
 | [0023](./0023-close-allocation-gaps.md) | Time-phased Ops, hours/dates in Resources editing, server-side custom dashboard | Accepted |
+| [0024](./0024-capacity-intelligence.md) | Capacity intelligence (insight + staffing) over the shared roster | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
