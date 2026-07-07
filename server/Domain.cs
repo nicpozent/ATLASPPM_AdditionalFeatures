@@ -1208,6 +1208,7 @@ public class RoadmapItem
     public string Title { get; set; } = default!;
     public string Description { get; set; } = "";
     public string Lane { get; set; } = "Now";            // Now | Next | Later
+    public int PlannedYear { get; set; }                 // calendar year for the "By year" view; 0 = unscheduled
     public string Status { get; set; } = "Proposed";     // Proposed | Committed | In progress | Done | Cancelled
     public string Theme { get; set; } = "";              // free-text strategic theme / swimlane
     public string Owner { get; set; } = "";

@@ -21,13 +21,15 @@ interface Link { entityType: string; entityId: string; label: string; }
 interface Item {
   id: number; ref: string; title: string; description: string; lane: string;
   status: string; theme: string; owner: string; startDate: string; endDate: string;
-  confidence: number; effort: number; value: number;
+  confidence: number; effort: number; value: number; plannedYear: number;
   milestones: Milestone[]; links: Link[]; dependsOn: number[]; blocks: number[];
 }
 interface LinkOption { entityType: string; entityId: string; label: string; }
 interface Board { canEdit: boolean; items: Item[]; themes: string[]; linkOptions: LinkOption[]; }
 
 const LANES = ["Now", "Next", "Later"] as const;
+// Year choices for the planned-year selector: last year through +5.
+const YEAR_OPTIONS = (() => { const y = new Date().getFullYear(); return Array.from({ length: 7 }, (_, i) => y - 1 + i); })();
 const LANE_ACCENT: Record<string, string> = { Now: color.success, Next: color.primary, Later: color.accent };
 const STATUSES = ["Proposed", "Committed", "In progress", "Done", "Cancelled"];
 const LINK_TYPES = ["okr", "project", "program", "product", "release"] as const;
@@ -64,7 +66,7 @@ export default function Roadmap() {
   const qc = useQueryClient();
   const { can } = usePermissions();
   const mayEdit = can("cap-roadmap", "E");
-  const [view, setView] = useState<"board" | "timeline">("board");
+  const [view, setView] = useState<"board" | "year" | "timeline">("board");
   const [theme, setTheme] = useState("all");
   const [status, setStatus] = useState("all");
   const [newItem, setNewItem] = useState(false);
@@ -88,6 +90,12 @@ export default function Roadmap() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["roadmap"] }),
     onError: (e) => toastError(e),
   });
+  const setYear = useMutation({
+    mutationFn: ({ id, plannedYear }: { id: number; plannedYear: number }) =>
+      api(`/roadmap/${id}`, { method: "PATCH", body: JSON.stringify({ plannedYear }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["roadmap"] }),
+    onError: (e) => toastError(e),
+  });
   const del = useMutation({
     mutationFn: (id: number) => api(`/roadmap/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["roadmap"] }); toast("Initiative removed"); },
@@ -100,20 +108,36 @@ export default function Roadmap() {
     setDragId(null);
     if (it && it.lane !== lane && mayEdit) move.mutate({ id: dragId, lane });
   };
+  // Effective year for the "By year" view: the explicit planned year, else the
+  // start-date's year, else unscheduled (0).
+  const yearOf = (i: Item) => i.plannedYear || (i.startDate ? new Date(i.startDate).getFullYear() || 0 : 0);
+  const onDropYear = (year: number) => {
+    if (dragId == null) return;
+    const it = items.find((i) => i.id === dragId);
+    setDragId(null);
+    if (it && yearOf(it) !== year && mayEdit) setYear.mutate({ id: dragId, plannedYear: year });
+  };
+  // Year columns: every year present on an item, plus this year and next, sorted,
+  // with an Unscheduled column at the end.
+  const thisYear = new Date().getFullYear();
+  const years = Array.from(new Set([
+    ...filtered.map(yearOf).filter((y) => y > 0),
+    thisYear, thisYear + 1,
+  ])).sort((a, b) => a - b);
 
   return (
     <div>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ display: "inline-flex", background: color.surface, border: `1px solid ${color.border2}`, borderRadius: radius.md, padding: 3 }}>
-          {(["board", "timeline"] as const).map((v) => (
+          {(["board", "year", "timeline"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
                 border: "none", borderRadius: radius.sm, padding: "6px 12px", cursor: "pointer",
                 background: view === v ? color.primary : "transparent", color: view === v ? "#fff" : color.textMuted,
               }}>
-              <Icon name={v === "board" ? "grid" : "gantt"} size={14} /> {v === "board" ? "Now / Next / Later" : "Timeline"}
+              <Icon name={v === "board" ? "grid" : v === "year" ? "calendar" : "gantt"} size={14} /> {v === "board" ? "Now / Next / Later" : v === "year" ? "By year" : "Timeline"}
             </button>
           ))}
         </div>
@@ -153,6 +177,35 @@ export default function Roadmap() {
                   {laneItems.length === 0
                     ? <div style={{ fontSize: 12, color: color.faint3, padding: "6px 4px 10px" }}>Nothing here yet.</div>
                     : laneItems.map((i) => (
+                      <ItemCard key={i.id} item={i} mayEdit={mayEdit} titleOf={titleOf}
+                        onEdit={() => setEditItem(i)} onDelete={() => del.mutate(i.id)}
+                        draggable={mayEdit} onDragStart={() => setDragId(i.id)} onDragEnd={() => setDragId(null)} />
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : view === "year" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
+          {[...years, 0].map((year) => {
+            const yearItems = filtered.filter((i) => yearOf(i) === year);
+            const label = year === 0 ? "Unscheduled" : String(year);
+            return (
+              <div key={year}
+                onDragOver={(e) => { if (dragId != null) e.preventDefault(); }}
+                onDrop={() => onDropYear(year)}
+                style={{ background: color.surfaceAlt, border: `1px solid ${color.border2}`, borderRadius: radius.lg, padding: 12, minHeight: 120 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 4px 12px" }}>
+                  <Icon name="calendar" size={14} color={year === thisYear ? color.primary : color.faint2} />
+                  <span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 700, color: year === 0 ? color.faint2 : color.ink }}>{label}</span>
+                  {year === thisYear && <span style={{ fontSize: 9.5, fontWeight: 700, color: color.primary, background: color.primaryTint, borderRadius: 5, padding: "1px 6px" }}>THIS YEAR</span>}
+                  <span style={{ fontSize: 11.5, color: color.faint2, fontWeight: 600 }}>{yearItems.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {yearItems.length === 0
+                    ? <div style={{ fontSize: 12, color: color.faint3, padding: "6px 4px 10px" }}>{year === 0 ? "Everything is scheduled." : "Nothing planned for this year yet."}</div>
+                    : yearItems.map((i) => (
                       <ItemCard key={i.id} item={i} mayEdit={mayEdit} titleOf={titleOf}
                         onEdit={() => setEditItem(i)} onDelete={() => del.mutate(i.id)}
                         draggable={mayEdit} onDragStart={() => setDragId(i.id)} onDragEnd={() => setDragId(null)} />
@@ -354,6 +407,7 @@ function ItemModal({ board, item, onClose }: { board: Board; item?: Item; onClos
   const [confidence, setConfidence] = useState(item?.confidence ?? 60);
   const [effort, setEffort] = useState(item?.effort ?? 3);
   const [value, setValue] = useState(item?.value ?? 3);
+  const [plannedYear, setPlannedYear] = useState(item?.plannedYear ?? 0);
   const [milestones, setMilestones] = useState<{ title: string; date: string; done: boolean }[]>(
     item?.milestones.map((m) => ({ title: m.title, date: m.date, done: m.done })) ?? []);
   const [links, setLinks] = useState<{ entityType: string; entityId: string }[]>(
@@ -369,7 +423,7 @@ function ItemModal({ board, item, onClose }: { board: Board; item?: Item; onClos
 
   const body = () => JSON.stringify({
     title: title.trim(), description: description.trim(), lane, status, theme: theme.trim(), owner: owner.trim(),
-    startDate, endDate, confidence, effort, value,
+    startDate, endDate, confidence, effort, value, plannedYear,
     milestones: milestones.filter((m) => m.title.trim()).map((m) => ({ title: m.title.trim(), date: m.date, done: m.done })),
     links, dependsOn,
   });
@@ -393,6 +447,12 @@ function ItemModal({ board, item, onClose }: { board: Board; item?: Item; onClos
 
       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1 }}><DecLabel>Horizon</DecLabel><Select value={lane} onChange={(e) => setLane(e.target.value)}>{LANES.map((l) => <option key={l} value={l}>{l}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Planned year</DecLabel>
+          <Select value={String(plannedYear)} onChange={(e) => setPlannedYear(Number(e.target.value))}>
+            <option value="0">Unscheduled</option>
+            {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </Select>
+        </div>
         <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
         <div style={{ flex: 1 }}><DecLabel>Theme</DecLabel><Input value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="Swimlane" list="roadmap-themes" />
           <datalist id="roadmap-themes">{board.themes.map((t) => <option key={t} value={t} />)}</datalist>
