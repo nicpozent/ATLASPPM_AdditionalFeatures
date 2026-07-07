@@ -6,6 +6,10 @@ User stories for every feature and capability in Atlas, organised by **section**
 > **US-<section>-<n>** — _As a **role**, I want **capability**, so that **benefit**._
 > **Acceptance:** the conditions that make the story done.
 
+> This catalogue is also browsable in-app under **Admin → User Stories**, and the
+> readiness assessment under **Admin → Application Evaluation**. The structured
+> source is `src/data/adminDocs.ts`; keep it and this doc in step.
+
 ### Roles
 
 **Server-authoritative (canonical, 6):** `PlatformAdmin`, `PMO`,
@@ -29,152 +33,177 @@ full (F) levels. Authorization is always server-side.
   **Acceptance:** MSAL redirect sign-in; MFA honoured via Conditional Access;
   active account resolved before first render; API roles decoded from the access
   token.
-- **US-AUTH-2** — _As a **security officer (PlatformAdmin)**, I want unattended
-  sessions to sign out after 15 minutes of inactivity, so that an unlocked
-  workstation can't be misused._
+- **US-AUTH-2** — _As a **PlatformAdmin (security)**, I want unattended sessions
+  to sign out after 15 minutes of inactivity, so that an unlocked workstation
+  can't be misused._
   **Acceptance:** idle > `VITE_AUTH_IDLE_MINUTES` (default 15, clamped 1–480) →
   MSAL logout; timer resets on pointer/keyboard/scroll/touch/focus; shared across
-  the user's tabs; inert when auth is disabled.
+  tabs; inert when auth disabled.
 - **US-AUTH-3** — _As a **user**, I want my role to decide what I can see and do,
   so that I'm not shown actions I can't perform._
-  **Acceptance:** nav + affordances reflect role; every write is re-checked
+  **Acceptance:** nav + affordances reflect role; every write re-checked
   server-side; a forbidden call returns 403 with a friendly message.
 - **US-AUTH-4** — _As a **PlatformAdmin**, I want to run the whole UI without a
   backend during evaluation, so that stakeholders can browse the mockup._
   **Acceptance:** `VITE_AUTH_ENABLED=false` → no gate, empty states everywhere.
+- **US-AUTH-5** — _As a **user**, I want a clear signed-in identity and a way to
+  switch my UI role view, so that I understand which persona's nav I'm seeing._
+  **Acceptance:** topbar shows identity + role switcher; switching changes nav
+  only, never server permissions.
 
 ## 2. Dashboard
 
-- **US-DASH-1** — _As an **Executive/PMO**, I want an Executive dashboard
-  (portfolio-health donut, budget burn, KPI cards with sparklines, active
-  projects, needs-attention, demand pipeline, recent activity), so that I see
-  portfolio health at a glance._
-  **Acceptance:** four layouts via segmented control (Executive / Operational /
-  Compact / Custom); KPIs zero and tables empty until data loads.
+- **US-DASH-1** — _As an **Executive/PMO**, I want an Executive dashboard (health
+  donut, budget burn, KPI cards with sparklines, active projects, needs-attention,
+  demand pipeline, recent activity), so that I see portfolio health at a glance._
+  **Acceptance:** four layouts via segmented control; KPIs zero and tables empty
+  until data loads.
 - **US-DASH-2** — _As a **PM/Team member**, I want an Operational dashboard (my
   tasks/sprint, approvals, KPIs), so that I can run my day._
 - **US-DASH-3** — _As a **power user**, I want a drag-and-drop Custom dashboard
-  (widget palette, add/remove/reset), persisted server-side, so that I keep my
-  own layout across sessions._
+  (widget palette, add/remove/reset) persisted server-side, so that I keep my own
+  layout across sessions._
   **Acceptance:** layout saved per user; reset restores defaults.
-- **US-DASH-4** — _As a **user**, I want the dashboard to refresh and to surface
+- **US-DASH-4** — _As a **user**, I want a Compact dense layout, so that I can
+  scan many items in little space._
+- **US-DASH-5** — _As a **user**, I want the dashboard to auto-refresh and surface
   errors clearly, so that I trust the numbers._
-  **Acceptance:** auto-refresh; a failed load shows a friendly error, not a blank
-  crash.
+  **Acceptance:** a failed load shows a friendly error, not a blank crash.
 
 ## 3. Portfolio & Blockers
 
-- **US-PORT-1** — _As a **PMO/PM**, I want a Projects sub-tab with filter chips
-  and project cards/table, so that I can scan and drill into any project._
+- **US-PORT-1** — _As a **PMO/PM**, I want a Projects sub-tab with filter chips and
+  project cards/table, so that I can scan and drill into any project._
   **Acceptance:** clicking a project opens Project Detail; filters by
   status/department.
 - **US-PORT-2** — _As a **PM**, I want a Blockers sub-tab (list + side panel,
   status, description, filter), so that I can triage what's stuck._
-  **Acceptance:** blockers clickable, editable, status lifecycle; also surfaced
-  on a project's Blockers tab.
-- **US-PORT-3** — _As an **Executive**, I want the portfolio timeline to show
-  items even before rich data exists, so that the view isn't empty._
+  **Acceptance:** blockers clickable, editable, status lifecycle; also on a
+  project's Blockers tab.
+- **US-PORT-3** — _As an **Executive**, I want the portfolio timeline to show items
+  even before rich data exists, so that the view isn't empty._
   **Acceptance:** windows derived from phases/tasks/sprints.
+- **US-PORT-4** — _As a **PMO**, I want to filter the portfolio by department and
+  owner, so that I focus on my slice._
 
 ## 4. Project Detail
 
-- **US-PROJ-1** — _As a **PM**, I want an Overview tab (summary, communication
-  plan, stakeholder matrix, skills panel, linked products), editable in place, so
-  that the project's context is current._
+- **US-PROJ-1** — _As a **PM**, I want an Overview tab (summary, communication plan,
+  stakeholder matrix, skills panel, linked products) editable in place, so that the
+  project's context is current._
 - **US-PROJ-2** — _As a **PM/Team member**, I want Tasks in board and list views
   with drag, edit/delete, fields, sprint/epic dropdowns, assignee filter, and a
   Backlog tab, so that I can manage delivery work._
   **Acceptance:** manual create gated on capability; synced tasks read-only where
   appropriate; completion % auto-derived from task states.
 - **US-PROJ-3** — _As a **PM**, I want Epics (clickable, edit/delete, multiple
-  dependencies) and Requirements (edit/delete, description, attachments, status
-  categories), so that scope is tracked._
-- **US-PROJ-4** — _As a **PM**, I want a RAID log (risks/assumptions/issues/
+  dependencies), so that scope structure is tracked._
+- **US-PROJ-4** — _As a **PM**, I want Requirements (edit/delete, description,
+  attachments, status categories), so that requirements trace to delivery._
+- **US-PROJ-5** — _As a **PM**, I want a RAID log (risks/assumptions/issues/
   dependencies) with lifecycle, so that governance is auditable._
-- **US-PROJ-5** — _As a **PM**, I want Artifacts with an artifact window,
-  versions, upload, and status lifecycle, so that deliverables are versioned._
-- **US-PROJ-6** — _As a **PMO/Finance**, I want a Costs tab (labor/license/PaaS/
+- **US-PROJ-6** — _As a **PM**, I want Artifacts with an artifact window, versions,
+  upload, and status lifecycle, so that deliverables are versioned._
+- **US-PROJ-7** — _As a **PMO/Finance**, I want a Costs tab (labor/license/PaaS/
   IaaS/SaaS + internal-labor lines), so that project spend is itemised._
-- **US-PROJ-7** — _As a **Chief Architect/PMO**, I want Gates (G0–G5) with gate
+- **US-PROJ-8** — _As a **Chief Architect/PMO**, I want Gates (G0–G5) with gate
   reviews, so that stage-gate governance is enforced._
-- **US-PROJ-8** — _As a **PM**, I want Change Requests (editable fields, status,
+- **US-PROJ-9** — _As a **PM**, I want Change Requests (editable fields, status,
   delete) and threaded Comments, so that change and discussion are recorded._
-- **US-PROJ-9** — _As a **PM**, I want to edit project details (dates, owner,
+- **US-PROJ-10** — _As a **PM**, I want to edit project details (dates, owner,
   methodology, Jira/ADO mapping) from the detail screen, so that I don't need an
   admin._
   **Acceptance:** start/end reflected in Gantt; edits gated on capability.
+- **US-PROJ-11** — _As a **PM**, I want the project detail content to match the
+  chosen methodology, so that the screen fits how we work._
+  **Acceptance:** e.g. Sprints tab only for agile-with-sprints.
+- **US-PROJ-12** — _As a **PM**, I want an Ops-impact panel on Overview, so that I
+  see run-the-business load pulling on delivery capacity._
 
 ## 5. Demands
 
 - **US-DEM-1** — _As a **PMO**, I want a value-vs-effort scored intake funnel with
   drag across stages, so that I can prioritise demand._
-- **US-DEM-2** — _As a **requester**, I want to create a demand; **as an
-  approver**, I want to approve/reject it, so that intake is governed._
+- **US-DEM-2** — _As a **requester**, I want to create a demand with the full
+  scoring form, so that my request is captured and comparable._
+- **US-DEM-3** — _As an **approver**, I want to approve/reject a demand, so that
+  intake is governed._
   **Acceptance:** create/approve modals; edits gated on `cap-demands`.
-- **US-DEM-3** — _As a **Stakeholder**, I want to see my own demands, so that I
+- **US-DEM-4** — _As a **Stakeholder**, I want to see my own demands, so that I
   track my requests without full portfolio access._
+- **US-DEM-5** — _As a **PMO**, I want to convert an approved demand into a project,
+  so that intake flows into delivery without re-keying._
 
 ## 6. Timeline / Gantt
 
-- **US-GANTT-1** — _As a **PM**, I want a project timeline (phases, bars,
-  milestones with an add-milestone modal, dependency arrows, month grid, export),
-  so that I can plan and communicate schedule._
+- **US-GANTT-1** — _As a **PM**, I want a project timeline (phases, bars, milestones
+  with an add-milestone modal, dependency arrows, month grid, export), so that I can
+  plan and communicate schedule._
 - **US-GANTT-2** — _As a **PM**, I want sprints shown below the schedule as
   collapsible phases, so that iteration cadence is visible._
-- **US-GANTT-3** — _As a **PMO**, I want a Program-scope timeline derived from its
+- **US-GANTT-3** — _As a **PM**, I want synced Jira/ADO sprints to appear in the
+  Schedule view, so that imported cadence shows without manual phases._
+  **Acceptance:** project gantt returns sprint bars; undated sprints fall back to
+  the project window.
+- **US-GANTT-4** — _As a **PMO**, I want a Program-scope timeline derived from its
   projects, tasks and sprints, so that cross-project schedule is visible._
-- **US-GANTT-4** — _As a **PM**, I want Resources and Sprints views on the
-  timeline, so that I see allocation and cadence in context._
+- **US-GANTT-5** — _As a **PM**, I want Resources and Sprints views on the timeline,
+  so that I see allocation and cadence in context._
 
 ## 7. Programs
 
 - **US-PROG-1** — _As a **PMO**, I want a program list and detail (stakeholder
   power/interest matrix, linked projects, status, start/end), so that I manage
   programs._
-- **US-PROG-2** — _As a **PMO**, I want to create programs and link/unlink
-  projects, and archive/delete, so that the program portfolio stays accurate._
+- **US-PROG-2** — _As a **PMO**, I want to create programs and link/unlink projects,
+  so that the program portfolio stays accurate._
+- **US-PROG-3** — _As a **PMO**, I want to archive/delete a program, so that retired
+  programs don't clutter the view._
 
 ## 8. Products
 
 - **US-PROD-1** — _As a **PMO/Product owner**, I want a product portfolio with
-  Jira/ADO tasks mapped to releases and linked projects, so that product delivery
-  is tracked._
-- **US-PROD-2** — _As a **Product owner**, I want product start/end dates, a
-  team assignment with allocations, and a timeline, so that product capacity is
-  planned._
+  Jira/ADO tasks mapped to releases and linked projects, so that product delivery is
+  tracked._
+- **US-PROD-2** — _As a **Product owner**, I want product start/end dates and a
+  timeline, so that product horizon is planned._
+- **US-PROD-3** — _As a **Product owner**, I want a product team assignment with
+  per-member allocations, so that product capacity is planned._
 
 ## 9. OKRs
 
-- **US-OKR-1** — _As an **Executive/PMO**, I want objectives with key results
-  linked to projects/programs/products, so that strategy connects to delivery._
-- **US-OKR-2** — _As a **PMO**, I want KR progress auto-derived from linked
-  entities (with manual RAG override), a timeline, and spillover/warning/missed
-  states, so that OKR status is trustworthy._
+- **US-OKR-1** — _As an **Executive/PMO**, I want objectives with key results linked
+  to projects/programs/products, so that strategy connects to delivery._
+- **US-OKR-2** — _As a **PMO**, I want KR progress auto-derived from linked entities
+  with a manual RAG override, so that OKR status is trustworthy._
   **Acceptance:** edit/delete gated on `cap-okrs`.
+- **US-OKR-3** — _As a **PMO**, I want an OKR timeline with spillover/warning/missed
+  states, so that I see objectives against time._
 
 ## 10. Resources & Availability
 
 - **US-RES-1** — _As a **resource manager**, I want people synced from Entra with
-  allocation vs availability, and per-person input rows by reporting period, so
-  that capacity is planned._
+  allocation vs availability and per-person input rows by reporting period, so that
+  capacity is planned._
 - **US-RES-2** — _As a **manager**, I want time-phased allocation (per-assignment
   start/end, %-or-hours), so that allocation reflects reality over time._
 - **US-RES-3** — _As a **manager**, I want an availability finder (who's free by
   date/range, stacked allocation), so that I can staff work._
 - **US-RES-4** — _As a **PMO**, I want colour-graded Excel exports (allocation
   histogram, skills matrix), so that I can share offline._
+- **US-RES-5** — _As a **manager**, I want allocation to include Ops load and
+  absences, so that capacity numbers are honest._
 
 ## 11. Financials & ROI
 
 - **US-FIN-1** — _As **Finance/PMO**, I want budget vs actual, CapEx/OpEx split,
-  forecast-at-completion, savings/benefit, and portfolio ROI, so that I steer
-  spend._
-- **US-FIN-2** — _As **PMO/PM Lead**, I want internal-labor cost lines (Dev,
-  Infra, PM, PO) editable by owning roles, so that internal cost is captured._
-- **US-FIN-3** — _As an **Executive**, I want financials per project/program/
-  product and overall, with a source toggle and forecast, so that I compare._
-- **US-FIN-4** — _As an **Executive**, I want ROI per entity (manual + auto) with
-  an explanation, so that I understand the number._
+  forecast-at-completion, savings/benefit, and portfolio ROI, so that I steer spend._
+- **US-FIN-2** — _As **PMO/PM Lead**, I want internal-labor cost lines (Dev, Infra,
+  PM, PO) editable by owning roles, so that internal cost is captured._
+- **US-FIN-3** — _As an **Executive**, I want financials per project/program/product
+  and overall, with a source toggle and forecast, so that I compare._
+- **US-FIN-4** — _As an **Executive**, I want ROI per entity (manual + auto) with an
+  explanation, so that I understand the number._
 
 ## 12. Delivery Status
 
@@ -184,55 +213,66 @@ full (F) levels. Authorization is always server-side.
 
 ## 13. Releases
 
-- **US-REL-1** — _As a **release manager**, I want a release calendar and
-  deployment tracking with per-status tabs and an overall view, so that I plan
-  deployments._
+- **US-REL-1** — _As a **release manager**, I want a release calendar and deployment
+  tracking with per-status tabs and an overall view, so that I plan deployments._
 - **US-REL-2** — _As a **release manager**, I want Cancelled status plus archive/
   delete and edit, so that the calendar stays clean._
+- **US-REL-3** — _As a **release manager**, I want to link a release to a project/
+  product/program via a dropdown of both connector-mapped and manually-created
+  entities, so that I don't hand-type ids and can't mistype._
+  **Acceptance:** scope-aware dropdown fed by the list endpoints; legacy free-text
+  kept as a "(current)" option.
 
 ## 14. Weekly Updates (News)
 
 - **US-NEWS-1** — _As a **PMO**, I want an editable news wall (headline, highlight
-  metric, shout-out, image, milestone, doc blocks) with themes + masonry and an
-  edit mode, so that I broadcast curated updates._
+  metric, shout-out, image, milestone, doc blocks) with themes + masonry and an edit
+  mode, so that I broadcast curated updates._
 
 ## 15. My Team, Skills & Labor Rates
 
 - **US-TEAM-1** — _As a **manager**, I want My Team with members, skills, and a
   roll-up view, so that I see my org._
-- **US-TEAM-2** — _As a **manager**, I want a customizable skills/competency
-  matrix (name-keyed ratings), so that I plan by capability._
+- **US-TEAM-2** — _As a **manager**, I want a customizable skills/competency matrix
+  (name-keyed ratings), so that I plan by capability._
 - **US-TEAM-3** — _As a **PMO/PM Lead**, I want an internal-labor rate card
-  (Junior/Semi-Senior/Senior/Specialist/Expert) with a day/month/hour calculator,
-  so that I estimate internal cost._
+  (Junior→Expert) with a day/month/hour calculator, so that I estimate internal
+  cost._
 
 ## 16. Methodologies & Create-Project Wizard
 
-- **US-METH-1** — _As a **PMO/PM**, I want a methodology library (Waterfall,
-  V-Model, Stage-Gate, Scrum, Kanban, SAFe, Scrumban, Spiral, Iterative, RAD,
-  DevOps), so that projects follow a chosen way of working._
+- **US-METH-1** — _As a **PMO/PM**, I want a methodology library (Waterfall, V-Model,
+  Stage-Gate, Scrum, Kanban, SAFe, Scrumban, Spiral, Iterative, RAD, DevOps), so
+  that projects follow a chosen way of working._
 - **US-METH-2** — _As a **PM**, I want a create-project wizard (methodology →
   name/dept/owner → integration), so that projects start consistently._
   **Acceptance:** methodology drives the project's detail content.
 
 ## 17. Integrations
 
-- **US-INT-1** — _As a **PlatformAdmin**, I want to configure connectors and
-  Test connection, so that I confirm access before syncing._
-  **Acceptance:** status never calls the remote; test/discovery degrade
-  gracefully; gated on `cap-integrations`.
-- **US-INT-2** — _As a **PM/PMO**, I want to discover and import Jira projects
-  (to a new/existing Atlas project, a program, or an Ops service) with optional
-  board id, so that delivery data flows in._
-- **US-INT-3** — _As a **PM/PMO**, I want to discover and import **Azure DevOps**
+- **US-INT-1** — _As a **PlatformAdmin**, I want to configure connectors and Test
+  connection, so that I confirm access before syncing._
+  **Acceptance:** status never calls the remote; test/discovery degrade gracefully;
+  gated on `cap-integrations`.
+- **US-INT-2** — _As a **PM/PMO**, I want to discover and import Jira projects (to a
+  new/existing project, a program, or an Ops service) with an optional board id, so
+  that delivery data flows in._
+- **US-INT-3** — _As a **PM/PMO**, I want to discover and import Azure DevOps
   projects and map them to Atlas projects, so that ADO work is tracked in Atlas._
-- **US-INT-4** — _As a **PM**, I want a **Sync now** that pulls Jira/ADO into
+- **US-INT-4** — _As a **PM**, I want a Sync now that pulls Jira/ADO into
   tasks/epics/sprints/backlog idempotently, so that Atlas mirrors the tracker
   without duplicates or clobbering manual rows._
   **Acceptance:** ADO iterations→sprints, work items→epics/tasks, no iteration ⇒
-  backlog; prune-on-full-pull; bounded at 4000.
-- **US-INT-5** — _As a **PM**, I want large syncs to run in the background, so
-  that a portfolio-wide Jira pull doesn't time out._
+  backlog; prune-on-full-pull; bounded.
+- **US-INT-5** — _As a **PM**, I want large syncs to run in the background, so that a
+  portfolio-wide pull doesn't time out._
+  **Acceptance:** 202 + jobId poll.
+- **US-INT-6** — _As a **Service Manager**, I want the Jira → Ops import to carry the
+  full issue (description, people, labels, components, versions, points, time,
+  epics, comments, attachments), so that an Ops import is as faithful as a project
+  import._
+  **Acceptance:** epics import as items tagged Epic; children link by epic/parent
+  key; comments/attachments idempotent by Jira id.
 
 ## 18. Reports
 
@@ -245,11 +285,16 @@ full (F) levels. Authorization is always server-side.
   that I assign capabilities to roles._
 - **US-ADM-2** — _As a **PlatformAdmin**, I want backups/restore, an audit log, AD
   sync, and install/integration guides, so that I operate the platform._
-- **US-ADM-3** — _As a **Data Protection Officer (PlatformAdmin)**, I want a Data
-  Privacy tab: DSAR export, erase, run-retention, and deletion requests, so that
-  I meet GDPR obligations._
-- **US-ADM-4** — _As a **PlatformAdmin**, I want to configure the idle-logout
-  timeout and SSO/MFA, so that session policy meets our standard._
+- **US-ADM-3** — _As a **Data Protection Officer**, I want a Data Privacy tab: DSAR
+  export, erase, run-retention, and deletion requests, so that I meet GDPR
+  obligations._
+- **US-ADM-4** — _As a **PlatformAdmin**, I want to configure the idle-logout timeout
+  and SSO/MFA, so that session policy meets our standard._
+- **US-ADM-5** — _As a **PlatformAdmin**, I want an Application Evaluation view and a
+  User Stories catalogue in-app, so that I can review readiness and scope without
+  leaving Atlas._
+- **US-ADM-6** — _As a **PlatformAdmin**, I want a database password rotation age
+  panel with 90/180-day nudges, so that credential hygiene is visible._
 
 ## 20. Help
 
@@ -260,30 +305,31 @@ full (F) levels. Authorization is always server-side.
 
 - **US-GOV-1** — _As a **Chief Architect**, I want stage gates (G0–G5) and gate
   reviews (architecture/security), so that decisions are gated._
-- **US-GOV-2** — _As a **Chief Architect**, I want an ARB sign-off panel,
-  architecture domains/waivers, and TOGAF ADM phases, so that architecture is
-  governed._
+- **US-GOV-2** — _As a **Chief Architect**, I want an ARB sign-off panel, architecture
+  domains/waivers, and TOGAF ADM phases, so that architecture is governed._
 - **US-GOV-3** — _As a **governance lead**, I want a decision log (ADR) with
   edit/delete, so that decisions are recorded._
 - **US-GOV-4** — _As a **compliance officer**, I want a security/compliance module
   (GDPR, PCI-DSS, ISO 27001, EU AI Act, SOC 2, NIS2) with control mappings and
   configurable review gates, so that controls have evidence._
-- **US-GOV-5** — _As a **QA lead**, I want a Quality module (plan → stages →
-  tests + defects, with tasks/test cases associated to a plan), so that quality
-  is tracked._
+- **US-GOV-5** — _As a **QA lead**, I want a Quality module (plan → stages → tests +
+  defects, tasks/test cases per plan), so that quality is tracked._
 
 ## 22. Ops (run-the-business)
 
 - **US-OPS-1** — _As a **Service Manager**, I want Ops services with work items
   (type/priority/status/assignee/allocation %), archivable, so that BAU work is
   tracked and counts against capacity._
-- **US-OPS-2** — _As a **Service Manager**, I want to import/sync a Jira space as
-  an Ops service and link existing project tasks to a service, so that a service
-  is fed by both Jira and real delivery tasks._
-  **Acceptance:** linked tasks are read-only, allocation stays with their project
-  (no double-counting).
-- **US-OPS-3** — _As a **PM**, I want an Ops "impact project" tag, so that a
-  project's Overview shows operational load pulling on its capacity._
+- **US-OPS-2** — _As a **Service Manager**, I want to import/sync a Jira space as an
+  Ops service and link existing project tasks to a service, so that a service is fed
+  by both Jira and real delivery tasks._
+  **Acceptance:** linked tasks read-only; allocation stays with their project (no
+  double-counting).
+- **US-OPS-3** — _As a **Service Manager**, I want to filter the board by Jira
+  work-item status and multi-select items for bulk delete, so that I triage the way
+  I think and clear synced noise quickly._
+- **US-OPS-4** — _As a **PM**, I want an Ops "impact project" tag, so that a project's
+  Overview shows operational load pulling on its capacity._
 
 ## 23. Roadmap
 
@@ -300,8 +346,8 @@ full (F) levels. Authorization is always server-side.
 
 ## 25. Notifications & Capacity Intelligence
 
-- **US-NOTIF-1** — _As a **user**, I want a notification center, subscribe
-  buttons, and preferences, so that I follow what matters._
+- **US-NOTIF-1** — _As a **user**, I want a notification center, subscribe buttons,
+  and preferences, so that I follow what matters._
 - **US-NOTIF-2** — _As a **manager**, I want over-allocation alerts (delivered,
   deduplicated), so that I catch capacity problems early._
 - **US-CAP-1** — _As a **manager**, I want capacity intelligence (skills-based
@@ -310,8 +356,8 @@ full (F) levels. Authorization is always server-side.
 
 ## 26. Stakeholder Experience
 
-- **US-STK-1** — _As a **Stakeholder**, I want a reduced navigation (my projects,
-  my demands, delivery, releases, weekly updates, help), so that I see only what's
+- **US-STK-1** — _As a **Stakeholder**, I want a reduced navigation (my projects, my
+  demands, delivery, releases, weekly updates, help), so that I see only what's
   relevant._
   **Acceptance:** `Stakeholder` role gets `NAV_STAKEHOLDER_*`; the API scopes data
   to the stakeholder.
@@ -319,10 +365,11 @@ full (F) levels. Authorization is always server-side.
 ## 27. Platform & Observability (operator)
 
 - **US-OBS-1** — _As an **operator**, I want traces, metrics, logs (OTLP),
-  health/readiness endpoints, and correlation IDs on errors, so that I can
-  diagnose incidents._
+  health/readiness endpoints, and correlation IDs on errors, so that I can diagnose
+  incidents._
 - **US-OBS-2** — _As an **operator**, I want a reference Grafana/Tempo/Prometheus/
-  Loki stack and dashboard, so that I stand up observability quickly._
+  Loki stack and dashboard with tuned alert rules, so that I stand up observability
+  quickly._
 - **US-OBS-3** — _As an **operator**, I want same-origin nginx edge, security
   headers/CSP, rate limiting, and secrets via env/Docker secrets, so that the
   deployment is hardened._
@@ -330,5 +377,6 @@ full (F) levels. Authorization is always server-side.
 ---
 
 _Traceability: each story maps to a built feature (see the tracked feature list
-and `building-blocks.md` ABB/SBB). Authorization statements are enforced
-server-side per ADR-0004; UI role behaviour is cosmetic per CLAUDE.md §7._
+and `building-blocks.md` ABB/SBB) and the in-app **Admin → User Stories** tab.
+Authorization statements are enforced server-side per ADR-0004; UI role behaviour
+is cosmetic per CLAUDE.md §7._

@@ -7,6 +7,7 @@ import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/comp
 import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { toast, toastError } from "@/components/Toast";
+import { EVALUATION, USER_STORY_SECTIONS, USER_STORY_INTRO, type EvalDimension } from "@/data/adminDocs";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -30,6 +31,8 @@ const ADMIN_TABS: { id: string; label: string; adminOnly?: boolean }[] = [
   { id: "backups", label: "Backups & Restore" },
   { id: "install", label: "Installation Guides" },
   { id: "integrations", label: "Integration Setup" },
+  { id: "evaluation", label: "Application Evaluation" },
+  { id: "userstories", label: "User Stories" },
 ];
 
 // ---- Roles & permissions (data-driven; DB-backed matrix) ------------------
@@ -121,6 +124,8 @@ export default function Admin() {
       {tab === "backups" && <BackupsSection />}
       {tab === "install" && <GuidesSection kind="install" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
       {tab === "integrations" && <GuidesSection kind="int" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
+      {tab === "evaluation" && <EvaluationSection />}
+      {tab === "userstories" && <UserStoriesSection />}
     </div>
   );
 }
@@ -979,5 +984,139 @@ function GuidesSection({ kind, openGuide, setOpenGuide }: {
         })}
       </div>
     </>
+  );
+}
+
+// ---- Application Evaluation (structured docs, from @/data/adminDocs) -------
+function Stars({ n }: { n: number }) {
+  return (
+    <span aria-label={`${n} of 5`} style={{ color: "#C98A00", letterSpacing: 1, fontSize: 13, whiteSpace: "nowrap" }}>
+      {"★".repeat(n)}<span style={{ color: color.border3 }}>{"★".repeat(5 - n)}</span>
+    </span>
+  );
+}
+
+const RISK_TINT: Record<string, { ink: string; bg: string }> = {
+  High: { ink: "#A1282B", bg: "#FBE7E8" },
+  Medium: { ink: "#8A6300", bg: "#FBF2D7" },
+  Low: { ink: "#566077", bg: "#EEF0F4" },
+};
+
+function EvaluationSection() {
+  const e = EVALUATION;
+  const excellent = e.scorecard.filter((d: EvalDimension) => d.stars === 5).length;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <Card>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={sectionTitle}>Application evaluation</div>
+            <div style={sectionSub}>Evidence-based assessment against engineering & product quality dimensions · reviewed {e.lastReviewed}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: color.primary }}>{e.overall}</div>
+            <div style={{ fontSize: 11.5, color: color.faint2 }}>{excellent} of {e.scorecard.length} dimensions at ★★★★★</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card padding={0}>
+        <div style={{ padding: "14px 20px 8px" }}><div style={sectionTitle}>Scorecard</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "30px 1.6fr 0.9fr 2.2fr 1.6fr", gap: 0, padding: "0 20px 6px", ...colHeadStyle }}>
+          <div>#</div><div>Dimension</div><div>Rating</div><div>Evidence</div><div>Gaps / next</div>
+        </div>
+        {e.scorecard.map((d: EvalDimension) => (
+          <div key={d.n} style={{ display: "grid", gridTemplateColumns: "30px 1.6fr 0.9fr 2.2fr 1.6fr", gap: 0, padding: "10px 20px", borderTop: `1px solid ${color.bg}`, alignItems: "start" }}>
+            <div style={{ fontSize: 12, color: color.faint3 }}>{d.n}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{d.name}</div>
+            <div><Stars n={d.stars} /></div>
+            <div style={{ fontSize: 12, color: color.textMuted, lineHeight: 1.5 }}>{d.evidence}</div>
+            <div style={{ fontSize: 12, color: d.gaps === "—" ? color.faint3 : color.textMuted, lineHeight: 1.5 }}>{d.gaps}</div>
+          </div>
+        ))}
+      </Card>
+
+      <Card>
+        <div style={sectionTitle}>Dimension notes</div>
+        <ul style={{ margin: "10px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 }}>
+          {e.notes.map((t, i) => <li key={i} style={{ fontSize: 12.5, color: color.textMuted, lineHeight: 1.55 }}>{t}</li>)}
+        </ul>
+      </Card>
+
+      <Card padding={0}>
+        <div style={{ padding: "14px 20px 8px" }}><div style={sectionTitle}>Top risks & recommended next steps</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2fr 3fr", gap: 0, padding: "0 20px 6px", ...colHeadStyle }}>
+          <div>Priority</div><div>Item</div><div>Why</div>
+        </div>
+        {e.risks.map((r, i) => {
+          const t = RISK_TINT[r.priority] ?? RISK_TINT.Low;
+          return (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "0.7fr 2fr 3fr", gap: 0, padding: "10px 20px", borderTop: `1px solid ${color.bg}`, alignItems: "center" }}>
+              <div><span style={{ fontSize: 11, fontWeight: 700, color: t.ink, background: t.bg, borderRadius: 6, padding: "2px 8px" }}>{r.priority}</span></div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text }}>{r.item}</div>
+              <div style={{ fontSize: 12, color: color.textMuted }}>{r.why}</div>
+            </div>
+          );
+        })}
+      </Card>
+
+      <Card>
+        <div style={sectionTitle}>Overall</div>
+        <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.6, marginTop: 8 }}>{e.verdict}</div>
+      </Card>
+    </div>
+  );
+}
+
+// ---- User Stories (structured docs, from @/data/adminDocs) -----------------
+function UserStoriesSection() {
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const total = USER_STORY_SECTIONS.reduce((n, s) => n + s.stories.length, 0);
+  const sections = USER_STORY_SECTIONS
+    .map((s) => ({
+      ...s,
+      stories: query
+        ? s.stories.filter((st) => `${st.id} ${st.role} ${st.want} ${st.benefit} ${st.acceptance ?? ""} ${s.title}`.toLowerCase().includes(query))
+        : s.stories,
+    }))
+    .filter((s) => s.stories.length > 0);
+  const shown = sections.reduce((n, s) => n + s.stories.length, 0);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Card>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={sectionTitle}>User stories</div>
+            <div style={{ ...sectionSub, maxWidth: 820, lineHeight: 1.5 }}>{USER_STORY_INTRO}</div>
+          </div>
+          <div style={{ minWidth: 220 }}>
+            <Input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Filter stories (role, module, text)…" aria-label="Filter user stories" />
+            <div style={{ fontSize: 11, color: color.faint3, marginTop: 5, textAlign: "right" }}>{query ? `${shown} of ${total}` : `${total} stories · ${USER_STORY_SECTIONS.length} modules`}</div>
+          </div>
+        </div>
+      </Card>
+
+      {sections.length === 0 ? (
+        <Card><EmptyBlock message="No stories match your filter." minHeight={100} /></Card>
+      ) : sections.map((s) => (
+        <Card key={s.title} padding={0}>
+          <div style={{ padding: "13px 20px", borderBottom: `1px solid ${color.bg}`, ...sectionTitle }}>{s.title}</div>
+          {s.stories.map((st) => (
+            <div key={st.id} style={{ padding: "12px 20px", borderTop: `1px solid ${color.bg}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3 }}>US-{st.id}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint, borderRadius: 6, padding: "2px 8px" }}>{st.role}</span>
+              </div>
+              <div style={{ fontSize: 13, color: color.text, lineHeight: 1.55 }}>
+                As a <strong>{st.role}</strong>, I want {st.want}, so that {st.benefit}.
+              </div>
+              {st.acceptance && <div style={{ fontSize: 12, color: color.faint2, marginTop: 3, lineHeight: 1.5 }}><strong style={{ color: color.textMuted }}>Acceptance:</strong> {st.acceptance}</div>}
+            </div>
+          ))}
+        </Card>
+      ))}
+    </div>
   );
 }
