@@ -6,10 +6,10 @@ public record RoadmapMilestoneReq(string Title, string? Date, bool? Done);
 public record RoadmapLinkReq(string EntityType, string EntityId);
 public record CreateRoadmapItemReq(string Title, string? Description, string? Lane, string? Status,
     string? Theme, string? Owner, string? StartDate, string? EndDate, int? Confidence, int? Effort, int? Value,
-    List<RoadmapMilestoneReq>? Milestones, List<RoadmapLinkReq>? Links, List<int>? DependsOn);
+    List<RoadmapMilestoneReq>? Milestones, List<RoadmapLinkReq>? Links, List<int>? DependsOn, int? PlannedYear);
 public record UpdateRoadmapItemReq(string? Title, string? Description, string? Lane, string? Status,
     string? Theme, string? Owner, string? StartDate, string? EndDate, int? Confidence, int? Effort, int? Value,
-    List<RoadmapMilestoneReq>? Milestones, List<RoadmapLinkReq>? Links, List<int>? DependsOn);
+    List<RoadmapMilestoneReq>? Milestones, List<RoadmapLinkReq>? Links, List<int>? DependsOn, int? PlannedYear);
 
 // ============================================================================
 //  Roadmap — strategic initiatives across the Now / Next / Later horizons that
@@ -65,6 +65,7 @@ public static class Roadmap
                 Confidence = Math.Clamp(req.Confidence ?? 60, 0, 100),
                 Effort = Math.Clamp(req.Effort ?? 3, 1, 5),
                 Value = Math.Clamp(req.Value ?? 3, 1, 5),
+                PlannedYear = NormYear(req.PlannedYear),
                 CreatedAt = DateTime.UtcNow.ToString("dd MMM yyyy"),
             };
             db.RoadmapItems.Add(item);
@@ -101,6 +102,7 @@ public static class Roadmap
             if (req.Confidence is not null) item.Confidence = Math.Clamp(req.Confidence.Value, 0, 100);
             if (req.Effort is not null) item.Effort = Math.Clamp(req.Effort.Value, 1, 5);
             if (req.Value is not null) item.Value = Math.Clamp(req.Value.Value, 1, 5);
+            if (req.PlannedYear is not null) item.PlannedYear = NormYear(req.PlannedYear);
             if (req.Milestones is not null) await ReplaceMilestonesAsync(db, id, req.Milestones);
             if (req.Links is not null) await ReplaceLinksAsync(db, id, req.Links);
             if (req.DependsOn is not null) await ReplaceDepsAsync(db, id, req.DependsOn);
@@ -213,5 +215,9 @@ public static class Roadmap
             i.Links.OrderBy(l => l.EntityType).ThenBy(l => l.Label)
                 .Select(l => new RoadmapLinkDto(l.EntityType, l.EntityId, l.Label)).ToList(),
             allDeps.Where(d => d.ItemId == i.Id).Select(d => d.DependsOnItemId).Distinct().ToList(),
-            allDeps.Where(d => d.DependsOnItemId == i.Id).Select(d => d.ItemId).Distinct().ToList());
+            allDeps.Where(d => d.DependsOnItemId == i.Id).Select(d => d.ItemId).Distinct().ToList(),
+            i.PlannedYear);
+
+    // Accept a sensible calendar year; 0/out-of-range ⇒ unscheduled.
+    static int NormYear(int? y) => y is int n && n >= 2000 && n <= 2100 ? n : 0;
 }
