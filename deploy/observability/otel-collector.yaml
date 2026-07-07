@@ -1,0 +1,49 @@
+# OpenTelemetry Collector — receives OTLP from the Atlas API and fans out:
+#   traces  -> Tempo (OTLP)
+#   metrics -> a Prometheus scrape endpoint on :8889
+#   logs    -> Loki (native OTLP endpoint)
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+  # Cap memory so a telemetry spike can't OOM the collector.
+  memory_limiter:
+    check_interval: 2s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+exporters:
+  # Traces → Tempo's OTLP ingest.
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Metrics → exposed for Prometheus to scrape (see prometheus.yml).
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  # Logs → Loki's native OTLP endpoint (Loki 3.x).
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]

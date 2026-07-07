@@ -39,7 +39,7 @@ requirement → capability → implementation → decision.
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
 | SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker` + `JiraSyncQueue`) | ABB-06, ABB-10 | ADR-0007, ADR-0028, ADR-0030 |
 | SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts | ABB-07 | ADR-0028 |
-| SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs | ABB-08 | ADR-0010 |
+| SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs + reference Grafana/Tempo/Prometheus/Loki stack & dashboard | ABB-08 | ADR-0010, ADR-0032 |
 | SBB-14 | Security headers/CSP, rate limiter, upload limits, least-privilege DB role | ABB-09 | ADR-0008, security-hardening.md |
 | SBB-15 | Governance modules (Gates, RAID, Architecture ADM/ARB, Security controls, Decisions, Quality) + GDPR/retention | ABB-10 | |
 | SBB-16 | `IConfiguration` env + Docker secrets tooling | ABB-11 | ADR-0009 |
@@ -75,7 +75,6 @@ flowchart LR
 | ABB | Gap | Planned SBB |
 |-----|-----|-------------|
 | ABB-05 Integration | Only Jira + Graph implemented | Azure DevOps connector (next), then ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI |
-| ABB-08 Observability | Dashboards not shipped | Reference Grafana/Tempo/Loki stack wiring |
 | ABB-01 UX | a11y baseline (ADR-0025) + automated axe sweep in CI over the shared primitives and a mobile navigation drawer (ADR-0026); remaining: browser-based contrast verification (Playwright+axe), broader per-screen tests | Full-page WCAG sweep in a headed browser |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
