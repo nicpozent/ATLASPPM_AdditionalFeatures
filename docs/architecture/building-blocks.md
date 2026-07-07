@@ -76,7 +76,7 @@ flowchart LR
 |-----|-----|-------------|
 | ABB-05 Integration | Only Jira + Graph implemented | Azure DevOps connector (next), then ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI |
 | ABB-08 Observability | Dashboards not shipped | Reference Grafana/Tempo/Loki stack wiring |
-| ABB-01 UX | Frontend test depth + formal a11y/responsive audit | Expanded Vitest coverage + WCAG pass |
+| ABB-01 UX | a11y baseline shipped in shared primitives (ADR-0025) + component/interaction tests; remaining: automated axe/contrast in CI, mobile sidebar drawer, broader per-screen tests | Automated WCAG sweep + phone-width layout |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
 a concrete technology is chosen.

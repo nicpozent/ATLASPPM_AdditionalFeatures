@@ -98,12 +98,15 @@ const BTN_VARIANT: Record<"primary" | "secondary", React.CSSProperties> = {
   secondary: { color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 14px" },
 };
 
-export function Button({ variant = "primary", style, disabled, ...rest }: ButtonProps) {
+export function Button({ variant = "primary", style, disabled, onFocus, onBlur, ...rest }: ButtonProps) {
+  const f = useFocusRing();
   return (
     <button
       {...rest}
       disabled={disabled}
-      style={{ ...BTN_BASE, ...BTN_VARIANT[variant], ...(disabled ? { opacity: 0.55, cursor: "not-allowed" } : null), ...style }}
+      onFocus={(e) => { f.onFocus(); onFocus?.(e); }}
+      onBlur={(e) => { f.onBlur(); onBlur?.(e); }}
+      style={{ ...BTN_BASE, ...BTN_VARIANT[variant], ...(disabled ? { opacity: 0.55, cursor: "not-allowed" } : null), ...(f.focused && !disabled ? { boxShadow: `0 0 0 3px ${color.primaryTint}` } : null), ...style }}
     />
   );
 }
@@ -263,6 +266,13 @@ export function RowMenu({ children, ariaLabel = "Actions", width = 180 }: {
     }
   }, [open]);
   const close = () => setOpen(false);
+  // Escape closes the menu and returns focus to its trigger (keyboard a11y).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); btnRef.current?.focus(); } };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [open]);
   return (
     <>
       <button ref={btnRef} aria-label={ariaLabel} aria-haspopup="menu" aria-expanded={open}
@@ -296,7 +306,9 @@ export function MenuItem({ label, icon, onClick, danger }: {
       background: "transparent", cursor: "pointer", fontSize: 13, fontFamily: "inherit", textAlign: "left",
       color: danger ? "#A1282B" : color.text, borderRadius: 6,
     }} onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#FBE7E8" : color.bg)}
-       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+       onFocus={(e) => (e.currentTarget.style.background = danger ? "#FBE7E8" : color.bg)}
+       onBlur={(e) => (e.currentTarget.style.background = "transparent")}>
       {icon && <span style={{ display: "flex", color: danger ? "#D13438" : color.faint2 }}>{icon}</span>}{label}
     </button>
   );
