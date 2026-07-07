@@ -14,6 +14,7 @@ interface ToastItem { id: number; message: string; kind: ToastKind; code?: strin
 let seq = 0;
 const listeners = new Set<(t: ToastItem) => void>();
 
+// eslint-disable-next-line react-refresh/only-export-components -- toast API co-located with the Toaster component; affects dev HMR only
 export function toast(message: string, kind: ToastKind = "info", code?: string) {
   const item: ToastItem = { id: ++seq, message, kind, code };
   listeners.forEach((l) => l(item));
@@ -21,6 +22,7 @@ export function toast(message: string, kind: ToastKind = "info", code?: string) 
 
 // Surface any thrown error as a friendly toast. When it's an unexpected (5xx)
 // failure carrying a correlation code, show the code with copy + troubleshooting.
+// eslint-disable-next-line react-refresh/only-export-components -- toast API co-located with the Toaster component; affects dev HMR only
 export function toastError(err: unknown) {
   const anyErr = err as { message?: string; errorId?: string };
   toast(anyErr?.message || "Something went wrong.", "error", anyErr?.errorId);

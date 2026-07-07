@@ -76,6 +76,7 @@ export function HealthPill({ status, label }: { status: string; label: string })
   return <Chip label={label} ink={c.ink} tint={c.tint} />;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- small helper co-located with the UI primitives; affects dev HMR only
 export function statusDot(status: string): string {
   return { green: chart.onTrack, amber: chart.atRisk, red: chart.critical, hold: chart.onHold, completed: "#0F6CBD" }[status] ?? chart.onHold;
 }
