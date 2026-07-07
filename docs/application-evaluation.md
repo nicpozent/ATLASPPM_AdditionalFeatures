@@ -18,7 +18,7 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 | 1 | **Functional coverage** (screens vs prototype) | ★★★★★ | All Workspace + Configuration screens built and data-wired; 128 tracked features complete | Ongoing prototype-fidelity spot-checks |
 | 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 38 ADRs | — |
 | 3 | **Frontend engineering** | ★★★★☆ | React 18 + TS strict + Vite 8; inline design tokens; route code-splitting + vendor chunks | 12 lint warnings (non-blocking `any`/fast-refresh) |
-| 4 | **Identity & access** | ★★★★☆ | Entra SSO (MSAL, PKCE); server-authoritative RBAC capability matrix; **15-min idle-logout** | SSO not yet verified end-to-end on a live tenant |
+| 4 | **Identity & access** | ★★★★★ | Entra SSO (MSAL, PKCE) **verified end-to-end on a live tenant**; server-authoritative RBAC capability matrix; **15-min idle-logout** | — |
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic; ADO delta/background pending |
@@ -36,10 +36,12 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 
 ## 2. Dimension notes
 
-- **Identity & idle-logout (4/9).** MSAL redirect flow; the API validates the JWT
-  (audience/issuer) and is authoritative for authorization. An idle-logout policy
-  (default 15 min, `VITE_AUTH_IDLE_MINUTES`, ADR-0038) signs unattended sessions
-  out client-side; it complements—not replaces—token expiry.
+- **Identity & idle-logout (4/9).** MSAL redirect flow, **verified end-to-end on a
+  live tenant** (interactive sign-in, bearer-token API calls, token-driven role,
+  401 on missing token). The API validates the JWT (audience/issuer) and is
+  authoritative for authorization. An idle-logout policy (default 15 min,
+  `VITE_AUTH_IDLE_MINUTES`, ADR-0038) signs unattended sessions out client-side;
+  it complements—not replaces—token expiry.
 - **Integrations (7).** Two connectors are real end-to-end (Jira, Azure DevOps)
   plus Graph directory/mail. The remaining connector cards are structural chrome
   pending backend work; each will mirror the Jira/ADO pattern (ADR-0006/0035/0036).
@@ -51,7 +53,6 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 
 | Priority | Item | Why |
 |----------|------|-----|
-| High | Verify Entra SSO end-to-end on a live tenant | Only untested path in the auth chain |
 | Medium | ADO delta + background sync | Bounded/synchronous today; large orgs need it |
 | Medium | Add full user-journey e2e (beyond a11y) | e2e currently proves a11y, not flows |
 | Low | Split the largest screen files | Maintainability of Project/Resources |
@@ -59,8 +60,13 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 
 ## 4. Overall
 
-**Verdict: production-ready for pilot.** The core PPM product is complete,
-data-wired, tested (443 automated tests across stacks), accessible (AA-gated),
-observable, and documented to a professional standard (ABB/SBB traceability, 38
-ADRs, HLD/LLD). The main pre-GA items are operational: a live SSO verification
-pass, broadening connector coverage, and full-journey e2e.
+**Verdict: production-ready.** The core PPM product is complete, data-wired,
+tested (443 automated tests across stacks), accessible (AA-gated), observable,
+and documented to a professional standard (ABB/SBB traceability, 38 ADRs,
+HLD/LLD). **Entra SSO is now verified end-to-end on a live tenant**, closing the
+last high-priority gap. Remaining items are enhancements, not blockers:
+broadening connector coverage beyond Jira/Azure DevOps, ADO delta/background
+sync, and full user-journey e2e.
+
+_Update 2026-07-07: SSO verified on the customer tenant — Identity & access
+raised to ★★★★★; overall 4.5/5._
