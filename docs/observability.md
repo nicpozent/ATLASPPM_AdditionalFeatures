@@ -118,6 +118,33 @@ Then set on the Atlas `api` service:
       OTEL_SERVICE_NAME: "atlas-api"
 ```
 
+### 3a′. One-command reference stack (Grafana + Tempo + Prometheus + Loki)
+
+For a self-hosted, batteries-included view, an **overlay compose** ships the
+collector *and* the backends *and* a pre-provisioned Grafana — no manual wiring:
+
+```bash
+docker compose -f docker-compose.yml \
+  -f deploy/observability/docker-compose.observability.yml up --build
+```
+
+- **Grafana** → http://localhost:3000 (default `admin`/`admin`; override with
+  `GRAFANA_USER`/`GRAFANA_PASSWORD`). The **Atlas API — Overview** dashboard
+  (folder *Atlas*) is provisioned automatically: request rate, 5xx ratio,
+  latency p50/p95/p99, audited-domain-writes/min, and live API logs.
+- Datasources (Prometheus, Tempo, Loki) are pre-wired, including trace↔log
+  correlation both ways.
+- Pipeline: `api → otel-collector → Tempo (traces) / Prometheus (metrics,
+  scraped off the collector's :8889) / Loki (logs via OTLP)`.
+- The overlay also flips the API's telemetry on for you (`OTEL_EXPORTER_OTLP_
+  ENDPOINT=http://otel-collector:4317`), so there's nothing else to set.
+
+Files live under `deploy/observability/` (collector, Tempo, Prometheus, Loki
+configs + Grafana provisioning) — treat them as a starting point and swap in a
+managed backend (below) for production. Metric names in the dashboard follow
+OTel semantic conventions (`http_server_request_duration_seconds_*`,
+`atlas_audit_events_total`); adjust if your exporter version differs.
+
 ### 3b. Azure Monitor / Application Insights (after the Azure move)
 
 Two options once Atlas runs on Azure:
