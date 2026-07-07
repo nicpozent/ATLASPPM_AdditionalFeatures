@@ -56,8 +56,15 @@ public static class GanttEndpoints
             var milestones = await db.Milestones.Where(m => m.ProjectId == id).OrderBy(m => m.Month).ThenBy(m => m.Id)
                 .Select(m => ToDto(m)).ToListAsync();
             var end = string.IsNullOrWhiteSpace(proj.Target) || proj.Target == "TBD" ? proj.Due : proj.Target;
+            var winStart = MonthOf(proj.StartDate);
+            var winEnd = MonthOf(end);
+            // Sprints synced from Jira (or created locally) render as bars in the
+            // Schedule view below the phases — past & current included (ADR-0029).
+            var sprints = (await db.Sprints.Where(s => s.ProjectId == id)
+                    .OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync())
+                .Select(s => SprintBar(s, winStart, winEnd)).ToList();
             return Results.Ok(new GanttDto(canEdit, phases, milestones,
-                MonthOf(proj.StartDate), MonthOf(end), proj.StartDate, end));
+                winStart, winEnd, proj.StartDate, end, sprints));
         });
 
         api.MapPost("/projects/{id}/phases", async (string id, CreatePhaseReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>

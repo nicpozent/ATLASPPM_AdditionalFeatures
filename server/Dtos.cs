@@ -138,7 +138,8 @@ public record SetPrefReq(bool InApp, bool Email);
 public record PhaseDto(int Id, string Name, int StartMonth, int EndMonth, int Progress);
 public record MilestoneDto(int Id, string Label, int Month, string Date);
 public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones,
-    int? ProjectStart = null, int? ProjectEnd = null, string StartDate = "", string EndDate = "");
+    int? ProjectStart = null, int? ProjectEnd = null, string StartDate = "", string EndDate = "",
+    List<GanttSprintDto>? Sprints = null);
 // A sprint bar on a timeline (months on the year grid; Undated ⇒ dates TBD in Jira).
 public record GanttSprintDto(int Id, string Name, string Status, int StartMonth, int EndMonth, bool Undated);
 // A program row now carries the project's own window + sprint bars (not just
