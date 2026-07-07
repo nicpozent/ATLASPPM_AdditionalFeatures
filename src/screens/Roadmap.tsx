@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input, Textarea, Select, Modal, RowMenu, Menu
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
+import { yearOf, yearColumns } from "@/lib/roadmap";
 
 // ============================================================================
 //  Roadmap — strategic initiatives on the Now / Next / Later horizons, with a
@@ -108,22 +109,15 @@ export default function Roadmap() {
     setDragId(null);
     if (it && it.lane !== lane && mayEdit) move.mutate({ id: dragId, lane });
   };
-  // Effective year for the "By year" view: the explicit planned year, else the
-  // start-date's year, else unscheduled (0).
-  const yearOf = (i: Item) => i.plannedYear || (i.startDate ? new Date(i.startDate).getFullYear() || 0 : 0);
+  // Effective year + year columns for the "By year" view (see src/lib/roadmap).
   const onDropYear = (year: number) => {
     if (dragId == null) return;
     const it = items.find((i) => i.id === dragId);
     setDragId(null);
     if (it && yearOf(it) !== year && mayEdit) setYear.mutate({ id: dragId, plannedYear: year });
   };
-  // Year columns: every year present on an item, plus this year and next, sorted,
-  // with an Unscheduled column at the end.
   const thisYear = new Date().getFullYear();
-  const years = Array.from(new Set([
-    ...filtered.map(yearOf).filter((y) => y > 0),
-    thisYear, thisYear + 1,
-  ])).sort((a, b) => a - b);
+  const years = yearColumns(filtered, thisYear);
 
   return (
     <div>
@@ -141,11 +135,11 @@ export default function Roadmap() {
             </button>
           ))}
         </div>
-        <select value={theme} onChange={(e) => setTheme(e.target.value)} style={selectStyle}>
+        <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="Filter by theme" style={selectStyle}>
           <option value="all">All themes</option>
           {(data?.themes ?? []).map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter by status" style={selectStyle}>
           <option value="all">All statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>

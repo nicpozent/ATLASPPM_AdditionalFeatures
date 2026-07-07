@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
 import { SubTeamManager } from "@/components/TeamPanel";
+import { laborHours, laborCost, HOURS_PER_DAY, DAYS_PER_MONTH } from "@/lib/labor";
 
 // ---------------------------------------------------------------------------
 // My Team — members come from Entra groups mapped to a manager slot in Admin →
@@ -106,8 +107,6 @@ const RATE_LEVEL_LABELS: Record<string, string> = {
   junior: "Junior", semiSenior: "Semi-Senior", senior: "Senior", specialist: "Specialist", expert: "Expert",
 };
 const RATE_DISC_LABELS: Record<string, string> = { dev: "Dev", infra: "Infra" };
-const HOURS_PER_DAY = 8;
-const DAYS_PER_MONTH = 21;   // working days/month (≈ 168 h)
 
 interface RateCard { canEdit: boolean; disciplines: string[]; levels: string[]; rates: Record<string, number>; }
 
@@ -148,9 +147,9 @@ function LaborRateCard() {
   const [months, setMonths] = useState("0");
   const [days, setDays] = useState("0");
   const [hours, setHours] = useState("0");
-  const totalHours = (Number(months) || 0) * DAYS_PER_MONTH * HOURS_PER_DAY + (Number(days) || 0) * HOURS_PER_DAY + (Number(hours) || 0);
+  const totalHours = laborHours(Number(months), Number(days), Number(hours));
   const calcRate = rateOf(calcDisc, calcLevel);
-  const cost = totalHours * calcRate;
+  const cost = laborCost(Number(months), Number(days), Number(hours), calcRate);
   const euro = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   return (

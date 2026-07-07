@@ -17,3 +17,9 @@ vite.config.d.ts
 # .NET build outputs (server/)
 [Bb]in/
 [Oo]bj/
+
+# Playwright (e2e a11y sweep) artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

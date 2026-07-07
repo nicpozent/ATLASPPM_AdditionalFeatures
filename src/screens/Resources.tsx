@@ -146,12 +146,12 @@ export default function Resources() {
         </span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A" }}>Filter</span>
-        <select value={person} onChange={(e) => setPerson(e.target.value)} style={selectStyle}>
+        <select value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Filter by person" style={selectStyle}>
           <option value="all">All people</option>
           {resources.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
         </select>
         {tab === "byproject" && (
-          <select value={proj} onChange={(e) => setProj(e.target.value)} style={selectStyle}>
+          <select value={proj} onChange={(e) => setProj(e.target.value)} aria-label="Filter by project" style={selectStyle}>
             <option value="all">All projects</option>
             {byProject.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -690,7 +690,7 @@ function AvailabilityTab() {
         )}
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A" }}>Min. free</span>
-        <select value={minFree} onChange={(e) => setMinFree(Number(e.target.value))} style={selectStyle}>
+        <select value={minFree} onChange={(e) => setMinFree(Number(e.target.value))} aria-label="Minimum free capacity" style={selectStyle}>
           {[0, 20, 50, 80, 100].map((v) => <option key={v} value={v}>{v === 0 ? "Any" : `≥ ${v}%`}</option>)}
         </select>
       </div>

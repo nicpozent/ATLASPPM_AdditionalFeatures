@@ -75,7 +75,7 @@ flowchart LR
 | ABB | Gap | Planned SBB |
 |-----|-----|-------------|
 | ABB-05 Integration | Only Jira + Graph implemented | Azure DevOps connector (next), then ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI |
-| ABB-01 UX | a11y baseline (ADR-0025) + automated axe sweep in CI over the shared primitives and a mobile navigation drawer (ADR-0026); remaining: browser-based contrast verification (Playwright+axe), broader per-screen tests | Full-page WCAG sweep in a headed browser |
+| ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep** (Playwright, structural-gated) & extracted per-screen logic tests (ADR-0033); remaining: **gate colour-contrast** once the token greys are lifted to WCAG AA | Token-contrast pass, then flip the contrast gate on |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
 a concrete technology is chosen.

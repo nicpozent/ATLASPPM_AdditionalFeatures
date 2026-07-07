@@ -182,7 +182,7 @@ export default function Gantt() {
               ))}
             </div>
           ) : (
-            <select value={activeId} onChange={(e) => setActive(e.target.value)} style={selectStyle}>
+            <select value={activeId} onChange={(e) => setActive(e.target.value)} aria-label={scope === "program" ? "Select program" : "Select project"} style={selectStyle}>
               {opts.length === 0
                 ? <option value="">{scope === "program" ? "No programs yet" : "No projects yet"}</option>
                 : opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
