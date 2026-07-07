@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api, apiUpload, apiDownload } from "@/api";
+import { syncJira, syncToast } from "@/lib/jiraSync";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
@@ -697,14 +698,15 @@ function Tasks({ projectId }: { projectId: string | null }) {
   // the role can manage integrations. Refreshes everything the sync writes.
   const jiraMapped = !!project?.jiraProjectKey && !!project?.jiraBoardId;
   const canSyncJira = can("cap-integrations", "E");
-  const syncJira = useMutation({
-    mutationFn: () => api<{ ok: boolean; sprints?: number; epics?: number; tasks?: number; backlog?: number; error?: string }>(`/projects/${projectId}/jira/sync`, { method: "POST" }),
-    onSuccess: (r) => {
-      if (r?.ok) {
-        toast(`Synced from Jira — ${r.tasks ?? 0} issues, ${r.epics ?? 0} epics, ${r.sprints ?? 0} sprints (${r.backlog ?? 0} in backlog).`, "info");
+  // Runs in the background (see syncJira/ADR-0030) so a large re-sync can't 504.
+  const syncProject = useMutation({
+    mutationFn: () => syncJira(`/projects/${projectId}/jira/sync`, false),
+    onSuccess: (o) => {
+      toast(syncToast(o), o.ok || o.state === "running" ? "info" : "error");
+      if (o.ok || o.state === "running") {
         for (const k of ["tasks", "epics", "sprints", "spillover", "raid"]) qc.invalidateQueries({ queryKey: [k, projectId] });
         qc.invalidateQueries({ queryKey: ["spillover-summary"] });
-      } else toast(r?.error ?? "Jira sync failed.", "error");
+      }
     },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -747,8 +749,8 @@ function Tasks({ projectId }: { projectId: string | null }) {
         </div>
         <div style={{ flex: 1 }} />
         {jiraMapped && (
-          <Button variant="secondary" onClick={() => syncJira.mutate()} disabled={syncJira.isPending || !canSyncJira} title={canSyncJira ? `Pull ${project?.jiraProjectKey} / board ${project?.jiraBoardId} from Jira` : "Needs Edit on Integrations & connectors"}>
-            <Icon name="refresh" size={15} /> {syncJira.isPending ? "Syncing…" : "Sync from Jira"}
+          <Button variant="secondary" onClick={() => syncProject.mutate()} disabled={syncProject.isPending || !canSyncJira} title={canSyncJira ? `Pull ${project?.jiraProjectKey} / board ${project?.jiraBoardId} from Jira` : "Needs Edit on Integrations & connectors"}>
+            <Icon name="refresh" size={15} /> {syncProject.isPending ? "Syncing…" : "Sync from Jira"}
           </Button>
         )}
         <Button onClick={() => setModal(true)} disabled={!canCreate} title={canCreate ? undefined : "Your role can't create tasks (needs the Project schedule right)"}><Icon name="plus" size={16} /> New task</Button>

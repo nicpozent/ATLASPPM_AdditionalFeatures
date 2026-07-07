@@ -4,6 +4,7 @@ import { color, font, radius } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { toast } from "@/components/Toast";
+import { syncJira, syncToast } from "@/lib/jiraSync";
 
 // ---- Identity, email & directory (Microsoft 365) — persisted via /settings --
 interface Identity { key: string; name: string; icon: string; detail: string; tint: string; ink: string }
@@ -64,14 +65,11 @@ export default function Integrations() {
     onSuccess: (r) => toast(r?.ok ? `Jira connected${r.displayName ? " as " + r.displayName : ""}.` : (r?.error ?? "Jira test failed."), r?.ok ? "info" : "error"),
     onError: (e) => toast((e as Error).message, "error"),
   });
-  // Pull every mapped project from Jira in one pass (pull-only sync).
-  const syncJira = useMutation({
-    mutationFn: () => api<{ ok: boolean; projects?: number; sprints?: number; epics?: number; tasks?: number; message?: string; errors?: string[] }>("/integrations/jira/sync", { method: "POST" }),
-    onSuccess: (r) => {
-      if (r?.message) { toast(r.message, "info"); return; }
-      const base = `Synced ${r?.projects ?? 0} project${r?.projects === 1 ? "" : "s"} — ${r?.tasks ?? 0} issues, ${r?.epics ?? 0} epics, ${r?.sprints ?? 0} sprints.`;
-      toast(r?.ok ? base : `${base} Some failed: ${(r?.errors ?? []).join("; ")}`, r?.ok ? "info" : "error");
-    },
+  // Pull every mapped project from Jira in one pass — runs in the background so a
+  // large portfolio-wide sync can't 504 the request (see syncJira/ADR-0030).
+  const syncAll = useMutation({
+    mutationFn: () => syncJira("/integrations/jira/sync", false),
+    onSuccess: (o) => toast(syncToast(o), o.ok || o.state === "running" ? "info" : "error"),
     onError: (e) => toast((e as Error).message, "error"),
   });
 
@@ -133,11 +131,11 @@ export default function Integrations() {
                   >{testJira.isPending ? "Testing…" : "Test connection"}</button>
                   {configured && (
                     <button
-                      onClick={() => syncJira.mutate()}
-                      disabled={syncJira.isPending || !jira?.canManage}
+                      onClick={() => syncAll.mutate()}
+                      disabled={syncAll.isPending || !jira?.canManage}
                       title={jira?.canManage ? "Pull all Jira-mapped projects (map a project's Jira key & board id in its details)" : "Needs Edit on Integrations & connectors"}
-                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncJira.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: syncJira.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                    >{syncJira.isPending ? "Syncing…" : "Sync now"}</button>
+                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAll.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: syncAll.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    >{syncAll.isPending ? "Syncing…" : "Sync now"}</button>
                   )}
                 </div>
               </div>

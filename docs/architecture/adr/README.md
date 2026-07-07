@@ -36,5 +36,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0027](./0027-frontend-code-splitting.md) | Frontend route-level code-splitting + vendor chunking | Accepted |
 | [0028](./0028-over-allocation-alerts.md) | Over-allocation alerts (delivered, deduplicated via snapshot) | Accepted |
 | [0029](./0029-timeline-derived-windows.md) | Timelines derive windows from phases, sprints & tasks | Accepted |
+| [0030](./0030-background-jira-sync.md) | Background Jira sync (no 504 on large pulls) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

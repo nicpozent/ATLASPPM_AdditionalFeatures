@@ -104,7 +104,7 @@ public static class Jira
 
         // Sync one project from its mapped Jira board. Managing integrations
         // requires Edit on "Integrations & connectors".
-        api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
@@ -113,6 +113,7 @@ public static class Jira
             if (p is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(p.JiraProjectKey))
                 return Results.Ok(new { ok = false, error = "This project isn't mapped to Jira — set its Jira project key first (a board id is optional and adds sprints)." });
+            if (background == true) return QueueSync(queue, http, cfg, "project", id, delta ?? false);
             try
             {
                 using var c = Client(cfg);
@@ -131,11 +132,12 @@ public static class Jira
         });
 
         // Sync every mapped project in one pass — the Integrations "Sync now".
-        api.MapPost("/integrations/jira/sync", async (bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/integrations/jira/sync", async (bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
+            if (background == true) return QueueSync(queue, http, cfg, "all", "", delta ?? false);
             var mapped = await db.Projects
                 .Where(p => !p.Archived && p.JiraProjectKey != "")
                 .ToListAsync();
@@ -165,18 +167,24 @@ public static class Jira
         // Sync a program's / product's mapped projects in one pass — powers the
         // "Sync from Jira" button on those entities' Overview. Syncs each linked
         // project (delta by default) and reports the roll-up.
-        api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
             var pg = await db.Programs.FindAsync(id);
             if (pg is null) return Results.NotFound();
+            if (background == true) return QueueSync(queue, http, cfg, "program", id, delta ?? true);
             return await SyncLinkedProjectsAsync(db, cfg, http, "program", pg.Projects, delta ?? true);
         });
-        api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
             var pr = await db.Products.FindAsync(id);
             if (pr is null) return Results.NotFound();
+            if (background == true) return QueueSync(queue, http, cfg, "product", id, delta ?? true);
             return await SyncLinkedProjectsAsync(db, cfg, http, "product", pr.Projects, delta ?? true);
         });
+
+        // Background sync job status (poll target for the 202 responses above).
+        api.MapGet("/integrations/jira/sync/status/{jobId}", (string jobId, JiraSyncQueue queue) =>
+            queue.TryGet(jobId, out var s) && s is not null ? Results.Ok(s) : Results.NotFound());
 
         // ---- Discovery & import --------------------------------------------
         // List every Jira project, flagging which are already mapped in Atlas so
@@ -271,6 +279,60 @@ public static class Jira
     // Sync the mapped, non-archived projects linked to a program/product and
     // return a roll-up. Skips unmapped links silently; requires Jira configured
     // and Edit on Integrations (checked here so both callers share the gate).
+    // Enqueue a background sync under the caller's identity and return 202 with a
+    // pollable job id (see /integrations/jira/sync/status/{jobId}).
+    static IResult QueueSync(JiraSyncQueue queue, HttpContext http, IConfiguration cfg, string kind, string targetId, bool delta)
+    {
+        // Borrow Audit() only to resolve the caller's actor/role for the eventual
+        // completion audit event (the worker has no HttpContext).
+        var who = Permissions.Audit(http, cfg, "Integrations", "Queued Jira sync", "");
+        var status = queue.Enqueue(kind, targetId, delta, who.Actor, who.Role);
+        return Results.Accepted($"/api/v1/integrations/jira/sync/status/{status.Id}",
+            new { ok = true, queued = true, jobId = status.Id, state = status.State });
+    }
+
+    // Roll-up counts for a multi-project sync pass.
+    public record BulkSyncResult(int Projects, int Sprints, int Epics, int Tasks, List<string> Errors);
+
+    // Sync a concrete list of projects, best-effort (one failure doesn't stop the
+    // pass). Shared by the synchronous endpoints and the background worker.
+    public static async Task<BulkSyncResult> SyncProjectsCoreAsync(AtlasDbContext db, IConfiguration cfg, List<Project> projects, bool delta)
+    {
+        int sp = 0, ep = 0, tk = 0, ok = 0;
+        var errors = new List<string>();
+        using var c = Client(cfg);
+        foreach (var p in projects)
+        {
+            try
+            {
+                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var r = await SyncProjectAsync(db, cfg, c, p, delta);
+                p.LastJiraSync = watermark;
+                sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex) { errors.Add($"{p.Id}: {ex.Message}"); }
+        }
+        return new BulkSyncResult(ok, sp, ep, tk, errors);
+    }
+
+    // Resolve which mapped, non-archived projects a background job should sync.
+    public static async Task<List<Project>> ResolveSyncTargetsAsync(AtlasDbContext db, string kind, string targetId)
+    {
+        var mapped = db.Projects.Where(p => !p.Archived && p.JiraProjectKey != "");
+        switch (kind)
+        {
+            case "project": return await mapped.Where(p => p.Id == targetId).ToListAsync();
+            case "program":
+                var pg = await db.Programs.FindAsync(targetId);
+                return pg is null ? new() : await mapped.Where(p => pg.Projects.Contains(p.Id)).ToListAsync();
+            case "product":
+                var pr = await db.Products.FindAsync(targetId);
+                return pr is null ? new() : await mapped.Where(p => pr.Projects.Contains(p.Id)).ToListAsync();
+            default: return await mapped.ToListAsync();   // "all"
+        }
+    }
+
     static async Task<IResult> SyncLinkedProjectsAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http,
         string scope, List<string> projectIds, bool delta)
     {
