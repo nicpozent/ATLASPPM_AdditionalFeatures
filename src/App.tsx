@@ -1,31 +1,36 @@
+import { lazy } from "react";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { SCREENS } from "@/nav";
 
-import Dashboard from "@/screens/Dashboard";
-import Portfolio from "@/screens/Portfolio";
-import Programs from "@/screens/Programs";
-import Products from "@/screens/Products";
-import Okrs from "@/screens/Okrs";
-import Roadmap from "@/screens/Roadmap";
-import Demands from "@/screens/Demands";
-import Gantt from "@/screens/Gantt";
-import Pip from "@/screens/Pip";
-import Project from "@/screens/Project";
-import Resources from "@/screens/Resources";
-import Financials from "@/screens/Financials";
-import Delivery from "@/screens/Delivery";
-import Releases from "@/screens/Releases";
-import Ops from "@/screens/Ops";
-import News from "@/screens/News";
-import Teams from "@/screens/Teams";
-import Methodologies from "@/screens/Methodologies";
-import Integrations from "@/screens/Integrations";
-import Reports from "@/screens/Reports";
-import Admin from "@/screens/Admin";
-import Help from "@/screens/Help";
-import MyProjects from "@/screens/MyProjects";
-import MyDemands from "@/screens/MyDemands";
+// Screens are lazy-loaded so each becomes its own chunk: the initial download is
+// just the shell + vendor, and a screen's code arrives only when its route is
+// first visited. The shell wraps <Outlet/> in a Suspense boundary (see
+// AppShell) that shows a lightweight loader while a chunk streams in.
+const Dashboard = lazy(() => import("@/screens/Dashboard"));
+const Portfolio = lazy(() => import("@/screens/Portfolio"));
+const Programs = lazy(() => import("@/screens/Programs"));
+const Products = lazy(() => import("@/screens/Products"));
+const Okrs = lazy(() => import("@/screens/Okrs"));
+const Roadmap = lazy(() => import("@/screens/Roadmap"));
+const Demands = lazy(() => import("@/screens/Demands"));
+const Gantt = lazy(() => import("@/screens/Gantt"));
+const Pip = lazy(() => import("@/screens/Pip"));
+const Project = lazy(() => import("@/screens/Project"));
+const Resources = lazy(() => import("@/screens/Resources"));
+const Financials = lazy(() => import("@/screens/Financials"));
+const Delivery = lazy(() => import("@/screens/Delivery"));
+const Releases = lazy(() => import("@/screens/Releases"));
+const Ops = lazy(() => import("@/screens/Ops"));
+const News = lazy(() => import("@/screens/News"));
+const Teams = lazy(() => import("@/screens/Teams"));
+const Methodologies = lazy(() => import("@/screens/Methodologies"));
+const Integrations = lazy(() => import("@/screens/Integrations"));
+const Reports = lazy(() => import("@/screens/Reports"));
+const Admin = lazy(() => import("@/screens/Admin"));
+const Help = lazy(() => import("@/screens/Help"));
+const MyProjects = lazy(() => import("@/screens/MyProjects"));
+const MyDemands = lazy(() => import("@/screens/MyDemands"));
 
 const router = createBrowserRouter([
   {

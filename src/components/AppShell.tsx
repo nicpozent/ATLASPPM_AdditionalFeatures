@@ -1,9 +1,21 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { color } from "@/theme";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { ErrorBoundary } from "./ui";
+
+// Shown while a lazily-loaded route chunk streams in. Deliberately minimal — a
+// centered pulse, no layout shift — so route transitions feel instant.
+function RouteFallback() {
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" style={{
+      display: "flex", alignItems: "center", justifyContent: "center", minHeight: 240,
+    }}>
+      <span style={{ fontSize: 13, color: color.faint, fontFamily: "'Public Sans', sans-serif" }}>Loading…</span>
+    </div>
+  );
+}
 
 // Tracks a max-width media query. Below the breakpoint the static sidebar is
 // swapped for an off-canvas drawer and the content padding tightens.
@@ -82,7 +94,9 @@ export function AppShell() {
           {/* Key the boundary by route so a crash on one screen never sticks —
               navigating elsewhere remounts it and clears the error state. */}
           <ErrorBoundary key={pathname}>
-            <Outlet />
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>
