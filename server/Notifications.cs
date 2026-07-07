@@ -90,11 +90,44 @@ public static class Notifications
         await SendEmailsAsync(cfg, emails, title, body);
     }
 
+    // A notification addressed to a role rather than a person, so everyone
+    // holding that role sees it (the inbox matches "role:<key>" against the
+    // caller's role keys — Permissions.CallerRoleKeys). Used for governance
+    // events that specific roles must always hear about, without each person
+    // subscribing. In-app is always written; email needs per-person addresses
+    // (from the directory), so it flows through the existing per-user prefs path.
+    public const string RolePrefix = "role:";
+
+    // Deliver an event to a fixed set of roles (e.g. PMO, Chief Architect, CTO,
+    // CIO, PM Lead for demands), excluding any role the actor themselves holds so
+    // they aren't pinged for their own action. Self-contained; persists its rows.
+    public static async Task EmitToRolesAsync(AtlasDbContext db, IConfiguration cfg,
+        string ev, IEnumerable<string> roleKeys, string title, string body,
+        string targetType, string targetId, IEnumerable<string>? excludeRoleKeys = null)
+    {
+        var exclude = new HashSet<string>(excludeRoleKeys ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        var targets = roleKeys.Where(k => !string.IsNullOrWhiteSpace(k) && !exclude.Contains(k))
+            .Select(k => k.Trim().ToLowerInvariant()).Distinct().ToList();
+        if (targets.Count == 0) return;
+        foreach (var k in targets)
+            db.Notifications.Add(NewRow(RolePrefix + k, ev, title, body, targetType, targetId));
+        await db.SaveChangesAsync();
+    }
+
     static async Task<Dictionary<string, (bool, bool)>> LoadPrefs(AtlasDbContext db, IEnumerable<string> users, string ev)
     {
         var set = users.ToHashSet();
         return (await db.NotificationPrefs.Where(p => p.EventType == ev && set.Contains(p.UserKey)).ToListAsync())
             .ToDictionary(p => p.UserKey, p => (p.InApp, p.Email));
+    }
+
+    // The UserKeys a caller receives: their own key plus a "role:<key>" entry for
+    // every role identity they hold (so role-addressed notifications reach them).
+    static List<string> Recipients(string me, HttpContext http, IConfiguration cfg)
+    {
+        var keys = new List<string> { me };
+        foreach (var r in Permissions.CallerRoleKeys(http, cfg)) keys.Add(RolePrefix + r.ToLowerInvariant());
+        return keys.Distinct().ToList();
     }
 
     static Notification NewRow(string user, string ev, string title, string body, string tType, string tId) => new()
@@ -183,21 +216,25 @@ public static class Notifications
         });
 
         // ---- Inbox --------------------------------------------------------
+        // The inbox shows notifications addressed to the caller personally OR to
+        // any role the caller holds ("role:<key>", e.g. a demand pinging the PMO).
         api.MapGet("/notifications", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             var me = Permissions.CallerKey(http, cfg);
-            var items = await db.Notifications.Where(n => n.UserKey == me)
+            var mine = Recipients(me, http, cfg);
+            var items = await db.Notifications.Where(n => mine.Contains(n.UserKey))
                 .OrderByDescending(n => n.At).Take(50)
                 .Select(n => new NotificationDto(n.Id, n.EventType, n.Title, n.Body, n.TargetType, n.TargetId, n.Read, n.At.ToString("o")))
                 .ToListAsync();
-            var unread = await db.Notifications.CountAsync(n => n.UserKey == me && !n.Read);
+            var unread = await db.Notifications.CountAsync(n => mine.Contains(n.UserKey) && !n.Read);
             return Results.Ok(new InboxDto(unread, items));
         });
 
         api.MapPost("/notifications/read", async (MarkReadReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             var me = Permissions.CallerKey(http, cfg);
-            var q = db.Notifications.Where(n => n.UserKey == me && !n.Read);
+            var mine = Recipients(me, http, cfg);
+            var q = db.Notifications.Where(n => mine.Contains(n.UserKey) && !n.Read);
             if (!req.All && req.Ids is { Count: > 0 }) q = q.Where(n => req.Ids.Contains(n.Id));
             await q.ExecuteUpdateAsync(s => s.SetProperty(n => n.Read, true));
             return Results.NoContent();

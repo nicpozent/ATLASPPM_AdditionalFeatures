@@ -33,6 +33,9 @@ public record UpdateKrReq(int? Progress, string? LinkType, string? LinkId);
 public static class WriteEndpoints
 {
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
+    // Leadership roles auto-notified on every demand create / status change
+    // (role-addressed, in-app for anyone holding the role — no subscription needed).
+    static readonly string[] DemandWatchRoles = { "pmo", "architect", "cto", "cio", "pmlead" };
     static readonly string[] BlockerStatuses = { "Active", "In progress", "Resolved", "Cancelled", "Archived" };
     static readonly string[] Statuses = { "green", "amber", "red", "hold", "completed" };
 
@@ -93,6 +96,10 @@ public static class WriteEndpoints
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Created demand", d.Id));
             await db.SaveChangesAsync();
             await Notifications.EmitPortfolioAsync(db, cfg, Notifications.Created, $"New demand: {d.Title}", $"{d.Id} · {d.Title} ({d.Dept}) was submitted.", "demand", d.Id, Permissions.CallerKey(http, cfg));
+            // Always alert portfolio leadership (PMO, Chief Architect, CTO, CIO, PM Lead).
+            await Notifications.EmitToRolesAsync(db, cfg, Notifications.Created, DemandWatchRoles,
+                $"New demand: {d.Title}", $"{d.Id} · {d.Title} ({d.Dept}) was submitted.", "demand", d.Id,
+                Permissions.CallerRoleKeys(http, cfg));
             return Results.Created($"/api/v1/demands/{d.Id}",
                 new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
@@ -167,6 +174,10 @@ public static class WriteEndpoints
                 var ev = req.Stage == "approved" ? Notifications.Approval : Notifications.Status;
                 var msg = req.Stage == "approved" ? "was approved" : $"moved to “{req.Stage}”";
                 await Notifications.EmitToEntityAsync(db, cfg, ev, "demand", d.Id, $"Demand {d.Title} {msg}", $"{d.Id} · {d.Title} {msg}.", Permissions.CallerKey(http, cfg));
+                // Also alert portfolio leadership regardless of per-demand subscription.
+                await Notifications.EmitToRolesAsync(db, cfg, ev, DemandWatchRoles,
+                    $"Demand {d.Title} {msg}", $"{d.Id} · {d.Title} {msg}.", "demand", d.Id,
+                    Permissions.CallerRoleKeys(http, cfg));
             }
             return Results.Ok(new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });

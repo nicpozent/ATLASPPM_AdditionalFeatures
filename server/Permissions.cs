@@ -28,9 +28,13 @@ public static class Permissions
         ["admin"] = "admin", ["pmo"] = "pmo", ["pm"] = "pm", ["pmlead"] = "pmlead",
         ["teammgr"] = "team", ["svcmgr"] = "team", ["devmgr"] = "team", ["inframgr"] = "team",
         ["architect"] = "pmo", ["stakeholder"] = "stkhldr",
+        // CTO / CIO — leadership identities enforced at Executive level (their
+        // distinct persona lives in the header switcher + ManagerKey).
+        ["cto"] = "exec", ["cio"] = "exec",
         // Canonical Entra app roles
         ["PlatformAdmin"] = "admin", ["PMO"] = "pmo", ["ProjectManager"] = "pm", ["PMLead"] = "pmlead",
         ["TeamMember"] = "team", ["Executive"] = "exec", ["Stakeholder"] = "stkhldr",
+        ["CTO"] = "exec", ["CIO"] = "exec",
         // Manager Entra app roles — these also carry a permission level (team, or
         // pmo for the architect) so a manager assigned only their manager role
         // gets the right access, not least-privilege. Their fine-grained manager
@@ -70,7 +74,30 @@ public static class Permissions
         ["architect"] = "architect", ["ChiefArchitect"] = "architect",
         ["pmo"] = "pmo", ["PMO"] = "pmo",
         ["pmlead"] = "pmlead", ["PMLead"] = "pmlead",
+        ["cto"] = "cto", ["CTO"] = "cto",
+        ["cio"] = "cio", ["CIO"] = "cio",
     };
+
+    // All role identity keys the caller holds — used to deliver role-addressed
+    // notifications (UserKey "role:<key>"). Auth off: the switcher identity plus
+    // its coarse/manager mappings; auth on: every role claim mapped through both
+    // the manager and coarse maps. Case-insensitive.
+    public static HashSet<string> CallerRoleKeys(HttpContext http, IConfiguration cfg)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void add(string v)
+        {
+            if (string.IsNullOrWhiteSpace(v)) return;
+            keys.Add(v);
+            if (ManagerMap.TryGetValue(v, out var m)) keys.Add(m);
+            if (RoleMap.TryGetValue(v, out var r)) keys.Add(r);
+        }
+        if (cfg.GetValue("Auth:Enabled", false))
+            foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role))) add(c.Value);
+        else
+            add(http.Request.Headers["X-Atlas-Role"].ToString());
+        return keys;
+    }
     public static string? ManagerKey(HttpContext http, IConfiguration cfg)
     {
         if (cfg.GetValue("Auth:Enabled", false))

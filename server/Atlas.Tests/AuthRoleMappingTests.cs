@@ -26,6 +26,8 @@ public class AuthRoleMappingTests
     [InlineData("ChiefArchitect", "pmo")]
     [InlineData("PlatformAdmin", "admin")]
     [InlineData("TeamMember", "team")]
+    [InlineData("CTO", "exec")]
+    [InlineData("CIO", "exec")]
     public void Manager_and_canonical_roles_map_to_a_permission_level(string appRole, string expected)
     {
         Assert.Equal(expected, Resolve(appRole));
