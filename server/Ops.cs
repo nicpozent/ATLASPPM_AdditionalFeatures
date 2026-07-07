@@ -47,10 +47,12 @@ public static class Ops
     public static void MapOpsEndpoints(this RouteGroupBuilder api)
     {
         // The Ops board: every service with its work items, plus a portfolio summary.
-        api.MapGet("/ops", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapGet("/ops", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, bool? includeArchived) =>
         {
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-ops", "E");
-            var services = await db.OpsServices.OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync();
+            var services = await db.OpsServices
+                .Where(s => includeArchived == true || !s.Archived)
+                .OrderBy(s => s.Ord).ThenBy(s => s.Id).ToListAsync();
             var items = await db.OpsItems.OrderBy(i => i.Ord).ThenBy(i => i.Id).ToListAsync();
             var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
 
@@ -61,7 +63,7 @@ public static class Ops
                 var active = its.Where(IsActive).ToList();
                 return new OpsServiceDto(s.Id, s.Ref, s.Name, s.Category, s.Dept, s.Owner, s.Status, s.Description,
                     its.Select(i => ToItemDto(i, s.Name, projNames)).ToList(),
-                    active.Count, active.Sum(i => i.Alloc));
+                    active.Count, active.Sum(i => i.Alloc), s.Archived, s.JiraProjectKey);
             }).ToList();
 
             var allActive = items.Where(IsActive).ToList();
@@ -95,7 +97,7 @@ public static class Ops
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Created ops service", $"{svc.Ref} {svc.Name}"));
             await db.SaveChangesAsync();
             return Results.Created($"/api/v1/ops/services/{svc.Id}",
-                new OpsServiceDto(svc.Id, svc.Ref, svc.Name, svc.Category, svc.Dept, svc.Owner, svc.Status, svc.Description, new(), 0, 0));
+                new OpsServiceDto(svc.Id, svc.Ref, svc.Name, svc.Category, svc.Dept, svc.Owner, svc.Status, svc.Description, new(), 0, 0, svc.Archived, svc.JiraProjectKey));
         });
 
         api.MapPatch("/ops/services/{id:int}", async (int id, UpdateOpsServiceReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -132,6 +134,19 @@ public static class Ops
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", "Removed ops service", $"{svc.Ref} {svc.Name}"));
             await db.SaveChangesAsync();
             return Results.NoContent();
+        });
+
+        // Archive / unarchive a service — hides it from the board without deleting
+        // its history (items are kept). Toggled by `on`.
+        api.MapPost("/ops/services/{id:int}/archive", async (int id, bool? on, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-ops", "E") is { } denied) return denied;
+            var svc = await db.OpsServices.FindAsync(id);
+            if (svc is null) return Results.NotFound();
+            svc.Archived = on ?? true;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Ops", svc.Archived ? "Archived ops service" : "Unarchived ops service", $"{svc.Ref} {svc.Name}"));
+            await db.SaveChangesAsync();
+            return Results.Ok(new { ok = true, archived = svc.Archived });
         });
 
         // ---- Work items ---------------------------------------------------

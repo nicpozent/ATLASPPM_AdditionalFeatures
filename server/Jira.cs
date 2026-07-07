@@ -215,11 +215,24 @@ public static class Jira
         // PM (Full on Projects & tasks). Editable afterwards from project details.
         api.MapPost("/integrations/jira/import", async (JiraImportReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
             var key = (req.JiraProjectKey ?? "").Trim().ToUpperInvariant();
+            var target = (req.Target ?? "project").Trim().ToLowerInvariant();
+
+            // Import a Jira project as an OPERATIONAL service (run-the-business
+            // space/board), pulling its issues as ops work items. Gated on cap-ops.
+            if (target == "ops")
+            {
+                if (await Permissions.Deny(http, db, cfg, "cap-ops", "E") is { } opsDenied) return opsDenied;
+                if (key.Length == 0) return Results.BadRequest(new { error = "A Jira project key is required." });
+                if (!JiraConfigured(cfg))
+                    return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
+                try { return await ImportOpsFromJiraAsync(db, cfg, http, key, req.Name); }
+                catch (Exception ex) { return Results.Json(new { ok = false, error = $"Jira → Ops import failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway); }
+            }
+
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "F") is { } denied) return denied;
             if (key.Length == 0) return Results.BadRequest(new { error = "A Jira project key is required." });
             var board = req.BoardId is int b && b > 0 ? b : (int?)null;
-            var target = (req.Target ?? "project").Trim().ToLowerInvariant();
 
             // Link an existing project.
             if (target == "project" && !string.IsNullOrWhiteSpace(req.AtlasId))
@@ -289,6 +302,69 @@ public static class Jira
         await db.SaveChangesAsync();
         return Results.Ok(new { ok = errors.Count == 0, projects = ok, sprints = sp, epics = ep, tasks = tk, errors });
     }
+
+    // Import a Jira project as an Ops service and upsert its issues as ops work
+    // items (idempotent by Jira issue key). Creates the service on first import,
+    // then tops up on re-import. Allocation is left at 0 (assigned by hand).
+    static async Task<IResult> ImportOpsFromJiraAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http, string key, string? name)
+    {
+        var svc = await db.OpsServices.FirstOrDefaultAsync(s => s.JiraProjectKey == key);
+        if (svc is null)
+        {
+            var maxNum = (await db.OpsServices.Select(s => s.Ref).ToListAsync())
+                .Select(r => int.TryParse(r.Split('-').Last(), out var n) ? n : 0).DefaultIfEmpty(0).Max();
+            var ord = (await db.OpsServices.Select(s => (int?)s.Ord).MaxAsync() ?? 0) + 1;
+            svc = new OpsService
+            {
+                Ref = $"OPS-{maxNum + 1}", Name = string.IsNullOrWhiteSpace(name) ? key : name!.Trim(),
+                Category = "Support", Dept = "Unassigned", Owner = "", Status = "Active",
+                Description = $"Imported from Jira project {key}.", JiraProjectKey = key, Ord = ord,
+            };
+            db.OpsServices.Add(svc);
+            await db.SaveChangesAsync();     // assign svc.Id
+        }
+
+        var existing = await db.OpsItems.Where(i => i.ServiceId == svc.Id).ToListAsync();
+        var itemOrd = existing.Select(i => i.Ord).DefaultIfEmpty(0).Max();
+        var fields = "summary,issuetype,assignee,priority,status";
+        using var c = Client(cfg);
+        var issues = await FetchJqlAsync(c, $"project = \"{key}\" ORDER BY created ASC", fields, () => { });
+        int imported = 0;
+        foreach (var ji in issues)
+        {
+            var ikey = Str(ji, "key");
+            if (ikey.Length == 0) continue;
+            var f = Prop(ji, "fields") ?? default;
+            if (StrPath(f, "issuetype", "name").Equals("Epic", StringComparison.OrdinalIgnoreCase)) continue;
+            var item = existing.FirstOrDefault(i => i.JiraKey == ikey);
+            if (item is null) { item = new OpsItem { ServiceId = svc.Id, JiraKey = ikey, Ord = ++itemOrd, CreatedAt = DateTime.UtcNow.ToString("dd MMM yyyy") }; db.OpsItems.Add(item); existing.Add(item); }
+            item.Title = Str(f, "summary");
+            item.Type = MapOpsType(StrPath(f, "issuetype", "name"));
+            item.Priority = MapPriority(StrPath(f, "priority", "name"));
+            item.Status = MapOpsStatus(StrPath(f, "status", "statusCategory", "key"));
+            item.Assignee = StrPath(f, "assignee", "displayName");
+            imported++;
+        }
+        db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Imported Jira project as Ops service", $"{key} → {svc.Ref} · {imported} items"));
+        await db.SaveChangesAsync();
+        return Results.Ok(new { ok = true, serviceId = svc.Id, serviceRef = svc.Ref, items = imported });
+    }
+
+    // Jira issue type → Ops work-item type.
+    static string MapOpsType(string? t) => (t ?? "").ToLowerInvariant() switch
+    {
+        "bug" or "incident" or "fault" => "Incident",
+        "change" or "change request" => "Change",
+        "task" or "story" or "sub-task" or "subtask" => "Request",
+        _ => "Other",
+    };
+    // Jira status category → Ops work-item status.
+    static string MapOpsStatus(string? cat) => (cat ?? "").ToLowerInvariant() switch
+    {
+        "done" => "Done",
+        "indeterminate" => "In progress",
+        _ => "Open",
+    };
 
     // Next "PRJ-N" id (mirrors the create-project numbering).
     static async Task<string> NextProjectIdAsync(AtlasDbContext db)

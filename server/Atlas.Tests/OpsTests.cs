@@ -86,4 +86,44 @@ public class OpsTests : IClassFixture<AtlasApiFactory>
         var board = await stk.GetFromJsonAsync<JsonElement>("/api/v1/ops");
         Assert.False(board.GetProperty("canEdit").GetBoolean());
     }
+
+    [Fact]
+    public async Task Archiving_hides_a_service_from_the_board_unless_included()
+    {
+        var c = As("admin");
+        var svcId = await IntId(await c.PostAsJsonAsync("/api/v1/ops/services", new { name = "To archive", category = "Support" }));
+
+        Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/v1/ops/services/{svcId}/archive?on=true", null)).StatusCode);
+
+        // Hidden by default…
+        var board = await c.GetFromJsonAsync<JsonElement>("/api/v1/ops");
+        Assert.DoesNotContain(board.GetProperty("services").EnumerateArray(), s => s.GetProperty("id").GetInt32() == svcId);
+        // …but visible with includeArchived, flagged archived.
+        var withArch = await c.GetFromJsonAsync<JsonElement>("/api/v1/ops?includeArchived=true");
+        var svc = withArch.GetProperty("services").EnumerateArray().First(s => s.GetProperty("id").GetInt32() == svcId);
+        Assert.True(svc.GetProperty("archived").GetBoolean());
+
+        // Restore brings it back.
+        Assert.Equal(HttpStatusCode.OK, (await c.PostAsync($"/api/v1/ops/services/{svcId}/archive?on=false", null)).StatusCode);
+        var board2 = await c.GetFromJsonAsync<JsonElement>("/api/v1/ops");
+        Assert.Contains(board2.GetProperty("services").EnumerateArray(), s => s.GetProperty("id").GetInt32() == svcId);
+    }
+
+    [Fact]
+    public async Task Importing_to_ops_needs_the_ops_capability()
+    {
+        // A stakeholder can't import to Ops (needs cap-ops Edit); this fails on the
+        // gate before any Jira call.
+        var stk = As("stakeholder");
+        var res = await stk.PostAsJsonAsync("/api/v1/integrations/jira/import", new { jiraProjectKey = "OPSIMP", target = "ops" });
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+
+        // Admin passes the gate; Jira isn't configured in tests, so it returns a
+        // friendly ok:false rather than erroring.
+        var admin = As("admin");
+        var ok = await admin.PostAsJsonAsync("/api/v1/integrations/jira/import", new { jiraProjectKey = "OPSIMP", target = "ops" });
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        using var doc = JsonDocument.Parse(await ok.Content.ReadAsStringAsync());
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+    }
 }
