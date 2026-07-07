@@ -844,6 +844,22 @@ function BackupsSection() {
     mutationFn: (on: boolean) => api("/settings/backups.auto", { method: "PATCH", body: JSON.stringify({ value: on ? "true" : "false" }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["backups"] }),
   });
+  const restore = useMutation({
+    mutationFn: (text: string) => api<{ ok: boolean; restored: Record<string, number> }>("/backups/restore", { method: "POST", body: text }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["backups"] });
+      const n = Object.values(res?.restored ?? {}).reduce((a, b) => a + b, 0);
+      toast(`Restored ${n} record${n === 1 ? "" : "s"} (merge). Reload to see changes.`, "info");
+    },
+    onError: (e) => toast(`Restore failed: ${(e as Error).message}`, "error"),
+  });
+  const onRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";   // allow re-selecting the same file
+    if (!file) return;
+    if (!confirm("Restore from this backup? This MERGES the file into the current data (upsert by id) — it updates and re-creates rows but never deletes. Child rows and attachments are not restored (use a database dump for full recovery).")) return;
+    file.text().then((t) => restore.mutate(t));
+  };
 
   return (
     <>
@@ -863,9 +879,16 @@ function BackupsSection() {
           <span style={{ fontSize: 12, fontWeight: 700, color: d.autoBackups ? "#3BD17A" : "#C9D6EE" }}>{d.autoBackups ? "ON" : "OFF"}</span>
         </button>
         {d.canManage && (
-          <button onClick={() => runBackup.mutate()} disabled={runBackup.isPending} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: runBackup.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: runBackup.isPending ? 0.7 : 1 }}>
-            <Icon name="download" size={16} /> {runBackup.isPending ? "Backing up…" : "Back up all now"}
-          </button>
+          <>
+            <button onClick={() => runBackup.mutate()} disabled={runBackup.isPending} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: runBackup.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: runBackup.isPending ? 0.7 : 1 }}>
+              <Icon name="download" size={16} /> {runBackup.isPending ? "Backing up…" : "Back up all now"}
+            </button>
+            <label title="Restore (merge) from a downloaded Atlas backup file"
+              style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: restore.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: restore.isPending ? 0.7 : 1 }}>
+              <Icon name="refresh" size={16} /> {restore.isPending ? "Restoring…" : "Restore…"}
+              <input type="file" accept="application/json,.json" onChange={onRestoreFile} disabled={restore.isPending} style={{ display: "none" }} />
+            </label>
+          </>
         )}
       </div>
       <div style={{ marginBottom: 18 }}>
