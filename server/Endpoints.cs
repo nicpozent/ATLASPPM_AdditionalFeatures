@@ -211,8 +211,28 @@ public static class Endpoints
                 r.ValuePerEuro)));
 
         api.MapGet("/dashboard", DashboardEndpoint.Build);
+
+        // Custom-dashboard layout, saved per user server-side so it follows them
+        // across devices (the client falls back to localStorage when signed out).
+        api.MapGet("/dashboard/custom", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var me = Permissions.CallerKey(http, cfg);
+            var row = await db.DashboardLayouts.FindAsync(me);
+            return Results.Ok(new { widgets = row?.Widgets ?? "" });
+        });
+        api.MapPut("/dashboard/custom", async (DashboardLayoutReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var me = Permissions.CallerKey(http, cfg);
+            var row = await db.DashboardLayouts.FindAsync(me);
+            if (row is null) { row = new DashboardLayout { UserKey = me }; db.DashboardLayouts.Add(row); }
+            row.Widgets = req.Widgets ?? "";
+            await db.SaveChangesAsync();
+            return Results.Ok(new { ok = true });
+        });
     }
 }
+
+public record DashboardLayoutReq(string? Widgets);
 
 public static class DashboardEndpoint
 {

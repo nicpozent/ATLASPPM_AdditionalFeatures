@@ -2,7 +2,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
-public record SetAllocReq(int? Alloc);
+public record SetAllocReq(int? Alloc, int? AllocHours, string? StartDate, string? EndDate,
+    int? ExtAlloc, int? ExtHours, string? ExtStartDate, string? ExtEndDate);
 public record OnboardReq(string? Name, string? Email, string? Title);
 
 // ============================================================================
@@ -31,6 +32,14 @@ public static class ResourcesData
         return Palette[h % Palette.Length];
     }
 
+    // Blank for empty/unparseable; else ISO yyyy-MM-dd.
+    static string NormDate(string? s)
+    {
+        var v = (s ?? "").Trim();
+        if (v.Length == 0) return "";
+        return DateOnly.TryParse(v, out var d) ? d.ToString("yyyy-MM-dd") : v;
+    }
+
     public static void MapResourceEndpoints(this RouteGroupBuilder api)
     {
         // The capacity roster: everyone with an allocation (product or project) or
@@ -45,7 +54,7 @@ public static class ResourcesData
             var productAllocs = await db.ProductAllocations.ToListAsync();
             var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
             var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
-            var opsByPerson = await Ops.AllocByPersonAsync(db);   // Ops% source: active ops work items
+            var opsByPerson = await Ops.AllocByPersonAsync(db, on);   // Ops% source: active ops work items (time-phased)
             // Combined project load per person: max(planned team %, task-estimate %)
             // per project, summed (ADR-0020). Includes people with only tasks.
             var projectByPerson = await AllocationEngine.ProjectLoadByPersonAsync(db, on);
@@ -107,7 +116,8 @@ public static class ResourcesData
                 .GroupBy(t => t.EntityId)
                 .Select(g => new ResByProjectDto(g.Key, projects[g.Key], canEdit,
                     g.SelectMany(t => t.Members).OrderByDescending(m => m.Alloc).ThenBy(m => m.Name)
-                        .Select(m => new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc)).ToList()))
+                        .Select(m => new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc,
+                            m.AllocHours, m.StartDate, m.EndDate, m.ExtAlloc, m.ExtHours, m.ExtStartDate, m.ExtEndDate)).ToList()))
                 .OrderBy(x => x.Name).ToList();
             return Results.Ok(byProject);
         });
@@ -128,16 +138,26 @@ public static class ResourcesData
             return Results.Ok(byProduct);
         });
 
-        // Set a project team member's allocation %.
+        // Set a project team member's allocation — % or weekly hours (hours win),
+        // an optional date window, and an optional extension. Time-phased like the
+        // Team panel; only the fields present in the request are changed.
         api.MapPatch("/resources/project-members/{memberId:int}", async (int memberId, SetAllocReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var m = await db.TeamAssignmentMembers.FindAsync(memberId);
             if (m is null) return Results.NotFound();
-            m.Alloc = Math.Clamp(req.Alloc ?? 0, 0, 100);
+            if (req.AllocHours is int ah) { m.AllocHours = Math.Max(0, ah); m.Alloc = AllocMath.Percent(req.Alloc, ah); }
+            else if (req.Alloc is int a) { m.Alloc = Math.Clamp(a, 0, 100); m.AllocHours = 0; }
+            if (req.StartDate is not null) m.StartDate = NormDate(req.StartDate);
+            if (req.EndDate is not null) m.EndDate = NormDate(req.EndDate);
+            if (req.ExtHours is int eh) { m.ExtHours = Math.Max(0, eh); m.ExtAlloc = AllocMath.Percent(req.ExtAlloc, eh); }
+            else if (req.ExtAlloc is int ea) { m.ExtAlloc = Math.Clamp(ea, 0, 100); m.ExtHours = 0; }
+            if (req.ExtStartDate is not null) m.ExtStartDate = NormDate(req.ExtStartDate);
+            if (req.ExtEndDate is not null) m.ExtEndDate = NormDate(req.ExtEndDate);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Resources", "Set allocation", $"{m.Name} · {m.Alloc}%"));
             await db.SaveChangesAsync();
-            return Results.Ok(new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc));
+            return Results.Ok(new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc,
+                m.AllocHours, m.StartDate, m.EndDate, m.ExtAlloc, m.ExtHours, m.ExtStartDate, m.ExtEndDate));
         });
 
         // Assignee options for a project's tasks: everyone actually attached to the

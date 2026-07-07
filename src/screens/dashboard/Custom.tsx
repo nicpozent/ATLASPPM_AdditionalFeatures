@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { color, font, chart } from "@/theme";
+import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { ProgressBar } from "@/components/ui";
 import { Sparkline, HealthDonut, BudgetChart, Gauge } from "./charts";
@@ -108,9 +109,26 @@ export function Custom({ d }: { d: DashboardData }) {
   const drag = useRef<{ kind: "add" | "move"; key?: string; uid?: string } | null>(null);
   const seq = useRef(0); // monotonic counter for stable, unique widget ids
 
+  // Persist the layout server-side (so it follows the user across devices) and to
+  // localStorage as an offline fallback.
   const persist = useCallback((list: Placed[]) => {
     setWidgets(list);
     try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+    api("/dashboard/custom", { method: "PUT", body: JSON.stringify({ widgets: JSON.stringify(list) }) }).catch(() => { /* offline: localStorage holds it */ });
+  }, []);
+
+  // On mount, prefer the server-saved layout (overrides the localStorage/default
+  // seed). Silent on failure — the local seed already rendered.
+  useEffect(() => {
+    let live = true;
+    api<{ widgets: string }>("/dashboard/custom").then((r) => {
+      if (!live || !r?.widgets) return;
+      try {
+        const saved = JSON.parse(r.widgets);
+        if (Array.isArray(saved)) setWidgets(saved);
+      } catch { /* ignore malformed */ }
+    }).catch(() => { /* keep local seed */ });
+    return () => { live = false; };
   }, []);
 
   const groups = useMemo(() => {

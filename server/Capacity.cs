@@ -43,7 +43,7 @@ public static class Capacity
         var map = new Dictionary<string, (int Ops, int Project, int Product)>(StringComparer.OrdinalIgnoreCase);
         (int Ops, int Project, int Product) G(string n) => map.TryGetValue(n, out var v) ? v : (0, 0, 0);
 
-        foreach (var (name, ops) in await Ops.AllocByPersonAsync(db)) { var v = G(name); map[name] = (v.Ops + ops, v.Project, v.Product); }
+        foreach (var (name, ops) in await Ops.AllocByPersonAsync(db, today)) { var v = G(name); map[name] = (v.Ops + ops, v.Project, v.Product); }
         // Project load = max(planned team %, task-estimate %) per project, summed
         // (ADR-0020) — the same engine the Resources roster uses.
         foreach (var (name, proj) in await AllocationEngine.ProjectLoadByPersonAsync(db, today)) { var v = G(name); map[name] = (v.Ops, v.Project + proj, v.Product); }

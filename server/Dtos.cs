@@ -189,7 +189,8 @@ public record OperationalDto(bool CanEdit, List<OperationalItemDto> Items);
 // ---- Ops module (run-the-business services & work items) -------------------
 public record OpsItemDto(int Id, int ServiceId, string ServiceName, string Title, string Description,
     string Type, string Priority, string Status, string Assignee, int Alloc,
-    string? ImpactProjectId, string? ImpactProjectName, string ImpactNote, string CreatedAt);
+    string? ImpactProjectId, string? ImpactProjectName, string ImpactNote, string CreatedAt,
+    string StartDate = "", string EndDate = "");
 public record OpsServiceDto(int Id, string Ref, string Name, string Category, string Dept, string Owner,
     string Status, string Description, List<OpsItemDto> Items, int ActiveCount, int Alloc,
     bool Archived = false, string JiraProjectKey = "");
@@ -327,7 +328,9 @@ public record PiLinkTargetDto(string Type, string Id, string Name);
 public record IncrementsDto(bool CanEdit, List<IncrementSummaryDto> Increments);
 
 // ---- Resources & allocation (derived from real product/project allocations) --
-public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc);
+public record ResAllocRowDto(int? MemberId, string Name, string Title, int Alloc,
+    int AllocHours = 0, string StartDate = "", string EndDate = "",
+    int ExtAlloc = 0, int ExtHours = 0, string ExtStartDate = "", string ExtEndDate = "");
 public record ResByProjectDto(string Id, string Name, bool CanEdit, List<ResAllocRowDto> Members);
 public record ResByProductDto(string Id, string Name, List<ResAllocRowDto> Members);
 public record UnonboardedDto(string Name, List<string> Projects);
