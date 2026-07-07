@@ -37,6 +37,14 @@ function statusPill(s: string): { ink: string; tint: string; label: string } {
 
 interface Item { type: Cat; id: string; name: string; owner: string; dept: string; status: string; progress: number | null; start: string; end: string }
 
+// The subset of fields the four list endpoints share that this view reads.
+// Optional because each entity type populates a slightly different set.
+interface PortfolioRow {
+  id: string; name: string; owner?: string; dept?: string; status?: string;
+  progress?: number | null; startDate?: string; target?: string; due?: string;
+  endDate?: string; date?: string; archived?: boolean;
+}
+
 function useAll<T>(path: string, key: string) {
   return useQuery({ queryKey: [key], retry: false, staleTime: 30_000, queryFn: async (): Promise<T[]> => (await api<T[]>(path)) ?? [] });
 }
@@ -44,10 +52,10 @@ function useAll<T>(path: string, key: string) {
 export default function PortfolioOverview() {
   const navigate = useNavigate();
   const [cat, setCat] = useState<Cat>("all");
-  const projects = useAll<any>("/projects", "projects");
-  const programs = useAll<any>("/programs", "programs");
-  const products = useAll<any>("/products", "products");
-  const releases = useAll<any>("/releases", "releases");
+  const projects = useAll<PortfolioRow>("/projects", "projects");
+  const programs = useAll<PortfolioRow>("/programs", "programs");
+  const products = useAll<PortfolioRow>("/products", "products");
+  const releases = useAll<PortfolioRow>("/releases", "releases");
 
   const items: Item[] = useMemo(() => {
     const P = (projects.data ?? []).filter((p) => !p.archived).map((p): Item => ({ type: "project", id: p.id, name: p.name, owner: p.owner ?? "", dept: p.dept ?? "", status: p.status ?? "", progress: p.progress ?? 0, start: p.startDate ?? "", end: p.target ?? p.due ?? "" }));

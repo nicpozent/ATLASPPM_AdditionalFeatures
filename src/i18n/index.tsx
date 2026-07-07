@@ -50,6 +50,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its provider by design; affects dev HMR only
 export function useI18n(): I18nCtx {
   const c = useContext(Ctx);
   if (!c) throw new Error("useI18n must be used within I18nProvider");
@@ -57,6 +58,7 @@ export function useI18n(): I18nCtx {
 }
 
 // Convenience hook for components that only need to translate.
+// eslint-disable-next-line react-refresh/only-export-components -- convenience hook co-located with the provider; affects dev HMR only
 export function useT(): TFunc {
   return useI18n().t;
 }

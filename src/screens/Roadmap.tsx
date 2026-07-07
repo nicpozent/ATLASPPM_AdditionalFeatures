@@ -80,7 +80,7 @@ export default function Roadmap() {
       (await api<Board>("/roadmap")) ?? { canEdit: false, items: [], themes: [], linkOptions: [] },
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data]);
   const filtered = items.filter((i) =>
     (theme === "all" || i.theme === theme) && (status === "all" || i.status === status));
   const titleOf = useMemo(() => new Map(items.map((i) => [i.id, i.title])), [items]);

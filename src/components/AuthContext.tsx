@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its provider by design; affects dev HMR only
 export function useAuth() {
   const c = useContext(Ctx);
   if (!c) throw new Error("useAuth must be used within AuthProvider");

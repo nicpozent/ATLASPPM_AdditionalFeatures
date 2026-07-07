@@ -26,6 +26,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={{ role, setRole, identity }}>{children}</Ctx.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its provider by design; affects dev HMR only
 export function useRole() {
   const c = useContext(Ctx);
   if (!c) throw new Error("useRole must be used within RoleProvider");
