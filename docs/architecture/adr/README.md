@@ -47,5 +47,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0038](./0038-idle-logout-policy.md) | Idle-logout policy (15-min inactivity sign-out, configurable) | Accepted |
 | [0039](./0039-ado-background-sync.md) | Background Azure DevOps sync (queue + worker + poll; cap raised) | Accepted |
 | [0040](./0040-tuned-dashboards-and-alerts.md) | Domain metrics, tuned Grafana dashboards & Prometheus alert rules | Accepted |
+| [0041](./0041-screen-decomposition.md) | Decompose large screen files into per-tab modules (project/, resources/) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
