@@ -353,6 +353,12 @@ full (F) levels. Authorization is always server-side.
 - **US-CAP-1** — _As a **manager**, I want capacity intelligence (skills-based
   staffing suggestions, my-allocations, capacity-vs-demand), so that I staff
   effectively._
+- **US-NOTIF-3** — _As **PMO / Chief Architect / CTO / CIO / PM Lead**, I want to
+  be notified automatically whenever a demand is created or changes status, so
+  that portfolio leadership sees intake without subscribing to each demand._
+  **Acceptance:** role-addressed notification on create + status/approval; in-app
+  for anyone holding the role (email via the existing per-user path); the actor
+  isn't self-notified._
 
 ## 26. Stakeholder Experience
 
