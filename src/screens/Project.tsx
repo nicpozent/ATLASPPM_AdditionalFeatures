@@ -620,26 +620,16 @@ interface Task {
 interface TaskAttachment { id: number; fileName: string; contentType: string; size: number; author: string; createdAt: string; }
 
 function useAssigneeOptions(projectId: string | null): string[] {
+  // People attached to the project (role + team/sub-team/individual) first, then
+  // the rest of the onboarded roster as a fallback pool — resolved server-side so
+  // the dropdown is populated even before a sub-team is attached.
   const { data } = useQuery({
-    queryKey: ["assignments", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<Assignments | null> => {
-      try { return await api<Assignments>(`/projects/${projectId}/assignments`); } catch { return null; }
+    queryKey: ["assignee-options", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<string[]> => {
+      try { return (await api<string[]>(`/projects/${projectId}/assignee-options`)) ?? []; } catch { return []; }
     },
   });
-  // Members of the sub-teams attached to this project (the people actually
-  // working on it) — the primary source for the assignee dropdown.
-  const { data: team } = useQuery({
-    queryKey: ["team-assignments", "project", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ assignments: { members: { name: string }[] }[] } | null> => {
-      try { return await api(`/teams/assignments/project/${projectId}`); } catch { return null; }
-    },
-  });
-  return useMemo(() => {
-    const set = new Set<string>();
-    (team?.assignments ?? []).forEach((a) => a.members.forEach((m) => { if (m.name?.trim()) set.add(m.name.trim()); }));
-    (data?.options ?? []).forEach((o) => { if (o?.trim()) set.add(o.trim()); });   // fallback pool
-    return Array.from(set);
-  }, [team, data]);
+  return useMemo(() => (data ?? []).filter((n) => n?.trim()), [data]);
 }
 
 // Epic names for the task epic dropdown (tasks tie to an epic by name).

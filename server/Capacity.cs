@@ -24,7 +24,13 @@ public static class Capacity
         var team = (await db.TeamAssignments.Include(a => a.Members)
                 .Where(a => a.EntityType == "project" && a.EntityId == projectId).ToListAsync())
             .SelectMany(a => a.Members).Select(m => m.Name);
-        return roles.Concat(team)
+        // People carrying open, estimated tasks on this project are working on it
+        // even without a formal role/team assignment — count them too.
+        var taskAssignees = await db.ProjectTasks
+            .Where(t => t.ProjectId == projectId && t.Status != "Done" && t.EstimateHours > 0
+                     && t.Assignee != "" && t.Assignee != "Unassigned")
+            .Select(t => t.Assignee).ToListAsync();
+        return roles.Concat(team).Concat(taskAssignees)
             .Where(n => !string.IsNullOrWhiteSpace(n) && n != "N/A")
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -38,14 +44,9 @@ public static class Capacity
         (int Ops, int Project, int Product) G(string n) => map.TryGetValue(n, out var v) ? v : (0, 0, 0);
 
         foreach (var (name, ops) in await Ops.AllocByPersonAsync(db)) { var v = G(name); map[name] = (v.Ops + ops, v.Project, v.Product); }
-        var projAssign = await db.TeamAssignments.Include(a => a.Members).Where(a => a.EntityType == "project").ToListAsync();
-        foreach (var a in projAssign)
-            foreach (var m in a.Members)
-            {
-                var live = (AllocMath.ActiveOn(m.StartDate, m.EndDate, today) ? m.Alloc : 0)
-                         + (m.ExtAlloc > 0 && AllocMath.ActiveOn(m.ExtStartDate, m.ExtEndDate, today) ? m.ExtAlloc : 0);
-                var v = G(m.Name); map[m.Name] = (v.Ops, v.Project + live, v.Product);
-            }
+        // Project load = max(planned team %, task-estimate %) per project, summed
+        // (ADR-0020) — the same engine the Resources roster uses.
+        foreach (var (name, proj) in await AllocationEngine.ProjectLoadByPersonAsync(db, today)) { var v = G(name); map[name] = (v.Ops, v.Project + proj, v.Product); }
         foreach (var pa in await db.ProductAllocations.ToListAsync()) { var v = G(pa.MemberName); map[pa.MemberName] = (v.Ops, v.Project, v.Product + pa.Alloc); }
         return map;
     }

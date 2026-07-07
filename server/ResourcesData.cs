@@ -46,6 +46,9 @@ public static class ResourcesData
             var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
             var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
             var opsByPerson = await Ops.AllocByPersonAsync(db);   // Ops% source: active ops work items
+            // Combined project load per person: max(planned team %, task-estimate %)
+            // per project, summed (ADR-0020). Includes people with only tasks.
+            var projectByPerson = await AllocationEngine.ProjectLoadByPersonAsync(db, on);
 
             // Accumulate per person (keyed case-insensitively by name).
             var people = new Dictionary<string, (string Name, string Title, string Dept, int Project, int Product, int Ops)>(StringComparer.OrdinalIgnoreCase);
@@ -57,14 +60,20 @@ public static class ResourcesData
                 var p = Get(a.MemberName);
                 people[a.MemberName] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? a.MemberTitle : p.Item2, p.Item3, p.Item4, p.Item5 + a.Alloc, p.Item6);
             }
+            // Ensure everyone with a project team assignment is listed (at 0% when
+            // their allocation isn't live today) and carries a title — the numbers
+            // come from the engine below so planned + task load never double-count.
             foreach (var t in projAssignments)
                 foreach (var m in t.Members)
                 {
-                    var live = (AllocMath.ActiveOn(m.StartDate, m.EndDate, on) ? m.Alloc : 0)
-                             + (m.ExtAlloc > 0 && AllocMath.ActiveOn(m.ExtStartDate, m.ExtEndDate, on) ? m.ExtAlloc : 0);
                     var p = Get(m.Name);
-                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4 + live, p.Item5, p.Item6);
+                    people[m.Name] = (p.Item1, string.IsNullOrEmpty(p.Item2) ? m.Title : p.Item2, p.Item3, p.Item4, p.Item5, p.Item6);
                 }
+            foreach (var (name, projPct) in projectByPerson)
+            {
+                var p = Get(name);
+                people[name] = (p.Item1, p.Item2, p.Item3, projPct, p.Item5, p.Item6);
+            }
             foreach (var g in groups)
                 foreach (var m in g.Members)
                 {
@@ -129,6 +138,34 @@ public static class ResourcesData
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Resources", "Set allocation", $"{m.Name} · {m.Alloc}%"));
             await db.SaveChangesAsync();
             return Results.Ok(new ResAllocRowDto(m.Id, m.Name, m.Title, m.Alloc));
+        });
+
+        // Assignee options for a project's tasks: everyone actually attached to the
+        // project (role assignments + team/sub-team/individual members) first, then
+        // the rest of the onboarded roster as a fallback pool — so the task-assignee
+        // dropdown is populated even when no sub-team is attached yet.
+        api.MapGet("/projects/{id}/assignee-options", async (string id, AtlasDbContext db) =>
+        {
+            var ordered = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            void AddName(string? n)
+            {
+                var name = (n ?? "").Trim();
+                if (name.Length == 0 || name == "N/A" || name == "Unassigned") return;
+                if (seen.Add(name)) ordered.Add(name);
+            }
+
+            // 1) People on this project — role assignments + attached team members.
+            foreach (var p in await db.RoleAssignments.Where(a => a.ProjectId == id).Select(a => a.Person).ToListAsync()) AddName(p);
+            var team = await db.TeamAssignments.Include(a => a.Members)
+                .Where(a => a.EntityType == "project" && a.EntityId == id).ToListAsync();
+            foreach (var m in team.SelectMany(a => a.Members)) AddName(m.Name);
+
+            // 2) Fallback pool — the whole onboarded roster (Entra members + roster).
+            foreach (var m in await db.TeamMembers.Select(m => m.DisplayName).ToListAsync()) AddName(m);
+            foreach (var r in await db.Resources.Select(r => r.Name).ToListAsync()) AddName(r);
+
+            return Results.Ok(ordered);
         });
 
         // Task assignees that aren't in the onboarded set (Resources + Entra members)
