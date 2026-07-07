@@ -421,15 +421,36 @@ public static class Jira
     }
 
     // Pull a Jira project's issues into an Ops service's items, upserting by Jira
-    // key (idempotent). Shared by the one-time import and the per-service re-sync.
-    // Caller is responsible for SaveChanges + audit.
+    // key (idempotent). Mirrors the project importer: the full field set is
+    // carried across (description, people, labels, components, versions,
+    // resolution, time tracking, points, dates, links), epics come in as items
+    // tagged Type="Epic" (with child items linked by epic/parent key), and each
+    // issue's comment thread and attachments are pulled too. Shared by the
+    // one-time import and the per-service re-sync. Caller owns SaveChanges + audit.
     public static async Task<int> PullOpsItemsAsync(AtlasDbContext db, IConfiguration cfg, OpsService svc)
     {
         var key = svc.JiraProjectKey;
         if (string.IsNullOrWhiteSpace(key)) return 0;
         var existing = await db.OpsItems.Where(i => i.ServiceId == svc.Id).ToListAsync();
         var itemOrd = existing.Select(i => i.Ord).DefaultIfEmpty(0).Max();
-        const string fields = "summary,issuetype,assignee,priority,status";
+        var pointsField = string.IsNullOrWhiteSpace(cfg["Jira:StoryPointsField"]) ? "customfield_10016" : cfg["Jira:StoryPointsField"]!.Trim();
+        var browseBase = NormalizeBaseUrl(cfg["Jira:BaseUrl"]) ?? "";
+        var importAttachments = !string.Equals(cfg["Jira:ImportAttachments"], "false", StringComparison.OrdinalIgnoreCase);
+        var importComments = !string.Equals(cfg["Jira:ImportComments"], "false", StringComparison.OrdinalIgnoreCase);
+        var maxAttachmentBytes = long.TryParse(cfg["Jira:MaxAttachmentBytes"], out var mb) && mb > 0 ? mb : 25L * 1024 * 1024;
+        var fields = "summary,description,status,issuetype,assignee,reporter,creator,duedate,priority," +
+                     "labels,components,fixVersions,resolution,resolutiondate,created,updated," +
+                     "timetracking,timespent,timeoriginalestimate,sprint,closedSprints,epic,parent,comment,attachment," +
+                     pointsField;
+        // Which Jira comment/attachment ids each existing item already holds, so a
+        // re-import tops up new ones without re-downloading or duplicating.
+        var existingIds = existing.Where(i => i.Id != 0).Select(i => i.Id).ToList();
+        var haveCom = (await db.OpsItemComments.Where(c => existingIds.Contains(c.OpsItemId) && c.JiraId != "")
+                .Select(c => new { c.OpsItemId, c.JiraId }).ToListAsync())
+            .GroupBy(x => x.OpsItemId).ToDictionary(g => g.Key, g => g.Select(x => x.JiraId).ToHashSet());
+        var haveAtt = (await db.OpsItemAttachments.Where(a => existingIds.Contains(a.OpsItemId))
+                .Select(a => new { a.OpsItemId, a.JiraId }).ToListAsync())
+            .GroupBy(x => x.OpsItemId).ToDictionary(g => g.Key, g => g.Select(x => x.JiraId).ToHashSet());
         using var c = Client(cfg);
         var issues = await FetchJqlAsync(c, $"project = \"{key}\" ORDER BY created ASC", fields, () => { });
         int imported = 0;
@@ -438,14 +459,84 @@ public static class Jira
             var ikey = Str(ji, "key");
             if (ikey.Length == 0) continue;
             var f = Prop(ji, "fields") ?? default;
-            if (StrPath(f, "issuetype", "name").Equals("Epic", StringComparison.OrdinalIgnoreCase)) continue;
+            var itype = StrPath(f, "issuetype", "name");
+            var isEpic = itype.Equals("Epic", StringComparison.OrdinalIgnoreCase);
             var item = existing.FirstOrDefault(i => i.JiraKey == ikey);
             if (item is null) { item = new OpsItem { ServiceId = svc.Id, JiraKey = ikey, Ord = ++itemOrd, CreatedAt = DateTime.UtcNow.ToString("dd MMM yyyy") }; db.OpsItems.Add(item); existing.Add(item); }
             item.Title = Str(f, "summary");
-            item.Type = MapOpsType(StrPath(f, "issuetype", "name"));
+            item.Type = isEpic ? "Epic" : MapOpsType(itype);
             item.Priority = MapPriority(StrPath(f, "priority", "name"));
             item.Status = MapOpsStatus(StrPath(f, "status", "statusCategory", "key"));
             item.Assignee = StrPath(f, "assignee", "displayName");
+            // Rich fields — mirror the project importer.
+            item.Description = AdfToText(Prop(f, "description"));
+            item.IssueType = itype;
+            item.Reporter = StrPath(f, "reporter", "displayName");
+            item.StatusName = StrPath(f, "status", "name");
+            item.Resolution = StrPath(f, "resolution", "name");
+            item.Labels = StrArray(f, "labels");
+            item.Components = ObjNameArray(f, "components");
+            item.FixVersions = ObjNameArray(f, "fixVersions");
+            item.ParentKey = StrPath(f, "parent", "key");
+            item.EpicKey = isEpic ? ikey : EpicKeyOf(f);
+            item.EpicName = isEpic ? Str(f, "summary") : EpicNameOf(f);
+            item.Points = Math.Max(0, IntProp(f, pointsField));
+            item.EstimateHours = SecondsToHours(LongProp(f, "timeoriginalestimate"));
+            item.TimeSpentHours = SecondsToHours(LongProp(f, "timespent"));
+            item.TargetDate = DatePart(Str(f, "duedate"));
+            item.JiraCreated = Str(f, "created");
+            item.JiraUpdated = Str(f, "updated");
+            item.JiraUrl = browseBase.Length > 0 ? $"{browseBase}/browse/{ikey}" : "";
+
+            // Comments — upsert by Jira comment id into the item's thread.
+            if (importComments && Prop(f, "comment") is { } cwrap && Prop(cwrap, "comments") is { ValueKind: JsonValueKind.Array } clist)
+            {
+                var have = item.Id != 0 && haveCom.TryGetValue(item.Id, out var hc) ? hc : new HashSet<string>();
+                foreach (var cm in clist.EnumerateArray())
+                {
+                    var cid = NumOrStr(cm, "id");
+                    if (cid.Length == 0 || have.Contains(cid)) continue;
+                    var author = StrPath(cm, "author", "displayName");
+                    item.Comments.Add(new OpsItemComment
+                    {
+                        JiraId = cid, Author = author.Length > 0 ? author : "Jira",
+                        Initials = Initials(author), Body = AdfToText(Prop(cm, "body")),
+                        At = ParseAt(Str(cm, "created")),
+                    });
+                    have.Add(cid);
+                }
+            }
+
+            // Attachments — download each new file (within the size cap); best-effort.
+            if (importAttachments && Prop(f, "attachment") is { ValueKind: JsonValueKind.Array } alist)
+            {
+                var have = item.Id != 0 && haveAtt.TryGetValue(item.Id, out var ha) ? ha : new HashSet<string>();
+                foreach (var att in alist.EnumerateArray())
+                {
+                    var aid = NumOrStr(att, "id");
+                    var url = Str(att, "content");
+                    var size = LongProp(att, "size");
+                    if (aid.Length == 0 || url.Length == 0 || have.Contains(aid)) continue;
+                    if (size > maxAttachmentBytes) continue;
+                    try
+                    {
+                        using var fileRes = await c.GetAsync(url);
+                        if (!fileRes.IsSuccessStatusCode) continue;
+                        var bytes = await fileRes.Content.ReadAsByteArrayAsync();
+                        if (bytes.LongLength > maxAttachmentBytes) continue;
+                        item.Attachments.Add(new OpsItemAttachment
+                        {
+                            JiraId = aid, FileName = Str(att, "filename"),
+                            ContentType = Str(att, "mimeType") is { Length: > 0 } mt ? mt : "application/octet-stream",
+                            Size = size > 0 ? size : bytes.LongLength,
+                            Author = StrPath(att, "author", "displayName"), CreatedAt = Str(att, "created"),
+                            Bytes = bytes,
+                        });
+                        have.Add(aid);
+                    }
+                    catch { /* skip this attachment, keep importing */ }
+                }
+            }
             imported++;
         }
         return imported;

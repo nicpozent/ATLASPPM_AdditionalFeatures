@@ -110,6 +110,50 @@ public class OpsTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Bulk_delete_removes_many_items_and_is_gated()
+    {
+        var c = As("admin");
+        var svcId = await IntId(await c.PostAsJsonAsync("/api/v1/ops/services", new { name = "Bulk svc", category = "Support" }));
+        var a = await IntId(await c.PostAsJsonAsync($"/api/v1/ops/services/{svcId}/items", new { title = "A" }));
+        var b = await IntId(await c.PostAsJsonAsync($"/api/v1/ops/services/{svcId}/items", new { title = "B" }));
+        var keep = await IntId(await c.PostAsJsonAsync($"/api/v1/ops/services/{svcId}/items", new { title = "Keep" }));
+
+        // A stakeholder can't bulk-delete.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await As("stakeholder").PostAsJsonAsync("/api/v1/ops/items/bulk-delete", new { ids = new[] { a, b } })).StatusCode);
+
+        // Admin removes two in one call; the third survives.
+        var res = await c.PostAsJsonAsync("/api/v1/ops/items/bulk-delete", new { ids = new[] { a, b } });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.Equal(2, doc.RootElement.GetProperty("deleted").GetInt32());
+
+        var board = await c.GetFromJsonAsync<JsonElement>("/api/v1/ops");
+        var svc = board.GetProperty("services").EnumerateArray().First(s => s.GetProperty("id").GetInt32() == svcId);
+        var titles = svc.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("title").GetString()).ToList();
+        Assert.Equal(new[] { "Keep" }, titles);
+        _ = keep;
+    }
+
+    [Fact]
+    public async Task Item_detail_returns_thread_shape_and_rich_fields()
+    {
+        var c = As("admin");
+        var svcId = await IntId(await c.PostAsJsonAsync("/api/v1/ops/services", new { name = "Detail svc", category = "Support" }));
+        var itemId = await IntId(await c.PostAsJsonAsync($"/api/v1/ops/services/{svcId}/items", new { title = "Detail item", type = "Request" }));
+
+        var detail = await c.GetFromJsonAsync<JsonElement>($"/api/v1/ops/items/{itemId}");
+        Assert.Equal("Detail item", detail.GetProperty("item").GetProperty("title").GetString());
+        // A locally-created item has no Jira provenance and an empty thread.
+        Assert.Equal("", detail.GetProperty("item").GetProperty("jiraKey").GetString());
+        Assert.Empty(detail.GetProperty("comments").EnumerateArray());
+        Assert.Empty(detail.GetProperty("attachments").EnumerateArray());
+
+        // An unknown attachment 404s rather than erroring.
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/api/v1/ops/item-attachments/999999")).StatusCode);
+    }
+
+    [Fact]
     public async Task Importing_to_ops_needs_the_ops_capability()
     {
         // A stakeholder can't import to Ops (needs cap-ops Edit); this fails on the
