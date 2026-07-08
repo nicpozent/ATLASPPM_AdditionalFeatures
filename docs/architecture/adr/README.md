@@ -51,5 +51,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0042](./0042-ops-full-jira-import-and-bulk-ops.md) | Ops: full-fidelity Jira import (epics + rich fields + comments/attachments), work-item-status filter, bulk delete | Accepted |
 | [0043](./0043-cto-cio-roles-and-demand-role-notifications.md) | CTO & CIO roles (header persona + Executive RBAC) + role-addressed demand notifications | Accepted |
 | [0044](./0044-ado-delta-sync.md) | Azure DevOps delta (changed-since) work-item sync | Accepted |
+| [0045](./0045-per-role-demand-email.md) | Per-role email for demand notifications (in-app mapping + per-person opt-out) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

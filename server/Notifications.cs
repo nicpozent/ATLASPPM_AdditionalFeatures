@@ -94,24 +94,70 @@ public static class Notifications
     // holding that role sees it (the inbox matches "role:<key>" against the
     // caller's role keys — Permissions.CallerRoleKeys). Used for governance
     // events that specific roles must always hear about, without each person
-    // subscribing. In-app is always written; email needs per-person addresses
-    // (from the directory), so it flows through the existing per-user prefs path.
+    // subscribing.
     public const string RolePrefix = "role:";
 
     // Deliver an event to a fixed set of roles (e.g. PMO, Chief Architect, CTO,
     // CIO, PM Lead for demands), excluding any role the actor themselves holds so
-    // they aren't pinged for their own action. Self-contained; persists its rows.
+    // they aren't pinged for their own action. In-app is always written (the
+    // always-available default). Email is ALSO sent to the people in those roles,
+    // resolved via the IN-APP group→role mapping (EntraGroup.ManagerKey →
+    // TeamMemberRow.Email — the mapping wins over the raw Entra manager attribute),
+    // default-on but honouring each person's opt-out (a NotificationPref for this
+    // event with Email=false). No directory sync ⇒ no addresses ⇒ in-app only.
+    // Self-contained; persists its own rows.
     public static async Task EmitToRolesAsync(AtlasDbContext db, IConfiguration cfg,
         string ev, IEnumerable<string> roleKeys, string title, string body,
         string targetType, string targetId, IEnumerable<string>? excludeRoleKeys = null)
     {
         var exclude = new HashSet<string>(excludeRoleKeys ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         var targets = roleKeys.Where(k => !string.IsNullOrWhiteSpace(k) && !exclude.Contains(k))
-            .Select(k => k.Trim().ToLowerInvariant()).Distinct().ToList();
+            .Select(k => k.Trim().ToLowerInvariant()).ToHashSet();
         if (targets.Count == 0) return;
         foreach (var k in targets)
             db.Notifications.Add(NewRow(RolePrefix + k, ev, title, body, targetType, targetId));
         await db.SaveChangesAsync();
+        await SendRoleEmailsAsync(db, cfg, ev, targets, title, body);
+    }
+
+    // Resolve the people in the target roles (via the in-app group→role mapping)
+    // and email those who haven't opted out. Best-effort; degrades to in-app only.
+    static async Task SendRoleEmailsAsync(AtlasDbContext db, IConfiguration cfg,
+        string ev, HashSet<string> targets, string title, string body)
+    {
+        var emails = await ResolveRoleEmailsAsync(db, ev, targets);
+        await SendEmailsAsync(cfg, emails, title, body);
+    }
+
+    // The distinct email addresses of people in the target roles who haven't opted
+    // out of this event. Members come from the IN-APP group→role mapping
+    // (EntraGroup.ManagerKey → TeamMemberRow.Email); opt-out is a NotificationPref
+    // for this event with Email=false. Pure read; unit-tested.
+    public static async Task<List<string>> ResolveRoleEmailsAsync(AtlasDbContext db, string ev, IEnumerable<string> roleKeys)
+    {
+        var targets = roleKeys.Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => k.Trim().ToLowerInvariant()).ToHashSet();
+        if (targets.Count == 0) return new();
+        var groups = await db.EntraGroups.Include(g => g.Members)
+            .Where(g => g.ManagerKey != "").ToListAsync();
+        var members = groups
+            .Where(g => targets.Contains(g.ManagerKey.Trim().ToLowerInvariant()))
+            .SelectMany(g => g.Members)
+            .Where(m => !string.IsNullOrWhiteSpace(m.Email))
+            .ToList();
+        if (members.Count == 0) return new();
+
+        var uids = members.Select(m => m.Uid).Where(u => !string.IsNullOrEmpty(u)).Distinct().ToList();
+        var optedOut = uids.Count == 0 ? new HashSet<string>()
+            : (await db.NotificationPrefs.Where(p => p.EventType == ev && !p.Email && uids.Contains(p.UserKey))
+                .Select(p => p.UserKey).ToListAsync()).ToHashSet();
+
+        return members
+            .Where(m => string.IsNullOrEmpty(m.Uid) || !optedOut.Contains(m.Uid))
+            .Select(m => m.Email.Trim())
+            .Where(e => e.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     static async Task<Dictionary<string, (bool, bool)>> LoadPrefs(AtlasDbContext db, IEnumerable<string> users, string ev)

@@ -29,6 +29,8 @@ public static class Teams
         ("architect", "Chief Architect"),
         ("pmo",       "PMO"),
         ("pmlead",    "PM Lead"),
+        ("cto",       "CTO"),
+        ("cio",       "CIO"),
     };
     static string Label(string key) => Slots.FirstOrDefault(s => s.Key == key).Label ?? key;
     public static string SlotLabel(string key) => string.IsNullOrEmpty(key) ? "" : Label(key);
