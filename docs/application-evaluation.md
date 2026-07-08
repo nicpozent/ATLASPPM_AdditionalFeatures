@@ -21,7 +21,7 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 | 4 | **Identity & access** | ★★★★★ | Entra SSO (MSAL, PKCE) **verified end-to-end on a live tenant**; server-authoritative RBAC capability matrix; **15-min idle-logout** | — |
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |
-| 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic; ADO delta sync pending |
+| 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts | — |
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout | Pen-test not performed; secrets rotation manual |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
@@ -62,7 +62,6 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 | Priority | Item | Why |
 |----------|------|-----|
 | Medium | Add full user-journey e2e (beyond a11y) | e2e currently proves a11y, not flows |
-| Low | ADO delta sync | Full pull works & is backgrounded; delta would cut re-sync cost |
 | Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy |
 | Low | Finish decomposing `Project.tsx` | ~2,960 lines; the per-tab pattern (ADR-0041) is in place to continue |
 

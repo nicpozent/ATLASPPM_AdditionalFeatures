@@ -16,9 +16,9 @@ interface JobStatus { state: string; projects?: number; sprints?: number; epics?
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function syncAdo(path: string): Promise<AdoSyncOutcome> {
+export async function syncAdo(path: string, delta = false): Promise<AdoSyncOutcome> {
   const sep = path.includes("?") ? "&" : "?";
-  const r = await api<QueuedResp>(`${path}${sep}background=true`, { method: "POST" });
+  const r = await api<QueuedResp>(`${path}${sep}delta=${delta}&background=true`, { method: "POST" });
   if (!r) return { ok: false, message: "No response from server." };
   if (r.ok === false) return { ok: false, error: r.error, message: r.message };
   // Server ran synchronously (didn't queue) — return its counts directly.

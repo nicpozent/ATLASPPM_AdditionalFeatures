@@ -50,6 +50,7 @@ public class Project
     // Organization). Empty ⇒ not linked. Work-item sync is a follow-up; the
     // mapping is stored now so the discovery importer can wire it (see ADR-0035).
     public string AdoProject { get; set; } = "";
+    public string LastAdoSync { get; set; } = "";       // UTC ISO of last successful ADO sync; drives delta (changed-since) pulls
 
     // Lifecycle. IsSystem marks seeded/demo projects — they can be archived but
     // never hard-deleted. Archived projects drop out of the active portfolio,

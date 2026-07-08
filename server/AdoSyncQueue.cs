@@ -16,6 +16,7 @@ public class AdoSyncJob
     public string TargetId { get; init; } = "all";   // "all" | a project id
     public string Actor { get; init; } = "system";
     public string Role { get; init; } = "system";
+    public bool Delta { get; init; }                  // changed-since pull (vs full)
 }
 
 public class AdoJobStatus
@@ -43,7 +44,7 @@ public class AdoSyncQueue
     // Pending (unread) jobs — surfaced as a metric gauge (ADR-0040).
     public int Pending => _channel.Reader.CanCount ? _channel.Reader.Count : 0;
 
-    public AdoJobStatus Enqueue(string targetId, string actor, string role)
+    public AdoJobStatus Enqueue(string targetId, string actor, string role, bool delta = false)
     {
         var id = Guid.NewGuid().ToString("n")[..12];
         var status = new AdoJobStatus { Id = id, TargetId = targetId, State = "queued", At = DateTime.UtcNow.ToString("o") };
@@ -51,7 +52,7 @@ public class AdoSyncQueue
         if (_status.Count > MaxTracked)
             foreach (var stale in _status.Values.OrderBy(s => s.At).Take(_status.Count - MaxTracked).ToList())
                 _status.TryRemove(stale.Id, out _);
-        _channel.Writer.TryWrite(new AdoSyncJob { Id = id, TargetId = targetId, Actor = actor, Role = role });
+        _channel.Writer.TryWrite(new AdoSyncJob { Id = id, TargetId = targetId, Actor = actor, Role = role, Delta = delta });
         return status;
     }
 
@@ -81,7 +82,7 @@ public class AdoSyncWorker(IServiceProvider sp, IConfiguration cfg, AdoSyncQueue
                 using var scope = sp.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
                 var targets = await AzureDevOps.ResolveSyncTargetsAsync(db, job.TargetId);
-                var r = await AzureDevOps.SyncProjectsCoreAsync(db, cfg, targets);
+                var r = await AzureDevOps.SyncProjectsCoreAsync(db, cfg, targets, job.Delta);
                 db.AuditEvents.Add(new AuditEvent
                 {
                     At = DateTime.UtcNow, Actor = job.Actor, Role = job.Role, Category = "Integrations",
