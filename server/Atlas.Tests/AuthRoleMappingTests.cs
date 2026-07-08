@@ -45,4 +45,26 @@ public class AuthRoleMappingTests
     {
         Assert.Equal("stkhldr", Resolve("SomethingElse"));
     }
+
+    // Auth-off (demo) header resolution: a known switcher identity maps to its
+    // canonical RoleDef; a role created in Admin resolves to its own id so it's
+    // enforced by its own matrix row.
+    static string? ResolveHeader(string header)
+    {
+        var req = new DefaultHttpContext().Request;
+        req.Headers["X-Atlas-Role"] = header;
+        return Permissions.ResolveRoleId(new ClaimsPrincipal(new ClaimsIdentity()), req, authEnabled: false);
+    }
+
+    [Fact]
+    public void Auth_off_no_header_is_full_access()
+        => Assert.Null(ResolveHeader(""));
+
+    [Fact]
+    public void Auth_off_known_identity_maps_to_its_roledef()
+        => Assert.Equal("exec", ResolveHeader("cto"));
+
+    [Fact]
+    public void Auth_off_custom_role_resolves_to_its_own_id()
+        => Assert.Equal("auditor", ResolveHeader("auditor"));
 }

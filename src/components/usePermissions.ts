@@ -14,12 +14,13 @@ interface RolesMatrix { roles: RoleRow[]; }
 
 const RANK: Record<string, number> = { F: 3, E: 2, V: 1, N: 0 };
 
-// The 9 cosmetic UI identities collapse onto the 6 matrix role ids (same map
-// the backend uses for the X-Atlas-Role header).
+// The cosmetic UI identities collapse onto the matrix role ids (same map the
+// backend uses for the X-Atlas-Role header). Anything not listed — e.g. a role
+// CREATED in Admin — falls through to its own id and is matched directly.
 const UI_TO_ROLE: Record<string, string> = {
-  admin: "admin", pmo: "pmo", pm: "pm",
+  admin: "admin", pmo: "pmo", pm: "pm", pmlead: "pmlead",
   teammgr: "team", svcmgr: "team", devmgr: "team", inframgr: "team",
-  architect: "pmo", stakeholder: "stkhldr",
+  architect: "pmo", cto: "exec", cio: "exec", stakeholder: "stkhldr",
 };
 
 export function usePermissions() {

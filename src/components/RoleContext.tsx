@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { ROLES, type RoleIdentity } from "@/nav";
 import { useAuth } from "./AuthContext";
+import { useRoleIdentities } from "./useRoleIdentities";
 
 interface RoleCtx { role: string; setRole: (r: string) => void; identity: RoleIdentity; }
 const Ctx = createContext<RoleCtx | null>(null);
@@ -14,15 +15,18 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   // to the last-picked role, then the demo default.
   const [role, setRoleState] = useState<string>(() => (user?.role || localStorage.getItem(KEY) || "pmo"));
   const setRole = (r: string) => { setRoleState(r); localStorage.setItem(KEY, r); };
+  const identities = useRoleIdentities();
   const identity = useMemo<RoleIdentity>(() => {
-    const base = ROLES.find((x) => x.value === role) ?? ROLES[1];
+    // Resolve from the merged list (built-in personas + roles created in Admin),
+    // falling back to the static personas before the /roles query resolves.
+    const base = identities.find((x) => x.value === role) ?? ROLES.find((x) => x.value === role) ?? ROLES[1];
     // When signed in via Entra the identity IS the real user — the switcher only
     // changes which role's view/nav is shown. With auth off (demo) fall back to
     // the prototype's cosmetic identity.
     return user
       ? { ...base, name: user.name, initials: user.initials, roleLabel: user.username }
       : base;
-  }, [role, user]);
+  }, [role, user, identities]);
   return <Ctx.Provider value={{ role, setRole, identity }}>{children}</Ctx.Provider>;
 }
 
