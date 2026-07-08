@@ -28,6 +28,17 @@ Result: `Project.tsx` ~4,300 → ~2,960 lines, `Resources.tsx` ~750 → ~420.
 _Continued: the `Artifacts` and `RAID` tabs were later extracted the same way
 (`project/Artifacts.tsx`, `project/Raid.tsx`), bringing `Project.tsx` to ~2,660._
 
+_Continued (agile tabs): the `Tasks`, `Backlog`, `Sprints` and `Epics` tabs were
+then extracted. Their shared plumbing was relocated first to break the cycle back
+into `Project.tsx`: the `Task`/`TaskAttachment` types, board/priority constants,
+`isAgileWithSprints` and the assignee/epic/sprint option hooks now live in
+`project/taskModel.ts` (non-component); the shared task components (`LinkSelect`,
+`SprintTaskRow`, `JiraTaskPanel`, `TaskDetailModal`, `NewTaskModal`) in
+`project/TaskModals.tsx`; `useProject`/`ProjectDetail` in `project/useProject.ts`;
+and the comment helpers (`CommentItem`, `fmtCommentTime`) in `project/util.ts`.
+Each tab is now its own file (`project/Tasks.tsx`, `Backlog.tsx`, `Sprints.tsx`,
+`Epics.tsx`). This brought `Project.tsx` to ~1,600._
+
 ## Consequences
 - **+** Smaller, single-responsibility files; a tab's code (types + component +
   modals) lives together and is easy to find and own.
@@ -35,10 +46,10 @@ _Continued: the `Artifacts` and `RAID` tabs were later extracted the same way
   the remaining Project tabs can follow incrementally.
 - **−** A little more cross-file import wiring; shared helpers now have an explicit
   home rather than being co-located.
-- **−** `Project.tsx` is still large (~2,660 after the Artifacts/RAID pass) — full
-  atomisation is deferred; the highest-value tabs were extracted first. Tabs that
-  share `Task`/`SprintTaskRow` (Tasks/Backlog/Sprints/Epics) need those helpers
-  relocated to a shared module before they can move cleanly.
+- **−** `Project.tsx` is now ~1,600. The remaining inline tabs (Overview, People,
+  Governance, Decision log, Dependencies, project Blockers, Vacations, Comments)
+  and their small shared models are left in place; they don't share the task
+  plumbing and can follow the same pattern if the file grows again.
 
 ## Alternatives considered
 - **Leave the files as-is** — the flagged maintainability cost remains; rejected.
