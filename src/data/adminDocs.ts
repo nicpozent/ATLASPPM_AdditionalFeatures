@@ -222,7 +222,7 @@ export const USER_STORY_SECTIONS: UserStorySection[] = [
     { id: "NOTIF-1", role: "User", want: "a notification center, subscribe buttons, and preferences", benefit: "I follow what matters" },
     { id: "NOTIF-2", role: "Manager", want: "over-allocation alerts (delivered, deduplicated)", benefit: "I catch capacity problems early" },
     { id: "CAP-1", role: "Manager", want: "capacity intelligence (skills-based staffing suggestions, my-allocations, capacity-vs-demand)", benefit: "I staff effectively" },
-    { id: "NOTIF-3", role: "PMO / Chief Architect / CTO / CIO / PM Lead", want: "to be notified automatically whenever a demand is created or changes status", benefit: "portfolio leadership sees intake without subscribing to each demand", acceptance: "role-addressed notification on create + status/approval; in-app for anyone holding the role (email via the existing per-user path); the actor isn't self-notified." },
+    { id: "NOTIF-3", role: "PMO / Chief Architect / CTO / CIO / PM Lead", want: "to be notified automatically whenever a demand is created or changes status", benefit: "portfolio leadership sees intake without subscribing to each demand", acceptance: "role-addressed in-app notification on create + status/approval; email to those role members too, resolved via the in-app group→role mapping, default-on with per-person opt-out; the actor isn't self-notified." },
   ]},
   { title: "26. Stakeholder Experience", stories: [
     { id: "STK-1", role: "Stakeholder", want: "a reduced navigation (my projects, my demands, delivery, releases, weekly updates, help)", benefit: "I see only what's relevant", acceptance: "Stakeholder role gets NAV_STAKEHOLDER_*; the API scopes data to the stakeholder." },
