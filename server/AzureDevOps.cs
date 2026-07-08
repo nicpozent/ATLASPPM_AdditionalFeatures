@@ -194,7 +194,7 @@ public static class AzureDevOps
         // (prunes rows that vanished from ADO). Gated on Integrations (Edit).
         // With ?background=true the pull runs off the request path (202 + jobId)
         // so a large project can't 504 — mirrors Jira (ADR-0030/0039).
-        api.MapPost("/projects/{id}/ado/sync", async (string id, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
+        api.MapPost("/projects/{id}/ado/sync", async (string id, bool? background, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!AdoConfigured(cfg))
@@ -203,11 +203,11 @@ public static class AzureDevOps
             if (p is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(p.AdoProject))
                 return Results.Ok(new { ok = false, error = "This project isn't mapped to an Azure DevOps project. Import/map it first." });
-            if (background == true) return QueueSync(queue, http, cfg, id);
+            if (background == true) return QueueSync(queue, http, cfg, id, delta == true);
             try
             {
                 using var c = Client(cfg);
-                var r = await SyncProjectAsync(db, cfg, c, p);
+                var r = await SyncProjectAsync(db, cfg, c, p, delta == true);
                 db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps project", $"{p.AdoProject} → {p.Id}: {r.Sprints} sprints, {r.Epics} epics, {r.Tasks} tasks"));
                 await db.SaveChangesAsync();
                 return Results.Ok(new { ok = true, r.Sprints, r.Epics, r.Tasks, r.Backlog, r.Truncated });
@@ -221,16 +221,16 @@ public static class AzureDevOps
         // Sync every ADO-mapped, non-archived project in one pass (best-effort:
         // one project's failure doesn't stop the rest). Gated on Integrations.
         // ?background=true queues the pass and returns 202 + jobId to poll.
-        api.MapPost("/integrations/ado/sync", async (bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
+        api.MapPost("/integrations/ado/sync", async (bool? background, bool? delta, AtlasDbContext db, IConfiguration cfg, HttpContext http, AdoSyncQueue queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!AdoConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Azure DevOps isn't configured — set AzureDevOps:Organization and AzureDevOps:Pat (see docs/azure-devops-setup.md)." });
-            if (background == true) return QueueSync(queue, http, cfg, "all");
+            if (background == true) return QueueSync(queue, http, cfg, "all", delta == true);
             var mapped = await db.Projects.Where(p => p.AdoProject != "" && !p.Archived).ToListAsync();
             try
             {
-                var r = await SyncProjectsCoreAsync(db, cfg, mapped);
+                var r = await SyncProjectsCoreAsync(db, cfg, mapped, delta == true);
                 db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", "Synced Azure DevOps (all mapped)", $"{r.Projects} projects, {r.Sprints} sprints, {r.Epics} epics, {r.Tasks} tasks"));
                 await db.SaveChangesAsync();
                 return Results.Ok(new { ok = true, projects = r.Projects, sprints = r.Sprints, epics = r.Epics, tasks = r.Tasks, errors = r.Errors });
@@ -249,10 +249,10 @@ public static class AzureDevOps
     }
 
     // Enqueue a background sync under the caller's identity; 202 + pollable id.
-    static IResult QueueSync(AdoSyncQueue queue, HttpContext http, IConfiguration cfg, string targetId)
+    static IResult QueueSync(AdoSyncQueue queue, HttpContext http, IConfiguration cfg, string targetId, bool delta = false)
     {
-        var who = Permissions.Audit(http, cfg, "Integrations", "Queued Azure DevOps sync", "");
-        var status = queue.Enqueue(targetId, who.Actor, who.Role);
+        var who = Permissions.Audit(http, cfg, "Integrations", "Queued Azure DevOps sync", delta ? "delta" : "full");
+        var status = queue.Enqueue(targetId, who.Actor, who.Role, delta);
         return Results.Accepted($"/api/v1/integrations/ado/sync/status/{status.Id}",
             new { ok = true, queued = true, jobId = status.Id, state = status.State });
     }
@@ -261,7 +261,7 @@ public static class AzureDevOps
     // sync-all endpoint and the background worker (best-effort per project).
     public record AdoBulkResult(int Projects, int Sprints, int Epics, int Tasks, List<string> Errors);
 
-    public static async Task<AdoBulkResult> SyncProjectsCoreAsync(AtlasDbContext db, IConfiguration cfg, List<Project> projects)
+    public static async Task<AdoBulkResult> SyncProjectsCoreAsync(AtlasDbContext db, IConfiguration cfg, List<Project> projects, bool delta = false)
     {
         int sp = 0, ep = 0, tk = 0, ok = 0;
         var errors = new List<string>();
@@ -269,7 +269,7 @@ public static class AzureDevOps
         foreach (var p in projects)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            try { var r = await SyncProjectAsync(db, cfg, c, p); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; AtlasTelemetry.RecordSync("ado", sw.Elapsed.TotalSeconds, ok: true); }
+            try { var r = await SyncProjectAsync(db, cfg, c, p, delta); sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++; AtlasTelemetry.RecordSync("ado", sw.Elapsed.TotalSeconds, ok: true); }
             catch (Exception ex) { errors.Add($"{p.AdoProject}: {ex.Message}"); AtlasTelemetry.RecordSync("ado", sw.Elapsed.TotalSeconds, ok: false); }
         }
         return new AdoBulkResult(ok, sp, ep, tk, errors);
@@ -315,11 +315,18 @@ public static class AzureDevOps
         string IterationLeaf, string ParentId, int Points, int Priority, string Description,
         string Created, string Changed);
 
-    public static async Task<AdoSyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p)
+    public static async Task<AdoSyncResult> SyncProjectAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p, bool delta = false)
     {
         var project = p.AdoProject.Trim();
         var enc = Uri.EscapeDataString(project);
         var truncated = false;
+        // Delta ("changed-since") pull: only work items changed since the last
+        // successful sync. Captured BEFORE the fetch so items that change during
+        // the pull are caught next time. A delta must NOT prune (unchanged items
+        // aren't returned); the first delta (no watermark) behaves as a full pull.
+        var watermark = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var deltaActive = delta && !string.IsNullOrEmpty(p.LastAdoSync);
+        var changedClause = ChangedSinceClause(delta, p.LastAdoSync);
 
         // --- Iterations → sprints (upsert by node identifier) ---------------
         var existingSprints = await db.Sprints.Where(s => s.ProjectId == p.Id).ToListAsync();
@@ -349,7 +356,7 @@ public static class AzureDevOps
         // --- Work items: WIQL for ids, then batched detail fetch ------------
         var ids = new List<string>();
         var wiql = new StringContent(
-            JsonSerializer.Serialize(new { query = $"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project.Replace("'", "''")}' ORDER BY [System.ChangedDate] ASC" }),
+            JsonSerializer.Serialize(new { query = $"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project.Replace("'", "''")}'{changedClause} ORDER BY [System.ChangedDate] ASC" }),
             Encoding.UTF8, "application/json");
         var wiqlRes = await c.PostAsync($"{enc}/_apis/wit/wiql?api-version={ApiVersion}", wiql);
         if (wiqlRes.IsSuccessStatusCode)
@@ -437,25 +444,37 @@ public static class AzureDevOps
             t.JiraUpdated = wi.Changed;
         }
 
-        // --- Prune rows that vanished from ADO (full pull) ------------------
-        if (seenTasks.Count > 0)
-            db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.AdoId.Length > 0 && !seenTasks.Contains(t.AdoId)));
-        if (seenEpics.Count > 0)
-            db.Epics.RemoveRange(existingEpics.Where(e => e.AdoId.Length > 0 && !seenEpics.Contains(e.AdoId)));
-        if (seenSprints.Count > 0)
-            db.Sprints.RemoveRange(existingSprints.Where(s => s.AdoId.Length > 0 && !seenSprints.Contains(s.AdoId)));
-
-        // Recompute synced epics' story rollup from surviving tasks (by name).
-        var liveTasks = existingTasks.Where(t => t.AdoId.Length == 0 || seenTasks.Contains(t.AdoId)).ToList();
-        foreach (var e in existingEpics.Where(e => e.AdoId.Length > 0 && seenEpics.Contains(e.AdoId)))
+        // --- Prune + full epic roll-up only on a full pull ------------------
+        // A delta doesn't list every item, so removing "unseen" rows or recomputing
+        // roll-ups from a partial set would wrongly delete/miscount unchanged rows.
+        if (!deltaActive)
         {
-            var its = liveTasks.Where(t => t.Epic == e.Name).ToList();
-            e.Stories = its.Count;
-            e.Done = its.Count(t => t.Status == "Done");
+            if (seenTasks.Count > 0)
+                db.ProjectTasks.RemoveRange(existingTasks.Where(t => t.AdoId.Length > 0 && !seenTasks.Contains(t.AdoId)));
+            if (seenEpics.Count > 0)
+                db.Epics.RemoveRange(existingEpics.Where(e => e.AdoId.Length > 0 && !seenEpics.Contains(e.AdoId)));
+            if (seenSprints.Count > 0)
+                db.Sprints.RemoveRange(existingSprints.Where(s => s.AdoId.Length > 0 && !seenSprints.Contains(s.AdoId)));
+
+            // Recompute synced epics' story rollup from surviving tasks (by name).
+            var liveTasks = existingTasks.Where(t => t.AdoId.Length == 0 || seenTasks.Contains(t.AdoId)).ToList();
+            foreach (var e in existingEpics.Where(e => e.AdoId.Length > 0 && seenEpics.Contains(e.AdoId)))
+            {
+                var its = liveTasks.Where(t => t.Epic == e.Name).ToList();
+                e.Stories = its.Count;
+                e.Done = its.Count(t => t.Status == "Done");
+            }
         }
 
+        p.LastAdoSync = watermark;    // stamp after a successful pull (caller owns SaveChanges)
         return new AdoSyncResult(seenSprints.Count, seenEpics.Count, seenTasks.Count, backlog, truncated);
     }
+
+    // The WIQL fragment appended for a delta pull — only when delta is requested
+    // AND there's a watermark to filter from (the first delta, no watermark,
+    // behaves as a full pull). Pure; unit-tested. Mirrors Jira.DeltaClause.
+    public static string ChangedSinceClause(bool delta, string? lastSync) =>
+        delta && !string.IsNullOrEmpty(lastSync) ? $" AND [System.ChangedDate] >= '{lastSync}'" : "";
 
     // Flatten the iteration classification-node tree to its leaf iterations
     // (nodes that carry a start date, i.e. real iterations not grouping folders).

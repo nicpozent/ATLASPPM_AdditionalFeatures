@@ -82,7 +82,7 @@ export default function Integrations() {
   // Pull every ADO-mapped project's work items → tasks/epics/sprints in one pass.
   // Runs in the background (202 + jobId polling) so a large org can't 504 (ADR-0039).
   const syncAllAdo = useMutation({
-    mutationFn: () => syncAdo("/integrations/ado/sync"),
+    mutationFn: (delta: boolean) => syncAdo("/integrations/ado/sync", delta),
     onSuccess: (o) => { toast(adoSyncToast(o), o.ok || o.state === "running" ? "info" : "error"); qc.invalidateQueries({ queryKey: ["projects"] }); },
     onError: (e) => toast((e as Error).message, "error"),
   });
@@ -183,12 +183,20 @@ export default function Integrations() {
                     style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: testAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                   >{testAdo.isPending ? "Testing…" : "Test connection"}</button>
                   {configured && (
-                    <button
-                      onClick={() => syncAllAdo.mutate()}
-                      disabled={syncAllAdo.isPending || !ado?.canManage}
-                      title={ado?.canManage ? "Pull all Azure DevOps-mapped projects (map a project from Discover below, or in its details)" : "Needs Edit on Integrations & connectors"}
-                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                    >{syncAllAdo.isPending ? "Syncing…" : "Sync now"}</button>
+                    <>
+                      <button
+                        onClick={() => syncAllAdo.mutate(true)}
+                        disabled={syncAllAdo.isPending || !ado?.canManage}
+                        title={ado?.canManage ? "Pull only work items changed since the last sync (faster)" : "Needs Edit on Integrations & connectors"}
+                        style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                      >Incremental</button>
+                      <button
+                        onClick={() => syncAllAdo.mutate(false)}
+                        disabled={syncAllAdo.isPending || !ado?.canManage}
+                        title={ado?.canManage ? "Full pull of all Azure DevOps-mapped projects (map a project from Discover below, or in its details)" : "Needs Edit on Integrations & connectors"}
+                        style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                      >{syncAllAdo.isPending ? "Syncing…" : "Sync now"}</button>
+                    </>
                   )}
                 </div>
               </div>

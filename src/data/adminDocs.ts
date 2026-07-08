@@ -35,7 +35,7 @@ export const EVALUATION: Evaluation = {
     { n: 4, name: "Identity & access", stars: 5, evidence: "Entra SSO (MSAL, PKCE) verified end-to-end on a live tenant; server-authoritative RBAC; 15-min idle-logout.", gaps: "—" },
     { n: 5, name: "Authorization model", stars: 5, evidence: "6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests.", gaps: "—" },
     { n: 6, name: "Data & persistence", stars: 5, evidence: "PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups.", gaps: "—" },
-    { n: 7, name: "Integrations", stars: 4, evidence: "Jira (full sync + attachments; Ops import incl. epics), Microsoft Graph, Azure DevOps (discovery + work-item sync, backgrounded).", gaps: "ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic; ADO delta sync pending." },
+    { n: 7, name: "Integrations", stars: 4, evidence: "Jira (full sync + attachments; Ops import incl. epics), Microsoft Graph, Azure DevOps (discovery + work-item sync, backgrounded, with delta/changed-since pulls).", gaps: "ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic." },
     { n: 8, name: "Async / background work", stars: 5, evidence: "Hosted services: Jira + ADO background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts.", gaps: "—" },
     { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout.", gaps: "Pen-test not performed; secrets rotation manual." },
     { n: 10, name: "Accessibility (WCAG 2 AA)", stars: 5, evidence: "jsdom axe on primitives + browser axe sweep gated incl. colour-contrast; mobile drawer; focus/dialog/menu semantics.", gaps: "Sweep covers representative routes; extend as views grow." },
@@ -57,12 +57,11 @@ export const EVALUATION: Evaluation = {
   ],
   risks: [
     { priority: "Medium", item: "Add full user-journey e2e (beyond a11y)", why: "e2e currently proves a11y, not flows." },
-    { priority: "Low", item: "ADO delta sync", why: "Full pull works & is backgrounded; delta would cut re-sync cost." },
     { priority: "Low", item: "k8s manifests + release pipeline", why: "Compose is single-node; no automated deploy." },
     { priority: "Low", item: "Finish decomposing Project.tsx", why: "Large file; the per-tab pattern is in place to continue." },
   ],
   verdict:
-    "Production-ready. The core PPM product is complete, data-wired, tested across stacks, accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps, ADO delta sync, and full user-journey e2e.",
+    "Production-ready. The core PPM product is complete, data-wired, tested across stacks, accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps and full user-journey e2e.",
 };
 
 // ---- User stories ----------------------------------------------------------

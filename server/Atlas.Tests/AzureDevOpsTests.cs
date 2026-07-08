@@ -186,3 +186,20 @@ public class AzureDevOpsMappingTests
     public void NormalizeOrgUrl_accepts_name_or_url(string raw, string? expected) =>
         Assert.Equal(expected, AzureDevOps.NormalizeOrgUrl(raw));
 }
+
+// ---- Delta ("changed-since") WIQL clause (pure; ADR-0044) -----------------
+public class AzureDevOpsDeltaClauseTests
+{
+    [Fact]
+    public void No_delta_requested_yields_no_clause()
+        => Assert.Equal("", Atlas.Api.AzureDevOps.ChangedSinceClause(false, "2026-07-08T06:00:00Z"));
+
+    [Fact]
+    public void First_delta_without_a_watermark_is_a_full_pull()
+        => Assert.Equal("", Atlas.Api.AzureDevOps.ChangedSinceClause(true, ""));
+
+    [Fact]
+    public void Delta_with_a_watermark_filters_by_changed_date()
+        => Assert.Equal(" AND [System.ChangedDate] >= '2026-07-08T06:00:00Z'",
+            Atlas.Api.AzureDevOps.ChangedSinceClause(true, "2026-07-08T06:00:00Z"));
+}
