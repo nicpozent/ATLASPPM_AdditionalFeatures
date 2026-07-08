@@ -63,7 +63,7 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 |----------|------|-----|
 | Medium | Add full user-journey e2e (beyond a11y) | e2e currently proves a11y, not flows |
 | Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy |
-| Low | Finish decomposing `Project.tsx` | ~2,660 lines (Requirements/Quality/Security/Architecture/Artifacts/RAID extracted); the per-tab pattern (ADR-0041) continues |
+| Low | Extend per-tab decomposition if screens regrow | `Project.tsx` down to ~1,600 (agile Tasks/Backlog/Sprints/Epics + shared task model extracted, ADR-0041); remaining inline tabs can follow the same pattern |
 
 ## 4. Overall
 
