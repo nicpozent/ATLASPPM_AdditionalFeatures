@@ -25,6 +25,9 @@ Split each large screen into a folder of focused modules, **behaviour-preserving
 
 Result: `Project.tsx` ~4,300 → ~2,960 lines, `Resources.tsx` ~750 → ~420.
 
+_Continued: the `Artifacts` and `RAID` tabs were later extracted the same way
+(`project/Artifacts.tsx`, `project/Raid.tsx`), bringing `Project.tsx` to ~2,660._
+
 ## Consequences
 - **+** Smaller, single-responsibility files; a tab's code (types + component +
   modals) lives together and is easy to find and own.
@@ -32,8 +35,10 @@ Result: `Project.tsx` ~4,300 → ~2,960 lines, `Resources.tsx` ~750 → ~420.
   the remaining Project tabs can follow incrementally.
 - **−** A little more cross-file import wiring; shared helpers now have an explicit
   home rather than being co-located.
-- **−** `Project.tsx` is still large (~2,960) — full atomisation is deferred; the
-  highest-value tabs were extracted first.
+- **−** `Project.tsx` is still large (~2,660 after the Artifacts/RAID pass) — full
+  atomisation is deferred; the highest-value tabs were extracted first. Tabs that
+  share `Task`/`SprintTaskRow` (Tasks/Backlog/Sprints/Epics) need those helpers
+  relocated to a shared module before they can move cleanly.
 
 ## Alternatives considered
 - **Leave the files as-is** — the flagged maintainability cost remains; rejected.

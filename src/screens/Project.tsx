@@ -2,7 +2,7 @@ import { useState, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
-import { api, apiUpload, apiDownload } from "@/api";
+import { api, apiDownload } from "@/api";
 import { syncJira, syncToast } from "@/lib/jiraSync";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, ProgressBar, Button, Modal, Input, Select, Textarea } from "@/components/ui";
@@ -16,11 +16,12 @@ import { DEPARTMENTS } from "@/departments";
 import { toast, toastError } from "@/components/Toast";
 import { SCREENS } from "@/nav";
 import { PdField, ChipRow, KV, SectionTitle, Meta, DecLabel } from "./project/shared";
-import { fmtSize } from "./project/util";
 import { Security } from "./project/Security";
 import { Requirements } from "./project/Requirements";
 import { Architecture } from "./project/Architecture";
 import { Quality } from "./project/Quality";
+import { Artifacts } from "./project/Artifacts";
+import { Raid } from "./project/Raid";
 
 // ---- data (empty until API exists) -----------------------------------------
 interface ProjectDetail {
@@ -1715,142 +1716,6 @@ function LogDecisionModal({ projectId, onClose }: { projectId: string; onClose: 
   );
 }
 
-interface RaidItem { id: number; type: string; title: string; owner: string; status: string; auto?: boolean; }
-const RAID_TYPE_COLORS: Record<string, { ink: string; tint: string }> = {
-  Risk:       { ink: "#8A6300", tint: "#FBF2D7" },
-  Issue:      { ink: "#A1282B", tint: "#FBE7E8" },
-  Assumption: { ink: "#0C5798", tint: "#E6EFFB" },
-  Dependency: { ink: "#5E2E89", tint: "#F0E8F7" },
-};
-const RAID_STATUS: Record<string, { ink: string; tint: string; dot: string }> = {
-  Open:       { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
-  Mitigating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  Validating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  "On track": { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  Resolved:   { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  Closed:     { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-};
-const raidStatus = (s: string) => RAID_STATUS[s] ?? { ink: "#56607A", tint: "#EEF1F6", dot: "#8A92A6" };
-const RAID_TYPES = ["Risk", "Issue", "Assumption", "Dependency"];
-const RAID_STATUSES = ["Open", "Mitigating", "Validating", "On track", "Resolved", "Closed"];
-
-function Raid({ projectId }: { projectId: string | null }) {
-  const [modal, setModal] = useState(false);
-  const [openId, setOpenId] = useState<number | null>(null);
-  const { data } = useQuery({
-    queryKey: ["raid", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; items: RaidItem[] }> =>
-      (await api<{ canEdit: boolean; items: RaidItem[] }>(`/projects/${projectId}/raid`)) ?? { canEdit: false, items: [] },
-  });
-  const items = data?.items ?? [];
-  const canEdit = data?.canEdit ?? false;
-
-  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its RAID register." /></Card>;
-
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13.5, color: color.faint }}>Risks, issues, assumptions &amp; dependencies for this project.</div>
-        <div style={{ flex: 1 }} />
-        {canEdit && <Button onClick={() => setModal(true)}><Icon name="plus" size={16} /> New item</Button>}
-      </div>
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", padding: "14px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-          <div>Type</div><div>Item</div><div>Owner</div><div>Status</div>
-        </div>
-        {items.length === 0 ? (
-          <EmptyBlock message="No RAID items logged yet." minHeight={140} />
-        ) : items.map((r) => {
-          const tc = RAID_TYPE_COLORS[r.type] ?? RAID_TYPE_COLORS.Risk;
-          const sc = raidStatus(r.status);
-          const clickable = canEdit && !r.auto;
-          return (
-            <div key={r.id} onClick={() => clickable && setOpenId(r.id)}
-              style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: clickable ? "pointer" : "default" }}>
-              <div><span style={{ fontSize: 11, fontWeight: 700, color: tc.ink, background: tc.tint, padding: "3px 10px", borderRadius: 6 }}>{r.type}</span></div>
-              <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                {r.title}
-                {r.auto && <span title="Auto-raised by Atlas from live project data — clears automatically when resolved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", borderRadius: 5, padding: "1px 7px", letterSpacing: "0.03em" }}>✦ AUTO</span>}
-              </div>
-              <div style={{ fontSize: 13, color: color.subtle }}>{r.owner}</div>
-              <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />{r.status}</span></div>
-            </div>
-          );
-        })}
-      </Card>
-      {modal && <RaidModal projectId={projectId} onClose={() => setModal(false)} />}
-      {openId !== null && (() => {
-        const r = items.find((x) => x.id === openId);
-        if (!r) return null;
-        return <RaidModal projectId={projectId} item={r} onClose={() => setOpenId(null)} />;
-      })()}
-    </>
-  );
-}
-
-function RaidModal({ projectId, item, onClose }: { projectId: string; item?: RaidItem; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [type, setType] = useState(item?.type ?? RAID_TYPES[0]);
-  const [title, setTitle] = useState(item?.title ?? "");
-  const [owner, setOwner] = useState(item && item.owner !== "—" ? item.owner : "");
-  const [status, setStatus] = useState(item?.status ?? RAID_STATUSES[0]);
-  const [confirmDel, setConfirmDel] = useState(false);
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["raid", projectId] });
-
-  const body = () => JSON.stringify({ type, title: title.trim(), owner: owner.trim(), status });
-  const save = useMutation({
-    mutationFn: () => item
-      ? api(`/raid/${item.id}`, { method: "PATCH", body: body() })
-      : api(`/projects/${projectId}/raid`, { method: "POST", body: body() }),
-    onSuccess: () => { invalidate(); onClose(); },
-    onError: (e) => toastError(e),
-  });
-  const del = useMutation({
-    mutationFn: () => api(`/raid/${item!.id}`, { method: "DELETE" }),
-    onSuccess: () => { invalidate(); onClose(); },
-    onError: (e) => toastError(e),
-  });
-
-  return (
-    <Modal onClose={onClose} width={480} label={item ? "RAID item" : "New RAID item"}>
-      {!item && <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Log a risk, issue, assumption or dependency against this project.</div>}
-      <DecLabel>Type</DecLabel>
-      <Select value={type} onChange={(e) => setType(e.target.value)} style={{ marginBottom: 14 }}>
-        {RAID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-      </Select>
-      <DecLabel>Item</DecLabel>
-      <Textarea value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Describe the risk / issue / assumption / dependency" style={{ minHeight: 60, resize: "vertical", marginBottom: 14 }} />
-      <div style={{ display: "flex", gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <DecLabel>Owner</DecLabel>
-          <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <DecLabel>Status</DecLabel>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {RAID_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
-        {item && (
-          confirmDel ? (
-            <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this item?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
-              <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
-            </>
-          ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
-          )
-        )}
-        <div style={{ flex: 1 }} />
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => { if (title.trim()) save.mutate(); }} disabled={save.isPending || !title.trim()}>{save.isPending ? "Saving…" : item ? "Save changes" : "Add item"}</Button>
-      </div>
-    </Modal>
-  );
-}
 
 interface CommentItem { id: number; author: string; initials: string; body: string; at: string; }
 
@@ -2082,162 +1947,6 @@ function EpicModal({ projectId, epic, epics, canEdit = true, onClose }: { projec
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>{readOnly ? "Close" : "Cancel"}</Button>
         {!readOnly && <Button onClick={() => { if (name.trim()) save.mutate(); }} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : epic ? "Save changes" : "Add epic"}</Button>}
-      </div>
-    </Modal>
-  );
-}
-
-// ---- Artifacts -------------------------------------------------------------
-interface ArtifactVersion { id: number; version: number; fileName: string; size: number; uploadedAt: string; }
-interface ArtifactItem { id: number; name: string; type: string; owner: string; status: string; versions: ArtifactVersion[]; }
-const ARTIFACT_TYPES = ["Governance", "Waterfall", "Agile", "Design", "Test", "Other"];
-const ARTIFACT_STATUSES = ["Draft", "In review", "Approved", "Living"];
-const ARTIFACT_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved:    { ink: "#0B6B37", tint: "#E7F4EC" },
-  "In review": { ink: "#8A6300", tint: "#FBF2D7" },
-  Living:      { ink: "#0C5798", tint: "#E6EFFB" },
-  Draft:       { ink: "#56607A", tint: "#EEF1F6" },
-};
-
-function Artifacts({ projectId }: { projectId: string | null }) {
-  const [modal, setModal] = useState(false);
-  const [openId, setOpenId] = useState<number | null>(null);
-  const { data } = useQuery({
-    queryKey: ["artifacts", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; artifacts: ArtifactItem[] }> =>
-      (await api<{ canEdit: boolean; artifacts: ArtifactItem[] }>(`/projects/${projectId}/artifacts`)) ?? { canEdit: false, artifacts: [] },
-  });
-  const artifacts = data?.artifacts ?? [];
-  const canEdit = data?.canEdit ?? false;
-  const open = artifacts.find((a) => a.id === openId) ?? null;
-
-  if (!projectId) return <Card><EmptyBlock minHeight={220} message="Select a project from the Portfolio to view its artifacts." /></Card>;
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <div style={{ fontSize: 13.5, color: color.faint }}>Waterfall &amp; agile artifacts — each carries its own file versions.</div>
-        <div style={{ flex: 1 }} />
-        <Button onClick={() => setModal(true)} disabled={!canEdit} title={canEdit ? undefined : "Your role can't add artifacts (needs Edit on “Comments & artifacts”)"}><Icon name="plus" size={16} /> New artifact</Button>
-      </div>
-      <Card padding={0} style={{ overflow: "hidden" }}>
-        {artifacts.length === 0 ? (
-          <EmptyBlock message="No artifacts yet." minHeight={140} />
-        ) : artifacts.map((a) => {
-          const sc = ARTIFACT_STATUS[a.status] ?? ARTIFACT_STATUS.Draft;
-          return (
-            <div key={a.id} onClick={() => setOpenId(a.id)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
-              <span style={{ color: color.primary, display: "flex" }}><Icon name="sheet" size={20} /></span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{a.name}</div>
-                <div style={{ fontSize: 11.5, color: color.faint3 }}>{a.type} · Owner {a.owner}</div>
-              </div>
-              <span style={{ fontSize: 12, color: color.faint }}>{a.versions.length ? `${a.versions.length} version${a.versions.length > 1 ? "s" : ""}` : "No file yet"}</span>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{a.status}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: color.primary }}><Icon name="externalLink" size={15} /> Open</span>
-            </div>
-          );
-        })}
-      </Card>
-      {modal && <NewArtifactModal projectId={projectId} onClose={() => setModal(false)} />}
-      {open && <ArtifactWindow projectId={projectId} artifact={open} canEdit={canEdit} onClose={() => setOpenId(null)} />}
-    </div>
-  );
-}
-
-function NewArtifactModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [type, setType] = useState(ARTIFACT_TYPES[0]);
-  const [owner, setOwner] = useState("");
-  const [status, setStatus] = useState("Draft");
-  const [file, setFile] = useState<File | null>(null);
-
-  const create = useMutation({
-    mutationFn: async () => {
-      const art = await api<{ id: number }>(`/projects/${projectId}/artifacts`, { method: "POST", body: JSON.stringify({ name: name.trim(), type, owner: owner.trim(), status }) });
-      if (art?.id && file) { const fd = new FormData(); fd.append("file", file); await apiUpload(`/artifacts/${art.id}/versions`, fd); }
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["artifacts", projectId] }); onClose(); },
-  });
-  const submit = () => { if (name.trim()) create.mutate(); };
-
-  return (
-    <Modal onClose={onClose} width={480} label="New artifact">
-      <div style={{ fontSize: 12, color: color.faint2, marginBottom: 18 }}>Register a document; attach its first file version now or later.</div>
-      <DecLabel>Name</DecLabel>
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Solution Architecture (SAD)" style={{ marginBottom: 14 }} />
-      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-        <div style={{ flex: 1 }}><DecLabel>Type</DecLabel><Select value={type} onChange={(e) => setType(e.target.value)}>{ARTIFACT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></div>
-        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={status} onChange={(e) => setStatus(e.target.value)}>{ARTIFACT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
-      </div>
-      <DecLabel>Owner</DecLabel>
-      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Document owner" style={{ marginBottom: 14 }} />
-      <DecLabel>First version (optional)</DecLabel>
-      <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12.5, color: color.subtle }} />
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={submit} disabled={create.isPending || !name.trim()}>{create.isPending ? "Saving…" : "Create artifact"}</Button>
-      </div>
-    </Modal>
-  );
-}
-
-function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: string; artifact: ArtifactItem; canEdit: boolean; onClose: () => void }) {
-  const qc = useQueryClient();
-  const sc = ARTIFACT_STATUS[artifact.status] ?? ARTIFACT_STATUS.Draft;
-  const upload = useMutation({
-    mutationFn: async (file: File) => { const fd = new FormData(); fd.append("file", file); await apiUpload(`/artifacts/${artifact.id}/versions`, fd); },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["artifacts", projectId] }),
-  });
-  const changeStatus = useMutation({
-    mutationFn: (status: string) => api(`/artifacts/${artifact.id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["artifacts", projectId] }),
-  });
-
-  return (
-    <Modal onClose={onClose} width={560} label={artifact.name}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <span style={{ fontSize: 12, color: color.faint3 }}>{artifact.type} · Owner {artifact.owner}</span>
-        <span style={{ flex: 1 }} />
-        {canEdit ? (
-          <Select
-            value={artifact.status}
-            disabled={changeStatus.isPending}
-            onChange={(e) => changeStatus.mutate(e.target.value)}
-            style={{ width: "auto", fontSize: 12, fontWeight: 600, color: sc.ink, background: sc.tint, borderColor: "transparent", padding: "4px 8px" }}
-          >
-            {ARTIFACT_STATUSES.map((s) => <option key={s} value={s} style={{ color: color.ink, background: "#fff" }}>{s}</option>)}
-          </Select>
-        ) : (
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{artifact.status}</span>
-        )}
-      </div>
-      <div style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.ink, margin: "18px 0 10px" }}>Versions</div>
-      {artifact.versions.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: color.faint3, padding: "14px 0" }}>No file versions uploaded yet.</div>
-      ) : (
-        <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden" }}>
-          {artifact.versions.map((v) => (
-            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderBottom: "1px solid #F2F4F9" }}>
-              <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: color.primary, background: color.primaryTint, padding: "2px 8px", borderRadius: 6 }}>v{v.version}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: color.text, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.fileName}</div>
-                <div style={{ fontSize: 11, color: color.faint3 }}>{fmtSize(v.size)} · {v.uploadedAt}</div>
-              </div>
-              <button onClick={() => apiDownload(`/artifact-versions/${v.id}`, v.fileName)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={15} /> Download</button>
-            </div>
-          ))}
-        </div>
-      )}
-      {canEdit && (
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 13px", cursor: upload.isPending ? "default" : "pointer" }}>
-          <Icon name="paperclip" size={15} /> {upload.isPending ? "Uploading…" : "Upload new version"}
-          <input type="file" style={{ display: "none" }} disabled={upload.isPending} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ""; }} />
-        </label>
-      )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-        <Button variant="secondary" onClick={onClose}>Close</Button>
       </div>
     </Modal>
   );

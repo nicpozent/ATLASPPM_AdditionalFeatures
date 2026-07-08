@@ -58,7 +58,7 @@ export const EVALUATION: Evaluation = {
   risks: [
     { priority: "Medium", item: "Add full user-journey e2e (beyond a11y)", why: "e2e currently proves a11y, not flows." },
     { priority: "Low", item: "k8s manifests + release pipeline", why: "Compose is single-node; no automated deploy." },
-    { priority: "Low", item: "Finish decomposing Project.tsx", why: "Large file; the per-tab pattern is in place to continue." },
+    { priority: "Low", item: "Finish decomposing Project.tsx", why: "~2,660 lines (Artifacts/RAID + earlier tabs extracted); the per-tab pattern continues." },
   ],
   verdict:
     "Production-ready. The core PPM product is complete, data-wired, tested across stacks, accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps and full user-journey e2e.",
