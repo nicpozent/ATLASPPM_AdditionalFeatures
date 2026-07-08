@@ -39,6 +39,18 @@ without rendering.
   state (open modals, populated tables); extend `ROUTES` as coverage grows.
 - **−** Adds a CI job that installs Chromium (~cacheable) and ~1–2 min wall time.
 
+_Continued: full user-journey specs were added under `e2e/journeys/` in the same
+Playwright job — driving multi-step click-through flows and asserting outcomes,
+which the axe sweep (single-page, no interaction) doesn't. **navigation** walks
+every Workspace + Configuration link and asserts each route + header + no
+error-boundary trip; **role-nav** switches the header role and asserts the
+sidebar reshapes (Stakeholder ↔ full nav); **dashboard-layouts** clicks the four
+layout tabs and asserts the view switches; **demands-drilldown** stubs the
+`/api/v1/*` surface with `page.route()` to prove a real data → render → open-detail
+flow (the one backend-dependent journey). The per-test timeout was raised to 60s
+since a single axe run alone is ~24s and several heavy tabs share one preview
+server._
+
 ## Alternatives considered
 - **Gate colour-contrast immediately** — would fail on existing token greys and
   block unrelated work; report-first is the pragmatic ramp.

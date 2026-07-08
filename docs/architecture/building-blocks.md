@@ -76,7 +76,7 @@ flowchart LR
 | ABB | Gap | Planned SBB |
 |-----|-----|-------------|
 | ABB-05 Integration | Jira + Graph + **Azure DevOps** (discovery · import · work-item sync, ADR-0035/0036) implemented | ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI (each mirrors the Jira/ADO pattern) |
-| ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep** (Playwright) & extracted per-screen logic tests (ADR-0033); token greys lifted to WCAG AA and **colour-contrast now gated** alongside structural rules (ADR-0037) | Extend swept routes as new high-traffic views land |
+| ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep + full user-journey e2e** (Playwright: navigation, role-nav, dashboard layouts, mocked demand drill-in) & extracted per-screen logic tests (ADR-0033); token greys lifted to WCAG AA and **colour-contrast now gated** alongside structural rules (ADR-0037) | Extend swept routes & journeys as new high-traffic views land; load/perf tests |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
 a concrete technology is chosen.
