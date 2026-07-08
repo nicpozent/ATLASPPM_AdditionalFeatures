@@ -42,8 +42,11 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      # Only Chromium is needed for the full-page axe sweep.
-      - run: npx playwright install --with-deps chromium
+      # Only Chromium is needed for the full-page axe sweep. Install just the
+      # browser binary (no --with-deps): ubuntu-latest already ships Chromium's
+      # shared libraries, and --with-deps runs apt against packages.microsoft.com,
+      # which intermittently fails with a signature error and flakes the job.
+      - run: npx playwright install chromium
       - run: npm run build
       # Serves the built app (vite preview) with no backend → empty states —
       # enough to run axe over the real DOM. Structural violations fail the job;
