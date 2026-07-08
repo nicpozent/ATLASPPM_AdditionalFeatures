@@ -26,7 +26,7 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-07 · main",
+  lastReviewed: "2026-07-08 · main @ full-journey e2e + Project.tsx decomposition",
   overall: "4.7 / 5 — 13 of 18 dimensions at ★★★★★.",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
@@ -40,28 +40,29 @@ export const EVALUATION: Evaluation = {
     { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout.", gaps: "Pen-test not performed; secrets rotation manual." },
     { n: 10, name: "Accessibility (WCAG 2 AA)", stars: 5, evidence: "jsdom axe on primitives + browser axe sweep gated incl. colour-contrast; mobile drawer; focus/dialog/menu semantics.", gaps: "Sweep covers representative routes; extend as views grow." },
     { n: 11, name: "Observability", stars: 5, evidence: "OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs; domain metrics + tuned dashboards + Prometheus alert rules.", gaps: "—" },
-    { n: 12, name: "Testing", stars: 4, evidence: "Backend 385+ xUnit; frontend 64 vitest + per-screen logic; Playwright/axe e2e; CI-gated.", gaps: "No load/perf tests; e2e is a11y-focused, not full journeys." },
+    { n: 12, name: "Testing", stars: 4, evidence: "Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); CI-gated.", gaps: "No load/perf tests." },
     { n: 13, name: "CI/CD", stars: 4, evidence: "GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates.", gaps: "No automated deploy/release pipeline." },
     { n: 14, name: "Delivery & runtime", stars: 4, evidence: "Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay.", gaps: "Single-node compose; no k8s manifests yet." },
     { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention.", gaps: "—" },
     { n: 16, name: "Internationalisation", stars: 5, evidence: "6 locales; completeness test gates missing keys.", gaps: "—" },
     { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 42 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
-    { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules.", gaps: "—" },
+    { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules (Project.tsx down to ~1,600 with Tasks/Backlog/Sprints/Epics extracted).", gaps: "—" },
   ],
   notes: [
     "Identity: MSAL redirect flow verified end-to-end on a live tenant (interactive sign-in, bearer-token API calls, token-driven role, 401 on missing token). The API validates the JWT and is authoritative for authorization; idle-logout (default 15 min) complements token expiry.",
     "Integrations: two connectors are real end-to-end (Jira, Azure DevOps), both with backgrounded work-item sync (202 + poll); the Jira → Ops import is now full-fidelity (epics + rich fields + comments/attachments).",
     "Observability: domain metrics (sync duration, queue depth, capacity alerts, DB command latency), a tuned operations dashboard and Prometheus alert rules on top of the reference stack.",
     "Accessibility: the design greys meet WCAG AA and the browser axe sweep gates colour-contrast alongside structural rules, so regressions fail CI.",
-    "Maintainability: the two outsized screens are decomposed into per-tab modules (project/, resources/) with shared/util helpers.",
+    "Maintainability: the outsized screens are decomposed into per-tab modules (project/, resources/) with shared/util helpers; Project.tsx is down to ~1,600 after extracting the agile Tasks/Backlog/Sprints/Epics tabs and their shared task model.",
+    "Testing: Playwright e2e now covers full user journeys (navigation across every screen, role-driven nav, dashboard layouts, a mocked demand data → render → drill-in flow) on top of the axe accessibility sweep.",
   ],
   risks: [
-    { priority: "Medium", item: "Add full user-journey e2e (beyond a11y)", why: "e2e currently proves a11y, not flows." },
+    { priority: "Low", item: "Add load/perf tests", why: "e2e now covers a11y + user journeys; performance under load is untested." },
     { priority: "Low", item: "k8s manifests + release pipeline", why: "Compose is single-node; no automated deploy." },
-    { priority: "Low", item: "Finish decomposing Project.tsx", why: "~2,660 lines (Artifacts/RAID + earlier tabs extracted); the per-tab pattern continues." },
+    { priority: "Low", item: "Broaden connector coverage", why: "Jira + Azure DevOps are real end-to-end; the rest are cosmetic chrome." },
   ],
   verdict:
-    "Production-ready. The core PPM product is complete, data-wired, tested across stacks, accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps and full user-journey e2e.",
+    "Production-ready. The core PPM product is complete, data-wired, tested across stacks (backend xUnit, frontend vitest, Playwright axe + full-journey e2e), accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps and load/perf testing.",
 };
 
 // ---- User stories ----------------------------------------------------------

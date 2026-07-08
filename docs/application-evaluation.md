@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-07 · main @ idle-logout._
+_Last reviewed: 2026-07-08 · main @ full-journey-e2e + Project.tsx decomposition._
 
 ## 1. Scorecard
 
@@ -26,7 +26,7 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout | Pen-test not performed; secrets rotation manual |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★☆ | Backend 383 xUnit; frontend 64 vitest + per-screen logic; Playwright/axe e2e; CI-gated | No load/perf tests; e2e is a11y-focused, not full journeys |
+| 12 | **Testing** | ★★★★☆ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep **+ full user-journey specs** (navigation, role-nav, dashboard layouts, mocked demand drill-in); CI-gated | No load/perf tests |
 | 13 | **CI/CD** | ★★★★☆ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates; current action versions | No automated deploy/release pipeline |
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention | — |
@@ -61,14 +61,15 @@ _Last reviewed: 2026-07-07 · main @ idle-logout._
 
 | Priority | Item | Why |
 |----------|------|-----|
-| Medium | Add full user-journey e2e (beyond a11y) | e2e currently proves a11y, not flows |
+| Low | Add load/perf tests | e2e now covers a11y + user journeys; performance under load is untested |
 | Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy |
 | Low | Extend per-tab decomposition if screens regrow | `Project.tsx` down to ~1,600 (agile Tasks/Backlog/Sprints/Epics + shared task model extracted, ADR-0041); remaining inline tabs can follow the same pattern |
 
 ## 4. Overall
 
 **Verdict: production-ready.** The core PPM product is complete, data-wired,
-tested (447 automated tests across stacks), accessible (AA-gated), observable,
+tested (468 automated tests across stacks — 394 backend xUnit, 64 frontend
+vitest, 10 Playwright e2e: 6 axe + 4 full-journey), accessible (AA-gated), observable,
 and documented to a professional standard (ABB/SBB traceability, 41 ADRs,
 HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are
 enhancements, not blockers: broadening connector coverage beyond Jira/Azure
@@ -79,3 +80,9 @@ follow-ups closed — lint clean (Frontend ★★★★★), ADO background sync
 ★★★★★), tuned dashboards + alerts (Observability ★★★★★), and screen
 decomposition (Maintainability ★★★★★). **Overall 4.7/5 — 13 of 18 dimensions at
 ★★★★★.**_
+
+_Update 2026-07-08: added full user-journey Playwright e2e (navigation, role-nav,
+dashboard layouts, mocked demand drill-in) beyond the axe sweep, and finished the
+`Project.tsx` per-tab decomposition (Tasks/Backlog/Sprints/Epics + shared task
+model, ADR-0041; `Project.tsx` ~1,600). The only remaining Testing gap is
+load/perf._

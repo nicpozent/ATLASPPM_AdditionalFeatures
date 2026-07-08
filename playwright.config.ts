@@ -15,6 +15,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // A single full-page axe run alone takes ~24s, so the 30s default is too tight
+  // once several heavy tabs share one preview server. 60s gives headroom without
+  // masking real hangs.
+  timeout: 60_000,
   reporter: "list",
   use: {
     baseURL: "http://localhost:4173",
