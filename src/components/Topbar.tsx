@@ -2,11 +2,12 @@ import { useLocation } from "react-router-dom";
 import { color, font, layout } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
+import { useRoleIdentities } from "./useRoleIdentities";
 import { useAuth } from "./AuthContext";
 import { NotificationCenter } from "./NotificationCenter";
 import { LanguagePicker } from "./LanguagePicker";
 import { useT } from "@/i18n";
-import { ROLES, SCREENS } from "@/nav";
+import { SCREENS } from "@/nav";
 
 export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
   const { role, setRole } = useRole();
@@ -17,7 +18,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
   // back again. In the demo (auth off) all identities are switchable, as in the
   // prototype; signed in, only a Platform Admin may impersonate other roles.
   const canSwitchAll = !enabled || user?.role === "admin";
-  const visibleRoles = canSwitchAll ? ROLES : ROLES.filter((r) => r.value === role);
+  const identities = useRoleIdentities();
+  const visibleRoles = canSwitchAll ? identities : identities.filter((r) => r.value === role);
   const { pathname } = useLocation();
   const screen = Object.values(SCREENS).find((s) => s.path === pathname) ?? SCREENS.dashboard;
 

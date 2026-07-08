@@ -57,7 +57,12 @@ public static class Permissions
             return Privilege.FirstOrDefault(ids.Contains) ?? "stkhldr"; // unknown → least privilege
         }
         var header = req.Headers["X-Atlas-Role"].ToString();
-        return string.IsNullOrWhiteSpace(header) ? null : RoleMap.GetValueOrDefault(header);
+        if (string.IsNullOrWhiteSpace(header)) return null;   // dev / no impersonation → full access
+        // A known switcher identity maps to its canonical RoleDef; otherwise treat
+        // the header as a RoleDef id directly, so a role CREATED in Admin → Roles &
+        // Permissions is selectable in the switcher and enforced by its own matrix
+        // row (an unknown id has no grants → least privilege, never full access).
+        return RoleMap.TryGetValue(header, out var mapped) ? mapped : header;
     }
 
     // Fine-grained manager identity — distinct per manager (Global Engineering ≠
