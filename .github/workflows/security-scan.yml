@@ -5,9 +5,10 @@ name: Security scan
 # dependency/secret/config scan (Trivy) looks at what ships; DAST (OWASP ZAP)
 # probes a *running* deployment from the outside.
 #
-# SAST + Trivy run report-only (they surface findings in the job log without
-# failing the build) so the scanners can be introduced without blocking on the
-# existing baseline; flip `soft-fail`/`exit-code` once the baseline is triaged.
+# SAST + Trivy are GATING (they fail the build on findings) as of the baseline
+# triage in ADR-0053 — the baseline is clean after fixing the real issues and
+# recording scoped, documented exceptions (.semgrepignore, .trivyignore.yaml, and
+# the Semgrep --exclude-rule list below; rationale in security-hardening.md §6).
 # ZAP is dispatch-only and points at a running environment you choose — the same
 # "run against a test server" model as the k6 perf suite (ADR-0047).
 
@@ -42,15 +43,29 @@ jobs:
       - name: Run Semgrep (OWASP Top 10 + security-audit + secrets)
         run: |
           python -m pip install --quiet semgrep
-          # Report-only: never fail the build yet (--error is intentionally omitted
-          # and the run is guarded) — findings are printed for triage.
-          semgrep scan \
+          # Gating (--error): a finding fails the build. Baseline is clean after
+          # ADR-0053 triage. Excluded rules are documented, accepted CI-policy /
+          # by-design exceptions (see security-hardening.md §6):
+          #  - mutable-action-tag: actions pinned to major versions, kept current
+          #    by Dependabot's github-actions ecosystem.
+          #  - gha-curl-pipe-shell: the official Trivy installer over TLS.
+          #  - nginx request-host/dynamic-proxy/missing-internal: standard
+          #    same-origin reverse proxy; the upstream is an internal config value.
+          #  - dockerfile missing-user: nginx edge master binds 80/443 (see
+          #    .trivyignore.yaml).
+          semgrep scan --error \
             --config p/security-audit \
             --config p/owasp-top-ten \
             --config p/secrets \
+            --exclude-rule yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag \
+            --exclude-rule yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell \
+            --exclude-rule generic.nginx.security.request-host-used.request-host-used \
+            --exclude-rule generic.nginx.security.dynamic-proxy-host.dynamic-proxy-host \
+            --exclude-rule generic.nginx.security.missing-internal.missing-internal \
+            --exclude-rule dockerfile.security.missing-user.missing-user \
             --metrics off \
             --oss-only \
-            --disable-version-check || true
+            --disable-version-check
 
   # ---- Dependencies · secrets · config (Trivy) ------------------------------
   deps:
@@ -60,9 +75,11 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-      - name: Trivy filesystem scan (report-only)
-        # exit-code 0 → report-only for now; raise to 1 to gate after triage.
-        run: trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 0 --no-progress .
+      - name: Trivy filesystem scan (gating)
+        # Gating: exit 1 on any HIGH/CRITICAL. Baseline clean after ADR-0053
+        # (API image runs non-root; the nginx-edge DS-0002 is a scoped, documented
+        # exception in .trivyignore.yaml).
+        run: trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress .
 
   # ---- DAST — probe a running deployment from the outside (OWASP ZAP) -------
   # Dispatch-only: DAST needs a live target, so point it at a running test

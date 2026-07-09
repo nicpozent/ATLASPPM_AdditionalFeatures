@@ -14,5 +14,9 @@ WORKDIR /app
 COPY --from=build /app ./
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+# Drop to the non-root `app` user the .NET 8 base image ships (UID 1654) — a
+# literal UID so static scanners can confirm it's non-root. The app binds the
+# unprivileged port 8080 and needs no write access to its own files.
+USER 1654
 # Migrations + seed run on startup (see Program.cs).
 ENTRYPOINT ["dotnet", "Atlas.Api.dll"]

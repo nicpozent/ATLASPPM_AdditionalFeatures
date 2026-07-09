@@ -1,0 +1,10 @@
+# Trivy ignore list — documented, accepted risk acceptances.
+# See docs/security-hardening.md §6 (ADR-0053) for the rationale.
+
+# DS-0002 — "no non-root USER" in a Dockerfile.
+# The API image (server/Dockerfile) IS non-root (USER 1654), so this only
+# applies to the nginx TLS-edge image (root Dockerfile): its master process must
+# run as root to bind the privileged ports 80/443 and read the certs, while the
+# worker processes drop to the unprivileged `nginx` user. Migrating to
+# nginx-unprivileged (8080/8443) is tracked as a follow-up.
+AVD-DS-0002
