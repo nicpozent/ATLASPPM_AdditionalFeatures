@@ -585,6 +585,11 @@ public static class Jira
         var deltaActive = delta && !string.IsNullOrEmpty(p.LastJiraSync);
         var deltaClause = DeltaClause(delta, p.LastJiraSync);
         var pointsField = string.IsNullOrWhiteSpace(cfg["Jira:StoryPointsField"]) ? "customfield_10016" : cfg["Jira:StoryPointsField"]!.Trim();
+        // Jira's Sprint field is a configurable CUSTOM field (default
+        // customfield_10020 on Jira Cloud), NOT a field literally named "sprint".
+        // Reading it lets board-less / JQL imports derive sprints from the issues
+        // themselves, so sprints show even without a mapped or readable board.
+        var sprintField = string.IsNullOrWhiteSpace(cfg["Jira:SprintField"]) ? "customfield_10020" : cfg["Jira:SprintField"]!.Trim();
         var truncated = false;
         var browseBase = NormalizeBaseUrl(cfg["Jira:BaseUrl"]) ?? "";
         // Files & comments are pulled by default; opt out or cap file size via config.
@@ -672,7 +677,7 @@ public static class Jira
         var fields = "summary,description,status,issuetype,assignee,reporter,creator,duedate,priority," +
                      "labels,components,fixVersions,resolution,resolutiondate,created,updated," +
                      "timetracking,timespent,timeoriginalestimate,sprint,closedSprints,epic,parent,comment,attachment," +
-                     pointsField;
+                     $"{pointsField},{sprintField}";
         // A delta run always uses the JQL search (with the updated-since filter),
         // even when a board is mapped, so the watermark applies; a full run with a
         // board keeps the board issue endpoint for its backlog ordering.
@@ -717,8 +722,12 @@ public static class Jira
             t.Points = Math.Max(0, IntProp(f, pointsField));
             // Board-less: derive the project's sprints from the issues' own sprint
             // fields so past/current sprints exist without a board.
-            if (board is null) foreach (var js in SprintsFromIssue(f)) UpsertSprint(js, 0);
-            var sprintName = SprintNameOf(f);
+            // Always derive the project's sprints from the issues' own sprint
+            // field(s) too — upsert is idempotent by sprint id, so this merges
+            // with any board-supplied sprints and covers board-less / JQL imports
+            // (and boards whose sprints aren't readable), so sprints aren't 0.
+            foreach (var js in SprintsFromIssue(f, sprintField)) UpsertSprint(js, 0);
+            var sprintName = SprintNameOf(f, sprintField);
             t.Sprint = sprintName;
             if (sprintName.Length == 0) backlog++;
             t.Epic = EpicNameOf(f);
@@ -901,32 +910,54 @@ public static class Jira
     }
 
     // The issue's sprint name: the active/assigned sprint if any, else the most
-    // recent closed sprint (so completed-sprint issues still group), else "".
-    static string SprintNameOf(JsonElement fields)
+    // recent closed sprint (so completed-sprint issues still group), else "". Reads
+    // the agile convenience `sprint`/`closedSprints` fields (board issue endpoint)
+    // AND the configurable Sprint custom field (default customfield_10020) that a
+    // JQL/board-less search returns — object arrays (Cloud) or legacy toString
+    // strings (older instances).
+    static string SprintNameOf(JsonElement fields, string sprintField)
     {
         if (Prop(fields, "sprint") is { } s)
         {
-            if (s.ValueKind == JsonValueKind.Object) return Str(s, "name");
-            if (s.ValueKind == JsonValueKind.Array && s.GetArrayLength() > 0) return Str(s[s.GetArrayLength() - 1], "name");
+            if (s.ValueKind == JsonValueKind.Object && Str(s, "name") is { Length: > 0 } n0) return n0;
+            if (s.ValueKind == JsonValueKind.Array && s.GetArrayLength() > 0 && Str(s[s.GetArrayLength() - 1], "name") is { Length: > 0 } nA) return nA;
+        }
+        if (Prop(fields, sprintField) is { ValueKind: JsonValueKind.Array } cf && cf.GetArrayLength() > 0)
+        {
+            var last = cf[cf.GetArrayLength() - 1];
+            if (last.ValueKind == JsonValueKind.Object && Str(last, "name") is { Length: > 0 } nc) return nc;
+            if (last.ValueKind == JsonValueKind.String) { var nm = LegacySprintName(last.GetString() ?? ""); if (nm.Length > 0) return nm; }
         }
         if (Prop(fields, "closedSprints") is { ValueKind: JsonValueKind.Array } cs && cs.GetArrayLength() > 0)
             return Str(cs[cs.GetArrayLength() - 1], "name");
         return "";
     }
 
-    // Every sprint object an issue references (current `sprint` — object or
-    // array — plus any `closedSprints`), used to derive a board-less project's
-    // sprints from its issues.
-    public static IEnumerable<JsonElement> SprintsFromIssue(JsonElement fields)
+    // Parse a name out of Jira's legacy sprint toString, e.g.
+    // "…Sprint@1a[id=5,rapidViewId=3,state=ACTIVE,name=Sprint 3,startDate=…]".
+    static string LegacySprintName(string s)
     {
-        if (Prop(fields, "sprint") is { } s)
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"name=([^,\]]+)");
+        return m.Success ? m.Groups[1].Value.Trim() : "";
+    }
+
+    // Every sprint OBJECT an issue references — the agile `sprint`/`closedSprints`
+    // fields plus the configurable Sprint custom field — used to derive a project's
+    // Sprint rows from its issues (so sprints exist without a readable board). Only
+    // objects (with id/name/dates) become rows; legacy string sprints still supply
+    // the task's sprint name via SprintNameOf.
+    public static IEnumerable<JsonElement> SprintsFromIssue(JsonElement fields, string sprintField)
+    {
+        static IEnumerable<JsonElement> FromField(JsonElement? p)
         {
-            if (s.ValueKind == JsonValueKind.Object) yield return s;
-            else if (s.ValueKind == JsonValueKind.Array)
-                foreach (var x in s.EnumerateArray()) if (x.ValueKind == JsonValueKind.Object) yield return x;
+            if (p is not { } v) yield break;
+            if (v.ValueKind == JsonValueKind.Object) yield return v;
+            else if (v.ValueKind == JsonValueKind.Array)
+                foreach (var x in v.EnumerateArray()) if (x.ValueKind == JsonValueKind.Object) yield return x;
         }
-        if (Prop(fields, "closedSprints") is { ValueKind: JsonValueKind.Array } cs)
-            foreach (var x in cs.EnumerateArray()) if (x.ValueKind == JsonValueKind.Object) yield return x;
+        foreach (var x in FromField(Prop(fields, "sprint"))) yield return x;
+        foreach (var x in FromField(Prop(fields, sprintField))) yield return x;
+        foreach (var x in FromField(Prop(fields, "closedSprints"))) yield return x;
     }
 
     // The issue's epic name: the agile `epic` object (company-managed), else an
