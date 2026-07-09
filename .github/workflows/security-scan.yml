@@ -1,0 +1,81 @@
+name: Security scan
+
+# Automated application-security scanning — the automated half of a penetration
+# test (ADR-0051). SAST (Semgrep) reads the source for vulnerable patterns; the
+# dependency/secret/config scan (Trivy) looks at what ships; DAST (OWASP ZAP)
+# probes a *running* deployment from the outside.
+#
+# SAST + Trivy run report-only (they surface findings in the job log without
+# failing the build) so the scanners can be introduced without blocking on the
+# existing baseline; flip `soft-fail`/`exit-code` once the baseline is triaged.
+# ZAP is dispatch-only and points at a running environment you choose — the same
+# "run against a test server" model as the k6 perf suite (ADR-0047).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * 1" # Monday 04:00 UTC — weekly sweep
+  workflow_dispatch:
+    inputs:
+      zap_target:
+        description: "URL for the OWASP ZAP baseline (DAST) scan, e.g. https://atlas-test.internal"
+        required: false
+        default: ""
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- SAST — static analysis of the source (C# + TypeScript) ---------------
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Semgrep (OWASP Top 10 + security-audit + secrets)
+        run: |
+          python -m pip install --quiet semgrep
+          # Report-only: never fail the build yet (--error is intentionally omitted
+          # and the run is guarded) — findings are printed for triage.
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/secrets \
+            --metrics off \
+            --oss-only \
+            --disable-version-check || true
+
+  # ---- Dependencies · secrets · config (Trivy) ------------------------------
+  deps:
+    name: Dependencies · secrets · IaC (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - name: Trivy filesystem scan (report-only)
+        # exit-code 0 → report-only for now; raise to 1 to gate after triage.
+        run: trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 0 --no-progress .
+
+  # ---- DAST — probe a running deployment from the outside (OWASP ZAP) -------
+  # Dispatch-only: DAST needs a live target, so point it at a running test
+  # environment (never production). Non-gating baseline (passive + safe active).
+  dast:
+    name: DAST (OWASP ZAP baseline)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.zap_target != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ github.event.inputs.zap_target }}
+          fail_action: false
+          allow_issue_writing: false
+          cmd_options: "-I" # don't fail on warnings; report only
