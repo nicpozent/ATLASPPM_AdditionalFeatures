@@ -156,11 +156,21 @@ function Lbl({ children }: { children: React.ReactNode }) {
   return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, margin: "12px 0 5px" }}>{children}</label>;
 }
 
+// Product owner candidates = the combined PM Lead + PMO team (Admin → Teams).
+// Falls back to the resource directory until those teams are mapped.
+function useOwnerPool() {
+  return useQuery({
+    queryKey: ["assignable", "pmpo"], retry: false, staleTime: 60_000,
+    queryFn: async (): Promise<string[]> => { try { return (await api<string[]>("/assignable/pmpo")) ?? []; } catch { return []; } },
+  });
+}
+
 function NewProductModal({ onClose, onCreate, submitting }: {
   onClose: () => void; onCreate: (p: NewProduct) => void; submitting?: boolean;
 }) {
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("");
+  const { data: ownerPool = [] } = useOwnerPool();
   const [source, setSource] = useState<Source>("manual");
   const [projects, setProjects] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -185,8 +195,11 @@ function NewProductModal({ onClose, onCreate, submitting }: {
       <div style={{ fontSize: 12.5, color: color.faint3, marginBottom: 16 }}>A durable product container. Tasks &amp; releases sync in from its source once connected.</div>
       <Lbl>Name</Lbl>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Storefront Web" />
-      <Lbl>Owner</Lbl>
-      <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Product owner" />
+      <Lbl>Product owner</Lbl>
+      <Select value={owner} onChange={(e) => setOwner(e.target.value)}>
+        <option value="">{ownerPool.length ? "— Select owner —" : "— No PM/PMO team mapped —"}</option>
+        {ownerPool.map((p) => <option key={p} value={p}>{p}</option>)}
+      </Select>
       <Lbl>Source</Lbl>
       <Select value={source} onChange={(e) => setSource(e.target.value as Source)}>
         <option value="manual">Manual (created here)</option>
@@ -226,6 +239,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
   const qc = useQueryClient();
   const { can } = usePermissions();
   const mayManage = product.canManage ?? can("cap-products", "E");
+  const { data: ownerPool = [] } = useOwnerPool();
   const [costsOpen, setCostsOpen] = useState(false);
   const setStatus = useMutation({
     mutationFn: (status: string) => api(`/products/${product.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
@@ -275,6 +289,13 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
             <select value={product.status ?? "Active"} onChange={(e) => setStatus.mutate(e.target.value)} title="Lifecycle status — products aren't deleted"
               style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
               {["Active", "Retired", "Replaced"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          {mayManage && (
+            <select value={ownerPool.includes(product.owner) ? product.owner : ""} onChange={(e) => updateProduct.mutate({ owner: e.target.value })} title="Product owner (PM Lead / PMO team)"
+              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
+              <option value="">{ownerPool.length ? "Owner: unassigned" : "Owner: no team mapped"}</option>
+              {ownerPool.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
           {mayManage ? (
