@@ -1,0 +1,90 @@
+name: Release
+
+# Build & publish versioned container images for the API and web tiers to the
+# GitHub Container Registry (GHCR) on a semver tag (ADR-0052). Uses the built-in
+# GITHUB_TOKEN — no external secrets — so it works out of the box. The actual
+# *deploy* to a host is intentionally out of scope until a target is chosen
+# (k8s/Helm is parked); this is the build-and-publish half of the pipeline.
+#
+#   git tag v1.2.3 && git push origin v1.2.3     # publishes v1.2.3 + 1.2 + latest
+# or run manually via the Actions tab (workflow_dispatch) with a test tag.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. v1.2.3 or a test tag like dev)"
+        required: true
+        default: "dev"
+
+permissions:
+  contents: read
+  packages: write # push to GHCR
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    name: Build & publish ${{ matrix.name }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: ./server
+            dockerfile: ./server/Dockerfile
+            build-args: ""
+          - name: web
+            context: .
+            dockerfile: ./Dockerfile
+            # Public build-time config (baked into the SPA). Fill VITE_AUTH_* for
+            # an SSO-enabled image; defaults produce an auth-off build.
+            build-args: |
+              VITE_API_BASE=/api/v1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build-args }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # Scan the built image before it's relied on (report-only, ADR-0051).
+      - name: Trivy image scan (report-only)
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          IMAGE="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          trivy image --severity HIGH,CRITICAL --exit-code 0 --no-progress "$IMAGE"
