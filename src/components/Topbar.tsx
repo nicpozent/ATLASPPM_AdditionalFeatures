@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import { color, font, layout } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
+import { useTheme } from "./ThemeContext";
 import { useRoleIdentities } from "./useRoleIdentities";
 import { useAuth } from "./AuthContext";
 import { NotificationCenter } from "./NotificationCenter";
@@ -77,6 +78,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
         </select>
       </div>
 
+      {/* Dark-mode toggle — per-profile (persists for the selected identity) */}
+      <ThemeToggle />
+
       {/* Language */}
       <LanguagePicker />
 
@@ -94,5 +98,30 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
         <span style={{ display: "flex", opacity: 0.8 }}><Icon name="chevronDown" size={14} /></span>
       </button>
     </header>
+  );
+}
+
+// Per-profile dark-mode toggle. Sits by the role switcher; the choice persists
+// against the selected identity (ADR-0056).
+function ThemeToggle() {
+  const { mode, toggle } = useTheme();
+  const t = useT();
+  const dark = mode === "dark";
+  const label = dark ? t("common.lightMode", "Switch to light mode") : t("common.darkMode", "Switch to dark mode");
+  return (
+    <button
+      onClick={toggle}
+      aria-label={label}
+      aria-pressed={dark}
+      title={label}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: 40, height: 40, flex: "none",
+        background: color.surfaceInput, border: `1px solid ${color.border3}`,
+        borderRadius: 9, color: color.faint2, cursor: "pointer", fontFamily: "inherit",
+      }}
+    >
+      <Icon name={dark ? "sun" : "moon"} size={17} />
+    </button>
   );
 }

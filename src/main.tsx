@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { RoleProvider } from "@/components/RoleContext";
+import { ThemeProvider } from "@/components/ThemeContext";
 import { AuthProvider } from "@/components/AuthContext";
 import { I18nProvider } from "@/i18n";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -15,9 +16,9 @@ const reset = document.createElement("style");
 reset.textContent = `
   *{box-sizing:border-box;}
   html,body,#root{margin:0;padding:0;height:100%;}
-  body{font-family:'Public Sans',-apple-system,sans-serif;color:#181B2A;background:#EEF1F6;-webkit-font-smoothing:antialiased;}
+  body{font-family:'Public Sans',-apple-system,sans-serif;color:var(--atlas-text,#181B2A);background:var(--atlas-bg,#EEF1F6);-webkit-font-smoothing:antialiased;}
   ::-webkit-scrollbar{width:10px;height:10px;}
-  ::-webkit-scrollbar-thumb{background:#C7CEDB;border-radius:6px;border:2px solid transparent;background-clip:content-box;}
+  ::-webkit-scrollbar-thumb{background:var(--atlas-border2,#C7CEDB);border-radius:6px;border:2px solid transparent;background-clip:content-box;}
   a{color:inherit;}
 `;
 document.head.appendChild(reset);
@@ -50,10 +51,12 @@ async function boot() {
         <I18nProvider>
           <AuthProvider>
             <RoleProvider>
-              <ErrorBoundary>
-                <App />
-              </ErrorBoundary>
-              <Toaster />
+              <ThemeProvider>
+                <ErrorBoundary>
+                  <App />
+                </ErrorBoundary>
+                <Toaster />
+              </ThemeProvider>
             </RoleProvider>
           </AuthProvider>
         </I18nProvider>

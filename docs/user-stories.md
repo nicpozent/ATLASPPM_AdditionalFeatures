@@ -50,6 +50,13 @@ full (F) levels. Authorization is always server-side.
   switch my UI role view, so that I understand which persona's nav I'm seeing._
   **Acceptance:** topbar shows identity + role switcher; switching changes nav
   only, never server permissions.
+- **US-AUTH-6** — _As a **user**, I want a dark mode I can toggle per profile, so
+  that each persona I use keeps my preferred appearance._
+  **Acceptance:** a sun/moon toggle in the top bar flips light/dark app-wide via
+  CSS variables; the choice persists in `localStorage` keyed by the selected
+  identity (`atlas.theme.<role>`), so switching persona restores that persona's
+  choice; the light palette (and its gated WCAG-AA contrast) is unchanged
+  (ADR-0056).
 
 ## 2. Dashboard
 

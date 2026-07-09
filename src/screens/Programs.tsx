@@ -291,7 +291,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           {costCard("Internal labor", fmt(0), color.navy, `Dev ${fmt(0)} · Arch ${fmt(0)} · Infra ${fmt(0)}`)}
           {costCard("Infra / cloud", fmt(0), "#0E7C7B")}
           {costCard("Dev tooling", fmt(0), "#7A3FB0")}
-          <div style={{ background: color.navy, borderRadius: 11, padding: "13px 14px" }}>
+          <div style={{ background: color.sidebarBg, borderRadius: 11, padding: "13px 14px" }}>
             <div style={{ fontSize: 11, color: "#9FB4E8" }}>Total cost</div>
             <div style={{ fontFamily: font.head, fontSize: 20, fontWeight: 700, color: "#fff", marginTop: 3 }}>{fmt(0)}</div>
             <div style={{ fontSize: 10.5, color: "#9FB4E8", marginTop: 3 }}>Vendor {fmt(0)} · Savings {fmt(0)}</div>

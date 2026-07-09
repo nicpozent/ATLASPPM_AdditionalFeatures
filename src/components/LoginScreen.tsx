@@ -35,7 +35,7 @@ function CheckDot() {
 
 function InfoMark() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: 1 }} aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: 1, stroke: color.primary }} aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <path d="M12 16v-4" />
       <path d="M12 8h.01" />
@@ -78,7 +78,7 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
       {!narrow && (
         <div style={{
           flex: "1.15 1 0", position: "relative", overflow: "hidden",
-          background: color.navy,
+          background: color.sidebarBg,
           display: "flex", flexDirection: "column", justifyContent: "center",
           padding: "48px 56px",
         }}>
@@ -191,7 +191,7 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
               style={{
                 width: "100%", marginTop: 20, display: "inline-flex", alignItems: "center", justifyContent: "center",
                 gap: 11, fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: "#fff",
-                background: color.navy, border: "none", padding: "14px 16px",
+                background: color.sidebarBg, border: "none", padding: "14px 16px",
                 borderRadius: radius.lg, cursor: "pointer",
               }}
             >

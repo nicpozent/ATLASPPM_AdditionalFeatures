@@ -76,6 +76,8 @@ const P: Record<string, string> = {
   award: "M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM8.21 13.89 7 23l5-3 5 3-1.21-9.12",
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
   x: "M18 6 6 18M6 6l12 12",
+  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
+  moon: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z",
 };
 
 export function Icon({ name, size = 19, color = "currentColor", strokeWidth = 2 }: {
@@ -85,8 +87,10 @@ export function Icon({ name, size = 19, color = "currentColor", strokeWidth = 2 
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
-      style={{ display: "block", flex: "none" }}
+      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+      // Stroke is applied via `style` (not the SVG presentation attribute) so a
+      // themeable `var(--atlas-…)` token resolves; `currentColor` also works here.
+      style={{ display: "block", flex: "none", stroke: color }}
     >
       <path d={d} />
     </svg>
