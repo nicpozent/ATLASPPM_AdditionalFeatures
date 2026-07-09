@@ -21,17 +21,21 @@ export function Sparkline({ points, stroke, width = 92, height = 30 }: {
   const Y = (v: number) => height - 3 - ((v - min) / r) * (height - 7);
   const d = points.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
   const area = `${d} L${width} ${height} L0 ${height} Z`;
-  const id = `sp-${stroke.slice(1)}-${points.length}`;
+  // Sanitise the gradient id: `stroke` may be a themeable `var(--…)` token, so
+  // strip everything but alphanumerics to keep the SVG id (and its url(#…) ref)
+  // valid. Colours are applied via `style` so var() resolves (SVG presentation
+  // attributes don't substitute var()).
+  const id = `sp-${stroke.replace(/[^a-zA-Z0-9]/g, "")}-${points.length}`;
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
       <defs>
         <linearGradient id={id} x1={0} y1={0} x2={0} y2={1}>
-          <stop offset="0%" stopColor={stroke} stopOpacity={0.24} />
-          <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+          <stop offset="0%" style={{ stopColor: stroke, stopOpacity: 0.24 }} />
+          <stop offset="100%" style={{ stopColor: stroke, stopOpacity: 0 }} />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${id})`} />
-      <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" style={{ stroke }} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -71,7 +75,7 @@ export function BudgetChart({ months, planned, actual, max, width = 300, height 
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-label="Budget burn (no data)">
         {grid}
-        <text x={width / 2} y={height / 2} fontSize={11} fill={color.faint3} textAnchor="middle" fontFamily="Public Sans">No spend data yet</text>
+        <text x={width / 2} y={height / 2} fontSize={11} style={{ fill: color.faint3 }} textAnchor="middle" fontFamily="Public Sans">No spend data yet</text>
       </svg>
     );
   }
@@ -83,19 +87,19 @@ export function BudgetChart({ months, planned, actual, max, width = 300, height 
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       <defs>
         <linearGradient id="bgrad" x1={0} y1={0} x2={0} y2={1}>
-          <stop offset="0%" stopColor={color.primary} stopOpacity={0.2} />
-          <stop offset="100%" stopColor={color.primary} stopOpacity={0} />
+          <stop offset="0%" style={{ stopColor: color.primary, stopOpacity: 0.2 }} />
+          <stop offset="100%" style={{ stopColor: color.primary, stopOpacity: 0 }} />
         </linearGradient>
       </defs>
       {grid}
       <path d={area} fill="url(#bgrad)" />
       <path d={line(planned)} fill="none" stroke={chart.planned} strokeWidth={2} strokeDasharray="5 4" strokeLinecap="round" />
-      <path d={line(actual)} fill="none" stroke={color.primary} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={line(actual)} fill="none" style={{ stroke: color.primary }} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
       {actual.map((v, i) => (
-        <circle key={i} cx={X(i)} cy={Y(v)} r={i === actual.length - 1 ? 3.5 : 2.4} fill={color.primary} stroke="#fff" strokeWidth={1.4} />
+        <circle key={i} cx={X(i)} cy={Y(v)} r={i === actual.length - 1 ? 3.5 : 2.4} style={{ fill: color.primary }} stroke="#fff" strokeWidth={1.4} />
       ))}
       {months.map((m, i) => (
-        <text key={m} x={X(i)} y={height - 6} fontSize={9.5} fill={color.faint3} textAnchor="middle" fontFamily="Public Sans">{m}</text>
+        <text key={m} x={X(i)} y={height - 6} fontSize={9.5} style={{ fill: color.faint3 }} textAnchor="middle" fontFamily="Public Sans">{m}</text>
       ))}
     </svg>
   );
@@ -108,10 +112,10 @@ export function Gauge({ pct, stroke, size = 96 }: { pct: number | null; stroke: 
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={chart.grid} strokeWidth={8} />
       {pct != null && (
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={stroke} strokeWidth={8}
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke }} strokeWidth={8}
           strokeLinecap="round" strokeDasharray={`${(val / 100) * c} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       )}
-      <text x={size / 2} y={size / 2 + 5} fontSize={19} fontWeight={700} fill={color.ink} textAnchor="middle" fontFamily={font.head}>
+      <text x={size / 2} y={size / 2 + 5} fontSize={19} fontWeight={700} style={{ fill: color.ink }} textAnchor="middle" fontFamily={font.head}>
         {pct != null ? `${pct}%` : "—"}
       </text>
     </svg>

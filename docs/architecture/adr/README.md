@@ -62,5 +62,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0053](./0053-appsec-baseline-triage-gating.md) | AppSec baseline triage → gating SAST + Trivy with scoped exceptions | Accepted |
 | [0054](./0054-on-prem-single-node-docker.md) | On-prem single-node Docker as the delivery target (k8s parked) | Accepted |
 | [0055](./0055-need-to-know-labour-rates.md) | Need-to-know internal-labour rate card (per-discipline view+edit, +Architect/PM/PO) | Accepted |
+| [0056](./0056-per-profile-dark-mode.md) | Per-profile dark mode via CSS variables (no global stylesheet) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
