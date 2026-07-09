@@ -52,6 +52,7 @@ requirement → capability → implementation → decision.
 | SBB-23 | Strategic roadmap (`RoadmapItem` + milestones/links/deps, `cap-roadmap`, Now/Next/Later board + **By-year board** + timeline) | ABB-06 | ADR-0019 |
 | SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity) | ABB-06 | ADR-0020 |
 | SBB-25 | Azure DevOps connector (`AzureDevOps.cs`: PAT auth, status/test, discovery + import/map `Project.AdoProject`, **work-item sync** — WIQL work items → epics/tasks, iterations → sprints, idempotent by `AdoId`; **background queue/worker**; **delta/changed-since pulls** via `LastAdoSync` + WIQL `[System.ChangedDate]`) | ABB-05, ABB-06 | ADR-0035, ADR-0036, ADR-0039, ADR-0044 |
+| SBB-26 | k6 performance/load suite (`perf/`: smoke·load·stress + public-API volume seeder; env-driven URL/auth; hot roll-up endpoints; Prometheus remote-write into the reference stack) | ABB-08, ABB-12 | ADR-0047 |
 
 ## 3. Traceability (ABB → SBB)
 
