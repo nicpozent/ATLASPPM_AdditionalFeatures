@@ -1093,6 +1093,13 @@ public class SecurityProfile
     public bool Dpp { get; set; }     // Digital Product Passport (ESPR)
     public bool Ppwr { get; set; }    // Packaging & Packaging Waste Regulation
     public bool Eudr { get; set; }    // EU Deforestation Regulation
+    // EU AI Act classification + ISO 42001 AI-management (ADR-0050). Empty tier =
+    // unclassified; the deterministic engine derives obligations from the tier.
+    public string AiSystemName { get; set; } = "";
+    public string AiRiskTier { get; set; } = "";    // prohibited | high | limited | minimal
+    public bool AiAnnexIii { get; set; }             // Annex III high-risk use case
+    public bool AiHumanOversight { get; set; }       // Art 14 — human oversight in place
+    public bool AiTransparency { get; set; }         // Art 50/13 — users informed they interact with AI
 }
 
 public class SecurityControl
