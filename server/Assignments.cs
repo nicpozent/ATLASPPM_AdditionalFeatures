@@ -36,6 +36,14 @@ public static class Assignments
     static bool CanAssignLead(string ui) => ui is "" or "admin" or "pmo";
     static bool CanAssignArch(string ui) => ui is "" or "admin" or "architect";
 
+    // Keep the currently-assigned person selectable even if they are no longer in
+    // the mapped team (moved teams, left the group) — otherwise the dropdown would
+    // silently drop the live value.
+    static List<string> WithCurrent(List<string> pool, string current) =>
+        string.IsNullOrEmpty(current) || current == "N/A" || pool.Contains(current)
+            ? pool
+            : pool.Concat(new[] { current }).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+
     public static void MapAssignmentEndpoints(this RouteGroupBuilder api)
     {
         api.MapGet("/projects/{id}/assignments", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -45,15 +53,49 @@ public static class Assignments
             var rows = await db.RoleAssignments.Where(a => a.ProjectId == id).ToListAsync();
             string Person(string key) => rows.FirstOrDefault(r => r.RoleKey == key)?.Person ?? "";
 
-            // People pool = real resources (synced from Entra ID). Empty until seeded.
-            var options = await db.Resources.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+            // Candidate people come from the mapped Entra teams (Admin → Teams):
+            //  • the 7 architect roles ← the Chief Architect's architecture team,
+            //  • the Security Officer  ← the Security Officer team,
+            //  • the Project Manager   ← the combined PM Lead + PMO pool.
+            // Until any team is mapped we fall back to the resource directory so
+            // the app is usable out of the box.
+            var mapped = await Teams.AnyTeamMappedAsync(db);
+            var fallback = mapped ? new List<string>()
+                : await db.Resources.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+            var archPool = mapped ? await Teams.PoolAsync(db, "architect") : fallback;
+            var secPool = mapped ? await Teams.PoolAsync(db, "secofficer") : fallback;
+            var pmPool = mapped ? await Teams.PoolAsync(db, "pmlead", "pmo") : fallback;
 
-            var arch = ArchRoles.Select(r => new RoleAssignmentDto(r.Key, r.Label, Person(r.Key))).ToList();
+            var arch = ArchRoles.Select(r =>
+            {
+                var person = Person(r.Key);
+                var pool = r.Key == "securityOfficer" ? secPool : archPool;
+                return new RoleAssignmentDto(r.Key, r.Label, person, WithCurrent(pool, person));
+            }).ToList();
             var missing = arch.Where(r => string.IsNullOrEmpty(r.Person)).Select(r => r.Label).ToList();
 
+            var lead = Person(LeadKey);
+            var leadOptions = WithCurrent(pmPool, lead);
             return Results.Ok(new AssignmentsDto(
-                CanAssignLead(ui), CanAssignArch(ui), LeadKey, LeadLabel, Person(LeadKey),
-                arch, options, missing));
+                CanAssignLead(ui), CanAssignArch(ui), LeadKey, LeadLabel, lead,
+                leadOptions, arch, leadOptions, missing));
+        });
+
+        // Candidate people for an assignment pool, for dropdowns outside the
+        // project role panel (e.g. Product Owner). Falls back to the resource
+        // directory until Entra teams are mapped.
+        api.MapGet("/assignable/{pool}", async (string pool, AtlasDbContext db) =>
+        {
+            if (!await Teams.AnyTeamMappedAsync(db))
+                return Results.Ok(await db.Resources.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync());
+            var names = pool switch
+            {
+                "pmpo" => await Teams.PoolAsync(db, "pmlead", "pmo"),
+                "architecture" => await Teams.PoolAsync(db, "architect"),
+                "secofficer" => await Teams.PoolAsync(db, "secofficer"),
+                _ => new List<string>(),
+            };
+            return Results.Ok(names);
         });
 
         // Assign (or clear) a single role. Body: { "person": "Name" | "" | "N/A" }.
@@ -85,7 +127,7 @@ public static class Assignments
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "People", "Assigned role",
                 $"{id} · {label} → {(person == "" ? "Unassigned" : person)}"));
             await db.SaveChangesAsync();
-            return Results.Ok(new RoleAssignmentDto(roleKey, label, person));
+            return Results.Ok(new RoleAssignmentDto(roleKey, label, person, new()));
         });
     }
 }

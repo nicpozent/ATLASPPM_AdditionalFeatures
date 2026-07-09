@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { color, font, layout } from "@/theme";
+import { color, font, layout, DARK_MODE_ENABLED } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useTheme } from "./ThemeContext";
@@ -78,8 +78,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
         </select>
       </div>
 
-      {/* Dark-mode toggle — per-profile (persists for the selected identity) */}
-      <ThemeToggle />
+      {/* Dark-mode toggle — hidden while the feature is finished off (theme.ts
+          DARK_MODE_ENABLED). Flip that flag back on to restore it. */}
+      {DARK_MODE_ENABLED && <ThemeToggle />}
 
       {/* Language */}
       <LanguagePicker />

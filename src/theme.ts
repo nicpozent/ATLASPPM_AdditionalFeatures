@@ -28,6 +28,13 @@ export const font = {
 // ---------------------------------------------------------------------------
 export type ThemeMode = "light" | "dark";
 
+// Feature flag — dark mode is hidden for now (toggle removed from the top bar
+// and the app pinned to light) while the feature is finished off later. All the
+// theming machinery below stays intact; stored per-profile preferences are left
+// untouched, so flipping this back to `true` restores the feature and each
+// profile's saved choice. See ADR-0056.
+export const DARK_MODE_ENABLED = false;
+
 // The light palette is the single source of truth for the token keys AND the
 // var() fallbacks (the exact values the a11y contrast gate was tuned against).
 const lightColors = {

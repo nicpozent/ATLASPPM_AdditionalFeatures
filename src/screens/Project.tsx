@@ -349,10 +349,10 @@ function Overview({ projectId }: { projectId: string | null }) {
 // People & roles — the project lead is assigned by the PMO, the architecture
 // roles by the Chief Architect; everyone else sees the panel read-only. Mirrors
 // the prototype's peoplePanelEl exactly. Server enforces who may change what.
-interface RoleRow { key: string; label: string; person: string; }
+interface RoleRow { key: string; label: string; person: string; options: string[]; }
 interface Assignments {
   canAssignLead: boolean; canAssignArch: boolean; leadKey: string; leadLabel: string;
-  lead: string; archRoles: RoleRow[]; options: string[]; missingArch: string[];
+  lead: string; leadOptions: string[]; archRoles: RoleRow[]; options: string[]; missingArch: string[];
 }
 
 function PeopleRoles({ projectId }: { projectId: string | null }) {
@@ -373,21 +373,23 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
     },
   });
 
-  const options = data?.options ?? [];
   const roRow = (label: string, val: string) => (
     <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: val ? "#1C2233" : "#B0B7C5" }}>{val === "N/A" ? "N/A" : val || "Unassigned"}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: val ? color.text : color.faint }}>{val === "N/A" ? "N/A" : val || "Unassigned"}</span>
     </div>
   );
-  const selRow = (key: string, label: string, val: string) => (
+  // Candidate people come from the team mapped to this role (Admin → Teams):
+  // architecture roles ← Chief Architect team, Security Officer ← its own team,
+  // the lead ← PM Lead + PMO. Empty until a team is mapped.
+  const selRow = (key: string, label: string, val: string, opts: string[]) => (
     <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <select value={val || ""} onChange={(e) => assign.mutate({ key, person: e.target.value })} disabled={!projectId || assign.isPending}
         style={{ border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer", minWidth: 190 }}>
-        <option value="">— Unassigned —</option>
+        <option value="">{opts.length ? "— Unassigned —" : "— No team mapped —"}</option>
         <option value="N/A">N/A</option>
-        {options.map((m) => <option key={m} value={m}>{m}</option>)}
+        {opts.map((m) => <option key={m} value={m}>{m}</option>)}
       </select>
     </div>
   );
@@ -405,14 +407,14 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
         <EmptyBlock message="Select a project from the Portfolio to assign people." minHeight={70} />
       ) : (
         <>
-          {data?.canAssignLead ? selRow(data.leadKey, data.leadLabel, data.lead) : roRow(data?.leadLabel ?? "Project Manager", data?.lead ?? "")}
+          {data?.canAssignLead ? selRow(data.leadKey, data.leadLabel, data.lead, data.leadOptions ?? []) : roRow(data?.leadLabel ?? "Project Manager", data?.lead ?? "")}
           {data?.canAssignArch && (data.missingArch.length > 0) && (
             <div style={{ margin: "12px 0 4px", fontSize: 12, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 9, padding: "9px 12px", lineHeight: 1.45 }}>
               ⚠ {data.missingArch.length} architecture role{data.missingArch.length > 1 ? "s" : ""} not yet assigned: {data.missingArch.join(", ")}
             </div>
           )}
           <div style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", letterSpacing: "0.05em", textTransform: "uppercase", margin: "16px 0 2px" }}>Architecture roles</div>
-          {(data?.archRoles ?? []).map((r) => data?.canAssignArch ? selRow(r.key, r.label, r.person) : roRow(r.label, r.person))}
+          {(data?.archRoles ?? []).map((r) => data?.canAssignArch ? selRow(r.key, r.label, r.person, r.options ?? []) : roRow(r.label, r.person))}
         </>
       )}
     </Card>

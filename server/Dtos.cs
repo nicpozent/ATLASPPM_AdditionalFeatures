@@ -239,9 +239,12 @@ public record RoadmapBoardDto(bool CanEdit, List<RoadmapItemDto> Items,
     List<string> Themes, List<RoadmapLinkOptionDto> LinkOptions);
 
 // ---- People & roles (project assignments) ----------------------------------
-public record RoleAssignmentDto(string Key, string Label, string Person);
+// Options is the candidate people pool for THIS role (sourced from the mapped
+// Entra team): architecture roles ← Chief Architect team, Security Officer ←
+// the Security Officer team, the lead ← PM Lead + PMO pool.
+public record RoleAssignmentDto(string Key, string Label, string Person, List<string> Options);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,
-    string Lead, List<RoleAssignmentDto> ArchRoles, List<string> Options, List<string> MissingArch);
+    string Lead, List<string> LeadOptions, List<RoleAssignmentDto> ArchRoles, List<string> Options, List<string> MissingArch);
 
 // ---- Risk engine & status report ------------------------------------------
 public record RiskFindingDto(string Severity, string Category, string Title, string Detail, string Framework, string Control);

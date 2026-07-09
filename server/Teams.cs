@@ -27,6 +27,7 @@ public static class Teams
         ("devmgr",    "Developers Manager"),
         ("inframgr",  "Infrastructure Manager"),
         ("architect", "Chief Architect"),
+        ("secofficer","Security Officer"),
         ("pmo",       "PMO"),
         ("pmlead",    "PM Lead"),
         ("cto",       "CTO"),
@@ -71,6 +72,29 @@ public static class Teams
         var nodes = await db.ManagerNodes.ToListAsync();
         return Slots.ToDictionary(s => s.Key, s => nodes.FirstOrDefault(n => n.Key == s.Key)?.ParentKey ?? "");
     }
+
+    // Candidate people for a role assignment = distinct member names across the
+    // Entra groups (or manual teams) mapped to any of `slots` — the exact teams
+    // named, no roll-up. Names match the RoleAssignment.Person string the
+    // assignment dropdowns store. Used by People & roles and product-owner pools.
+    public static async Task<List<string>> PoolAsync(AtlasDbContext db, params string[] slots)
+    {
+        var set = slots.Where(IsSlot).ToHashSet();
+        if (set.Count == 0) return new();
+        var names = await db.EntraGroups
+            .Where(g => set.Contains(g.ManagerKey))
+            .SelectMany(g => g.Members.Select(m => m.DisplayName))
+            .ToListAsync();
+        return names.Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    // True once at least one team has been mapped to a slot AND has members.
+    // Before that the assignment dropdowns fall back to the resource directory
+    // so the app is usable out of the box; once teams are mapped, pools are strict.
+    public static Task<bool> AnyTeamMappedAsync(AtlasDbContext db) =>
+        db.EntraGroups.AnyAsync(g => g.ManagerKey != "" && g.Members.Any());
 
     public static void MapTeamEndpoints(this RouteGroupBuilder api)
     {
