@@ -35,6 +35,26 @@ public class GanttTimelineTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Project_gantt_returns_sprints_for_the_schedule_tab_including_undated()
+    {
+        // Proves the Project-timeline Schedule's data source (/projects/{id}/gantt)
+        // surfaces a project's sprints — dated and (Jira-style) undated — so the
+        // band renders whenever Sprint rows exist. If a real project's Schedule is
+        // empty, the sprints aren't in the DB (run the Jira/ADO sync), not a render bug.
+        var c = Admin();
+        var spid = await Str(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Sched sprints", startDate = "1 Mar 2026", target = "1 Sep 2026" }), "id");
+        await c.PostAsJsonAsync($"/api/v1/projects/{spid}/sprints", new { name = "Sprint 1", startDate = "2026-03-10", endDate = "2026-03-24", status = "Active" });
+        await c.PostAsJsonAsync($"/api/v1/projects/{spid}/sprints", new { name = "Sprint 2 (undated)", status = "Future" });
+
+        var sg = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{spid}/gantt");
+        var sprints = sg.GetProperty("sprints").EnumerateArray().ToList();
+        Assert.Contains(sprints, s => s.GetProperty("name").GetString() == "Sprint 1" && !s.GetProperty("undated").GetBoolean());
+        // Undated sprints are kept (flagged) via the window fallback, so past/
+        // current/future sprints all show rather than being dropped.
+        Assert.Contains(sprints, s => s.GetProperty("name").GetString() == "Sprint 2 (undated)" && s.GetProperty("undated").GetBoolean());
+    }
+
+    [Fact]
     public async Task Portfolio_derives_an_undated_projects_window_from_its_phases()
     {
         var c = Admin();
