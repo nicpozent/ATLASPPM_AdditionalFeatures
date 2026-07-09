@@ -28,10 +28,10 @@ _Last reviewed: 2026-07-09 · main @ perf-smoke-pentest-scope._
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
 | 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; smoke wired into CI (`perf-smoke.yml`, seeded API + k6 vs hot roll-ups) | Full load/stress runs operated against a seeded test env; NBomber not used |
 | 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
-| 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
+| 14 | **Delivery & runtime** | ★★★★★ | **On-prem single-node Docker (`docker compose`: web/worker/db/nginx edge) as the chosen, documented target (ADR-0054)**; images promoted from GHCR (ADR-0052); migrations on start; health-gated; secrets overlay; upgrade = pull-and-recreate | k8s parked (no scale/HA need at portfolio scale); HA is a single-node trade-off |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049) | — |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 53 ADRs, in-app Help + **Security Posture** page, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 54 ADRs, in-app Help + **Security Posture** page, setup guides, this evaluation, user stories | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -73,7 +73,7 @@ _Last reviewed: 2026-07-09 · main @ perf-smoke-pentest-scope._
 | Priority | Item | Why |
 |----------|------|-----|
 | Low | Commission a human pen-test + automate secret rotation | SAST/SCA gate, DAST on demand, CodeQL note, and a pen-test scope + remediation register now exist (`docs/pentest-scope.md`, ADR-0051/0053); the external engagement itself and automated secret rotation remain |
-| Low | k8s manifests + automated deploy | Release images publish to GHCR on tag (ADR-0052); deploy-to-host + k8s deferred until a target is chosen |
+| Low | Kubernetes / multi-node HA (only if scale grows) | On-prem single-node Docker is the chosen target (ADR-0054); the 12-factor GHCR images already suit k8s if a future multi-node/HA need appears — parked deliberately, not a gap |
 | Low | Broaden connector coverage | Only Jira + Azure DevOps are real end-to-end; others are cosmetic chrome |
 
 ## 4. Overall
@@ -142,3 +142,16 @@ flag, human-oversight + transparency measures and an AI-system name (one additiv
 migration); the deterministic engine derives obligations per tier (Art 5/9/10/14/50)
 and the Security tab gains an AI-classification card. No rating change (Governance
 already ★★★★★)._
+
+_Update 2026-07-09: perf-smoke wired into CI + CodeQL enablement note + pen-test
+scope & remediation register (`docs/pentest-scope.md`). Testing/CI evidence
+refreshed; no rating change (Security ★★★★☆ — the human engagement itself +
+automated secret rotation remain)._
+
+_Update 2026-07-09: on-prem single-node Docker fixed as the delivery target
+(ADR-0054) — build (CI) → publish (GHCR, ADR-0052) → run (compose: web/worker/db/
+nginx edge, off the public internet, pull-and-recreate upgrades). Kubernetes is
+parked deliberately (no scale/HA need at portfolio scale), reframing the old
+"no k8s manifests" gap as a matched decision rather than a shortfall. Delivery &
+runtime → ★★★★★. **Overall 4.9/5 — 16 of 18 dimensions at ★★★★★** (the two
+non-max are Integrations ★★★★☆ and Security ★★★★☆)._

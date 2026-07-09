@@ -53,5 +53,13 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0044](./0044-ado-delta-sync.md) | Azure DevOps delta (changed-since) work-item sync | Accepted |
 | [0045](./0045-per-role-demand-email.md) | Per-role email for demand notifications (in-app mapping + per-person opt-out) | Accepted |
 | [0046](./0046-data-driven-role-switcher.md) | Data-driven header role switcher (created roles selectable + enforced) | Accepted |
+| [0047](./0047-performance-load-testing.md) | k6 performance/load-testing suite (smoke·load·stress + API volume seeder) | Accepted |
+| [0048](./0048-web-worker-process-split.md) | Web / worker process split (role-selectable container) | Accepted |
+| [0049](./0049-compliance-coverage-and-zero-trust.md) | Deterministic compliance coverage (multi-framework) + Zero-Trust posture mapping | Accepted |
+| [0050](./0050-ai-act-risk-tiering-iso-42001.md) | EU AI Act risk-tiering + ISO 42001 AI-management obligations | Accepted |
+| [0051](./0051-automated-appsec-scanning.md) | Automated AppSec scanning (SAST · SCA/secrets/IaC · DAST) | Accepted |
+| [0052](./0052-release-pipeline-ghcr.md) | Tag-triggered release pipeline publishing versioned images to GHCR | Accepted |
+| [0053](./0053-appsec-baseline-triage-gating.md) | AppSec baseline triage → gating SAST + Trivy with scoped exceptions | Accepted |
+| [0054](./0054-on-prem-single-node-docker.md) | On-prem single-node Docker as the delivery target (k8s parked) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
