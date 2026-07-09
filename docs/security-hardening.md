@@ -135,3 +135,38 @@ blanket disable:
 | `gha-curl-pipe-shell` | Semgrep `--exclude-rule` | Official Trivy installer over TLS from the vendor repo. |
 | nginx `request-host` / `dynamic-proxy-host` / `missing-internal` | Semgrep `--exclude-rule` | Standard same-origin reverse proxy; the `proxy_pass` upstream is an internal config value, not attacker input. |
 | `design/` (prototype reference) | `.semgrepignore` | The approved prototype (CLAUDE.md §2) — never bundled or served, so its demo helpers aren't application AppSec. |
+
+### CodeQL (GitHub-native, complementary)
+
+CodeQL runs semantic dataflow analysis that Semgrep's pattern rules don't, so we
+run it **in addition to** the SAST above — but it lives in GitHub's own scanning,
+not in a workflow file we commit. Enabling it is a one-time **repo Settings**
+toggle, not code:
+
+> **Settings → Code security → Code scanning → CodeQL analysis → Set up →
+> Default setup → Enable.** Pick languages **JavaScript/TypeScript** and **C#**;
+> leave the schedule at the default (on push/PR to `main` + weekly). Findings
+> surface under the repo's **Security → Code scanning** tab.
+
+Default setup needs no `codeql.yml` in the repo and no secrets. It only reads the
+source GitHub already hosts — it never touches the running application, so it
+doesn't change the "no connection between GitHub and the app" posture. Promote
+findings to gating (branch-protection required check) once the baseline is
+triaged, the same way SAST/Trivy were (ADR-0053).
+
+### Performance smoke (on-demand)
+
+`perf-smoke.yml` (`workflow_dispatch`) stands up a throwaway Postgres + a seeded
+API and runs the single-VU k6 smoke pass (`perf/smoke.js`) over every hot roll-up
+endpoint, failing on any error or on roll-up p95 latency past budget (ADR-0047).
+It's the deterministic subset of the k6 suite wired into CI; `load.js`/`stress.js`
+stay manual against a real test server. Not a security control — a
+performance-regression gate — but it shares the "run against a *test* server,
+never production; the seeder is a throwaway fixture" model.
+
+### Manual penetration test (out of band)
+
+The automated SAST/SCA/DAST above is the machine-checkable half. A human
+penetration test / red-team is a separate external engagement it does not
+replace — scope, rules of engagement, and the remediation register live in
+[`docs/pentest-scope.md`](./pentest-scope.md).

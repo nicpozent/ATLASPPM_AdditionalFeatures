@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ appsec-posture._
+_Last reviewed: 2026-07-09 · main @ perf-smoke-pentest-scope._
 
 ## 1. Scorecard
 
@@ -23,11 +23,11 @@ _Last reviewed: 2026-07-09 · main @ appsec-posture._
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
-| 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture** | Human pen-test + automated secret rotation outstanding |
+| 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)** | Human pen-test engagement + automated secret rotation outstanding |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; CI-gated | Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used |
-| 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
+| 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; smoke wired into CI (`perf-smoke.yml`, seeded API + k6 vs hot roll-ups) | Full load/stress runs operated against a seeded test env; NBomber not used |
+| 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049) | — |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
@@ -72,8 +72,7 @@ _Last reviewed: 2026-07-09 · main @ appsec-posture._
 
 | Priority | Item | Why |
 |----------|------|-----|
-| Low | Commission a human pen-test + automate secret rotation | SAST/SCA gate and DAST runs on demand (ADR-0051/0053); a human pen-test and automated secret rotation remain |
-| Low | Wire `perf/smoke.js` into CI (`workflow_dispatch`) | k6 suite exists (ADR-0047); full load runs are test-server-operated, smoke could gate |
+| Low | Commission a human pen-test + automate secret rotation | SAST/SCA gate, DAST on demand, CodeQL note, and a pen-test scope + remediation register now exist (`docs/pentest-scope.md`, ADR-0051/0053); the external engagement itself and automated secret rotation remain |
 | Low | k8s manifests + automated deploy | Release images publish to GHCR on tag (ADR-0052); deploy-to-host + k8s deferred until a target is chosen |
 | Low | Broaden connector coverage | Only Jira + Azure DevOps are real end-to-end; others are cosmetic chrome |
 

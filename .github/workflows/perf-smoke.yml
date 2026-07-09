@@ -1,0 +1,90 @@
+name: Perf smoke
+
+# On-demand performance smoke gate (ADR-0047). Stands up a throwaway Postgres +
+# a seeded API, then runs the single-VU k6 smoke pass over every hot roll-up
+# endpoint. Fails if any endpoint errors or if roll-up p95 latency creeps past
+# the budget in perf/smoke.js.
+#
+# workflow_dispatch only — it's a heavier job (build + DB + k6) than the base CI
+# gates, and it's the deterministic subset of the k6 suite (load/stress stay
+# manual against a real test server). Run it from the Actions tab before a
+# release, or when touching a hot roll-up endpoint.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: perf-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: k6 smoke (roll-up endpoints)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: atlas
+        ports:
+          - 5432:5432
+        # Wait for Postgres to accept connections before the API starts.
+        options: >-
+          --health-cmd "pg_isready -U atlas"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      # Start the API in the background against the service Postgres. Seed the
+      # demo portfolio (a dev/test fixture, never persisted to prod) so the
+      # roll-up endpoints have rows and the latency thresholds are meaningful.
+      - name: Start API (seeded, background)
+        working-directory: server
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5109
+          ConnectionStrings__Postgres: "Host=127.0.0.1;Port=5432;Database=atlas;Username=atlas;Password=atlas"
+          Seed__Enabled: "true"
+          OpenApi__Enabled: "false"
+        run: |
+          dotnet run -c Release --project Atlas.Api.csproj > "$GITHUB_WORKSPACE/api.log" 2>&1 &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+
+      # Poll readiness (DB reachable + migrations applied) for up to 90s.
+      - name: Wait for API readiness
+        run: |
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:5109/readyz >/dev/null 2>&1; then
+              echo "API ready after ${i} attempt(s)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::API did not become ready in time."
+          echo "----- api.log -----"
+          cat "$GITHUB_WORKSPACE/api.log" || true
+          exit 1
+
+      # k6 via the official container — no host install. --network host lets it
+      # reach the API on 127.0.0.1:5109; the perf/ dir is mounted read-only.
+      - name: k6 smoke
+        run: |
+          docker run --rm --network host \
+            -e BASE_URL=http://127.0.0.1:5109 \
+            -v "$GITHUB_WORKSPACE/perf:/perf:ro" \
+            grafana/k6 run /perf/smoke.js
+
+      - name: API log (on failure)
+        if: failure()
+        run: cat "$GITHUB_WORKSPACE/api.log" || true
+
+      - name: Stop API
+        if: always()
+        run: kill "$API_PID" 2>/dev/null || true
