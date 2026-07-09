@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-08 · main @ full-journey-e2e + Project.tsx decomposition._
+_Last reviewed: 2026-07-09 · main @ perf-suite._
 
 ## 1. Scorecard
 
@@ -26,12 +26,12 @@ _Last reviewed: 2026-07-08 · main @ full-journey-e2e + Project.tsx decompositio
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout | Pen-test not performed; secrets rotation manual |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★☆ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep **+ full user-journey specs** (navigation, role-nav, dashboard layouts, mocked demand drill-in); CI-gated | No load/perf tests |
+| 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; CI-gated | Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used |
 | 13 | **CI/CD** | ★★★★☆ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates; current action versions | No automated deploy/release pipeline |
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention | — |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 41 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 47 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -56,24 +56,31 @@ _Last reviewed: 2026-07-08 · main @ full-journey-e2e + Project.tsx decompositio
   regressions fail CI.
 - **Maintainability (18).** The two outsized screens are decomposed into per-tab
   modules (`project/`, `resources/`) with shared/util helpers; ADR-0041.
+- **Testing (12).** Correctness (394 xUnit, 64 vitest), accessibility + full user
+  journeys (Playwright), and now **performance**: a k6 suite (`perf/`) drives the
+  hot roll-up endpoints — `smoke` (CI-ready gate), `load` (recorded baseline),
+  `stress` (find-the-knee) — with an API-driven volume seeder and Prometheus
+  remote-write into the reference stack; ADR-0047.
 
 ## 3. Top risks & recommended next steps
 
 | Priority | Item | Why |
 |----------|------|-----|
-| Low | Add load/perf tests | e2e now covers a11y + user journeys; performance under load is untested |
-| Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy |
-| Low | Extend per-tab decomposition if screens regrow | `Project.tsx` down to ~1,600 (agile Tasks/Backlog/Sprints/Epics + shared task model extracted, ADR-0041); remaining inline tabs can follow the same pattern |
+| Low | Automated security scanning (SAST/DAST) | No pen-test performed; CodeQL + OWASP ZAP would cover the automated OWASP-Top-10 half |
+| Low | Wire `perf/smoke.js` into CI (`workflow_dispatch`) | k6 suite exists (ADR-0047); full load runs are test-server-operated, smoke could gate |
+| Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy (deferred until a target host is chosen) |
+| Low | Broaden connector coverage | Only Jira + Azure DevOps are real end-to-end; others are cosmetic chrome |
 
 ## 4. Overall
 
 **Verdict: production-ready.** The core PPM product is complete, data-wired,
 tested (468 automated tests across stacks — 394 backend xUnit, 64 frontend
-vitest, 10 Playwright e2e: 6 axe + 4 full-journey), accessible (AA-gated), observable,
-and documented to a professional standard (ABB/SBB traceability, 41 ADRs,
-HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are
-enhancements, not blockers: broadening connector coverage beyond Jira/Azure
-DevOps, ADO delta sync, and full user-journey e2e.
+vitest, 10 Playwright e2e: 6 axe + 4 full-journey — plus a k6 load/perf suite),
+accessible (AA-gated), observable, and documented to a professional standard
+(ABB/SBB traceability, 47 ADRs, HLD/LLD). Entra SSO is verified end-to-end on a
+live tenant. Remaining items are enhancements, not blockers: broadening connector
+coverage beyond Jira/Azure DevOps, automated security scanning (SAST/DAST), and a
+release/k8s pipeline once a target host is chosen.
 
 _Update 2026-07-07: SSO verified (Identity ★★★★★); then the four post-review
 follow-ups closed — lint clean (Frontend ★★★★★), ADO background sync (Async
@@ -86,3 +93,7 @@ dashboard layouts, mocked demand drill-in) beyond the axe sweep, and finished th
 `Project.tsx` per-tab decomposition (Tasks/Backlog/Sprints/Epics + shared task
 model, ADR-0041; `Project.tsx` ~1,600). The only remaining Testing gap is
 load/perf._
+
+_Update 2026-07-09: added a k6 load/perf suite (`perf/` — smoke·load·stress +
+API-driven volume seeder, Prometheus remote-write; ADR-0047), closing the last
+Testing gap (★★★★★). **Overall 4.8/5 — 14 of 18 dimensions at ★★★★★.**_

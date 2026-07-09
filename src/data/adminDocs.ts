@@ -26,11 +26,11 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-08 · main @ full-journey e2e + Project.tsx decomposition",
-  overall: "4.7 / 5 — 13 of 18 dimensions at ★★★★★.",
+  lastReviewed: "2026-07-09 · main @ perf-suite",
+  overall: "4.8 / 5 — 14 of 18 dimensions at ★★★★★.",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
-    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 42 ADRs.", gaps: "—" },
+    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 47 ADRs.", gaps: "—" },
     { n: 3, name: "Frontend engineering", stars: 5, evidence: "React 18 + TS strict + Vite; inline design tokens; route code-splitting + vendor chunks; lint clean (0 warnings).", gaps: "—" },
     { n: 4, name: "Identity & access", stars: 5, evidence: "Entra SSO (MSAL, PKCE) verified end-to-end on a live tenant; server-authoritative RBAC; 15-min idle-logout.", gaps: "—" },
     { n: 5, name: "Authorization model", stars: 5, evidence: "6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests.", gaps: "—" },
@@ -40,12 +40,12 @@ export const EVALUATION: Evaluation = {
     { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout.", gaps: "Pen-test not performed; secrets rotation manual." },
     { n: 10, name: "Accessibility (WCAG 2 AA)", stars: 5, evidence: "jsdom axe on primitives + browser axe sweep gated incl. colour-contrast; mobile drawer; focus/dialog/menu semantics.", gaps: "Sweep covers representative routes; extend as views grow." },
     { n: 11, name: "Observability", stars: 5, evidence: "OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs; domain metrics + tuned dashboards + Prometheus alert rules.", gaps: "—" },
-    { n: 12, name: "Testing", stars: 4, evidence: "Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); CI-gated.", gaps: "No load/perf tests." },
+    { n: 12, name: "Testing", stars: 5, evidence: "Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047); CI-gated.", gaps: "Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used." },
     { n: 13, name: "CI/CD", stars: 4, evidence: "GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates.", gaps: "No automated deploy/release pipeline." },
     { n: 14, name: "Delivery & runtime", stars: 4, evidence: "Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay.", gaps: "Single-node compose; no k8s manifests yet." },
     { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention.", gaps: "—" },
     { n: 16, name: "Internationalisation", stars: 5, evidence: "6 locales; completeness test gates missing keys.", gaps: "—" },
-    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 42 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
+    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 47 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
     { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules (Project.tsx down to ~1,600 with Tasks/Backlog/Sprints/Epics extracted).", gaps: "—" },
   ],
   notes: [
@@ -54,15 +54,16 @@ export const EVALUATION: Evaluation = {
     "Observability: domain metrics (sync duration, queue depth, capacity alerts, DB command latency), a tuned operations dashboard and Prometheus alert rules on top of the reference stack.",
     "Accessibility: the design greys meet WCAG AA and the browser axe sweep gates colour-contrast alongside structural rules, so regressions fail CI.",
     "Maintainability: the outsized screens are decomposed into per-tab modules (project/, resources/) with shared/util helpers; Project.tsx is down to ~1,600 after extracting the agile Tasks/Backlog/Sprints/Epics tabs and their shared task model.",
-    "Testing: Playwright e2e now covers full user journeys (navigation across every screen, role-driven nav, dashboard layouts, a mocked demand data → render → drill-in flow) on top of the axe accessibility sweep.",
+    "Testing: Playwright e2e now covers full user journeys (navigation across every screen, role-driven nav, dashboard layouts, a mocked demand data → render → drill-in flow) on top of the axe accessibility sweep; a k6 load/perf suite (perf/ — smoke·load·stress + an API-driven volume seeder, Prometheus remote-write) drives the hot roll-up endpoints against a seeded test env (ADR-0047).",
   ],
   risks: [
-    { priority: "Low", item: "Add load/perf tests", why: "e2e now covers a11y + user journeys; performance under load is untested." },
-    { priority: "Low", item: "k8s manifests + release pipeline", why: "Compose is single-node; no automated deploy." },
+    { priority: "Low", item: "Automated security scanning (SAST/DAST)", why: "No pen-test performed; CodeQL + OWASP ZAP would cover the automated OWASP-Top-10 half." },
+    { priority: "Low", item: "Wire perf smoke into CI", why: "k6 suite exists (ADR-0047); full load runs are test-server-operated, smoke could gate." },
+    { priority: "Low", item: "k8s manifests + release pipeline", why: "Compose is single-node; no automated deploy (deferred until a target host is chosen)." },
     { priority: "Low", item: "Broaden connector coverage", why: "Jira + Azure DevOps are real end-to-end; the rest are cosmetic chrome." },
   ],
   verdict:
-    "Production-ready. The core PPM product is complete, data-wired, tested across stacks (backend xUnit, frontend vitest, Playwright axe + full-journey e2e), accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps and load/perf testing.",
+    "Production-ready. The core PPM product is complete, data-wired, tested across stacks (backend xUnit, frontend vitest, Playwright axe + full-journey e2e, k6 load/perf), accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps, automated security scanning, and a release/k8s pipeline once a target host is chosen.",
 };
 
 // ---- User stories ----------------------------------------------------------
