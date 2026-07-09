@@ -87,3 +87,24 @@ with raw DB access** (they'd see ciphertext; only the app holds the key). It is
 **not** enabled because it removes the ability to query/sort/filter those columns
 and adds migration and performance cost. It's a deliberate, scoped decision — ask
 if the threat model calls for it and we'll pick the specific fields.
+
+## 6. Automated application-security scanning (CI)
+
+Beyond the supply-chain gates (`npm audit`, `dotnet list --vulnerable`), the
+`security-scan.yml` workflow runs the automated half of a penetration test
+(ADR-0051):
+
+- **SAST — Semgrep** (`p/security-audit`, `p/owasp-top-ten`, `p/secrets`): source
+  analysis of the C#/TypeScript for injection, authz, crypto and hardcoded-secret
+  patterns.
+- **SCA · secrets · IaC — Trivy** (`fs`): dependency CVEs, committed secrets, and
+  Dockerfile/compose misconfiguration.
+- **DAST — OWASP ZAP baseline** (`workflow_dispatch` with a `zap_target` URL):
+  probes a *running* test environment from the outside (never production) — the
+  same run-against-a-test-server model as the k6 perf suite.
+
+SAST + Trivy are **report-only** during rollout (findings surface in the job log
+without failing the build); flip them to gating once the current baseline is
+triaged. GitHub-native **CodeQL** is complementary and enabled via the repo's
+*Code scanning → Default setup* toggle. A human penetration test / red-team is a
+separate external engagement this does not replace.
