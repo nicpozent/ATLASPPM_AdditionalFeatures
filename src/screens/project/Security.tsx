@@ -31,7 +31,7 @@ const SRG_STATUS: Record<string, { ink: string; tint: string }> = {
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
 const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
-const FRAMEWORK_OPTS = ["ISO 27001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "EU AI Act", "Digital Product Passport (ESPR)", "Packaging (PPWR)", "EU Deforestation (EUDR)"];
+const FRAMEWORK_OPTS = ["ISO 27001", "ISO 42001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "NIST CSF 2.0", "EU AI Act", "Digital Product Passport (ESPR)", "Packaging (PPWR)", "EU Deforestation (EUDR)"];
 const CTL_STATUSES = ["Planned", "Partial", "Implemented", "Archived"];
 const CTL_STATUS: Record<string, { ink: string; tint: string }> = {
   Implemented: { ink: "#0B6B37", tint: "#E7F4EC" },

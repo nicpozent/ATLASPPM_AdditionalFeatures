@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ web-worker-split._
+_Last reviewed: 2026-07-09 · main @ compliance-coverage._
 
 ## 1. Scorecard
 
@@ -29,9 +29,9 @@ _Last reviewed: 2026-07-09 · main @ web-worker-split._
 | 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; CI-gated | Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used |
 | 13 | **CI/CD** | ★★★★☆ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates; current action versions | No automated deploy/release pipeline |
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
-| 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention | — |
+| 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; **deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; Zero-Trust posture (ADR-0049)** | AI-Act risk-tiering + first-class NIST/ISO 42001 scoping planned (ADR-0050) |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 48 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 49 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -109,3 +109,11 @@ recurring timer jobs run in their own container off the request path, with a
 `worker` service added to compose; default `all` keeps single-container
 behaviour. No rating change (Async/Architecture already ★★★★★); on-demand sync
 consumers stay in the web role pending a durable-queue follow-up._
+
+_Update 2026-07-09: compliance framework coverage (ADR-0049) — added NIST CSF 2.0
++ ISO 42001 to the control catalogue (fixing the ISO 42001 inconsistency), a
+generic per-framework coverage rule in the deterministic engine (NIST/SOC 2/NIS2/
+ISO 42001 now scored from real control data), named MITRE ATT&CK technique classes,
+and a documented Zero-Trust posture mapping. No rating change (Governance already
+★★★★★). Follow-up ADR-0050 will add AI-Act risk-tiering + first-class NIST/ISO 42001
+scoping (schema)._

@@ -26,11 +26,11 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-09 · main @ web-worker-split",
+  lastReviewed: "2026-07-09 · main @ compliance-coverage",
   overall: "4.8 / 5 — 14 of 18 dimensions at ★★★★★.",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
-    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 48 ADRs.", gaps: "—" },
+    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 49 ADRs.", gaps: "—" },
     { n: 3, name: "Frontend engineering", stars: 5, evidence: "React 18 + TS strict + Vite; inline design tokens; route code-splitting + vendor chunks; lint clean (0 warnings).", gaps: "—" },
     { n: 4, name: "Identity & access", stars: 5, evidence: "Entra SSO (MSAL, PKCE) verified end-to-end on a live tenant; server-authoritative RBAC; 15-min idle-logout.", gaps: "—" },
     { n: 5, name: "Authorization model", stars: 5, evidence: "6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests.", gaps: "—" },
@@ -43,9 +43,9 @@ export const EVALUATION: Evaluation = {
     { n: 12, name: "Testing", stars: 5, evidence: "Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047); CI-gated.", gaps: "Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used." },
     { n: 13, name: "CI/CD", stars: 4, evidence: "GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates.", gaps: "No automated deploy/release pipeline." },
     { n: 14, name: "Delivery & runtime", stars: 4, evidence: "Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay.", gaps: "Single-node compose; no k8s manifests yet." },
-    { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention.", gaps: "—" },
+    { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK with a generic per-framework coverage rule; Zero-Trust posture mapping (ADR-0049).", gaps: "AI-Act risk-tiering + first-class NIST/ISO 42001 scoping planned (ADR-0050)." },
     { n: 16, name: "Internationalisation", stars: 5, evidence: "6 locales; completeness test gates missing keys.", gaps: "—" },
-    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 48 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
+    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 49 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
     { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules (Project.tsx down to ~1,600 with Tasks/Backlog/Sprints/Epics extracted).", gaps: "—" },
   ],
   notes: [
@@ -56,6 +56,7 @@ export const EVALUATION: Evaluation = {
     "Maintainability: the outsized screens are decomposed into per-tab modules (project/, resources/) with shared/util helpers; Project.tsx is down to ~1,600 after extracting the agile Tasks/Backlog/Sprints/Epics tabs and their shared task model.",
     "Testing: Playwright e2e now covers full user journeys (navigation across every screen, role-driven nav, dashboard layouts, a mocked demand data → render → drill-in flow) on top of the axe accessibility sweep; a k6 load/perf suite (perf/ — smoke·load·stress + an API-driven volume seeder, Prometheus remote-write) drives the hot roll-up endpoints against a seeded test env (ADR-0047).",
     "Runtime topology: the backend runs in a selectable process role (Atlas__Role = web/worker/all; ADR-0048). The recurring timer jobs (scheduled Jira sync, retention, capacity alerts) run in a separate worker container so a heavy unattended pass can't starve user requests; a worker service is in docker-compose. Default 'all' keeps single-container behaviour. The monolith is intentionally not split into microservices — read roll-ups join across domains in one transaction — so the split is request-serving vs. recurring background work; on-demand sync consumers stay in the web role pending a durable-queue follow-up.",
+    "Compliance coverage (ADR-0049): the deterministic risk engine (Risks.cs, no LLM) evaluates each project's real data and maps findings to GDPR, ISO 27001, ISO 42001, PCI-DSS, SOC 2, NIS2, NIST CSF 2.0 and MITRE ATT&CK. A generic per-framework coverage rule scores any framework a project logs controls under, so new frameworks map without code. MITRE findings name tactic/technique classes by architecture change type. Zero-Trust posture (verify explicitly / least privilege / assume breach / continuous monitoring) is mapped to existing controls; the network-segmentation half is infrastructure, deferred until a hosting target is chosen. Follow-up ADR-0050: EU AI Act risk-tiering + first-class NIST/ISO 42001 scoping.",
   ],
   risks: [
     { priority: "Low", item: "Automated security scanning (SAST/DAST)", why: "No pen-test performed; CodeQL + OWASP ZAP would cover the automated OWASP-Top-10 half." },

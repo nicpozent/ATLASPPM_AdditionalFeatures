@@ -5,13 +5,29 @@ namespace Atlas.Api;
 // ============================================================================
 //  Deterministic risk engine + status report. Rules run over the project's real
 //  data (budget, tasks, quality, dependencies, gates, security, architecture)
-//  and each finding cites the standard/control it maps to:
-//  ISO 27001, ISO 42001, GDPR, PCI-DSS, MITRE ATT&CK, or PMO governance.
-//  No LLM — every finding is reproducible and auditable.
+//  and each finding cites the standard/control it maps to: ISO 27001, ISO 42001,
+//  GDPR, PCI-DSS, NIST CSF, SOC 2, NIS2, MITRE ATT&CK, or PMO/ITIL governance.
+//  A generic coverage pass additionally scores *any* framework the project has
+//  logged controls under, so new frameworks map without a bespoke rule. No LLM —
+//  every finding is reproducible and auditable. (Zero-Trust posture — how these
+//  controls map to the ZT tenets — is documented in ADR-0049.)
 // ============================================================================
 public static class Risks
 {
     static int Sev(string s) => s == "High" ? 3 : s == "Medium" ? 2 : 1;
+
+    // Adversary technique classes surfaced for an architecture-significant change
+    // (deterministic, keyed off the change type) — turns the MITRE ATT&CK finding
+    // from a generic note into named tactic/technique references.
+    static readonly Dictionary<string, string> AttackTechniques = new()
+    {
+        ["payment"]          = "Credential Access (T1552 unsecured credentials), Collection (T1005)",
+        ["cloud-platform"]   = "Initial Access (T1190 exploit public-facing app), Valid Accounts (T1078)",
+        ["new-saas"]         = "Initial Access (T1190), Persistence (T1098 account manipulation)",
+        ["ai-solution"]      = "Supply-chain compromise (T1195), data/model poisoning; Initial Access (T1190)",
+        ["new-product"]      = "Initial Access (T1190), Brute Force (T1110)",
+        ["core-replacement"] = "Lateral Movement (T1210), OS Credential Dumping (T1003)",
+    };
 
     // Runs the rule set and returns findings ordered most-severe first.
     static async Task<List<RiskFindingDto>> EvaluateAsync(AtlasDbContext db, string id)
@@ -120,7 +136,28 @@ public static class Risks
             var archSignificant = arch is not null && new[] { "new-product", "core-replacement", "payment", "cloud-platform", "new-saas", "ai-solution" }.Contains(arch.ChangeType);
             if (archSignificant && !controls.Any(c => c.Control.Contains("crypto") || c.Framework == "ISO 27001" && c.Status == "Implemented"))
                 f.Add(new("Medium", "Threat model", "Threat-model coverage gap",
-                    "Architecture-significant change without evidenced security controls; adversary techniques are unmitigated.", "MITRE ATT&CK", "Initial Access / Credential Access (unmitigated technique classes)"));
+                    "Architecture-significant change without evidenced security controls; adversary techniques are unmitigated.",
+                    "MITRE ATT&CK", $"Unmitigated technique classes — {AttackTechniques.GetValueOrDefault(arch!.ChangeType, "Initial Access / Credential Access")}"));
+        }
+
+        // ---- Generic framework coverage ------------------------------------
+        // For every framework the project has logged controls under, score
+        // implementation. This gives NIST CSF, SOC 2, NIS2, ISO 42001 (and any
+        // future framework) a deterministic finding without a bespoke rule.
+        // Skips a framework a specific rule above already reported, and any
+        // fully-implemented framework.
+        foreach (var fw in controls.Select(c => c.Framework).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
+        {
+            if (f.Any(x => x.Framework == fw)) continue;
+            var fwControls = controls.Where(c => c.Framework == fw && c.Status != "Archived").ToList();
+            if (fwControls.Count == 0) continue;
+            var impl = fwControls.Count(c => c.Status == "Implemented");
+            if (impl == fwControls.Count) continue;
+            f.Add(new(impl == 0 ? "Medium" : "Low", "Compliance",
+                $"{fw}: {impl}/{fwControls.Count} controls implemented",
+                impl == 0 ? "Controls are logged for this framework but none are marked Implemented."
+                          : "Some controls for this framework are still Planned or Partial.",
+                fw, "Control implementation coverage"));
         }
 
         return f.OrderByDescending(x => Sev(x.Severity)).ToList();
