@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ appsec-scanning._
+_Last reviewed: 2026-07-09 · main @ release-pipeline._
 
 ## 1. Scorecard
 
@@ -27,11 +27,11 @@ _Last reviewed: 2026-07-09 · main @ appsec-scanning._
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
 | 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; CI-gated | Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used |
-| 13 | **CI/CD** | ★★★★☆ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates; current action versions | No automated deploy/release pipeline |
+| 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049) | — |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 51 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 52 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -74,7 +74,7 @@ _Last reviewed: 2026-07-09 · main @ appsec-scanning._
 |----------|------|-----|
 | Low | Flip AppSec scanners to gating + commission a pen-test | SAST/Trivy/ZAP land report-only (ADR-0051); gate after baseline triage, and a human pen-test is still a separate engagement |
 | Low | Wire `perf/smoke.js` into CI (`workflow_dispatch`) | k6 suite exists (ADR-0047); full load runs are test-server-operated, smoke could gate |
-| Low | k8s manifests + release pipeline | Compose is single-node; no automated deploy (deferred until a target host is chosen) |
+| Low | k8s manifests + automated deploy | Release images publish to GHCR on tag (ADR-0052); deploy-to-host + k8s deferred until a target is chosen |
 | Low | Broaden connector coverage | Only Jira + Azure DevOps are real end-to-end; others are cosmetic chrome |
 
 ## 4. Overall
@@ -123,6 +123,12 @@ workflow adds SAST (Semgrep OWASP Top 10 + secrets), SCA/secret/IaC (Trivy) and 
 dispatch-driven OWASP ZAP baseline (DAST against a test env). Report-only during
 rollout; the automated half of a pen-test now runs continuously. No rating change
 (Security stays ★★★★☆ until scanners gate + a human pen-test is commissioned)._
+
+_Update 2026-07-09: release pipeline (ADR-0052) — a tag-triggered `release.yml`
+builds and publishes versioned api/web images to GHCR (Buildx + GHA cache + Trivy
+image scan), using the built-in token (no external secrets). CI/CD → ★★★★★ (the
+deploy-to-host step stays host-dependent, parked with k8s). **Overall 4.8/5 —
+15 of 18 dimensions at ★★★★★.**_
 
 _Update 2026-07-09: EU AI Act risk-tiering + ISO 42001 AI-management (ADR-0050) —
 `SecurityProfile` gains a risk tier (minimal/limited/high/prohibited), Annex-III
