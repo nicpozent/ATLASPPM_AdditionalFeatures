@@ -214,23 +214,51 @@ Tracked as roadmap; each will mirror the Jira / Azure DevOps connector pattern.
 
 ## 7. Deployment topology
 
+The supported target is **on-prem single-node Docker** (`docker compose`) on a
+Linux VM or Windows Server, kept off the public internet (ADR-0054). One host runs
+four services; production pulls the versioned `api`/`web` images published to GHCR
+by the release pipeline (ADR-0052) rather than building on the host.
+
 ```mermaid
 flowchart TB
-  subgraph Host["Container host / VM (Linux or Windows Server + Docker)"]
-    web["web (nginx + SPA)\n:443 / :80"]
-    api["api (.NET 8)\ninternal"]
-    db[("db (PostgreSQL 16)\nnamed volume: atlas_db")]
+  browser["Browser (internal network)"]
+  subgraph Host["On-prem host — Linux VM / Windows Server + Docker (single node)"]
+    web["web — nginx + SPA\nTLS edge :443 / :80"]
+    api["api — .NET 8, role=web\nmigrations + seed + /api/v1\nexpose :8080"]
+    worker["worker — .NET 8, role=worker\nrecurring jobs (Jira sync,\nretention, capacity alerts)\nno HTTP surface (ADR-0048)"]
+    db[("db — PostgreSQL 16\nnamed volume atlas_db\nno published port")]
   end
-  ingress["Ingress / LB\n(TLS termination)"] --> web
-  web --> api --> db
-  secrets["Docker secrets / env\n(DB creds, Entra, Jira, OTLP)"] -.-> api
+  browser ==>|"TLS, same-origin /api"| web --> api --> db
+  worker --> db
+  secrets["Docker secrets / env\n(DB creds, Entra, Jira/ADO, OTLP)"] -.-> api
+  secrets -.-> worker
+  otlp["OTLP collector →\nGrafana/Tempo/Prometheus/Loki\n(reference stack)"]
+  api -.->|"traces/metrics/logs"| otlp
+  worker -.-> otlp
+  ext["Entra ID · Jira · Azure DevOps\n(outbound only)"]
+  api -.->|"outbound"| ext
+  worker -.-> ext
 ```
 
-- TLS terminates at an ingress/LB (or extend `deploy/nginx.conf`).
-- Postgres uses a named volume (or a managed Postgres via `ConnectionStrings__Postgres`).
-- Config via environment / Docker secrets (12-factor). See [secrets.md](../secrets.md).
-- Supported hosts include a **Linux VM** and **Windows Server** with Docker — the
-  in-app Help centre carries step-by-step install guides for both.
+- **Four services on one node:** `web` (nginx TLS edge, same-origin `/api` → api),
+  `api` (role=web — owns EF migrations + reference-data seed, serves `/api/v1`),
+  `worker` (role=worker — recurring background jobs off the request path,
+  ADR-0048), `db` (Postgres 16 on a named volume, **no published port** — reachable
+  only inside the host). The smallest installs collapse to a single container
+  (`api` role=`all`, no `worker`).
+- **Images are promoted, not rebuilt:** hosts `docker compose pull` the GHCR
+  images (ADR-0052); upgrades are pull-and-recreate, health-gated by `/readyz`
+  (the api applies migrations on startup).
+- **Config via environment / Docker secrets** (12-factor), never in VCS. See
+  [secrets.md](../secrets.md) and [security-hardening.md](../security-hardening.md).
+- **No GitHub↔app path at runtime:** CI (scanners, release build) runs in GitHub;
+  the deployed app only talks to its DB, the configured directory/issue trackers,
+  and its OTLP collector.
+- **Kubernetes is parked, not missing** (ADR-0054): the 12-factor images already
+  suit k8s if a future multi-node/HA need appears, but a control plane to run four
+  containers on one node isn't justified at portfolio scale.
+- Supported hosts (**Linux VM**, **Windows Server** + Docker) have step-by-step
+  install guides in the in-app Help centre.
 
 ## 8. Security & trust boundaries (overview)
 
@@ -266,7 +294,7 @@ flowchart LR
 | Identity | Microsoft Entra ID (OIDC), Microsoft Graph |
 | Integrations | Jira Cloud REST (agile + enhanced JQL) |
 | Observability | OpenTelemetry (OTLP), Swagger/OpenAPI (Swashbuckle) |
-| Delivery | Docker, docker-compose, nginx; GitHub Actions CI (build · lint · test) |
+| Delivery | On-prem single-node Docker (`docker compose`: web/worker split), nginx edge; GitHub Actions CI (build · lint · test · a11y · SAST/SCA/DAST · perf-smoke) + tag-triggered GHCR release pipeline (ADR-0052/0054) |
 
 See the [LLD](./lld.md) for component-level detail and the [ADR log](./adr/) for the
 reasoning behind each of these choices.

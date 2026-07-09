@@ -295,6 +295,14 @@ full (F) levels. Authorization is always server-side.
   leaving Atlas._
 - **US-ADM-6** — _As a **PlatformAdmin**, I want a database password rotation age
   panel with 90/180-day nudges, so that credential hygiene is visible._
+- **US-ADM-7** — _As a **PlatformAdmin / security lead**, I want an in-app Security
+  Posture view, so that I can see the application-security scanning posture without
+  leaving Atlas._
+  **Acceptance:** a read-only **Admin → Security Posture** tab lists the scanners
+  (SAST/SCA/DAST + CodeQL), how to run them (CI, the off-GitHub
+  `scripts/security-scan.sh`, or air-gapped), the scoped documented exceptions, and
+  the manual-pen-test pointer; the page makes **no external calls** and the app
+  runs no scans itself (ADR-0051/0053).
 
 ## 20. Help
 
@@ -310,10 +318,26 @@ full (F) levels. Authorization is always server-side.
 - **US-GOV-3** — _As a **governance lead**, I want a decision log (ADR) with
   edit/delete, so that decisions are recorded._
 - **US-GOV-4** — _As a **compliance officer**, I want a security/compliance module
-  (GDPR, PCI-DSS, ISO 27001, EU AI Act, SOC 2, NIS2) with control mappings and
-  configurable review gates, so that controls have evidence._
+  with control mappings and configurable review gates, so that controls have
+  evidence._
+  **Acceptance:** a deterministic risk engine (`Risks.cs`, no LLM) evaluates each
+  project's real data and maps findings to GDPR, ISO 27001, ISO 42001, PCI-DSS,
+  SOC 2, NIS2, NIST CSF 2.0 and MITRE ATT&CK, with a generic per-framework
+  coverage rule so a new framework maps without code; a Zero-Trust posture
+  (verify-explicitly / least-privilege / assume-breach / continuous-monitoring)
+  is mapped to existing controls (ADR-0049).
 - **US-GOV-5** — _As a **QA lead**, I want a Quality module (plan → stages → tests +
   defects, tasks/test cases per plan), so that quality is tracked._
+- **US-GOV-6** — _As a **compliance officer**, I want each project's AI use
+  classified under the EU AI Act and ISO 42001, so that AI obligations are explicit
+  and evidenced._
+  **Acceptance:** the security profile records a risk tier
+  (minimal/limited/high/prohibited), an Annex III flag, human-oversight and
+  transparency measures, and the AI system/model name; the engine derives
+  obligations from the tier — prohibited → Art 5; high/Annex III → human oversight
+  (Art 14) + risk-management & data-governance (Art 9/10, ISO 42001); limited →
+  transparency (Art 50); in-scope-but-unclassified is flagged to triage (Art 6).
+  The Security tab shows an AI-classification card when AI is in scope (ADR-0050).
 
 ## 22. Ops (run-the-business)
 
@@ -380,6 +404,38 @@ full (F) levels. Authorization is always server-side.
 - **US-OBS-3** — _As an **operator**, I want same-origin nginx edge, security
   headers/CSP, rate limiting, and secrets via env/Docker secrets, so that the
   deployment is hardened._
+- **US-OBS-4** — _As an **operator**, I want the recurring background jobs to run in
+  a separate container from the request-serving API, so that a portfolio-wide
+  scheduled sync or retention pass can't starve user requests._
+  **Acceptance:** a process role (`Atlas__Role` = web/worker/all) selects behaviour
+  from one image; `docker-compose.yml` ships `api` (web) + `worker` (worker); the
+  default `all` keeps single-container behaviour for the smallest installs
+  (ADR-0048).
+- **US-OBS-5** — _As a **security lead**, I want automated application-security
+  scanning on every change and runnable off GitHub, so that the OWASP-Top-10
+  baseline stays clean between manual pen-tests._
+  **Acceptance:** `security-scan.yml` runs gating SAST (Semgrep) + SCA/secrets/IaC
+  (Trivy) on push/PR and on-demand DAST (OWASP ZAP) against a test server;
+  `scripts/security-scan.sh` runs the same SAST + SCA (and optional `--dast`) from
+  any machine or on-prem agent with no GitHub connection; CodeQL is enabled via the
+  repo's default-setup toggle; the scope and remediation register for the manual
+  engagement live in `docs/pentest-scope.md` (ADR-0051/0053).
+- **US-OBS-6** — _As an **operator**, I want a performance-smoke gate and a k6
+  load/perf suite, so that a latency regression on the hot roll-up endpoints is
+  caught before release._
+  **Acceptance:** `perf-smoke.yml` (`workflow_dispatch`) stands up a throwaway
+  Postgres + a seeded API and runs the single-VU k6 smoke pass over the hot roll-up
+  endpoints, failing on any error or p95 past budget; `load`/`stress` stay manual
+  against a real test server; the seeder is a throwaway-DB fixture, never production
+  (ADR-0047).
+- **US-OBS-7** — _As an **operator**, I want a tag-triggered release pipeline and a
+  documented on-prem Docker deployment, so that I can ship a reproducible build to
+  our own infrastructure._
+  **Acceptance:** pushing a `v*.*.*` tag builds and publishes versioned `api`/`web`
+  images to GHCR (Buildx + report-only image scan, ADR-0052); the supported target
+  is on-prem single-node Docker (`docker compose`: web/worker/db/nginx edge), off
+  the public internet, upgraded by pull-and-recreate — Kubernetes is parked, not
+  required, at portfolio scale (ADR-0054).
 
 ---
 
