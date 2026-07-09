@@ -364,7 +364,7 @@ function UsersSection() {
         </div>
         {admin?.canManage && (
           <button onClick={() => sync.mutate()} disabled={sync.isPending} title={connected ? "Sync groups & members from Entra" : "Graph not configured — this will report how to enable it"}
-            style={{ display: "flex", alignItems: "center", gap: 7, background: "#fff", color: color.primary, border: "none", borderRadius: 9, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", opacity: sync.isPending ? 0.7 : 1, fontFamily: "inherit" }}>
+            style={{ display: "flex", alignItems: "center", gap: 7, background: color.surface, color: color.primary, border: "none", borderRadius: 9, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", opacity: sync.isPending ? 0.7 : 1, fontFamily: "inherit" }}>
             <Icon name="sync" size={16} /> {sync.isPending ? "Syncing…" : "Sync now"}
           </button>
         )}
@@ -378,7 +378,7 @@ function UsersSection() {
 }
 
 // ---- STAKEHOLDERS ---------------------------------------------------------
-const labelStyle: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
+const labelStyle: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
 
 function StakeholdersSection() {
   const [name, setName] = useState(""); const [title, setTitle] = useState(""); const [org, setOrg] = useState(""); const [email, setEmail] = useState("");
@@ -482,7 +482,7 @@ function ArchiveSection() {
               <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{a.id} · {a.dept} · {a.owner}</div>
             </div>
             {d.canGovern && (
-              <button onClick={() => restore.mutate(a.id)} disabled={restore.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "1px solid #CFE0F4", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
+              <button onClick={() => restore.mutate(a.id)} disabled={restore.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
             )}
             {d.canDelete && !a.isSystem && (
               <button onClick={() => purge.mutate(a.id)} disabled={purge.isPending} title="Permanently delete (Platform Admin)" style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
@@ -596,7 +596,7 @@ function TeamsSection() {
         </div>
         {d.canManage && (
           <button onClick={() => sync.mutate()} disabled={sync.isPending} title={d.graphConfigured ? "Sync groups & members from Entra" : "Graph not configured — this will report how to enable it"}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: sync.isPending ? 0.7 : 1 }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, background: color.surface, color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: sync.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: sync.isPending ? 0.7 : 1 }}>
             <Icon name="refresh" size={16} /> {sync.isPending ? "Syncing…" : "Sync from Entra"}
           </button>
         )}
@@ -881,13 +881,13 @@ function BackupsSection() {
           <span style={{ fontSize: 12.5, color: "#fff" }}>Automatic backups</span>
           <span style={{ position: "relative", width: 40, height: 22, display: "inline-block" }}>
             <span style={{ position: "absolute", inset: 0, background: d.autoBackups ? "#3BD17A" : "rgba(255,255,255,0.25)", borderRadius: 20 }} />
-            <span style={{ position: "absolute", top: 3, [d.autoBackups ? "right" : "left"]: 3, width: 16, height: 16, background: "#fff", borderRadius: "50%" } as React.CSSProperties} />
+            <span style={{ position: "absolute", top: 3, [d.autoBackups ? "right" : "left"]: 3, width: 16, height: 16, background: color.surface, borderRadius: "50%" } as React.CSSProperties} />
           </span>
           <span style={{ fontSize: 12, fontWeight: 700, color: d.autoBackups ? "#3BD17A" : "#C9D6EE" }}>{d.autoBackups ? "ON" : "OFF"}</span>
         </button>
         {d.canManage && (
           <>
-            <button onClick={() => runBackup.mutate()} disabled={runBackup.isPending} style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: runBackup.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: runBackup.isPending ? 0.7 : 1 }}>
+            <button onClick={() => runBackup.mutate()} disabled={runBackup.isPending} style={{ display: "flex", alignItems: "center", gap: 8, background: color.surface, color: color.primary, border: "none", borderRadius: 10, padding: "11px 17px", fontSize: 13.5, fontWeight: 700, cursor: runBackup.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: runBackup.isPending ? 0.7 : 1 }}>
               <Icon name="download" size={16} /> {runBackup.isPending ? "Backing up…" : "Back up all now"}
             </button>
             <label title="Restore (merge) from a downloaded Atlas backup file"
@@ -961,13 +961,13 @@ function GuidesSection({ kind, openGuide, setOpenGuide }: {
                 {g.brand ? (
                   <span style={{ width: 38, height: 38, borderRadius: 10, background: g.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontFamily: font.head, fontSize: 12.5, fontWeight: 700 }}>{g.initials}</span>
                 ) : (
-                  <span style={{ width: 38, height: 38, borderRadius: 10, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={g.icon ?? "gear"} size={20} /></span>
+                  <span style={{ width: 38, height: 38, borderRadius: 10, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={g.icon ?? "gear"} size={20} /></span>
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 600, color: color.ink }}>{g.name}</div>
                   <div style={{ fontSize: 12, color: color.faint3 }}>{g.sub}</div>
                 </div>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "#566077", background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{g.steps.length} steps</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{g.steps.length} steps</span>
                 {g.time && <span style={{ fontSize: 12, color: color.faint3 }}>{g.time}</span>}
                 <span style={{ color: "#C2C8D4", display: "flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><Icon name="chevronDown" size={18} /></span>
               </div>

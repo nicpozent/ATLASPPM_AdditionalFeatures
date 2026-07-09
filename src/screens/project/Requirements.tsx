@@ -104,7 +104,7 @@ export function Requirements({ projectId }: { projectId: string | null }) {
               </div>
               <div style={{ fontSize: 12, color: color.subtle }}>{r.release}</div>
               <div style={{ textAlign: "right" }}>
-                {canEdit && <button onClick={() => setCrFor(r.code)} title="Raise change request" style={{ fontSize: 10.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: `1px solid ${color.border}`, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>CR</button>}
+                {canEdit && <button onClick={() => setCrFor(r.code)} title="Raise change request" style={{ fontSize: 10.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.border}`, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>CR</button>}
               </div>
             </div>
           );

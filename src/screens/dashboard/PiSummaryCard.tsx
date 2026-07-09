@@ -65,7 +65,7 @@ export function PiSummaryCard() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{active.name}</span>
         {active.key && <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint2 }}>{active.key}</span>}
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "2px 8px", borderRadius: 6 }}>{active.state}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, padding: "2px 8px", borderRadius: 6 }}>{active.state}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
         {metric(`Committed objectives${committed.length ? ` · ${doneObj} done` : ""}`, String(committed.length))}

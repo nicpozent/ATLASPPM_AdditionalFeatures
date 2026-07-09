@@ -397,7 +397,7 @@ function PiAvailability({ from, to }: { from: string; to: string }) {
                 <div style={{ fontSize: 10.5, color: color.faint3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
               </div>
               <div style={{ flex: 1, minWidth: 80 }}>
-                <div style={{ height: 10, borderRadius: 4, background: "#EEF1F6", overflow: "hidden" }} title={p.slices.map((s) => `${s.entityName} ${s.pct}%`).join(" · ") || "unallocated"}>
+                <div style={{ height: 10, borderRadius: 4, background: color.bg, overflow: "hidden" }} title={p.slices.map((s) => `${s.entityName} ${s.pct}%`).join(" · ") || "unallocated"}>
                   <div style={{ width: `${Math.min(100, p.allocated)}%`, height: "100%", background: p.allocated > 100 ? color.danger : color.primary }} />
                 </div>
               </div>

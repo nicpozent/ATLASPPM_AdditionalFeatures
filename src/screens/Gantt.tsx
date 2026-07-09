@@ -178,9 +178,9 @@ export default function Gantt() {
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 22px", borderBottom: `1px solid ${color.bg}`, flexWrap: "wrap" }}>
           {scope === "portfolio"
-            ? <span style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="layers" size={20} /></span>
+            ? <span style={{ width: 42, height: 42, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="layers" size={20} /></span>
             : scope === "program"
-            ? <span style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="folders" size={20} /></span>
+            ? <span style={{ width: 42, height: 42, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="folders" size={20} /></span>
             : <span style={{ width: 11, height: 11, borderRadius: "50%", background: color.faint3 }} />}
           <div>
             <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{scope === "portfolio" ? "Portfolio timeline" : scope === "program" ? "Program timeline" : "Project timeline"}</div>
@@ -210,7 +210,7 @@ export default function Gantt() {
 
         {/* view tabs (project/program only) */}
         {scope !== "portfolio" && (
-          <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+          <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
             {VIEW_TABS.map(([vid, label]) => {
               const active = view === vid;
               return <button key={vid} onClick={() => setView(vid)} style={{ padding: "11px 16px", marginRight: 6, border: "none", borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: active ? color.primary : "#565F73" }}>{label}</button>;
@@ -325,7 +325,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
           {canEdit && <button onClick={onAddPhase} style={addBtn}>+ Add</button>}
         </div>
         {hasWindow && (
-          <div style={{ height: 34, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: "#FBFCFE" }}>
+          <div style={{ height: 34, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: color.navy }}>Project window</span>
             <span style={{ fontSize: 10.5, color: color.faint3 }}>{startDate || "—"} → {endDate || "—"}</span>
           </div>
@@ -352,7 +352,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         ))}
         {sprints.length > 0 && (
           <>
-            <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>Sprints</div>
+            <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>Sprints</div>
             {sprints.map((s) => {
               const open = openSprints.has(s.id);
               return (
@@ -374,7 +374,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             })}
           </>
         )}
-        <div style={{ height: 72, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+        <div style={{ height: 72, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
           Milestones
           {canEdit && <button onClick={onAddMilestone} style={addBtn}>+ Add</button>}
         </div>
@@ -383,7 +383,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
         {hasWindow && (
-          <div style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA", background: "#FBFCFE", backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+          <div style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
             <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
           </div>
         )}
@@ -395,7 +395,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         </div>
         {sprints.length > 0 && (
           <div>
-            <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }} />
+            <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
             {sprints.map((s) => {
               const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
               const open = openSprints.has(s.id);
@@ -420,7 +420,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             })}
           </div>
         )}
-        <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+        <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
           {milestones.map((ms) => (
             <div key={ms.id} style={{ position: "absolute", top: 0, left: `${(ms.month + 0.5) / 12 * 100}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
               <span style={{ display: "block", width: 16, height: 16, background: "#E0A100", transform: "rotate(45deg)", margin: "10px auto 0", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.22)", cursor: canEdit ? "pointer" : "default" }}
@@ -494,9 +494,9 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
           const empty = !hasWindow && r.phases.length === 0 && (r.sprints?.length ?? 0) === 0;
           return (
             <div key={r.projectId}>
-              <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 12, fontWeight: 700, color: color.navy, background: "#F6F8FC", borderBottom: "1px solid #EEF1F6" }}>{r.projectName}</div>
+              <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 12, fontWeight: 700, color: color.navy, background: color.surfaceAlt, borderBottom: "1px solid #EEF1F6" }}>{r.projectName}</div>
               {hasWindow && (
-                <div style={{ height: 30, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: "#FBFCFE" }}>
+                <div style={{ height: 30, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: color.navy }}>Project window</span>
                   <span style={{ fontSize: 10, color: color.faint3 }}>{r.startDate || "—"} → {r.endDate || "—"}</span>
                 </div>
@@ -529,9 +529,9 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
             const empty = !hasWindow && r.phases.length === 0 && (r.sprints?.length ?? 0) === 0;
             return (
               <div key={r.projectId}>
-                <div style={{ height: 30, borderBottom: "1px solid #EEF1F6", background: "#F6F8FC" }} />
+                <div style={{ height: 30, borderBottom: "1px solid #EEF1F6", background: color.surfaceAlt }} />
                 {hasWindow && (
-                  <div style={{ position: "relative", height: 30, borderBottom: "1px solid #F4F6FA", background: "#FBFCFE" }}>
+                  <div style={{ position: "relative", height: 30, borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
                     <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barStyle(Math.min(r.startMonth!, r.endMonth!), Math.max(r.startMonth!, r.endMonth!)), top: 6, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
                   </div>
                 )}
@@ -550,7 +550,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
             );
           })}
         </div>
-        <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+        <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
           {milestones.map((ms) => (
             <div key={ms.id} style={{ position: "absolute", top: 0, left: `${(ms.month + 0.5) / 12 * 100}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
               <span style={{ display: "block", width: 14, height: 14, background: "#E0A100", transform: "rotate(45deg)", margin: "12px auto 0", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.22)" }} />
@@ -592,7 +592,7 @@ function ResourceView({ projectId }: { projectId: string }) {
               <div style={{ fontSize: 10.5, color: color.faint3 }}>{p.role}</div>
             </div>
           </div>
-          <div style={{ height: 14, background: "#EEF1F6", borderRadius: 7, overflow: "hidden", display: "flex", position: "relative" }}>
+          <div style={{ height: 14, background: color.bg, borderRadius: 7, overflow: "hidden", display: "flex", position: "relative" }}>
             {seg(p.opsPct, "#8A93A6")}{seg(p.projectPct, "#0F6CBD")}{seg(p.productPct, "#7A3FB0")}
             {p.util > 100 && <span style={{ position: "absolute", right: 4, top: -1, fontSize: 9, fontWeight: 700, color: "#A1282B" }}>over</span>}
           </div>
@@ -636,11 +636,11 @@ function SprintView({ projectId }: { projectId: string }) {
         const done = items.filter((t) => t.status === "Done").length;
         return (
           <div key={sprint} style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: "#F6F8FC", borderBottom: `1px solid ${color.bg}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: color.surfaceAlt, borderBottom: `1px solid ${color.bg}` }}>
               <span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 600, color: color.navy }}>{sprint}</span>
               <span style={{ fontSize: 11.5, color: color.faint2 }}>{items.length} task{items.length === 1 ? "" : "s"} · {done} done</span>
               <div style={{ flex: 1 }} />
-              <div style={{ width: 120, height: 6, background: "#EEF1F6", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ width: 120, height: 6, background: color.bg, borderRadius: 4, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${items.length ? Math.round(done / items.length * 100) : 0}%`, background: "#15A34A" }} />
               </div>
             </div>
@@ -685,8 +685,8 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
   return (
     <div>
       {/* status filter */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", padding: "12px 22px", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A", marginRight: 2 }}>Status</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", padding: "12px 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle, marginRight: 2 }}>Status</span>
         {(["all", ...statuses]).map((s) => {
           const active = statusFilter === s;
           const c = s === "all" ? { bg: color.primary, border: color.primary } : (TASK_BAR[s] ?? TASK_BAR["To Do"]);
@@ -707,7 +707,7 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
             <div key={t.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
               <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
               <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
+              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
             </div>
           ))}
         </div>
@@ -791,6 +791,6 @@ function PhaseModal({ title, phase, onClose, onSave, pending }: { title: string;
 function Legend({ swatch, children }: { swatch: React.ReactNode; children: React.ReactNode }) {
   return <span style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch}{children}</span>;
 }
-const selectStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.primary, background: "#fff", cursor: "pointer", maxWidth: 280 };
+const selectStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.primary, background: color.surface, cursor: "pointer", maxWidth: 280 };
 const addBtn: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", textTransform: "none", letterSpacing: 0 };
-const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
+const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };

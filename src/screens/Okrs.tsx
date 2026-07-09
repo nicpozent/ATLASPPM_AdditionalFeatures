@@ -55,7 +55,7 @@ function LinkPicker({ type, id, onChange }: { type: string; id: string; onChange
     </div>
   );
 }
-const okrSelectStyle: React.CSSProperties = { fontSize: 13.5, padding: "8px 10px", border: `1px solid ${color.border2}`, borderRadius: 8, background: "#fff", color: color.text, fontFamily: "inherit", outline: "none" };
+const okrSelectStyle: React.CSSProperties = { fontSize: 13.5, padding: "8px 10px", border: `1px solid ${color.border2}`, borderRadius: 8, background: color.surface, color: color.text, fontFamily: "inherit", outline: "none" };
 
 // Manual RAG health (set by PMO / Platform Admin).
 const RAG: Record<string, { label: string; ink: string; tint: string; dot: string }> = {
@@ -178,7 +178,7 @@ export default function Okrs() {
           padding: "56px 24px", textAlign: "center",
         }}>
           <div style={{
-            width: 46, height: 46, borderRadius: 12, background: "#EEF3FB", color: color.primary,
+            width: 46, height: 46, borderRadius: 12, background: color.primaryTint, color: color.primary,
             display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px",
           }}><Icon name="target" size={22} /></div>
           <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{okrStatus === "Completed" ? "No completed objectives yet" : "No objectives yet"}</div>
@@ -197,7 +197,7 @@ export default function Okrs() {
             return (
               <div key={o.id} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 13, padding: "18px 22px", borderBottom: `1px solid ${color.bg}` }}>
-                  <span style={{ width: 40, height: 40, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                  <span style={{ width: 40, height: 40, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                     <Icon name="target" size={20} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -222,7 +222,7 @@ export default function Okrs() {
                     <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: objInk(p) }}>{p}%</div>
                     <div style={{ fontSize: 10.5, color: color.faint3 }}>objective</div>
                   </div>
-                  {canEdit && <button onClick={() => setEditObj(o)} title="Edit objective" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
+                  {canEdit && <button onClick={() => setEditObj(o)} title="Edit objective" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
                   {canEdit && (
                     (o.status ?? "Active") === "Completed"
                       ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
@@ -339,7 +339,7 @@ export default function Okrs() {
             <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px" }}>This can't be undone. To keep the record, mark it complete instead.</div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
-            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "9px 16px", borderRadius: 9, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
           </div>
         </ModalShell>
@@ -465,7 +465,7 @@ function ModalShell({ title, width, onClose, children }: { title: string; width:
   return (
     <div>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(17,22,58,0.42)", zIndex: 190 }} />
-      <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: `min(${width}px,94vw)`, background: "#fff", borderRadius: 14, boxShadow: "0 30px 80px rgba(20,26,60,0.35)", zIndex: 200, overflow: "hidden" }}>
+      <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: `min(${width}px,94vw)`, background: color.surface, borderRadius: 14, boxShadow: "0 30px 80px rgba(20,26,60,0.35)", zIndex: 200, overflow: "hidden" }}>
         <div style={{ padding: "18px 20px", borderBottom: `1px solid ${color.bg}`, fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{title}</div>
         {children}
       </div>
@@ -475,11 +475,11 @@ function ModalShell({ title, width, onClose, children }: { title: string; width:
 function ModalActions({ onClose, onSave, saveLabel, disabled }: { onClose: () => void; onSave: () => void; saveLabel: string; disabled?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
-      <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: "#fff", border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+      <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
       <button onClick={onSave} disabled={disabled} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 16px", borderRadius: 9, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit" }}>{saveLabel}</button>
     </div>
   );
 }
 function Label({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>{children}</label>;
 }

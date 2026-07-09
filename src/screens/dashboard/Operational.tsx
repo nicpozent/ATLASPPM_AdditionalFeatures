@@ -69,7 +69,7 @@ export function Operational({ d, onProject }: { d: DashboardData; onProject: (id
                     </div>
                     <div style={{ display: "flex", gap: 7 }}>
                       <button style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#15A34A", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Approve</button>
-                      <button style={{ fontSize: 12, fontWeight: 600, color: color.faint, background: "#fff", border: `1px solid ${color.border2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Decline</button>
+                      <button style={{ fontSize: 12, fontWeight: 600, color: color.faint, background: color.surface, border: `1px solid ${color.border2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Decline</button>
                     </div>
                   </div>
                 ))}

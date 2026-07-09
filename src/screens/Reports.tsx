@@ -231,7 +231,7 @@ export default function Reports() {
         {REPORT_TYPES.map((r) => (
           <div key={r.key} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 19 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 13, marginBottom: 14 }}>
-              <span style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+              <span style={{ width: 42, height: 42, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                 <Icon name={r.icon} size={20} />
               </span>
               <div>
@@ -287,4 +287,4 @@ export default function Reports() {
   );
 }
 
-const selStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" };
+const selStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" };

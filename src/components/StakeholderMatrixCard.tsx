@@ -83,7 +83,7 @@ export function StakeholderMatrixCard({ scopeType, scopeId }: { scopeType: "proj
                     <span style={{ fontSize: 11, color: color.faint2 }}>{s.role} · {q.label}</span>
                     {canEdit && (
                       <button onClick={() => remove.mutate(s.id)} disabled={remove.isPending} aria-label={`Remove ${s.name}`}
-                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
                     )}
                   </div>
                 );

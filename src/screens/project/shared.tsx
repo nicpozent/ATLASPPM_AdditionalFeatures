@@ -7,7 +7,7 @@ import { color, font } from "@/theme";
 export function PdField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 13 }}>
-      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   );
@@ -49,6 +49,6 @@ export function Meta({ label, children }: { label: string; children: React.React
 
 
 export function DecLabel({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>{children}</label>;
 }
 

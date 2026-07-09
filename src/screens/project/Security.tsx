@@ -276,7 +276,7 @@ export function Security({ projectId }: { projectId: string | null }) {
       <Card padding={0} style={{ overflow: "hidden", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
           <span style={{ flex: 1, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Security review gates</span>
-          {canEdit && <button onClick={() => setGateModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add gate</button>}
+          {canEdit && <button onClick={() => setGateModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add gate</button>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1.1fr 0.9fr 0.9fr", padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
           <div>Gate</div><div>Type</div><div>Reviewer</div><div>Date</div><div>Status</div>
@@ -301,7 +301,7 @@ export function Security({ projectId }: { projectId: string | null }) {
       <Card padding={0} style={{ overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
           <span style={{ flex: 1, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Control evidence register</span>
-          {canEdit && <button onClick={() => setAddOpen(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add control</button>}
+          {canEdit && <button onClick={() => setAddOpen(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add control</button>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: SEC_COLS, padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
           <div>ID</div><div>Control</div><div>Framework</div><div>Evidence</div><div>Owner</div><div>Status</div>
@@ -479,9 +479,9 @@ function SecTextField({ value, disabled, placeholder, onCommit }: { value: strin
 
 function Toggle({ on, label, disabled, onClick }: { on: boolean; label: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <div onClick={() => !disabled && onClick()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, padding: "9px 14px", borderRadius: 9, border: `1px solid ${color.border2}`, background: "#F7F9FC", color: "#3A4358", cursor: disabled ? "default" : "pointer" }}>
+    <div onClick={() => !disabled && onClick()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, padding: "9px 14px", borderRadius: 9, border: `1px solid ${color.border2}`, background: color.surfaceAlt, color: "#3A4358", cursor: disabled ? "default" : "pointer" }}>
       <span style={{ width: 34, height: 19, borderRadius: 20, background: on ? "#15A34A" : "#CBD2DE", position: "relative", flex: "none", transition: "background .15s" }}>
-        <span style={{ position: "absolute", top: 2, left: on ? 17 : 2, width: 15, height: 15, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+        <span style={{ position: "absolute", top: 2, left: on ? 17 : 2, width: 15, height: 15, borderRadius: "50%", background: color.surface, transition: "left .15s" }} />
       </span>
       {label}
     </div>

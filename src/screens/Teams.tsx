@@ -52,12 +52,12 @@ export default function Teams() {
           {teams.map((t) => (
             <Card key={t.key} padding={0} style={{ overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
-                <span style={{ width: 34, height: 34, borderRadius: 9, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="users" size={18} /></span>
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="users" size={18} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 600, color: color.navy }}>{t.label}</span>
                     {t.isSelf && <span style={{ fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>}
-                    {!t.isSelf && !data?.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Reports to you</span>}
+                    {!t.isSelf && !data?.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Reports to you</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: color.faint3 }}>{t.memberCount} member{t.memberCount === 1 ? "" : "s"} · {t.groups.length} group{t.groups.length === 1 ? "" : "s"}</div>
                 </div>
@@ -168,7 +168,7 @@ function LaborRateCard() {
   return (
     <Card padding={0} style={{ overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
-        <span style={{ width: 34, height: 34, borderRadius: 9, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
+        <span style={{ width: 34, height: 34, borderRadius: 9, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 600, color: color.navy }}>Internal-labour rate card</div>
           <div style={{ fontSize: 11.5, color: color.faint3 }}>Average blended cost / hour by discipline and seniority</div>
@@ -218,7 +218,7 @@ function LaborRateCard() {
       </div>
 
       {/* Calculator */}
-      <div style={{ borderTop: `1px solid ${color.bg}`, background: "#FBFCFE", padding: "16px 22px" }}>
+      <div style={{ borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt, padding: "16px 22px" }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: color.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Cost calculator</div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <CalcField label="Discipline">
@@ -248,7 +248,7 @@ function LaborRateCard() {
   );
 }
 
-const selStyle: CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: color.text };
+const selStyle: CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", background: color.surface, color: color.text };
 function CalcField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -348,7 +348,7 @@ function SkillsMatrix() {
                       {canEdit ? (
                         <select value={lvl} aria-label={`${p} · ${s.name}`}
                           onChange={(e) => setRating.mutate({ skillId: s.id, person: p, level: Number(e.target.value) })}
-                          style={{ width: "100%", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 4px", fontSize: 12.5, fontWeight: 700, color: levelColor(lvl), background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+                          style={{ width: "100%", border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 4px", fontSize: 12.5, fontWeight: 700, color: levelColor(lvl), background: color.surface, cursor: "pointer", fontFamily: "inherit" }}>
                           {LEVELS.map((label, i) => <option key={i} value={i}>{label}</option>)}
                         </select>
                       ) : (
@@ -364,10 +364,10 @@ function SkillsMatrix() {
       )}
       <div style={{ display: "flex", gap: 14, padding: "12px 22px", flexWrap: "wrap", borderTop: `1px solid ${color.bg}` }}>
         <span style={{ fontSize: 11, color: color.faint3 }}>Scale:</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>0 None</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>1–2 Working</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>3 Proficient</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>4 Expert</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>0 None</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>1–2 Working</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>3 Proficient</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>4 Expert</span>
       </div>
     </Card>
   );

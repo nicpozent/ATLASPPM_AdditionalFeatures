@@ -88,7 +88,7 @@ export function Sidebar({ drawer = false, onNavigate }: { drawer?: boolean; onNa
       {/* Brand */}
       <div style={{ padding: "18px 16px 15px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{
-          background: "#fff", borderRadius: 11, padding: "12px 14px",
+          background: color.surface, borderRadius: 11, padding: "12px 14px",
           display: "flex", flexDirection: "column", alignItems: "center", gap: 9,
         }}>
           <img src="/assets/birgma-logo-trim.png" alt="Birgma" style={{ height: 18, width: "auto", display: "block" }} />

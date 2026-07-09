@@ -39,7 +39,7 @@ const PALETTE: { kind: BlockKind; label: string; icon: string }[] = [
 // ---- small style helpers -------------------------------------------------
 const inpStyle: React.CSSProperties = {
   width: "100%", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 9px",
-  fontSize: 13, fontFamily: "inherit", color: color.text, outline: "none", marginBottom: 8, background: "#fff",
+  fontSize: 13, fontFamily: "inherit", color: color.text, outline: "none", marginBottom: 8, background: color.surface,
 };
 const txtStyle: React.CSSProperties = {
   width: "100%", minHeight: 60, resize: "vertical", border: `1px solid ${color.border2}`, borderRadius: 8,
@@ -54,13 +54,13 @@ function BlockWrap({ editing, extra, onRemove, children }: {
 }) {
   return (
     <div style={{
-      position: "relative", background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16,
+      position: "relative", background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16,
       padding: 18, breakInside: "avoid", marginBottom: 16, boxShadow: "0 1px 2px rgba(20,26,60,0.04)", ...extra,
     }}>
       {editing && (
         <button onClick={onRemove} title="Remove" style={{
           position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: 6,
-          border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer",
+          border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer",
           fontSize: 14, lineHeight: 1, zIndex: 2,
         }}>×</button>
       )}
@@ -291,7 +291,7 @@ export default function News() {
       </div>
 
       {/* PMO editor toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap", background: "#fff", border: `1px solid ${color.border}`, borderRadius: 13, padding: "13px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap", background: color.surface, border: `1px solid ${color.border}`, borderRadius: 13, padding: "13px 16px" }}>
         <span style={{ fontSize: 12.5, fontWeight: 700, color: color.navy }}>PMO editor</span>
         <button onClick={() => setEdit((e) => !e)} disabled={!canEdit}
           title={canEdit ? undefined : "Your role can't edit the news wall"} style={{
@@ -330,11 +330,11 @@ export default function News() {
       {/* add-block palette (edit mode only) */}
       {edit && (
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 18 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#56607A" }}>Add block:</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: color.subtle }}>Add block:</span>
           {PALETTE.map((ab) => (
             <button key={ab.kind} onClick={() => addBlock.mutate(ab.kind)} style={{
               display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.primary,
-              background: "#fff", border: "1px solid #CFE0F4", padding: "8px 12px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
+              background: color.surface, border: "1px solid #CFE0F4", padding: "8px 12px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
             }}>
               <Icon name={ab.icon} size={16} /> {ab.label}
             </button>
@@ -344,7 +344,7 @@ export default function News() {
 
       {/* the wall */}
       {blocks.length === 0 ? (
-        <div style={{ background: "#fff", border: `1px dashed ${color.border2}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3 }}>
+        <div style={{ background: color.surface, border: `1px dashed ${color.border2}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: color.faint2 }}>
             <Icon name="megaphone" size={26} strokeWidth={1.6} />
           </div>

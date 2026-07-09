@@ -165,7 +165,7 @@ export function Select({ style, onFocus, onBlur, children, ...rest }: React.Sele
   );
 }
 
-const LABEL_STYLE: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
+const LABEL_STYLE: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
 
 // Label + control wrapper that associates the two via htmlFor/id (accessibility).
 export function Field({ label, children, style, labelStyle }: {

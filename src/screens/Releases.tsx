@@ -63,7 +63,7 @@ const GRID = "0.6fr 1.7fr 1.2fr 0.9fr 0.9fr 1fr 0.8fr 0.9fr 44px";
 const selectStyle: React.CSSProperties = {
   border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px",
   fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text,
-  background: "#fff", cursor: "pointer",
+  background: color.surface, cursor: "pointer",
 };
 
 function PillBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -215,7 +215,7 @@ export default function Releases() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.name}</span>
-                    {r.archived && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
+                    {r.archived && <span style={{ fontSize: 9.5, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
                   </div>
                   <div style={{ fontSize: 11, color: color.faint3 }}>{r.reqs} reqs · {r.crs} CRs · {r.owner}</div>
                 </div>
@@ -224,10 +224,10 @@ export default function Releases() {
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#0C5798", textTransform: "uppercase", letterSpacing: "0.03em" }}>{r.scope}</div>
                 </div>
                 <div style={{ fontSize: 12.5, color: color.textMuted }}>{r.date}</div>
-                <div><span style={{ fontSize: 11, fontWeight: 600, color: color.textMuted, background: "#EEF1F6", padding: "3px 9px", borderRadius: 6 }}>{r.env}</span></div>
+                <div><span style={{ fontSize: 11, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 9px", borderRadius: 6 }}>{r.env}</span></div>
                 <div style={{ paddingRight: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ flex: 1, height: 6, background: "#EEF1F6", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ flex: 1, height: 6, background: color.bg, borderRadius: 4, overflow: "hidden" }}>
                       <div style={{ height: "100%", width: `${r.progress}%`, background: "#0F6CBD", borderRadius: 4 }} />
                     </div>
                     <span style={{ fontFamily: font.mono, fontSize: 11, fontWeight: 700, color: color.subtle }}>{r.progress}%</span>
@@ -298,7 +298,7 @@ export default function Releases() {
 }
 
 function RelLbl({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, margin: "12px 0 5px" }}>{children}</label>;
 }
 
 interface LinkOpt { id: string; name: string }

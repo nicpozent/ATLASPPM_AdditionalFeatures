@@ -168,10 +168,10 @@ export default function Portfolio() {
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                       {p.archived && (
-                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>
+                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>
                       )}
                       {!p.archived && p.status === "completed" && (
-                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Completed</span>
+                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Completed</span>
                       )}
                       {p.blockerCount > 0 && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flex: "none", color: "#D13438", background: "#FBE7E8", borderRadius: 6, padding: "1px 6px 1px 4px", fontSize: 10.5, fontWeight: 700 }}><Icon name="alert" size={12} />{p.blockerCount}</span>
@@ -567,7 +567,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 13 }}>
-      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>{label}</label>
       {children}
     </div>
   );

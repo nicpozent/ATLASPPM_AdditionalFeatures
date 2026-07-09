@@ -114,7 +114,7 @@ export default function Demands() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 13, padding: "0 3px" }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.color }} />
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{s.label}</span>
-                <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.faint, background: "#fff", border: `1px solid ${color.border}`, padding: "0 7px", borderRadius: 20 }}>{items.length}</span>
+                <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.faint, background: color.surface, border: `1px solid ${color.border}`, padding: "0 7px", borderRadius: 20 }}>{items.length}</span>
                 <div style={{ flex: 1 }} />
                 {maySubmit && <span onClick={() => setModal(true)} style={{ color: color.faint3, display: "flex", cursor: "pointer" }}><Icon name="plus" size={16} /></span>}
               </div>
@@ -129,7 +129,7 @@ export default function Demands() {
                       onDragStart={(e) => { dragId.current = d.id; e.dataTransfer.effectAllowed = "move"; }}
                       onDragEnd={() => { dragId.current = null; setOverStage(null); }}
                       onClick={() => setDetailId(d.id)}
-                      style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
+                      style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
                         <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{d.id}</span>
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: pr.ink, background: pr.tint, padding: "2px 8px", borderRadius: 20 }}>{d.priority}</span>

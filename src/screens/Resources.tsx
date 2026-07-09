@@ -125,15 +125,15 @@ export default function Resources() {
         <button
           onClick={() => { const y = new Date().getFullYear(); apiDownload(`/resources/allocation-report.xlsx?period=${period}&from=${y}-01-01&to=${y}-12-31`, `atlas-allocation-${period}.xlsx`); }}
           title={`Download this year's allocation as a colour-graded Excel, bucketed by ${period}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#fff", border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
           <Icon name="download" size={15} /> Export .xlsx
         </button>
       </div>
 
       {/* period selector + filters */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: "#56607A" }}>Period:</span>
-        <div style={{ display: "inline-flex", background: "#fff", border: `1px solid ${color.border3}`, borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: color.subtle }}>Period:</span>
+        <div style={{ display: "inline-flex", background: color.surface, border: `1px solid ${color.border3}`, borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
           {PERIODS.map((p) => {
             const active = period === p.id;
             return (
@@ -148,7 +148,7 @@ export default function Resources() {
           Utilisation = Ops % + Project % + Product % · over 100% flags over-allocation. Project % is set in By Project; Product % in By Product.
         </span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A" }}>Filter</span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Filter</span>
         <select value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Filter by person" style={selectStyle}>
           <option value="all">All people</option>
           {resources.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
@@ -358,10 +358,10 @@ function SkillsMatrix() {
       </div>
       <div style={{ display: "flex", gap: 14, padding: "13px 22px", flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, color: color.faint3 }}>Scale:</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>0 None</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>1–2 Working</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>3 Proficient</span>
-        <span style={{ fontSize: 11, color: "#566077" }}>4 Expert</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>0 None</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>1–2 Working</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>3 Proficient</span>
+        <span style={{ fontSize: 11, color: color.subtle }}>4 Expert</span>
       </div>
     </div>
   );
@@ -390,7 +390,7 @@ function UnonboardedPanel({ people }: { people: Unonboarded[] }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {people.map((p) => (
-          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 10, padding: "8px 12px" }}>
+          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, padding: "8px 12px" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: color.text, flex: "none" }}>{p.name}</span>
             <span style={{ flex: 1, fontSize: 11.5, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.projects.join(", ")}</span>
             {canOnboard

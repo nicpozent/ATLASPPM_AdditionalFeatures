@@ -133,5 +133,5 @@ function SubmitDemandModal({ onClose, onSubmit, submitting }: { onClose: () => v
 }
 
 function Lbl({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, margin: "12px 0 5px" }}>{children}</label>;
 }

@@ -166,7 +166,7 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
 
           {/* brand marks */}
           <div style={{
-            background: "#fff", borderRadius: 14, padding: "18px 22px",
+            background: color.surface, borderRadius: 14, padding: "18px 22px",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 20,
             boxShadow: "0 1px 3px rgba(17,22,58,0.06)", border: `1px solid ${color.border}`,
           }}>
@@ -177,7 +177,7 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
 
           {/* sign-in card */}
           <div style={{
-            background: "#fff", borderRadius: 16, padding: "28px 26px 26px",
+            background: color.surface, borderRadius: 16, padding: "28px 26px 26px",
             boxShadow: "0 1px 3px rgba(17,22,58,0.06)", border: `1px solid ${color.border}`,
           }}>
             <h2 style={{ margin: 0, fontFamily: font.head, fontSize: 22, fontWeight: 700, color: color.ink }}>

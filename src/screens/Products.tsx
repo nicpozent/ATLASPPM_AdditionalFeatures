@@ -106,7 +106,7 @@ export default function Products() {
         ))}
       </div>
       {shown.length === 0 ? (
-        <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
+        <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
           {products.length === 0 ? "No products yet. Products appear here once synced from Jira or Azure DevOps." : `No ${pstatus.toLowerCase()} products.`}
         </div>
       ) : (
@@ -116,7 +116,7 @@ export default function Products() {
             const pts = p.tasks.reduce((s, t) => s + (t.points || 0), 0);
             const src = SOURCE_META[p.source];
             return (
-              <div key={p.id} onClick={() => setSelectedId(p.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer" }}>
+              <div key={p.id} onClick={() => setSelectedId(p.id)} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 13 }}>
                   <span style={boxBadge(40)}><Icon name="box" size={20} /></span>
                   <div style={{ flex: 1 }}>
@@ -153,7 +153,7 @@ export default function Products() {
 }
 
 function Lbl({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, margin: "12px 0 5px" }}>{children}</label>;
 }
 
 function NewProductModal({ onClose, onCreate, submitting }: {
@@ -251,7 +251,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
     return ["Unassigned", ...Array.from(set)];
   }, [product.releases, tasks]);
 
-  const sectionCard: React.CSSProperties = { background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
+  const sectionCard: React.CSSProperties = { background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
   const sectionTitle: React.CSSProperties = { padding: "16px 22px 13px", fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy };
   const taskCols = "110px minmax(200px,2fr) 100px 50px 140px 150px";
 
@@ -260,7 +260,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
       <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: color.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", marginBottom: 14, padding: 0 }}>← All products</button>
 
       {/* header */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 22, marginBottom: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: 22, marginBottom: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
           <span style={boxBadge(44)}><Icon name="box" size={22} /></span>
           <div style={{ flex: 1 }}>
@@ -273,13 +273,13 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
           ); })()}
           {mayManage && (
             <select value={product.status ?? "Active"} onChange={(e) => setStatus.mutate(e.target.value)} title="Lifecycle status — products aren't deleted"
-              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
               {["Active", "Retired", "Replaced"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
           {mayManage ? (
             <select value={product.dept ?? ""} onChange={(e) => updateProduct.mutate({ dept: e.target.value })} title="Owning department"
-              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+              style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
               <option value="">Dept: none</option>
               {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -341,7 +341,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
 
 
       {/* tasks → release mapping */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={sectionTitle}>Tasks → release mapping</div>
         <div style={{ overflowX: "auto" }}>
           <div style={{ display: "grid", gridTemplateColumns: taskCols, minWidth: 760, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
@@ -362,7 +362,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
                   style={{ width: "100%", fontSize: 11.5, color: color.textMuted, fontFamily: font.mono, border: `1px solid ${color.border2}`, borderRadius: 6, padding: "4px 6px", outline: "none" }} /></div>
                 <div><select value={t.mappedRelease}
                   onChange={(e) => setTasks((l) => l.map((x, xi) => (xi === i ? { ...x, mappedRelease: e.target.value } : x)))}
-                  style={{ width: "100%", fontSize: 12, fontWeight: 600, color: color.text, border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 7px", fontFamily: "inherit", cursor: "pointer", background: "#fff" }}>
+                  style={{ width: "100%", fontSize: 12, fontWeight: 600, color: color.text, border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 7px", fontFamily: "inherit", cursor: "pointer", background: color.surface }}>
                   {relOpts.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select></div>
               </div>
@@ -372,7 +372,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
       </div>
 
       {/* team vacations */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, marginTop: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, marginTop: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 6 }}>Team vacations</div>
         <div style={{ fontSize: 11.5, color: color.faint2, marginBottom: 14 }}>Absences for resources on this product</div>
         <div style={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No absences recorded.</div>
@@ -426,7 +426,7 @@ function ProductTimeline({ startDate, endDate, releases, canManage, onDates }: {
   const s = Date.parse(startDate), e = Date.parse(endDate);
   const hasSpan = !isNaN(s) && !isNaN(e) && e > s;
   const dated = releases.map((r) => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => (isNaN(a.t) ? 0 : a.t) - (isNaN(b.t) ? 0 : b.t));
-  const card: React.CSSProperties = { background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
+  const card: React.CSSProperties = { background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 22px 13px" }}>
@@ -500,7 +500,7 @@ function ProductTeamSection({ productId }: { productId: string }) {
     onSuccess: refresh,
   });
 
-  const sectionCard: React.CSSProperties = { background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
+  const sectionCard: React.CSSProperties = { background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 18 };
   const t = data;
   const canEdit = !!(t?.canAllocate || t?.canAssignTeam);
   const assignKey = (m: Assignable) => `${m.email}|${m.name}|${m.teamKey}`;
@@ -512,12 +512,12 @@ function ProductTeamSection({ productId }: { productId: string }) {
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, flex: 1 }}>Product team &amp; allocation</div>
         {t && (t.canAssignTeam ? (
           <select value={t.teamKey} onChange={(e) => setTeam.mutate(e.target.value)} title="Owning delivery team"
-            style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+            style={{ border: `1px solid ${color.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
             <option value="">No team assigned</option>
             {t.teamOptions.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
         ) : t.teamLabel ? (
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: "#EEF3FB", borderRadius: 8, padding: "5px 11px" }}><Icon name="users" size={14} /> {t.teamLabel}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, borderRadius: 8, padding: "5px 11px" }}><Icon name="users" size={14} /> {t.teamLabel}</span>
         ) : null)}
       </div>
 
@@ -555,7 +555,7 @@ function ProductTeamSection({ productId }: { productId: string }) {
             {t.canAllocate && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}`, flexWrap: "wrap" }}>
                 <select value={pick} onChange={(e) => setPick(e.target.value)}
-                  style={{ flex: 1, minWidth: 200, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 12.5, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer" }}>
+                  style={{ flex: 1, minWidth: 200, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 10px", fontSize: 12.5, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" }}>
                   <option value="">{t.assignable.length ? "Add a member from your teams…" : "No unallocated members in your teams"}</option>
                   {t.assignable.map((m) => <option key={assignKey(m)} value={assignKey(m)}>{m.name}{m.jobTitle ? ` — ${m.jobTitle}` : ""} · {m.teamLabel}</option>)}
                 </select>
@@ -575,5 +575,5 @@ function ProductTeamSection({ productId }: { productId: string }) {
 }
 
 function boxBadge(size: number): React.CSSProperties {
-  return { width: size, height: size, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
+  return { width: size, height: size, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 }

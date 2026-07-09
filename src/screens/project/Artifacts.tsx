@@ -129,7 +129,7 @@ function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: 
             onChange={(e) => changeStatus.mutate(e.target.value)}
             style={{ width: "auto", fontSize: 12, fontWeight: 600, color: sc.ink, background: sc.tint, borderColor: "transparent", padding: "4px 8px" }}
           >
-            {ARTIFACT_STATUSES.map((s) => <option key={s} value={s} style={{ color: color.ink, background: "#fff" }}>{s}</option>)}
+            {ARTIFACT_STATUSES.map((s) => <option key={s} value={s} style={{ color: color.ink, background: color.surface }}>{s}</option>)}
           </Select>
         ) : (
           <span style={{ fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 11px", borderRadius: 20 }}>{artifact.status}</span>
@@ -153,7 +153,7 @@ function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: 
         </div>
       )}
       {canEdit && (
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FB", border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 13px", cursor: upload.isPending ? "default" : "pointer" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 14, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 13px", cursor: upload.isPending ? "default" : "pointer" }}>
           <Icon name="paperclip" size={15} /> {upload.isPending ? "Uploading…" : "Upload new version"}
           <input type="file" style={{ display: "none" }} disabled={upload.isPending} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ""; }} />
         </label>

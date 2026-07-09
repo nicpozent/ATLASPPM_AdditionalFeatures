@@ -70,6 +70,6 @@ export default function Dashboard() {
 }
 
 const heroBtn: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8, background: "#fff", border: `1px solid ${color.border2}`,
+  display: "flex", alignItems: "center", gap: 8, background: color.surface, border: `1px solid ${color.border2}`,
   color: color.text, borderRadius: 9, padding: "10px 15px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
 };
