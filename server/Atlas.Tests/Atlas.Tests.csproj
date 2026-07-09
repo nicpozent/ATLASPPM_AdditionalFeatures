@@ -18,7 +18,7 @@
     <!-- EF Core 9 references System.Text.Json 9.0.x; the ASP.NET Core 8 test
          host pulls 8.0.x. Pin 9.0.x here so the reference to Atlas.Api (built
          against STJ 9) unifies instead of failing with CS1705. -->
-    <PackageReference Include="System.Text.Json" Version="9.0.9" />
+    <PackageReference Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Api.csproj" />
