@@ -7,7 +7,8 @@ public record UpdateSecurityProfileReq(
     string? Classification, string? Residency, string? Subjects, string? Retention,
     bool? PersonalData, bool? SpecialCategory, bool? AutomatedDecisions, bool? CardholderData,
     bool? Gdpr, bool? Pci, bool? Iso, bool? AiAct, bool? Soc2, bool? Nis2,
-    bool? Dpp, bool? Ppwr, bool? Eudr);
+    bool? Dpp, bool? Ppwr, bool? Eudr,
+    string? AiSystemName, string? AiRiskTier, bool? AiAnnexIii, bool? AiHumanOversight, bool? AiTransparency);
 public record CreateSecControlReq(string Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 public record UpdateSecControlReq(string? Control, string? Framework, string? Evidence, string? Owner, string? Status, string? Description, string? Reason);
 public record CreateReviewGateReq(string Name, string? Type, string? Reviewer, string? Status, string? Date, string? Note);
@@ -26,6 +27,8 @@ public static class Security
     static readonly string[] ControlStatuses = { "Planned", "Partial", "Implemented", "Archived" };
     static readonly string[] GateTypes = { "Security", "Architecture", "Privacy", "Threat model", "Data protection" };
     static readonly string[] GateStatuses = { "Scheduled", "Passed", "Failed", "Waived", "Not required" };
+    // EU AI Act risk tiers (empty = unclassified). Order = increasing risk.
+    static readonly string[] AiRiskTiers = { "", "minimal", "limited", "high", "prohibited" };
 
     static async Task<SecurityProfile> EnsureAsync(AtlasDbContext db, string projectId)
     {
@@ -42,7 +45,8 @@ public static class Security
     static SecurityProfileDto ToDto(SecurityProfile p) => new(
         p.Classification, p.Residency, p.Subjects, p.Retention,
         p.PersonalData, p.SpecialCategory, p.AutomatedDecisions, p.CardholderData,
-        p.Gdpr, p.Pci, p.Iso, p.AiAct, p.Soc2, p.Nis2, p.Dpp, p.Ppwr, p.Eudr);
+        p.Gdpr, p.Pci, p.Iso, p.AiAct, p.Soc2, p.Nis2, p.Dpp, p.Ppwr, p.Eudr,
+        p.AiSystemName, p.AiRiskTier, p.AiAnnexIii, p.AiHumanOversight, p.AiTransparency);
 
     public static void MapSecurityEndpoints(this RouteGroupBuilder api)
     {
@@ -79,6 +83,11 @@ public static class Security
             if (req.Dpp is { } dpp) p.Dpp = dpp;
             if (req.Ppwr is { } ppwr) p.Ppwr = ppwr;
             if (req.Eudr is { } eudr) p.Eudr = eudr;
+            if (req.AiSystemName is not null) p.AiSystemName = req.AiSystemName.Trim();
+            if (req.AiRiskTier is not null && AiRiskTiers.Contains(req.AiRiskTier)) p.AiRiskTier = req.AiRiskTier;
+            if (req.AiAnnexIii is { } an) p.AiAnnexIii = an;
+            if (req.AiHumanOversight is { } ho) p.AiHumanOversight = ho;
+            if (req.AiTransparency is { } tr) p.AiTransparency = tr;
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Security", "Updated security profile", id));
             await db.SaveChangesAsync();
             return Results.Ok(ToDto(p));

@@ -127,9 +127,37 @@ public static class Risks
                         "ISO 27001 is in scope with missing or partial Annex A controls.", "ISO 27001", "A.5 / A.8 — Organisational & technological controls"));
             }
 
-            if ((sec.AutomatedDecisions || sec.AiAct) && !Implemented("SOC 2") && !controls.Any(c => c.Control.Contains("AI") || c.Control.Contains("model")))
-                f.Add(new("Medium", "AI governance", "AI system without management controls",
-                    "Automated decision-making is in scope without evidenced AI-management controls.", "ISO 42001", "AI management system — risk & oversight"));
+            // ---- EU AI Act risk-tiering + ISO 42001 AI management (ADR-0050) ---
+            // Obligations are derived deterministically from the declared risk
+            // tier (Annex III implies high-risk); an in-scope-but-unclassified AI
+            // system is itself flagged so it gets triaged.
+            var aiInScope = sec.AiAct || sec.AutomatedDecisions || sec.AiAnnexIii || !string.IsNullOrEmpty(sec.AiRiskTier);
+            if (aiInScope)
+            {
+                var tier = string.IsNullOrEmpty(sec.AiRiskTier) && sec.AiAnnexIii ? "high" : sec.AiRiskTier;
+                var aiControl = controls.Any(c => (c.Framework == "ISO 42001" || c.Control.Contains("AI") || c.Control.Contains("model")) && c.Status == "Implemented");
+                if (tier == "prohibited")
+                    f.Add(new("High", "AI governance", "Prohibited AI practice in scope",
+                        "Classified as a prohibited practice under EU AI Act Art. 5 — it must not be placed on the EU market.", "EU AI Act", "Art. 5 — Prohibited AI practices"));
+                else if (tier == "high")
+                {
+                    if (!sec.AiHumanOversight)
+                        f.Add(new("High", "AI governance", "High-risk AI without human oversight",
+                            "A high-risk AI system (Annex III) requires effective human oversight under Art. 14, which is not evidenced.", "EU AI Act", "Art. 14 — Human oversight"));
+                    if (!aiControl)
+                        f.Add(new("Medium", "AI governance", "High-risk AI management controls incomplete",
+                            "A high-risk AI system needs a risk-management system (Art. 9) and data governance (Art. 10); no AI-management (ISO 42001) control is Implemented.", "ISO 42001", "Clause 6 — AI risk management & data governance"));
+                }
+                else if (tier == "limited")
+                {
+                    if (!sec.AiTransparency)
+                        f.Add(new("Low", "AI governance", "AI transparency obligation unmet",
+                            "Limited-risk AI must tell users they are interacting with an AI system (Art. 50); no transparency measure is recorded.", "EU AI Act", "Art. 50 — Transparency obligations"));
+                }
+                else if (string.IsNullOrEmpty(tier))
+                    f.Add(new("Medium", "AI governance", "AI system not risk-classified",
+                        "The initiative involves AI/automated decisions but has no EU AI Act risk tier set; classify it (minimal/limited/high/prohibited) to derive its obligations.", "EU AI Act", "Art. 6 — Classification rules for AI systems"));
+            }
 
             // Threat-model coverage → MITRE ATT&CK (advisory)
             var arch = await db.ArchProfiles.FindAsync(id);

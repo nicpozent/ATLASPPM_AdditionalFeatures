@@ -15,7 +15,22 @@ interface SecProfile {
   personalData: boolean; specialCategory: boolean; automatedDecisions: boolean; cardholderData: boolean;
   gdpr: boolean; pci: boolean; iso: boolean; aiAct: boolean; soc2: boolean; nis2: boolean;
   dpp?: boolean; ppwr?: boolean; eudr?: boolean;
+  // EU AI Act classification + ISO 42001 AI-management (ADR-0050)
+  aiSystemName?: string; aiRiskTier?: string; aiAnnexIii?: boolean; aiHumanOversight?: boolean; aiTransparency?: boolean;
 }
+// EU AI Act risk tiers with the obligation headline each pulls in.
+const AI_TIERS: { value: string; label: string; note: string }[] = [
+  { value: "", label: "Unclassified", note: "Classify the system to derive its EU AI Act obligations." },
+  { value: "minimal", label: "Minimal risk", note: "No mandatory obligations; voluntary codes of conduct apply." },
+  { value: "limited", label: "Limited risk", note: "Transparency — users must be told they interact with AI (Art. 50)." },
+  { value: "high", label: "High risk (Annex III)", note: "Risk management (Art. 9), data governance (Art. 10), human oversight (Art. 14), conformity assessment." },
+  { value: "prohibited", label: "Prohibited (Art. 5)", note: "Must not be placed on the EU market." },
+];
+const AI_TIER_COLOR: Record<string, { ink: string; tint: string }> = {
+  "": { ink: "#56607A", tint: "#EEF1F6" }, minimal: { ink: "#0B6B37", tint: "#E7F4EC" },
+  limited: { ink: "#8A6300", tint: "#FBF2D7" }, high: { ink: "#A1282B", tint: "#FBE7E8" },
+  prohibited: { ink: "#7A1216", tint: "#F7D5D7" },
+};
 interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
 interface SecReviewGate { id: number; name: string; type: string; reviewer: string; status: string; date: string; note: string; }
 interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; reviewGates: SecReviewGate[]; }
@@ -175,6 +190,43 @@ export function Security({ projectId }: { projectId: string | null }) {
           })}
         </div>
       </Card>
+
+      {/* EU AI Act classification + ISO 42001 AI management — shown when AI is in scope */}
+      {p.aiAct && (() => {
+        const tier = p.aiRiskTier ?? "";
+        const tc = AI_TIER_COLOR[tier] ?? AI_TIER_COLOR[""];
+        const meta = AI_TIERS.find((t) => t.value === tier) ?? AI_TIERS[0];
+        const aiToggles: { key: keyof SecProfile; label: string }[] = [
+          { key: "aiAnnexIii", label: "Annex III high-risk use case" },
+          { key: "aiHumanOversight", label: "Human oversight in place (Art. 14)" },
+          { key: "aiTransparency", label: "Users informed it's AI (Art. 50)" },
+        ];
+        return (
+          <Card style={{ marginBottom: 16 }}>
+            <SectionTitle>AI system classification — EU AI Act &amp; ISO 42001</SectionTitle>
+            <div style={{ fontSize: 12, color: color.faint2, marginTop: -6, marginBottom: 14 }}>Set the risk tier and oversight measures — the risk engine derives the AI Act / ISO 42001 obligations from these.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "14px 26px", marginBottom: 14 }}>
+              <SecField label="AI system / model">
+                <SecTextField value={p.aiSystemName ?? ""} disabled={!canEdit} placeholder="e.g. Product recommender v2" onCommit={(v) => patch.mutate({ aiSystemName: v })} />
+              </SecField>
+              <SecField label="EU AI Act risk tier">
+                <Select value={tier} disabled={!canEdit} onChange={(e) => patch.mutate({ aiRiskTier: e.target.value })}>
+                  {AI_TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </Select>
+              </SecField>
+            </div>
+            <div style={{ border: `1px solid ${tc.ink}`, background: tc.tint, borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: tc.ink }}>{meta.label}</span>
+              <span style={{ fontSize: 12.5, color: "#3A4358", marginLeft: 8 }}>{meta.note}</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {aiToggles.map((t) => (
+                <Toggle key={t.key} on={!!p[t.key]} label={t.label} disabled={!canEdit} onClick={() => patch.mutate({ [t.key]: !p[t.key] } as Partial<SecProfile>)} />
+              ))}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* product & sustainability regulation reference — obligations + deadlines */}
       {(() => {
