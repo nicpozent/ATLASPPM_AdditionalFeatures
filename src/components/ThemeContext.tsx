@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useLayoutEffect, useState } from "react";
-import { applyThemeVars, type ThemeMode } from "@/theme";
+import { applyThemeVars, DARK_MODE_ENABLED, type ThemeMode } from "@/theme";
 import { useRole } from "./RoleContext";
 
 // Dark mode is a per-profile preference: the choice is stored keyed by the
@@ -8,6 +8,10 @@ import { useRole } from "./RoleContext";
 const keyFor = (role: string) => `atlas.theme.${role}`;
 
 function readMode(role: string): ThemeMode {
+  // While dark mode is hidden (DARK_MODE_ENABLED=false) the app is pinned to
+  // light regardless of any stored preference — the stored value is preserved
+  // and honoured again once the feature is re-enabled.
+  if (!DARK_MODE_ENABLED) return "light";
   return localStorage.getItem(keyFor(role)) === "dark" ? "dark" : "light";
 }
 
