@@ -64,7 +64,7 @@ flowchart TB
     api[".NET 8 Minimal API\n/api/v1/*  ·  RBAC  ·  background workers"]
   end
 
-  db[("PostgreSQL 16\nEF Core 8, migrations on boot")]
+  db[("PostgreSQL 16\nEF Core 9, migrations on boot")]
 
   entra["Entra ID"]
   jira["Jira Cloud"]
@@ -114,7 +114,7 @@ flowchart LR
   end
   xcut["Cross-cutting:\nPermissions · Logging/correlation · RateLimiter · Telemetry · Health"]
   API --- xcut
-  API --> EF["EF Core 8 / AtlasDbContext"] --> PG[("PostgreSQL")]
+  API --> EF["EF Core 9 / AtlasDbContext"] --> PG[("PostgreSQL")]
 ```
 
 Cross-cutting services wrap every request: `Permissions` (authorization),
@@ -149,12 +149,13 @@ sequenceDiagram
   participant A as Atlas API
   participant J as Jira Cloud
   Trigger->>A: sync project (has JiraProjectKey)
-  alt board id present
+  alt board id mapped
     A->>J: GET agile board sprints / epics / issues
-  else no board (a "space")
+  else no board id
+    A->>J: GET board?projectKeyOrId=KEY → discover scrum boards → their sprints
     A->>J: GET enhanced JQL search (project = KEY), derive epics from Epic-type issues
   end
-  J-->>A: issues (+ sprints if board)
+  J-->>A: issues + sprints (board-mapped or key-discovered)
   A->>A: Upsert tasks/epics/sprints; prune removed; flag non-onboarded assignees
   A-->>Trigger: SyncResult (counts, warnings)
 ```
@@ -288,8 +289,8 @@ flowchart LR
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript 5, Vite 5, react-router 6, TanStack Query 5, MSAL browser 3, inline-styled design tokens |
-| Backend | .NET 8, ASP.NET Core minimal APIs, EF Core 8, Npgsql 8 |
+| Frontend | React 18, TypeScript 5, Vite 8, react-router 6, TanStack Query 5, MSAL browser 5, inline-styled design tokens (light/dark CSS-variable palettes, ADR-0056) |
+| Backend | .NET 8, ASP.NET Core minimal APIs, EF Core 9, Npgsql 9 |
 | Data | PostgreSQL 16 |
 | Identity | Microsoft Entra ID (OIDC), Microsoft Graph |
 | Integrations | Jira Cloud REST (agile + enhanced JQL) |

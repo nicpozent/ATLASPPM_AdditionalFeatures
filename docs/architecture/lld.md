@@ -118,10 +118,12 @@ hides affordances; it is never the control.
   access, seeded in `Rbac.cs`.
 - **Levels**: `N` < `V` < `E` < `F` (None/View/Edit/Full), rank-compared.
 - **Roles** (6 canonical): `admin`, `pmo`, `pm`, `team`, `exec`, `stkhldr`. Each has
-  a level per capability (the seed strings). The 9 cosmetic header identities and
-  the manager slots (teammgr/svcmgr/devmgr/inframgr/architect/pmlead) **resolve**
-  onto these 6 (`UI_TO_ROLE` client-side; `Permissions.ManagerKey` keeps fine
-  identity server-side for scope roll-ups).
+  a level per capability (the seed strings). The 16 cosmetic header identities and
+  the manager slots (teammgr/svcmgr/devmgr/devapac/blogit/inframgr/inframgr_apac/
+  architect/pmlead) **resolve** onto these 6 (`UI_TO_ROLE` client-side;
+  `Permissions.ManagerKey` keeps fine identity server-side for scope roll-ups). The
+  regional managers (devapac/blogit/inframgr_apac) clone their base manager's
+  mapping and differ only in labour-rate visibility (ADR-0057).
 - **Check**: `Permissions.Allows(http, db, cfg, cap, level)` → bool;
   `Permissions.Deny(...)` → a `403` result or null. Role comes from the validated
   JWT (prod) or the `X-Atlas-Role` header (dev/tests).

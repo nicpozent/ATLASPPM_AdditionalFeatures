@@ -27,15 +27,15 @@ requirement → capability → implementation → decision.
 
 | ID | SBB (component / technology) | Realises | Notes / ADR |
 |----|------------------------------|----------|-------------|
-| SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL) | ABB-01, ABB-02 | ADR-0003 |
+| SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL); **per-profile dark mode** via CSS-variable palettes (top-bar toggle, persisted per identity) | ABB-01, ABB-02 | ADR-0003, ADR-0056 |
 | SBB-02 | i18n message catalogue (6 locales) | ABB-01 | completeness test |
 | SBB-03 | Microsoft Entra ID (OIDC) + MSAL, with a client-side idle-logout policy (default 15 min, `VITE_AUTH_IDLE_MINUTES`) | ABB-02, ABB-09 | ADR-0005, ADR-0038 |
-| SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); data-driven header switcher (created roles selectable) | ABB-02 | ADR-0004, ADR-0043, ADR-0046 |
+| SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); **regional manager identities (Infrastructure Mgr APAC, Dev APAC Mgr, BLOG IT Manager) cloning their base role's capabilities**; data-driven header switcher (created roles selectable); **need-to-know internal-labour rates — per discipline×region line, server-filtered** | ABB-02 | ADR-0004, ADR-0043, ADR-0046, ADR-0055, ADR-0057 |
 | SBB-05 | .NET 8 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
-| SBB-07 | EF Core 8 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
+| SBB-07 | EF Core 9 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |
-| SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments) | ABB-05 | ADR-0006, ADR-0018 |
+| SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments; **board auto-discovery by project key when no board id is mapped, so sprints import regardless**) | ABB-05 | ADR-0006, ADR-0018 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
 | SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker`+`JiraSyncQueue`, `AdoSyncWorker`+`AdoSyncQueue`); **process-role split (`Atlas__Role` web/worker/all) — recurring timer jobs run in a separate worker container off the request path** | ABB-06, ABB-10, ABB-12 | ADR-0007, ADR-0028, ADR-0030, ADR-0039, ADR-0048 |
 | SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts; role-addressed demand alerts (PMO/Architect/CTO/CIO/PM Lead) with per-role email via the in-app group→role mapping + per-person opt-out | ABB-07 | ADR-0028, ADR-0043, ADR-0045 |

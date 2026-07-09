@@ -34,6 +34,6 @@ flowchart LR
 ## Status & scope
 
 Reflects `main` as of the current release: React 18 + TypeScript SPA, .NET 8
-minimal API, EF Core 8 on PostgreSQL 16, Entra ID SSO, containerised behind nginx.
+minimal API, EF Core 9 on PostgreSQL 16, Entra ID SSO, containerised behind nginx.
 Keep these documents updated in the same PR as any change that alters a container,
 a trust boundary, the data model shape, or a decision recorded in an ADR.
