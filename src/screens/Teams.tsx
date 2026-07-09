@@ -56,7 +56,7 @@ export default function Teams() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 600, color: color.navy }}>{t.label}</span>
-                    {t.isSelf && <span style={{ fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>}
+                    {t.isSelf && <span style={{ fontSize: 10, fontWeight: 700, color: color.successInk, background: color.successTint, borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>You</span>}
                     {!t.isSelf && !data?.isAdmin && <span style={{ fontSize: 10, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 7px", textTransform: "uppercase", letterSpacing: "0.03em" }}>Reports to you</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: color.faint3 }}>{t.memberCount} member{t.memberCount === 1 ? "" : "s"} · {t.groups.length} group{t.groups.length === 1 ? "" : "s"}</div>
@@ -199,7 +199,7 @@ function LaborRateCard() {
           </thead>
           <tbody>
             {disciplines.map((d) => (
-              <tr key={d} style={{ borderTop: "1px solid #F2F4F9" }}>
+              <tr key={d} style={{ borderTop: `1px solid ${color.surfaceAlt}` }}>
                 <td style={{ fontSize: 13, fontWeight: 600, color: color.text, padding: "10px 8px" }}>{RATE_DISC_LABELS[d] ?? d}</td>
                 {levels.map((l) => (
                   <td key={l} style={{ textAlign: "right", padding: "8px" }}>
@@ -336,7 +336,7 @@ function SkillsMatrix() {
             </div>
             {/* rows */}
             {people.map((p) => (
-              <div key={p} style={{ display: "grid", gridTemplateColumns: `${NAME_COL}px repeat(${skills.length}, 90px)`, borderBottom: "1px solid #F4F6FA", alignItems: "center" }}>
+              <div key={p} style={{ display: "grid", gridTemplateColumns: `${NAME_COL}px repeat(${skills.length}, 90px)`, borderBottom: `1px solid ${color.surfaceAlt}`, alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 22px", minWidth: 0 }}>
                   <span style={{ width: 26, height: 26, borderRadius: "50%", background: avatarColor(p), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 700, flex: "none" }}>{initials(p)}</span>
                   <span style={{ fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p}</span>

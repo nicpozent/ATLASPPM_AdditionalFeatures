@@ -33,7 +33,7 @@ export function SubscribeButton({ targetType, targetId }: { targetType: "project
         display: "flex", alignItems: "center", gap: 7, borderRadius: 9, padding: "8px 13px",
         fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
         border: `1px solid ${subscribed ? color.primary : color.border}`,
-        background: subscribed ? "#EEF3FB" : "#fff", color: subscribed ? color.primary : "#56607A",
+        background: subscribed ? color.primaryTint : "#fff", color: subscribed ? color.primary : color.subtle,
       }}
     >
       <Icon name="bell" size={15} />

@@ -22,11 +22,11 @@ type PortfolioCat = "all" | "project" | "program" | "product" | "release";
 interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
 interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; }
 const TASK_BAR: Record<string, { bg: string; border: string }> = {
-  "To Do":       { bg: "#EEF1F6", border: "#8A93A6" },
-  "In Progress": { bg: "#E6EFFB", border: "#0F6CBD" },
-  "In Review":   { bg: "#FBF2D7", border: "#E0A100" },
-  Done:          { bg: "#E7F4EC", border: "#15A34A" },
-  Blocked:       { bg: "#FBE7E8", border: "#D13438" },
+  "To Do":       { bg: color.neutralTint,  border: color.holdBorder },
+  "In Progress": { bg: color.primaryTint2, border: color.primary },
+  "In Review":   { bg: color.warningTint,  border: color.warning },
+  Done:          { bg: color.successTint,  border: color.success },
+  Blocked:       { bg: color.dangerTint,   border: color.danger },
 };
 const monthOfIso = (s: string): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getMonth(); };
 
@@ -168,9 +168,9 @@ export default function Gantt() {
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* scope toggle */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
         {([["project", "Project timeline"], ["program", "Program timeline"], ["portfolio", "Portfolio timeline"]] as const).map(([s, label]) => (
-          <button key={s} onClick={() => setScope(s)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === s ? "#fff" : "transparent", color: scope === s ? color.primary : "#565F73", boxShadow: scope === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{label}</button>
+          <button key={s} onClick={() => setScope(s)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === s ? color.surface : "transparent", color: scope === s ? color.primary : color.subtle, boxShadow: scope === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{label}</button>
         ))}
       </div>
 
@@ -202,7 +202,7 @@ export default function Gantt() {
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: color.subtle, flexWrap: "wrap" }}>
             <Legend swatch={<span style={{ width: 14, height: 10, borderRadius: 3, background: "#0F6CBD" }} />}>Complete</Legend>
-            <Legend swatch={<span style={{ width: 14, height: 10, borderRadius: 3, background: "#DCEAF8", border: "1px solid #0F6CBD" }} />}>Planned</Legend>
+            <Legend swatch={<span style={{ width: 14, height: 10, borderRadius: 3, background: color.primaryTint2, border: `1px solid ${color.primary}` }} />}>Planned</Legend>
             <Legend swatch={<span style={{ width: 10, height: 10, background: "#E0A100", transform: "rotate(45deg)" }} />}>Milestone</Legend>
             <Legend swatch={<span style={{ width: 2, height: 13, background: "#D13438" }} />}>Today</Legend>
           </div>
@@ -213,7 +213,7 @@ export default function Gantt() {
           <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
             {VIEW_TABS.map(([vid, label]) => {
               const active = view === vid;
-              return <button key={vid} onClick={() => setView(vid)} style={{ padding: "11px 16px", marginRight: 6, border: "none", borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: active ? color.primary : "#565F73" }}>{label}</button>;
+              return <button key={vid} onClick={() => setView(vid)} style={{ padding: "11px 16px", marginRight: 6, border: "none", borderBottom: active ? `2.5px solid ${color.primary}` : "2.5px solid transparent", background: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: active ? color.primary : color.subtle }}>{label}</button>;
             })}
           </div>
         )}
@@ -263,10 +263,10 @@ function barStyle(startMonth: number, endMonth: number): React.CSSProperties {
 
 function PhaseBar({ phase, editable, onEdit }: { phase: Phase; editable?: boolean; onEdit?: () => void }) {
   return (
-    <div style={{ position: "relative", height: 38, borderBottom: "1px solid #F4F6FA" }}>
+    <div style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <div title={`${phase.name} · ${MONTHS[phase.startMonth]}–${MONTHS[phase.endMonth]} · ${phase.progress}%`}
         onClick={editable ? onEdit : undefined}
-        style={{ ...barStyle(phase.startMonth, phase.endMonth), borderRadius: 6, background: "#DCEAF8", border: "1px solid #0F6CBD", overflow: "hidden", cursor: editable ? "pointer" : "default" }}>
+        style={{ ...barStyle(phase.startMonth, phase.endMonth), borderRadius: 6, background: color.primaryTint2, border: `1px solid ${color.primary}`, overflow: "hidden", cursor: editable ? "pointer" : "default" }}>
         <div style={{ height: "100%", width: `${phase.progress}%`, background: "#0F6CBD" }} />
       </div>
     </div>
@@ -276,7 +276,7 @@ function PhaseBar({ phase, editable, onEdit }: { phase: Phase; editable?: boolea
 function MonthHeader() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(12,1fr)", height: 38, borderBottom: `1px solid ${color.bg}` }}>
-      {MONTHS.map((m) => <div key={m} style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, color: color.faint, fontWeight: 600, borderRight: "1px solid #F4F6FA" }}>{m}</div>)}
+      {MONTHS.map((m) => <div key={m} style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, color: color.faint, fontWeight: 600, borderRight: `1px solid ${color.surfaceAlt}` }}>{m}</div>)}
     </div>
   );
 }
@@ -293,14 +293,14 @@ function NowLine() {
 interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
 interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; }
 const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
-  Started:   { bg: "#D7EFE0", border: "#15A34A" },
-  Completed: { bg: "#E6EFFB", border: "#0F6CBD" },
-  Halted:    { bg: "#FBF2D7", border: "#E0A100" },
-  Cancelled: { bg: "#FBE7E8", border: "#D13438" },
-  Planned:   { bg: "#EEF1F6", border: "#8A93A6" },
+  Started:   { bg: color.successTint,  border: color.success },
+  Completed: { bg: color.primaryTint2, border: color.primary },
+  Halted:    { bg: color.warningTint,  border: color.warning },
+  Cancelled: { bg: color.dangerTint,   border: color.danger },
+  Planned:   { bg: color.neutralTint,  border: color.holdBorder },
   // legacy
-  Active:    { bg: "#D7EFE0", border: "#15A34A" },
-  Closed:    { bg: "#E6EFFB", border: "#0F6CBD" },
+  Active:    { bg: color.successTint,  border: color.success },
+  Closed:    { bg: color.primaryTint2, border: color.primary },
 };
 function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
@@ -325,7 +325,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
           {canEdit && <button onClick={onAddPhase} style={addBtn}>+ Add</button>}
         </div>
         {hasWindow && (
-          <div style={{ height: 34, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
+          <div style={{ height: 34, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: color.navy }}>Project window</span>
             <span style={{ fontSize: 10.5, color: color.faint3 }}>{startDate || "—"} → {endDate || "—"}</span>
           </div>
@@ -337,7 +337,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             </div>
           )
         ) : phases.map((p) => (
-          <div key={p.id} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+          <div key={p.id} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <span style={{ flex: 1, fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
             <span style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: color.faint3, flex: "none" }}>{p.progress}%</span>
             {canEdit && (
@@ -357,15 +357,15 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               const open = openSprints.has(s.id);
               return (
                 <div key={s.id}>
-                  <div onClick={() => toggleSprint(s.id)} title="Show tasks" style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 14px 0 18px", borderBottom: "1px solid #F4F6FA", cursor: "pointer" }}>
+                  <div onClick={() => toggleSprint(s.id)} title="Show tasks" style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 14px 0 18px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
                     <Icon name={open ? "chevronDown" : "chevronRight"} size={14} color={color.faint} />
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
                     <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
                   </div>
                   {open && (s.tasks.length === 0
-                    ? <div style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", fontSize: 11, color: color.faint3, borderBottom: "1px solid #F4F6FA" }}>No tasks in this sprint</div>
+                    ? <div style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", fontSize: 11, color: color.faint3, borderBottom: `1px solid ${color.surfaceAlt}` }}>No tasks in this sprint</div>
                     : s.tasks.map((t) => (
-                      <div key={t.id} style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", borderBottom: "1px solid #F7F9FC" }}>
+                      <div key={t.id} style={{ height: 28, display: "flex", alignItems: "center", padding: "0 14px 0 42px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                         <span style={{ flex: 1, fontSize: 11, color: color.subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
                       </div>
                     )))}
@@ -383,11 +383,11 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
         {hasWindow && (
-          <div style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
-            <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
+          <div style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+            <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
           </div>
         )}
-        <div style={{ position: "relative", minHeight: rowsHeight, height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", minHeight: rowsHeight, height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
           <NowLine />
           <div>
             {phases.map((p) => <PhaseBar key={p.id} phase={p} editable={canEdit} onEdit={() => onEditPhase(p)} />)}
@@ -401,16 +401,16 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               const open = openSprints.has(s.id);
               return (
                 <div key={s.id}>
-                  <div style={{ position: "relative", height: 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+                  <div style={{ position: "relative", height: 34, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
                     <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
                       style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
-                    ? <div style={{ height: 28, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }} />
+                    ? <div style={{ height: 28, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }} />
                     : s.tasks.map((t) => {
                       const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
                       return (
-                        <div key={t.id} style={{ position: "relative", height: 28, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+                        <div key={t.id} style={{ position: "relative", height: 28, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
                           <div title={`${t.name} · ${t.status}`} style={{ ...barStyle(t.startMonth, t.endMonth), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
                         </div>
                       );
@@ -437,10 +437,10 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
 
 // ---- Portfolio schedule (all entity types on one grid) --------------------
 const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: string }> = {
-  project: { ink: "#7A3FB0", tint: "#F0E8F7", bar: "#7A3FB0", label: "Project" },
-  program: { ink: "#0C5798", tint: "#E6EFFB", bar: "#0F6CBD", label: "Program" },
-  product: { ink: "#0B6B37", tint: "#E7F4EC", bar: "#15A34A", label: "Product" },
-  release: { ink: "#8A6300", tint: "#FBF2D7", bar: "#E0A100", label: "Release" },
+  project: { ink: "#7A3FB0", tint: color.accentTint, bar: "#7A3FB0", label: "Project" },
+  program: { ink: color.primaryDark, tint: color.primaryTint2, bar: "#0F6CBD", label: "Program" },
+  product: { ink: color.successInk, tint: color.successTint, bar: "#15A34A", label: "Product" },
+  release: { ink: color.warningInk, tint: color.warningTint, bar: "#E0A100", label: "Release" },
 };
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   if (items.length === 0) return <Note text={cat === "all" ? "Nothing with dates in the portfolio yet. Set start/end dates on projects, programs, products or releases to see them here." : "No dated items in this category."} />;
@@ -452,7 +452,7 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
         {items.map((i) => {
           const t = PF_TYPE[i.type] ?? PF_TYPE.project;
           return (
-            <div key={`${i.type}-${i.id}`} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+            <div key={`${i.type}-${i.id}`} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <span style={{ fontSize: 9.5, fontWeight: 700, color: t.ink, background: t.tint, padding: "2px 7px", borderRadius: 20, flex: "none" }}>{t.label}</span>
               <span style={{ flex: 1, fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.name}</span>
               {i.progress !== null && <span style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: color.faint3, flex: "none" }}>{i.progress}%</span>}
@@ -462,12 +462,12 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
       </div>
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
           <NowLine />
           {items.map((i) => {
             const t = PF_TYPE[i.type] ?? PF_TYPE.project;
             return (
-              <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: "1px solid #F4F6FA" }}>
+              <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
                   style={{ ...barStyle(i.startMonth, i.endMonth), borderRadius: 6, background: t.tint, border: `1px solid ${t.bar}`, overflow: "hidden" }}>
                   {i.progress !== null && <div style={{ height: "100%", width: `${i.progress}%`, background: t.bar }} />}
@@ -494,27 +494,27 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
           const empty = !hasWindow && r.phases.length === 0 && (r.sprints?.length ?? 0) === 0;
           return (
             <div key={r.projectId}>
-              <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 12, fontWeight: 700, color: color.navy, background: color.surfaceAlt, borderBottom: "1px solid #EEF1F6" }}>{r.projectName}</div>
+              <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 12, fontWeight: 700, color: color.navy, background: color.surfaceAlt, borderBottom: `1px solid ${color.bg}` }}>{r.projectName}</div>
               {hasWindow && (
-                <div style={{ height: 30, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
+                <div style={{ height: 30, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px", borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: color.navy }}>Project window</span>
                   <span style={{ fontSize: 10, color: color.faint3 }}>{r.startDate || "—"} → {r.endDate || "—"}</span>
                 </div>
               )}
               {r.phases.map((p) => (
-                <div key={p.id} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", borderBottom: "1px solid #F4F6FA" }}>
+                <div key={p.id} style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                   <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                   <span style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: color.faint3 }}>{p.progress}%</span>
                 </div>
               ))}
               {(r.sprints ?? []).map((s) => (
-                <div key={s.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 22px", borderBottom: "1px solid #F4F6FA" }}>
+                <div key={s.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                   <Icon name="zap" size={13} color={color.faint} />
                   <span style={{ flex: 1, fontSize: 11.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
                 </div>
               ))}
-              {empty && <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11.5, color: color.faint3, borderBottom: "1px solid #F4F6FA" }}>No schedule yet</div>}
+              {empty && <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11.5, color: color.faint3, borderBottom: `1px solid ${color.surfaceAlt}` }}>No schedule yet</div>}
             </div>
           );
         })}
@@ -522,30 +522,30 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
       {/* right grid */}
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
           <NowLine />
           {rows.map((r) => {
             const hasWindow = r.startMonth != null && r.endMonth != null;
             const empty = !hasWindow && r.phases.length === 0 && (r.sprints?.length ?? 0) === 0;
             return (
               <div key={r.projectId}>
-                <div style={{ height: 30, borderBottom: "1px solid #EEF1F6", background: color.surfaceAlt }} />
+                <div style={{ height: 30, borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
                 {hasWindow && (
-                  <div style={{ position: "relative", height: 30, borderBottom: "1px solid #F4F6FA", background: color.surfaceAlt }}>
-                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barStyle(Math.min(r.startMonth!, r.endMonth!), Math.max(r.startMonth!, r.endMonth!)), top: 6, height: 18, borderRadius: 6, background: "repeating-linear-gradient(45deg,#E6EFFB,#E6EFFB 6px,#D7E6F8 6px,#D7E6F8 12px)", border: "1.5px solid #0F6CBD" }} />
+                  <div style={{ position: "relative", height: 30, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
+                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barStyle(Math.min(r.startMonth!, r.endMonth!), Math.max(r.startMonth!, r.endMonth!)), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
                   </div>
                 )}
                 {r.phases.map((p) => <PhaseBar key={p.id} phase={p} />)}
                 {(r.sprints ?? []).map((s) => {
                   const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
                   return (
-                    <div key={s.id} style={{ position: "relative", height: 34, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+                    <div key={s.id} style={{ position: "relative", height: 34, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
                       <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
                         style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                     </div>
                   );
                 })}
-                {empty && <div style={{ height: 38, borderBottom: "1px solid #F4F6FA" }} />}
+                {empty && <div style={{ height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }} />}
               </div>
             );
           })}
@@ -584,7 +584,7 @@ function ResourceView({ projectId }: { projectId: string }) {
         <Legend swatch={<span style={{ width: 12, height: 10, borderRadius: 2, background: "#7A3FB0" }} />}>Product</Legend>
       </div>
       {people.map((p) => (
-        <div key={p.name} style={{ display: "grid", gridTemplateColumns: "200px 1fr 54px", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F4F6FA" }}>
+        <div key={p.name} style={{ display: "grid", gridTemplateColumns: "200px 1fr 54px", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${color.surfaceAlt}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
             <span style={{ width: 26, height: 26, borderRadius: "50%", background: p.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 700, flex: "none" }}>{p.initials}</span>
             <div style={{ minWidth: 0 }}>
@@ -594,7 +594,7 @@ function ResourceView({ projectId }: { projectId: string }) {
           </div>
           <div style={{ height: 14, background: color.bg, borderRadius: 7, overflow: "hidden", display: "flex", position: "relative" }}>
             {seg(p.opsPct, "#8A93A6")}{seg(p.projectPct, "#0F6CBD")}{seg(p.productPct, "#7A3FB0")}
-            {p.util > 100 && <span style={{ position: "absolute", right: 4, top: -1, fontSize: 9, fontWeight: 700, color: "#A1282B" }}>over</span>}
+            {p.util > 100 && <span style={{ position: "absolute", right: 4, top: -1, fontSize: 9, fontWeight: 700, color: color.dangerInk }}>over</span>}
           </div>
           <span style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: p.over ? "#A1282B" : color.textMuted, textAlign: "right" }}>{p.util}%</span>
         </div>
@@ -610,9 +610,9 @@ function ResourceView({ projectId }: { projectId: string }) {
 interface Task { id: number; code: string; name: string; assignee: string; status: string; sprint: string; }
 const EMPTY_TASKS: Task[] = [];
 const TASK_STATUS: Record<string, { ink: string; tint: string }> = {
-  "Done": { ink: "#0B6B37", tint: "#E7F4EC" }, "In Progress": { ink: "#0C5798", tint: "#E6EFFB" },
-  "In Review": { ink: "#8A6300", tint: "#FBF2D7" }, "To Do": { ink: "#566077", tint: "#EEF1F6" },
-  "Blocked": { ink: "#A1282B", tint: "#FBE7E8" },
+  "Done": { ink: color.successInk, tint: color.successTint }, "In Progress": { ink: color.primaryDark, tint: color.primaryTint2 },
+  "In Review": { ink: color.warningInk, tint: color.warningTint }, "To Do": { ink: color.subtle, tint: color.bg },
+  "Blocked": { ink: color.dangerInk, tint: color.dangerTint },
 };
 
 function SprintView({ projectId }: { projectId: string }) {
@@ -647,7 +647,7 @@ function SprintView({ projectId }: { projectId: string }) {
             {items.map((t) => {
               const sc = TASK_STATUS[t.status] ?? TASK_STATUS["To Do"];
               return (
-                <div key={t.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 110px", alignItems: "center", gap: 10, padding: "9px 16px", borderBottom: "1px solid #F4F6FA" }}>
+                <div key={t.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 110px", alignItems: "center", gap: 10, padding: "9px 16px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                   <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{t.code}</span>
                   <span style={{ fontSize: 12.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
                   <span style={{ fontSize: 11.5, color: color.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.assignee}</span>
@@ -704,22 +704,22 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
         <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
           <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Task</div>
           {rows.map((t) => (
-            <div key={t.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: "1px solid #F4F6FA" }}>
+            <div key={t.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
               <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
+              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
             </div>
           ))}
         </div>
         {/* right grid */}
         <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
           <MonthHeader />
-          <div style={{ position: "relative", height: rowsHeight, backgroundImage: "linear-gradient(90deg,#F2F4F9 1px,transparent 1px)", backgroundSize: "8.3333% 100%" }}>
+          <div style={{ position: "relative", height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
             <NowLine />
             {rows.map((t) => {
               const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
               return (
-                <div key={t.id} style={{ position: "relative", height: 34, borderBottom: "1px solid #F4F6FA" }}>
+                <div key={t.id} style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                   <div title={`${t.code} ${t.name} · ${t.status}${t.scheduled ? "" : " · unscheduled"}`}
                     style={{ ...barStyle(t.startMonth, t.endMonth), top: 8, height: 18, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}`, opacity: t.scheduled ? 1 : 0.5, display: "flex", alignItems: "center", paddingLeft: 7, fontSize: 10, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>
                     {t.status}
@@ -792,5 +792,5 @@ function Legend({ swatch, children }: { swatch: React.ReactNode; children: React
   return <span style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch}{children}</span>;
 }
 const selectStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.primary, background: color.surface, cursor: "pointer", maxWidth: 280 };
-const addBtn: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", textTransform: "none", letterSpacing: 0 };
+const addBtn: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", textTransform: "none", letterSpacing: 0 };
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };

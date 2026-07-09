@@ -94,8 +94,8 @@ export default function Project() {
           const active = tab === tid;
           return (
             <button key={tid} onClick={() => setTab(tid)} style={{
-              padding: "10px 4px", margin: "0 14px 0 0", border: "none", borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent",
-              background: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 700 : 500, color: active ? color.primary : "#565F73", fontFamily: "inherit", whiteSpace: "nowrap",
+              padding: "10px 4px", margin: "0 14px 0 0", border: "none", borderBottom: active ? `2.5px solid ${color.primary}` : "2.5px solid transparent",
+              background: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 700 : 500, color: active ? color.primary : color.subtle, fontFamily: "inherit", whiteSpace: "nowrap",
             }}>{label}</button>
           );
         })}
@@ -332,7 +332,7 @@ function Overview({ projectId }: { projectId: string | null }) {
                 <div key={t.code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                   <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
                   <span style={{ flex: 1, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-                  <span style={{ fontFamily: font.mono, fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 4, padding: "1px 6px", flex: "none" }}>{t.baseline} → {t.sprint}</span>
+                  <span style={{ fontFamily: font.mono, fontSize: 10, fontWeight: 700, color: color.warningInk, background: color.warningTint, borderRadius: 4, padding: "1px 6px", flex: "none" }}>{t.baseline} → {t.sprint}</span>
                 </div>
               ))}
               {spilled.length > 4 && <div style={{ fontSize: 11.5, color: color.faint3 }}>+{spilled.length - 4} more · see Tasks</div>}
@@ -375,16 +375,16 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
 
   const options = data?.options ?? [];
   const roRow = (label: string, val: string) => (
-    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
+    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <span style={{ fontSize: 12.5, fontWeight: 600, color: val ? "#1C2233" : "#B0B7C5" }}>{val === "N/A" ? "N/A" : val || "Unassigned"}</span>
     </div>
   );
   const selRow = (key: string, label: string, val: string) => (
-    <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
+    <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <select value={val || ""} onChange={(e) => assign.mutate({ key, person: e.target.value })} disabled={!projectId || assign.isPending}
-        style={{ border: "1px solid #E0E5EE", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer", minWidth: 190 }}>
+        style={{ border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer", minWidth: 190 }}>
         <option value="">— Unassigned —</option>
         <option value="N/A">N/A</option>
         {options.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -407,7 +407,7 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
         <>
           {data?.canAssignLead ? selRow(data.leadKey, data.leadLabel, data.lead) : roRow(data?.leadLabel ?? "Project Manager", data?.lead ?? "")}
           {data?.canAssignArch && (data.missingArch.length > 0) && (
-            <div style={{ margin: "12px 0 4px", fontSize: 12, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 9, padding: "9px 12px", lineHeight: 1.45 }}>
+            <div style={{ margin: "12px 0 4px", fontSize: 12, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 9, padding: "9px 12px", lineHeight: 1.45 }}>
               ⚠ {data.missingArch.length} architecture role{data.missingArch.length > 1 ? "s" : ""} not yet assigned: {data.missingArch.join(", ")}
             </div>
           )}
@@ -435,7 +435,7 @@ function TeamCapacity({ projectId }: { projectId: string | null }) {
     <Card padding="18px 22px">
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <SectionTitle>Team capacity</SectionTitle>
-        {(data?.overCount ?? 0) > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{data!.overCount} over-allocated</span>}
+        {(data?.overCount ?? 0) > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{data!.overCount} over-allocated</span>}
       </div>
       <div style={{ fontSize: 12, color: color.faint2, marginTop: -6, marginBottom: 14 }}>Assigned people vs their allocation. Utilisation = ops + project + product; over 100% flags a resource risk.</div>
       {!data || data.assigned === 0 ? (
@@ -449,7 +449,7 @@ function TeamCapacity({ projectId }: { projectId: string | null }) {
                 <span style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{p.name}</span>
                 <span style={{ fontSize: 11.5, color: color.faint3 }}>{p.role}</span>
                 <div style={{ flex: 1 }} />
-                {p.highOps && !p.over && <span title="Heavy operational load" style={{ fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 5, padding: "1px 6px" }}>HIGH OPS</span>}
+                {p.highOps && !p.over && <span title="Heavy operational load" style={{ fontSize: 10, fontWeight: 700, color: color.warningInk, background: color.warningTint, borderRadius: 5, padding: "1px 6px" }}>HIGH OPS</span>}
                 <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: p.over ? "#A1282B" : color.textMuted }}>{p.util}%</span>
               </div>
               <div style={{ display: "flex", height: 8, borderRadius: 5, overflow: "hidden", background: color.bg, boxShadow: p.over ? "0 0 0 1.5px #D13438" : "none" }}>
@@ -482,8 +482,8 @@ const OPS_SEVERITIES = ["Critical", "High", "Medium", "Low"];
 const OPS_STATUSES = ["Open", "In progress", "Resolved", "Closed"];
 const OPS_SOURCES = ["Manual", "ServiceNow", "ManageEngine SDP", "Jira", "Azure DevOps"];
 const OPS_SEV_COLOR: Record<string, { ink: string; tint: string }> = {
-  Critical: { ink: "#A1282B", tint: "#FBE7E8" }, High: { ink: "#A1282B", tint: "#FBE7E8" },
-  Medium: { ink: "#8A6300", tint: "#FBF2D7" }, Low: { ink: "#566077", tint: "#EEF1F6" },
+  Critical: { ink: color.dangerInk, tint: color.dangerTint }, High: { ink: color.dangerInk, tint: color.dangerTint },
+  Medium: { ink: color.warningInk, tint: color.warningTint }, Low: { ink: color.subtle, tint: color.bg },
 };
 const opsActive = (s: string) => s === "Open" || s === "In progress";
 
@@ -517,7 +517,7 @@ function OperationalImpact({ projectId }: { projectId: string | null }) {
     <Card padding="18px 22px">
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <SectionTitle>Operational impact</SectionTitle>
-        {activeCount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{activeCount} active</span>}
+        {activeCount > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, borderRadius: 20, padding: "1px 9px", marginBottom: 12 }}>{activeCount} active</span>}
         <div style={{ flex: 1 }} />
         {canEdit && projectId && <Button variant="secondary" onClick={() => setModal(true)} style={{ marginBottom: 12, padding: "7px 12px" }}><Icon name="plus" size={15} /> Log item</Button>}
       </div>
@@ -530,7 +530,7 @@ function OperationalImpact({ projectId }: { projectId: string | null }) {
             const sev = OPS_SEV_COLOR[o.severity] ?? OPS_SEV_COLOR.Medium;
             const resolved = o.status === "Resolved" || o.status === "Closed";
             return (
-              <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid #F4F6FA", opacity: resolved ? 0.6 : 1 }}>
+              <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: `1px solid ${color.surfaceAlt}`, opacity: resolved ? 0.6 : 1 }}>
                 <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none", width: 54 }}>{o.ref}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.title}</div>
@@ -595,10 +595,10 @@ interface Gate { id: number; code: string; name: string; approver: string; statu
 interface GatesData { canGovern: boolean; gates: Gate[]; }
 
 const GATE_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved:      { ink: "#0B6B37", tint: "#E7F4EC" },
-  Pending:       { ink: "#8A6300", tint: "#FBF2D7" },
-  Rejected:      { ink: "#A1282B", tint: "#FBE7E8" },
-  "Not started": { ink: "#8A92A6", tint: "#EEF1F6" },
+  Approved:      { ink: color.successInk, tint: color.successTint },
+  Pending:       { ink: color.warningInk, tint: color.warningTint },
+  Rejected:      { ink: color.dangerInk, tint: color.dangerTint },
+  "Not started": { ink: "#8A92A6", tint: color.bg },
 };
 
 function Governance({ projectId }: { projectId: string | null }) {
@@ -637,7 +637,7 @@ function Governance({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13.5, color: color.faint }}>Stage-gate approvals, review checkpoints &amp; decision log.</div>
         <div style={{ flex: 1 }} />
-        {canGovern && <span style={{ fontSize: 11, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 10px", borderRadius: 6 }}>You can approve gates</span>}
+        {canGovern && <span style={{ fontSize: 11, fontWeight: 600, color: color.successInk, background: color.successTint, padding: "4px 10px", borderRadius: 6 }}>You can approve gates</span>}
       </div>
 
       {/* gate rail */}
@@ -681,7 +681,7 @@ function Governance({ projectId }: { projectId: string | null }) {
                   <button onClick={() => decide.mutate({ gateId: g.id, action: "approve" })} disabled={decide.isPending}
                     style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "#fff", background: "#0B6B37", border: "none", borderRadius: 8, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>Approve</button>
                   <button onClick={() => decide.mutate({ gateId: g.id, action: "reject" })} disabled={decide.isPending}
-                    style={{ flex: "none", fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
+                    style={{ flex: "none", fontSize: 12, fontWeight: 600, color: color.dangerInk, background: color.dangerTint, border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
                 </div>
               )}
             </div>
@@ -706,9 +706,9 @@ function Governance({ projectId }: { projectId: string | null }) {
 
 interface Decision { id: number; code: string; title: string; context: string; decision: string; owner: string; date: string; status: string; }
 const DEC_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved: { ink: "#0B6B37", tint: "#E7F4EC" },
-  Proposed: { ink: "#0C5798", tint: "#E6EFFB" },
-  Rejected: { ink: "#A1282B", tint: "#FBE7E8" },
+  Approved: { ink: color.successInk, tint: color.successTint },
+  Proposed: { ink: color.primaryDark, tint: color.primaryTint2 },
+  Rejected: { ink: color.dangerInk, tint: color.dangerTint },
 };
 const DEC_COLS = "0.7fr 1.6fr 2fr 1fr 0.8fr 0.9fr";
 
@@ -726,7 +726,7 @@ function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGo
       <div style={{ display: "flex", alignItems: "center", padding: "16px 22px 13px" }}>
         <span style={{ flex: 1, fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Decision log</span>
         {canGovern && (
-          <button onClick={() => setModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#EAF2FC", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontFamily: "inherit" }}>+ Log decision</button>
+          <button onClick={() => setModal(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint2, border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontFamily: "inherit" }}>+ Log decision</button>
         )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: DEC_COLS, padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
@@ -737,7 +737,7 @@ function DecisionLog({ projectId, canGovern }: { projectId: string | null; canGo
       ) : decisions.map((d) => {
         const sc = DEC_STATUS[d.status] ?? DEC_STATUS.Proposed;
         return (
-          <div key={d.code} onClick={() => canGovern && setOpen(d)} style={{ display: "grid", gridTemplateColumns: DEC_COLS, alignItems: "flex-start", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canGovern ? "pointer" : "default" }}>
+          <div key={d.code} onClick={() => canGovern && setOpen(d)} style={{ display: "grid", gridTemplateColumns: DEC_COLS, alignItems: "flex-start", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canGovern ? "pointer" : "default" }}>
             <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
             <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{d.title}</div>
             <div style={{ fontSize: 12, color: color.faint, lineHeight: 1.4 }}><span style={{ color: color.faint3 }}>{d.context}</span> {d.decision}</div>
@@ -787,12 +787,12 @@ function EditDecisionModal({ projectId, decision, onClose }: { projectId: string
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this decision?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this decision?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         )}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -908,21 +908,21 @@ interface RiskReport { high: number; medium: number; low: number; findings: Risk
 interface StatusReport { name: string; phase: string; health: string; progress: number; budgetLine: string; tasksDone: number; tasksTotal: number; blocked: number; spillover: number; passRate: number; openDefects: number; gatesApproved: number; gatesTotal: number; dpiaLevel: string; highlights: string[]; topRisks: RiskFinding[]; }
 
 const RISK_SEV: Record<string, { ink: string; tint: string }> = {
-  High: { ink: "#A1282B", tint: "#FBE7E8" }, Medium: { ink: "#8A6300", tint: "#FBF2D7" }, Low: { ink: "#56607A", tint: "#EEF1F6" },
+  High: { ink: color.dangerInk, tint: color.dangerTint }, Medium: { ink: color.warningInk, tint: color.warningTint }, Low: { ink: color.subtle, tint: color.bg },
 };
 const FRAMEWORK_TINT: Record<string, { ink: string; tint: string }> = {
-  "ISO 27001": { ink: "#0C5798", tint: "#E6EFFB" }, "ISO 42001": { ink: "#5E2E89", tint: "#F0E8F7" },
-  GDPR: { ink: "#0B6B37", tint: "#E7F4EC" }, "PCI-DSS": { ink: "#A1282B", tint: "#FBE7E8" },
-  "MITRE ATT&CK": { ink: "#8A6300", tint: "#FBF2D7" }, "PMO governance": { ink: "#56607A", tint: "#EEF1F6" },
-  "NIST CSF 2.0": { ink: "#0C5798", tint: "#E6EFFB" }, "SOC 2": { ink: "#5E2E89", tint: "#F0E8F7" },
-  NIS2: { ink: "#8A6300", tint: "#FBF2D7" }, "EU AI Act": { ink: "#A1282B", tint: "#FBE7E8" },
+  "ISO 27001": { ink: color.primaryDark, tint: color.primaryTint2 }, "ISO 42001": { ink: "#5E2E89", tint: color.accentTint },
+  GDPR: { ink: color.successInk, tint: color.successTint }, "PCI-DSS": { ink: color.dangerInk, tint: color.dangerTint },
+  "MITRE ATT&CK": { ink: color.warningInk, tint: color.warningTint }, "PMO governance": { ink: color.subtle, tint: color.bg },
+  "NIST CSF 2.0": { ink: color.primaryDark, tint: color.primaryTint2 }, "SOC 2": { ink: "#5E2E89", tint: color.accentTint },
+  NIS2: { ink: color.warningInk, tint: color.warningTint }, "EU AI Act": { ink: color.dangerInk, tint: color.dangerTint },
 };
 
 function RiskRow({ r }: { r: RiskFinding }) {
   const sc = RISK_SEV[r.severity] ?? RISK_SEV.Low;
   const fc = FRAMEWORK_TINT[r.framework] ?? FRAMEWORK_TINT["PMO governance"];
   return (
-    <div style={{ padding: "12px 0", borderTop: "1px solid #F2F4F9" }}>
+    <div style={{ padding: "12px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "2px 8px", borderRadius: 6 }}>{r.severity}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{r.title}</span>
@@ -1009,10 +1009,10 @@ function StatusReportModal({ projectId, onClose }: { projectId: string; onClose:
 interface DepLink { id: string; name: string; dept: string; status: string; health: string; }
 interface DepData { canEdit: boolean; dependsOn: DepLink[]; blocks: DepLink[]; inheritedRisk: boolean; ownHealth: string; effHealth: string; depRiskTitle: string; }
 const STATUS_PILL: Record<string, { ink: string; tint: string; dot: string }> = {
-  green: { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  amber: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  red:   { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
-  hold:  { ink: "#56607A", tint: "#EEF1F6", dot: "#8A93A6" },
+  green: { ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
+  amber: { ink: color.warningInk, tint: color.warningTint, dot: "#E0A100" },
+  red:   { ink: color.dangerInk, tint: color.dangerTint, dot: "#D13438" },
+  hold:  { ink: color.subtle, tint: color.bg, dot: "#8A93A6" },
 };
 
 function Dependencies({ projectId }: { projectId: string | null }) {
@@ -1045,7 +1045,7 @@ function Dependencies({ projectId }: { projectId: string | null }) {
       ) : links.map((d) => {
         const sc = STATUS_PILL[d.status] ?? STATUS_PILL.green;
         return (
-          <div key={d.id} onClick={() => openProject(d.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "13px 18px", borderBottom: "1px solid #F4F6FA", cursor: "pointer" }}>
+          <div key={d.id} onClick={() => openProject(d.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "13px 18px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: sc.dot, flex: "none" }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{d.name}</div>
@@ -1054,7 +1054,7 @@ function Dependencies({ projectId }: { projectId: string | null }) {
             <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{d.health}</span>
             {unlinkable && canEdit && (
               <button onClick={(e) => { e.stopPropagation(); if (confirm(`Unlink dependency on “${d.name}”?`)) unlink.mutate(d.id); }}
-                title="Remove dependency" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: "#A1282B", flex: "none" }}>
+                title="Remove dependency" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: color.dangerInk, flex: "none" }}>
                 <Icon name="trash" size={15} />
               </button>
             )}
@@ -1068,8 +1068,8 @@ function Dependencies({ projectId }: { projectId: string | null }) {
     <div style={{ maxWidth: 880 }}>
       <div style={{ fontSize: 13.5, color: color.faint, marginBottom: 16 }}>Cross-project links for this project. Task &amp; epic dependencies are shown on their own tabs.</div>
       {inheritedRisk && (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: "#FBF6E8", border: "1px solid #F0E2BC", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
-          <span style={{ color: "#8A6300", display: "flex", marginTop: 1 }}><Icon name="alert" size={18} /></span>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, background: color.surfaceAlt, border: `1px solid ${color.warnBorder}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+          <span style={{ color: color.warningInk, display: "flex", marginTop: 1 }}><Icon name="alert" size={18} /></span>
           <div style={{ fontSize: 13, lineHeight: 1.5, color: "#5A4A1F" }}>
             <b>Aggregated status: {effHealth}.</b> This project's own health is <b>{ownHealth}</b>, but it inherits risk from a dependency — {depRiskTitle}. Resolve the upstream item to clear the rollup.
           </div>
@@ -1121,11 +1121,11 @@ function LinkProjectModal({ projectId, existing, onClose }: { projectId: string;
 interface ProjBlocker { id: string; title: string; projectId: string; projectName: string; owner: string; status: string; description: string; }
 const BLK_STATUSES = ["Active", "In progress", "Resolved", "Cancelled", "Archived"];
 const BLK_STATUS_COLOR: Record<string, { ink: string; tint: string; dot: string }> = {
-  Active:        { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
-  "In progress": { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  Resolved:      { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  Cancelled:     { ink: "#56607A", tint: "#EEF1F6", dot: "#8A93A6" },
-  Archived:      { ink: "#5E2E89", tint: "#F0E8F7", dot: "#7A6BB0" },
+  Active:        { ink: color.dangerInk, tint: color.dangerTint, dot: "#D13438" },
+  "In progress": { ink: color.warningInk, tint: color.warningTint, dot: "#E0A100" },
+  Resolved:      { ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
+  Cancelled:     { ink: color.subtle, tint: color.bg, dot: "#8A93A6" },
+  Archived:      { ink: "#5E2E89", tint: color.accentTint, dot: "#7A6BB0" },
 };
 
 function ProjectBlockers({ projectId }: { projectId: string | null }) {
@@ -1159,7 +1159,7 @@ function ProjectBlockers({ projectId }: { projectId: string | null }) {
         ) : blockers.map((b) => {
           const sc = BLK_STATUS_COLOR[b.status] ?? BLK_STATUS_COLOR.Active;
           return (
-            <div key={b.id} onClick={() => canEdit && setOpen(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.6fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
+            <div key={b.id} onClick={() => canEdit && setOpen(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.6fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{b.id}</div>
               <div style={{ paddingRight: 12, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 500, color: color.text }}>{b.title}</div>
@@ -1215,12 +1215,12 @@ function ProjectBlockerModal({ projectId, blocker, onClose }: { projectId: strin
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {blocker && (confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this blocker?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this blocker?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         ))}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -1275,18 +1275,18 @@ function Vacations({ projectId }: { projectId: string | null }) {
 
       {/* calendar */}
       <div style={{ border: `1px solid ${color.border}`, borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1px solid #EEF1F6" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: `1px solid ${color.bg}` }}>
           <div style={{ padding: "8px 14px", fontSize: 10.5, color: color.faint3, textTransform: "uppercase", fontWeight: 600 }}>Resource</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)" }}>
-            {VAC_MONTHS.map((m) => <div key={m} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#7B849A", borderLeft: "1px solid #F4F6FA" }}>{m}</div>)}
+            {VAC_MONTHS.map((m) => <div key={m} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#7B849A", borderLeft: `1px solid ${color.surfaceAlt}` }}>{m}</div>)}
           </div>
         </div>
         {people.length === 0 ? (
           <div style={{ padding: "26px 14px", textAlign: "center", fontSize: 12.5, color: color.faint3 }}>No absences logged for this project yet.</div>
         ) : people.map((name) => (
-          <div key={name} style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: "1px solid #F4F6FA", alignItems: "center" }}>
+          <div key={name} style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: `1px solid ${color.surfaceAlt}`, alignItems: "center" }}>
             <div style={{ padding: "7px 14px", fontSize: 12.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-            <div style={{ position: "relative", height: 30, backgroundImage: "linear-gradient(90deg,#F4F6FA 1px,transparent 1px)", backgroundSize: "16.666% 100%" }}>
+            <div style={{ position: "relative", height: 30, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "16.666% 100%" }}>
               {absences.filter((a) => a.person === name).map((a) => {
                 const left = vpct(a.from), w = Math.max(1.5, vpct(a.to) - left);
                 return <div key={a.id} title={`${name} · ${a.type} · ${a.from}→${a.to}`} style={{ position: "absolute", left: `${left}%`, width: `${w}%`, top: 7, height: 16, borderRadius: 5, background: ABSENCE_COLOR[a.type] ?? "#0F6CBD", opacity: 0.9 }} />;
@@ -1305,7 +1305,7 @@ function Vacations({ projectId }: { projectId: string | null }) {
 
       {/* add absence */}
       {canEdit && (
-        <div style={{ background: color.surfaceAlt, border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+        <div style={{ background: color.surfaceAlt, border: `1px solid ${color.bg}`, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add an absence</div>
           <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
             <Input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Resource name" style={{ width: 180 }} />
@@ -1368,16 +1368,16 @@ function WaysOfWorking({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
         <SectionTitle>Ways of working</SectionTitle>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{data.cadence}</span>
-        {data.canEdit && <button onClick={() => setDraft({ ...data, ceremonies: data.ceremonies.map((c) => ({ ...c })), artifacts: [...data.artifacts], roles: [...data.roles] })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 8, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
+        {data.canEdit && <button onClick={() => setDraft({ ...data, ceremonies: data.ceremonies.map((c) => ({ ...c })), artifacts: [...data.artifacts], roles: [...data.roles] })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, borderRadius: 8, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
       </div>
       <div style={{ fontSize: 12.5, color: color.faint2, lineHeight: 1.5, marginBottom: 16 }}>{data.summary}</div>
 
       <div style={WOW_UPPER}>Ceremonies &amp; cadences</div>
       <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
         {data.ceremonies.map((c, i) => (
-          <div key={c.label + i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 13px", borderBottom: i < data.ceremonies.length - 1 ? "1px solid #F4F6FA" : "none" }}>
+          <div key={c.label + i} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 13px", borderBottom: i < data.ceremonies.length - 1 ? `1px solid ${color.surfaceAlt}` : "none" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#0F6CBD", marginTop: 6, flex: "none" }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{c.label}</div>
@@ -1390,11 +1390,11 @@ function WaysOfWorking({ projectId }: { projectId: string | null }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div>
           <div style={WOW_UPPER}>Key artifacts</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.artifacts.map((a) => chip(a, "#6A2E9E", "#F0E8F7"))}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.artifacts.map((a) => chip(a, "#6A2E9E", color.accentTint))}</div>
         </div>
         <div>
           <div style={WOW_UPPER}>Roles</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.roles.map((r) => chip(r, "#0B6B37", "#E7F4EC"))}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.roles.map((r) => chip(r, "#0B6B37", color.successTint))}</div>
         </div>
       </div>
     </Card>
@@ -1441,11 +1441,11 @@ function WowEditor({ draft, setDraft, onSave, onCancel, saving }: {
           </div>
         ))}
       </div>
-      <button onClick={() => set({ ceremonies: [...draft.ceremonies, { label: "", detail: "" }] })} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}><Icon name="plus" size={14} /> Add ceremony</button>
+      <button onClick={() => set({ ceremonies: [...draft.ceremonies, { label: "", detail: "" }] })} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}><Icon name="plus" size={14} /> Add ceremony</button>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {editChips("Key artifacts", draft.artifacts, "artifacts", "#6A2E9E", "#F0E8F7")}
-        {editChips("Roles", draft.roles, "roles", "#0B6B37", "#E7F4EC")}
+        {editChips("Key artifacts", draft.artifacts, "artifacts", "#6A2E9E", color.accentTint)}
+        {editChips("Roles", draft.roles, "roles", "#0B6B37", color.successTint)}
       </div>
     </Card>
   );
@@ -1485,13 +1485,13 @@ function OpsImpactPanel({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: `1px solid ${color.bg}` }}>
         <Icon name="activity" size={17} color={color.warningAlt} />
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Operational load</div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "#8A6300", background: "#FBF2D7", borderRadius: 6, padding: "2px 8px" }}>{data?.alloc ?? 0}% capacity</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: color.warningInk, background: color.warningTint, borderRadius: 6, padding: "2px 8px" }}>{data?.alloc ?? 0}% capacity</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: color.faint2 }}>{items.length} item{items.length === 1 ? "" : "s"} pulling capacity off delivery</span>
       </div>
       <div>
         {items.map((i) => (
-          <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", borderBottom: "1px solid #F4F6FA" }}>
+          <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{i.title}</div>
               <div style={{ fontSize: 11, color: color.faint2, marginTop: 1 }}>
@@ -1563,7 +1563,7 @@ function CommunicationPlan({ projectId }: { projectId: string | null }) {
       </div>
 
       {canEdit && (
-        <div style={{ background: color.surfaceAlt, border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+        <div style={{ background: color.surfaceAlt, border: `1px solid ${color.bg}`, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add a communication</div>
           <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1.2fr 1fr", gap: 9, marginBottom: 9 }}>
             <Input value={stakeholder} onChange={(e) => setStakeholder(e.target.value)} placeholder="Stakeholder / group" />
@@ -1593,14 +1593,14 @@ function CommRow({ entry, canEdit, grid, onPatch, onRemove }: {
   const cellInput: React.CSSProperties = { border: "none", background: "transparent", fontSize: 12.5, fontFamily: "inherit", color: color.text, outline: "none", width: "100%" };
   if (!canEdit) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "11px 14px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5, color: color.text }}>
+      <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "11px 14px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5, color: color.text }}>
         <div style={{ fontWeight: 600 }}>{entry.stakeholder}</div>
         <div>{entry.channel}</div><div>{entry.commType}</div><div>{entry.schedule}</div><div>{entry.owner || "—"}</div>
       </div>
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "8px 14px", borderBottom: "1px solid #F4F6FA" }}>
+    <div style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", padding: "8px 14px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <input value={stakeholder} onChange={(e) => setStakeholder(e.target.value)} onBlur={() => stakeholder !== entry.stakeholder && onPatch({ stakeholder })} style={{ ...cellInput, fontWeight: 600 }} />
       <select value={entry.channel} onChange={(e) => onPatch({ channel: e.target.value })} style={cellSelect}>{COMM_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select>
       <select value={entry.commType} onChange={(e) => onPatch({ commType: e.target.value })} style={cellSelect}>{COMM_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}</select>

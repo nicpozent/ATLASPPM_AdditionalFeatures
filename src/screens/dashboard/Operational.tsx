@@ -3,11 +3,11 @@ import { Card } from "@/components/ui";
 import { KPI_DEFS, type DashboardData } from "./data";
 
 const STATUS_COLORS: Record<string, { dot: string; ink: string; tint: string }> = {
-  "In progress": { dot: "#0F6CBD", ink: "#0C5798", tint: "#E6EFFB" },
-  "To do":       { dot: "#8A93A6", ink: "#4A5266", tint: "#EEF1F6" },
-  "In review":   { dot: "#E0A100", ink: "#8A6300", tint: "#FBF2D7" },
-  "Done":        { dot: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
-  "Blocked":     { dot: "#D13438", ink: "#A1282B", tint: "#FBE7E8" },
+  "In progress": { dot: "#0F6CBD", ink: color.primaryDark, tint: color.primaryTint2 },
+  "To do":       { dot: "#8A93A6", ink: color.subtle, tint: color.bg },
+  "In review":   { dot: "#E0A100", ink: color.warningInk, tint: color.warningTint },
+  "Done":        { dot: "#15A34A", ink: color.successInk, tint: color.successTint },
+  "Blocked":     { dot: "#D13438", ink: color.dangerInk, tint: color.dangerTint },
 };
 
 export function Operational({ d, onProject }: { d: DashboardData; onProject: (id: string) => void }) {
@@ -18,7 +18,7 @@ export function Operational({ d, onProject }: { d: DashboardData; onProject: (id
         {KPI_DEFS.map((def, i) => {
           const k = d.kpis[def.key];
           return (
-            <div key={def.key} style={{ flex: 1, padding: "13px 18px", borderRight: i < KPI_DEFS.length - 1 ? "1px solid #F2F4F9" : "none", display: "flex", flexDirection: "column", gap: 3 }}>
+            <div key={def.key} style={{ flex: 1, padding: "13px 18px", borderRight: i < KPI_DEFS.length - 1 ? `1px solid ${color.surfaceAlt}` : "none", display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 11.5, color: color.faint }}>{def.label}</span>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: k ? color.ink : color.faint3 }}>{k?.value ?? "—"}</span>
@@ -40,11 +40,11 @@ export function Operational({ d, onProject }: { d: DashboardData; onProject: (id
               </div>
             </div>
             {d.tasks.length === 0 ? (
-              <div style={{ padding: "34px 20px", textAlign: "center", color: color.faint3, fontSize: 13, borderTop: "1px solid #F2F4F9" }}>No tasks assigned to you.</div>
+              <div style={{ padding: "34px 20px", textAlign: "center", color: color.faint3, fontSize: 13, borderTop: `1px solid ${color.surfaceAlt}` }}>No tasks assigned to you.</div>
             ) : d.tasks.map((t, i) => {
               const sc = STATUS_COLORS[t.status] ?? STATUS_COLORS["To do"];
               return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: "1px solid #F2F4F9" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderTop: `1px solid ${color.surfaceAlt}` }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: sc.dot, flex: "none" }} />
                   <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
                   <span style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{t.sprint}</span>

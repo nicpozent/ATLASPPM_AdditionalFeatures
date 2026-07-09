@@ -15,10 +15,10 @@ import { SprintTaskRow } from "./TaskModals";
 interface EpicRef { id: number; name: string; }
 interface EpicItem { id: number; name: string; stories: number; done: number; pct: number; status: string; dependsOn: string; deps: EpicRef[]; }
 const EPIC_STATUS: Record<string, { ink: string; tint: string; bar: string }> = {
-  Complete:      { ink: "#0B6B37", tint: "#E7F4EC", bar: "#15A34A" },
-  "In progress": { ink: "#0C5798", tint: "#E6EFFB", bar: "#0F6CBD" },
-  Upcoming:      { ink: "#56607A", tint: "#EEF1F6", bar: "#8A93A6" },
-  "At risk":     { ink: "#8A6300", tint: "#FBF2D7", bar: "#E0A100" },
+  Complete:      { ink: color.successInk, tint: color.successTint, bar: "#15A34A" },
+  "In progress": { ink: color.primaryDark, tint: color.primaryTint2, bar: "#0F6CBD" },
+  Upcoming:      { ink: color.subtle, tint: color.bg, bar: "#8A93A6" },
+  "At risk":     { ink: color.warningInk, tint: color.warningTint, bar: "#E0A100" },
 };
 const EPIC_STATUSES = ["Complete", "In progress", "Upcoming", "At risk"];
 
@@ -64,7 +64,7 @@ export function Epics({ projectId }: { projectId: string | null }) {
                   <span>{e.done} of {e.stories} stories done</span>
                   <span style={{ fontFamily: font.head, fontWeight: 700, color: color.ink }}>{e.pct}%</span>
                 </div>
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #F2F4F9", display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "#7A6BB0" }}>
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${color.surfaceAlt}`, display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "#7A6BB0" }}>
                   <Icon name="link" size={14} /><span>{depLabel}</span>
                 </div>
               </button>
@@ -142,7 +142,7 @@ function EpicModal({ projectId, epic, epics, canEdit = true, onClose }: { projec
             const on = depIds.includes(c.id);
             return (
               <button key={c.id} type="button" disabled={readOnly} onClick={() => toggleDep(c.id)}
-                style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: readOnly ? "default" : "pointer", padding: "5px 11px", borderRadius: 20, border: `1px solid ${on ? "#7A6BB0" : color.border}`, background: on ? "#F0E8F7" : "#fff", color: on ? "#5E2E89" : color.faint }}>
+                style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: readOnly ? "default" : "pointer", padding: "5px 11px", borderRadius: 20, border: `1px solid ${on ? "#7A6BB0" : color.border}`, background: on ? color.accentTint : "#fff", color: on ? "#5E2E89" : color.faint }}>
                 {on ? "✓ " : ""}{c.name}
               </button>
             );
@@ -169,12 +169,12 @@ function EpicModal({ projectId, epic, epics, canEdit = true, onClose }: { projec
         {epic && canEdit && (
           confirmDel ? (
             <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this epic?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this epic?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
               <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete epic</button>
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete epic</button>
           )
         )}
         <div style={{ flex: 1 }} />

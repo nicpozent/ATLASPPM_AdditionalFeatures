@@ -14,8 +14,8 @@ interface PlanTask { id: number; title: string; status: string; assignee: string
 interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; tasks: PlanTask[]; }
 const PLAN_TASK_STATUSES = ["Not run", "In test", "Passed", "Failed", "Blocked"];
 const PLAN_TASK_COLOR: Record<string, { ink: string; tint: string }> = {
-  Passed: { ink: "#0B6B37", tint: "#E7F4EC" }, "In test": { ink: "#0C5798", tint: "#E6EFFB" },
-  Failed: { ink: "#A1282B", tint: "#FBE7E8" }, Blocked: { ink: "#8A6300", tint: "#FBF2D7" }, "Not run": { ink: "#56607A", tint: "#EEF1F6" },
+  Passed: { ink: color.successInk, tint: color.successTint }, "In test": { ink: color.primaryDark, tint: color.primaryTint2 },
+  Failed: { ink: color.dangerInk, tint: color.dangerTint }, Blocked: { ink: color.warningInk, tint: color.warningTint }, "Not run": { ink: color.subtle, tint: color.bg },
 };
 interface Defect { id: number; code: string; title: string; severity: string; owner: string; status: string; test: string; }
 interface QualityData { canEdit: boolean; totals: { cases: number; coverage: number; passRate: number; failed: number; openDefects: number }; plans: TestPlan[]; defects: Defect[]; }
@@ -25,10 +25,10 @@ const QA_STAGES = ["Unit", "Integration", "System", "UAT", "Regression", "Perfor
 const DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"];
 const DEFECT_STATUSES = ["Open", "In progress", "Resolved", "Closed"];
 const SEV_COLOR: Record<string, { ink: string; tint: string }> = {
-  Critical: { ink: "#A1282B", tint: "#FBE7E8" }, High: { ink: "#8A6300", tint: "#FBF2D7" }, Medium: { ink: "#0C5798", tint: "#E6EFFB" }, Low: { ink: "#56607A", tint: "#EEF1F6" },
+  Critical: { ink: color.dangerInk, tint: color.dangerTint }, High: { ink: color.warningInk, tint: color.warningTint }, Medium: { ink: color.primaryDark, tint: color.primaryTint2 }, Low: { ink: color.subtle, tint: color.bg },
 };
 const DEFECT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
-  Open: { ink: "#A1282B", tint: "#FBE7E8" }, "In progress": { ink: "#8A6300", tint: "#FBF2D7" }, Resolved: { ink: "#0B6B37", tint: "#E7F4EC" }, Closed: { ink: "#56607A", tint: "#EEF1F6" },
+  Open: { ink: color.dangerInk, tint: color.dangerTint }, "In progress": { ink: color.warningInk, tint: color.warningTint }, Resolved: { ink: color.successInk, tint: color.successTint }, Closed: { ink: color.subtle, tint: color.bg },
 };
 const DEF_COLS = "0.7fr 2.4fr 0.9fr 1fr 1fr 0.8fr";
 
@@ -83,9 +83,9 @@ export function Quality({ projectId }: { projectId: string | null }) {
         ) : plans.map((p) => {
           const pct = (n: number) => p.cases === 0 ? "0%" : `${(100 * n / p.cases).toFixed(1)}%`;
           return (
-            <div key={p.id} style={{ padding: "13px 22px", borderTop: "1px solid #F2F4F9" }}>
+            <div key={p.id} style={{ padding: "13px 22px", borderTop: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#5E2E89", background: "#F0E8F7", padding: "2px 9px", borderRadius: 20 }}>{p.stage}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#5E2E89", background: color.accentTint, padding: "2px 9px", borderRadius: 20 }}>{p.stage}</span>
                 <button onClick={() => canEdit && setOpenPlan(p)} style={{ flex: 1, textAlign: "left", fontSize: 13.5, fontWeight: 600, color: canEdit ? color.primary : color.text, background: "none", border: "none", padding: 0, cursor: canEdit ? "pointer" : "default", fontFamily: "inherit" }}>{p.name}</button>
                 <span style={{ fontSize: 11.5, color: color.faint }}>{p.cases} cases · {p.execPct}% executed</span>
                 <button onClick={() => toggleExpand(p.id)} style={{ fontSize: 11.5, fontWeight: 600, color: color.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>{expanded.has(p.id) ? "▾" : "▸"} {p.tasks.length} task{p.tasks.length === 1 ? "" : "s"}</button>
@@ -96,9 +96,9 @@ export function Quality({ projectId }: { projectId: string | null }) {
                 <div style={{ width: pct(p.blocked), background: "#E0A100" }} />
               </div>
               <div style={{ display: "flex", gap: 16, marginTop: 7 }}>
-                <span style={{ fontSize: 11, color: "#0B6B37" }}>● {p.passed} passed</span>
-                <span style={{ fontSize: 11, color: "#A1282B" }}>● {p.failed} failed</span>
-                <span style={{ fontSize: 11, color: "#8A6300" }}>● {p.blocked} blocked</span>
+                <span style={{ fontSize: 11, color: color.successInk }}>● {p.passed} passed</span>
+                <span style={{ fontSize: 11, color: color.dangerInk }}>● {p.failed} failed</span>
+                <span style={{ fontSize: 11, color: color.warningInk }}>● {p.blocked} blocked</span>
                 <span style={{ fontSize: 11, color: color.faint3 }}>○ {p.notRun} not run</span>
               </div>
               {expanded.has(p.id) && <PlanTasks projectId={projectId} plan={p} canEdit={canEdit} />}
@@ -122,7 +122,7 @@ export function Quality({ projectId }: { projectId: string | null }) {
           const sv = SEV_COLOR[d.severity] ?? SEV_COLOR.Medium;
           const st = DEFECT_STATUS_COLOR[d.status] ?? DEFECT_STATUS_COLOR.Open;
           return (
-            <div key={d.id} onClick={() => canEdit && setOpenDefect(d)} style={{ display: "grid", gridTemplateColumns: DEF_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
+            <div key={d.id} onClick={() => canEdit && setOpenDefect(d)} style={{ display: "grid", gridTemplateColumns: DEF_COLS, alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.code}</div>
               <div style={{ fontSize: 13, color: color.text, fontWeight: 500 }}>{d.title}</div>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: sv.ink, background: sv.tint, padding: "3px 9px", borderRadius: 6 }}>{d.severity}</span></div>
@@ -161,7 +161,7 @@ function PlanTasks({ projectId, plan, canEdit }: { projectId: string; plan: Test
   });
 
   return (
-    <div style={{ marginTop: 11, paddingTop: 11, borderTop: "1px dashed #E4E8F1" }}>
+    <div style={{ marginTop: 11, paddingTop: 11, borderTop: `1px dashed ${color.border3}` }}>
       {plan.tasks.length === 0 ? (
         <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: canEdit ? 9 : 0 }}>No test cases on this plan yet.</div>
       ) : (
@@ -179,7 +179,7 @@ function PlanTasks({ projectId, plan, canEdit }: { projectId: string; plan: Test
                 ) : (
                   <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 8px", borderRadius: 20 }}>{t.status}</span>
                 )}
-                {canEdit && <button onClick={() => del.mutate(t.id)} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", color: "#A1282B", display: "inline-flex" }}><Icon name="trash" size={13} /></button>}
+                {canEdit && <button onClick={() => del.mutate(t.id)} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", color: color.dangerInk, display: "inline-flex" }}><Icon name="trash" size={13} /></button>}
               </div>
             );
           })}
@@ -230,12 +230,12 @@ function PlanModal({ projectId, plan, onClose }: { projectId: string; plan?: Tes
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {plan && (confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this plan?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this plan?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         ))}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -281,12 +281,12 @@ function DefectModal({ projectId, defect, onClose }: { projectId: string; defect
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {defect && (confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this defect?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this defect?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         ))}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

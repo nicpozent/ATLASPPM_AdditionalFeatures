@@ -22,15 +22,15 @@ const REQ_PRIORITIES = ["Critical", "High", "Medium", "Low"];
 const TEST_RESULTS = ["Not run", "In test", "Passed", "Failed"];
 const CR_IMPACTS = ["Low", "Medium", "High"];
 const REQ_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "In review": { ink: "#0C5798", tint: "#E6EFFB" }, Draft: { ink: "#56607A", tint: "#EEF1F6" },
-  Replaced: { ink: "#5E2E89", tint: "#F0E8F7" }, Archived: { ink: "#56607A", tint: "#EEF1F6" },
-  "Retired (Requester)": { ink: "#8A6300", tint: "#FBF2D7" }, "Retired (PM)": { ink: "#8A6300", tint: "#FBF2D7" }, "Retired (Team)": { ink: "#8A6300", tint: "#FBF2D7" },
+  Approved: { ink: color.successInk, tint: color.successTint }, "In review": { ink: color.primaryDark, tint: color.primaryTint2 }, Draft: { ink: color.subtle, tint: color.bg },
+  Replaced: { ink: "#5E2E89", tint: color.accentTint }, Archived: { ink: color.subtle, tint: color.bg },
+  "Retired (Requester)": { ink: color.warningInk, tint: color.warningTint }, "Retired (PM)": { ink: color.warningInk, tint: color.warningTint }, "Retired (Team)": { ink: color.warningInk, tint: color.warningTint },
 };
 const TEST_STATUS: Record<string, { ink: string; tint: string }> = {
-  Passed: { ink: "#0B6B37", tint: "#E7F4EC" }, "In test": { ink: "#0C5798", tint: "#E6EFFB" }, Failed: { ink: "#A1282B", tint: "#FBE7E8" }, "Not run": { ink: "#56607A", tint: "#EEF1F6" },
+  Passed: { ink: color.successInk, tint: color.successTint }, "In test": { ink: color.primaryDark, tint: color.primaryTint2 }, Failed: { ink: color.dangerInk, tint: color.dangerTint }, "Not run": { ink: color.subtle, tint: color.bg },
 };
 const CR_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, Pending: { ink: "#8A6300", tint: "#FBF2D7" }, Rejected: { ink: "#A1282B", tint: "#FBE7E8" },
+  Approved: { ink: color.successInk, tint: color.successTint }, Pending: { ink: color.warningInk, tint: color.warningTint }, Rejected: { ink: color.dangerInk, tint: color.dangerTint },
 };
 const REQ_COLS = "2.4fr 1fr 1.1fr 0.9fr 1fr 1fr 60px";
 const CR_COLS = "0.7fr 2.2fr 0.9fr 0.8fr 1fr 0.9fr 1fr";
@@ -88,7 +88,7 @@ export function Requirements({ projectId }: { projectId: string | null }) {
           const sc = REQ_STATUS[r.status] ?? REQ_STATUS.Draft;
           const tc = TEST_STATUS[r.testStatus] ?? TEST_STATUS["Not run"];
           return (
-            <div key={r.id} style={{ display: "grid", gridTemplateColumns: REQ_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={r.id} style={{ display: "grid", gridTemplateColumns: REQ_COLS, alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ minWidth: 0 }}>
                 <button onClick={() => setOpenId(r.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{r.title}</button>
                 <div style={{ fontSize: 11, color: color.faint3, fontFamily: font.mono, display: "flex", alignItems: "center", gap: 6 }}>{r.code} · {r.type} · {r.priority}{r.attachments.length > 0 && <span title={`${r.attachments.length} attachment(s)`} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}><Icon name="paperclip" size={11} />{r.attachments.length}</span>}</div>
@@ -128,7 +128,7 @@ export function Requirements({ projectId }: { projectId: string | null }) {
         ) : changeRequests.map((c) => {
           const sc = CR_STATUS[c.status] ?? CR_STATUS.Pending;
           return (
-            <div key={c.id} onClick={() => canEdit && setOpenCr(c)} style={{ display: "grid", gridTemplateColumns: CR_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: canEdit ? "pointer" : "default" }}>
+            <div key={c.id} onClick={() => canEdit && setOpenCr(c)} style={{ display: "grid", gridTemplateColumns: CR_COLS, alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
               <div style={{ fontSize: 13, color: canEdit ? color.primary : color.text, fontWeight: 600 }}>{c.title}</div>
               <div style={{ fontSize: 12, color: color.subtle, fontFamily: font.mono }}>{c.reqCode || "—"}</div>
@@ -193,12 +193,12 @@ function EditCrModal({ projectId, cr, reqCodes, onClose }: { projectId: string; 
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this CR?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this CR?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         )}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -326,7 +326,7 @@ function RequirementModal({ projectId, req, canEdit, onClose }: { projectId: str
                   <div style={{ fontSize: 11, color: color.faint3 }}>{fmtSize(a.size)} · {a.uploadedAt}</div>
                 </div>
                 <button onClick={() => apiDownload(`/requirement-attachments/${a.id}`, a.fileName)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.primary, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Icon name="download" size={14} /> Download</button>
-                {canEdit && <button onClick={() => removeAtt.mutate(a.id)} title="Remove attachment" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={14} /></button>}
+                {canEdit && <button onClick={() => removeAtt.mutate(a.id)} title="Remove attachment" style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", color: color.dangerInk }}><Icon name="trash" size={14} /></button>}
               </div>
             ))}
           </div>
@@ -337,12 +337,12 @@ function RequirementModal({ projectId, req, canEdit, onClose }: { projectId: str
         {canEdit && (
           confirmDel ? (
             <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this requirement?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this requirement?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
               <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete requirement</button>
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete requirement</button>
           )
         )}
         <div style={{ flex: 1 }} />

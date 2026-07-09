@@ -55,13 +55,13 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
   return (
     <Modal onClose={onClose} width={520} label={`${SCOPE_LABEL[scope]} costs · ${name}`}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <span style={{ width: 34, height: 34, borderRadius: 9, background: "#E7F4EC", color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
+        <span style={{ width: 34, height: 34, borderRadius: 9, background: color.successTint, color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name="coins" size={18} /></span>
         <div style={{ fontSize: 12, color: color.faint2 }}>€ thousands · You can edit only the cost lines your role owns.</div>
       </div>
       {/* Spent to date vs Forecast at completion — same taxonomy, separate figures */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 9, padding: 3, gap: 2, marginBottom: 14 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 9, padding: 3, gap: 2, marginBottom: 14 }}>
         {([["actual", "Spent to date"], ["forecast", "Forecast at completion"]] as [CostKind, string][]).map(([k, lbl]) => (
-          <button key={k} onClick={() => setKind(k)} style={{ padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: kind === k ? "#fff" : "transparent", color: kind === k ? color.primary : "#565F73", boxShadow: kind === k ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{lbl}</button>
+          <button key={k} onClick={() => setKind(k)} style={{ padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: kind === k ? color.surface : "transparent", color: kind === k ? color.primary : color.subtle, boxShadow: kind === k ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{lbl}</button>
         ))}
       </div>
 

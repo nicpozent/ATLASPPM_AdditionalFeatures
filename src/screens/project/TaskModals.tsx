@@ -167,7 +167,7 @@ export function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, epi
   return (
     <Modal onClose={onClose} width={620} label={`${task.code} · Task`}>
       {onLeave && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 9, padding: "9px 12px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, color: color.dangerInk, background: color.dangerTint, border: `1px solid ${color.dangerBorder}`, borderRadius: 9, padding: "9px 12px", marginBottom: 16 }}>
           <Icon name="alert" size={15} /> {task.assignee} is on leave during this task's scheduled window ({startDate || "—"} → {targetDate || startDate || "—"}).
         </div>
       )}
@@ -242,12 +242,12 @@ export function TaskDetailModal({ projectId, task, canEdit, assigneeOptions, epi
         {canEdit && (
           confirmDel ? (
             <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this task?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm delete"}</Button>
+              <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this task?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm delete"}</Button>
               <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete task</button>
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete task</button>
           )
         )}
         <div style={{ flex: 1 }} />

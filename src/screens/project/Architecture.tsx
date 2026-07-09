@@ -24,22 +24,22 @@ const GOV_LEVEL: Record<string, string> = {
 };
 const ADM_STATUSES = ["Not started", "Draft", "In progress", "In review", "Approved"];
 const ADM_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "In review": { ink: "#8A6300", tint: "#FBF2D7" },
-  "In progress": { ink: "#0C5798", tint: "#E6EFFB" }, Draft: { ink: "#5E2E89", tint: "#F0E8F7" }, "Not started": { ink: "#56607A", tint: "#EEF1F6" },
+  Approved: { ink: color.successInk, tint: color.successTint }, "In review": { ink: color.warningInk, tint: color.warningTint },
+  "In progress": { ink: color.primaryDark, tint: color.primaryTint2 }, Draft: { ink: "#5E2E89", tint: color.accentTint }, "Not started": { ink: color.subtle, tint: color.bg },
 };
 const ADM_COLS = "1.6fr 1.4fr 1.1fr 1.2fr 0.9fr";
 
 // ARB decision → label + colour, and overall board status → colour.
 const ARB_DECISION: Record<string, { label: string; ink: string; tint: string }> = {
-  pending: { label: "Pending", ink: "#56607A", tint: "#EEF1F6" },
-  approved: { label: "Approved", ink: "#0B6B37", tint: "#E7F4EC" },
-  conditions: { label: "With conditions", ink: "#0C5798", tint: "#E6EFFB" },
-  rejected: { label: "Rejected", ink: "#A1282B", tint: "#FBE7E8" },
+  pending: { label: "Pending", ink: color.subtle, tint: color.bg },
+  approved: { label: "Approved", ink: color.successInk, tint: color.successTint },
+  conditions: { label: "With conditions", ink: color.primaryDark, tint: color.primaryTint2 },
+  rejected: { label: "Rejected", ink: color.dangerInk, tint: color.dangerTint },
 };
 const ARB_OVERALL: Record<string, { ink: string; tint: string }> = {
-  Approved: { ink: "#0B6B37", tint: "#E7F4EC" }, "Approved with conditions": { ink: "#0C5798", tint: "#E6EFFB" },
-  Rejected: { ink: "#A1282B", tint: "#FBE7E8" }, "In review": { ink: "#8A6300", tint: "#FBF2D7" },
-  Pending: { ink: "#56607A", tint: "#EEF1F6" }, "Not started": { ink: "#56607A", tint: "#EEF1F6" },
+  Approved: { ink: color.successInk, tint: color.successTint }, "Approved with conditions": { ink: color.primaryDark, tint: color.primaryTint2 },
+  Rejected: { ink: color.dangerInk, tint: color.dangerTint }, "In review": { ink: color.warningInk, tint: color.warningTint },
+  Pending: { ink: color.subtle, tint: color.bg }, "Not started": { ink: color.subtle, tint: color.bg },
 };
 
 export function Architecture({ projectId }: { projectId: string | null }) {
@@ -75,7 +75,7 @@ export function Architecture({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13.5, color: color.faint }}>Architecture triage, tailored TOGAF ADM &amp; phase governance.</div>
         <div style={{ flex: 1 }} />
-        {canEdit && <span style={{ fontSize: 11, fontWeight: 600, color: "#5E2E89", background: "#F0E8F7", padding: "4px 10px", borderRadius: 6 }}>Chief Architect controls enabled</span>}
+        {canEdit && <span style={{ fontSize: 11, fontWeight: 600, color: "#5E2E89", background: color.accentTint, padding: "4px 10px", borderRadius: 6 }}>Chief Architect controls enabled</span>}
       </div>
 
       {/* triage / impact assessment */}
@@ -91,10 +91,10 @@ export function Architecture({ projectId }: { projectId: string | null }) {
             </Select>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F5F0FA", border: "1px solid #E4D7F0", borderRadius: 10, padding: "12px 15px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: color.accentTint, border: "1px solid #E4D7F0", borderRadius: 10, padding: "12px 15px" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", textTransform: "uppercase", letterSpacing: "0.04em" }}>Required governance</span>
           <span style={{ fontFamily: font.head, fontSize: 14, fontWeight: 700, color: "#3B1A5C" }}>{level}</span>
-          {full && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", padding: "3px 9px", borderRadius: 6 }}>Architecture-significant</span>}
+          {full && <span style={{ fontSize: 10.5, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, padding: "3px 9px", borderRadius: 6 }}>Architecture-significant</span>}
         </div>
       </Card>
 
@@ -108,7 +108,7 @@ export function Architecture({ projectId }: { projectId: string | null }) {
           const sc = ADM_STATUS[p.status] ?? ADM_STATUS["Not started"];
           const next = ADM_STATUSES[(ADM_STATUSES.indexOf(p.status) + 1) % ADM_STATUSES.length];
           return (
-            <div key={p.id} style={{ display: "grid", gridTemplateColumns: ADM_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={p.id} style={{ display: "grid", gridTemplateColumns: ADM_COLS, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ fontSize: 13, color: color.text, fontWeight: 600 }}>{p.phase}</div>
               <div style={{ fontSize: 12, color: color.faint }}>{p.focus}</div>
               <div style={{ fontSize: 12, color: color.subtle }}>{p.owner}</div>
@@ -135,7 +135,7 @@ export function Architecture({ projectId }: { projectId: string | null }) {
         {approvals.map((a) => {
           const dc = ARB_DECISION[a.decision] ?? ARB_DECISION.pending;
           return (
-            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 22px", borderTop: "1px solid #F2F4F9" }}>
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 22px", borderTop: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{a.role}</div>
                 <div style={{ fontSize: 11.5, color: color.faint3 }}>

@@ -109,7 +109,7 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
                 {canEdit && (
                   <>
                     <button onClick={() => setEditing(a)} title="Edit who's working on this" style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, display: "flex", padding: 4 }}><Icon name="edit" size={14} /></button>
-                    <button onClick={() => { if (confirm(`Detach “${a.subTeamName}” from this ${entityType}?`)) detach.mutate(a.id); }} title="Detach sub-team" style={{ background: "none", border: "none", cursor: "pointer", color: "#A1282B", display: "flex", padding: 4 }}><Icon name="trash" size={14} /></button>
+                    <button onClick={() => { if (confirm(`Detach “${a.subTeamName}” from this ${entityType}?`)) detach.mutate(a.id); }} title="Detach sub-team" style={{ background: "none", border: "none", cursor: "pointer", color: color.dangerInk, display: "flex", padding: 4 }}><Icon name="trash" size={14} /></button>
                   </>
                 )}
               </div>
@@ -125,7 +125,7 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
                         <Avatar name={m.name} />
                         <span style={{ fontSize: 12, color: color.text }}>{m.name}</span>
                         {m.alloc > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: color.primary }}>{m.alloc}%</span>}
-                        {m.extAlloc > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "#8A6300" }} title="extension">+{m.extAlloc}%</span>}
+                        {m.extAlloc > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: color.warningInk }} title="extension">+{m.extAlloc}%</span>}
                         {range && <span style={{ fontSize: 10, color: color.faint3, fontFamily: font.mono }}>{range}</span>}
                       </span>
                     );
@@ -166,8 +166,8 @@ function AllocEditor({ value, onChange }: { value: AllocEdit; onChange: (a: Allo
         <input type="date" value={value.end} onChange={(e) => set({ end: e.target.value })} style={dateInput} />
       </div>
       {value.extOn ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#FBF6E7", border: "1px solid #F0E4BE", borderRadius: 8, padding: "6px 8px" }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: "#8A6300" }}>EXTENSION</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 8, padding: "6px 8px" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: color.warningInk }}>EXTENSION</span>
           <span style={{ display: "inline-flex", borderRadius: 7, overflow: "hidden", border: `1px solid ${color.border2}` }}>
             <button type="button" onClick={() => set({ extMode: "percent" })} style={modeBtn(value.extMode === "percent")}>%</button>
             <button type="button" onClick={() => set({ extMode: "hours" })} style={modeBtn(value.extMode === "hours")}>h/wk</button>
@@ -196,7 +196,7 @@ function MemberChecklist({ members, selected, onToggle, edits, onEdit }: {
         const on = selected.has(m.name);
         return (
           <div key={m.id}
-            style={{ background: on ? "#EAF2FB" : color.surfaceAlt, border: `1px solid ${on ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "8px 10px" }}>
+            style={{ background: on ? color.primaryTint : color.surfaceAlt, border: `1px solid ${on ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "8px 10px" }}>
             <button type="button" onClick={() => onToggle(m.name)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: "none", border: "none", width: "100%", minWidth: 0, padding: 0 }}>
               <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primary : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
               <Avatar name={m.name} />
@@ -384,7 +384,7 @@ function SubTeamCard({ team, onChange }: { team: SubTeamT; onChange: () => void 
         <span style={{ fontSize: 10.5, fontWeight: 600, color: color.faint, background: color.bg, borderRadius: 20, padding: "2px 9px" }}>{team.managerLabel}</span>
         <div style={{ flex: 1 }} />
         <button onClick={() => setEdit(true)} title="Rename / describe" style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, display: "flex", padding: 4 }}><Icon name="edit" size={14} /></button>
-        <button onClick={() => { if (confirm(`Delete sub-team “${team.name}”? It will be detached from anything it's assigned to.`)) del.mutate(); }} title="Delete sub-team" style={{ background: "none", border: "none", cursor: "pointer", color: "#A1282B", display: "flex", padding: 4 }}><Icon name="trash" size={14} /></button>
+        <button onClick={() => { if (confirm(`Delete sub-team “${team.name}”? It will be detached from anything it's assigned to.`)) del.mutate(); }} title="Delete sub-team" style={{ background: "none", border: "none", cursor: "pointer", color: color.dangerInk, display: "flex", padding: 4 }}><Icon name="trash" size={14} /></button>
       </div>
       {team.description && <div style={{ fontSize: 12, color: color.subtle, marginBottom: 9 }}>{team.description}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 11 }}>

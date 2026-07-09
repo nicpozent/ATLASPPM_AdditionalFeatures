@@ -18,21 +18,21 @@ const CATS: { key: Cat; label: string; icon: string }[] = [
   { key: "release", label: "Releases", icon: "rocket" },
 ];
 const TYPE_META: Record<string, { label: string; ink: string; tint: string; icon: string }> = {
-  project: { label: "Project", ink: "#7A3FB0", tint: "#F0E8F7", icon: "folder" },
-  program: { label: "Program", ink: "#0C5798", tint: "#E6EFFB", icon: "folders" },
-  product: { label: "Product", ink: "#0B6B37", tint: "#E7F4EC", icon: "box" },
-  release: { label: "Release", ink: "#8A6300", tint: "#FBF2D7", icon: "rocket" },
+  project: { label: "Project", ink: "#7A3FB0", tint: color.accentTint, icon: "folder" },
+  program: { label: "Program", ink: color.primaryDark, tint: color.primaryTint2, icon: "folders" },
+  product: { label: "Product", ink: color.successInk, tint: color.successTint, icon: "box" },
+  release: { label: "Release", ink: color.warningInk, tint: color.warningTint, icon: "rocket" },
 };
 
 // Traffic-light + free-text status → a pill colour.
 function statusPill(s: string): { ink: string; tint: string; label: string } {
   const k = (s || "").toLowerCase();
-  if (k === "green" || k.includes("track") || k === "deployed" || k === "active") return { ink: "#0B6B37", tint: "#E7F4EC", label: s || "On track" };
-  if (k === "amber" || k.includes("risk") || k === "in progress" || k === "planned") return { ink: "#8A6300", tint: "#FBF2D7", label: s };
-  if (k === "red" || k.includes("critical")) return { ink: "#A1282B", tint: "#FBE7E8", label: s };
-  if (k === "hold" || k.includes("hold") || k === "cancelled") return { ink: "#56607A", tint: "#EEF1F6", label: s };
-  if (k === "completed") return { ink: "#0C5798", tint: "#E6EFFB", label: s };
-  return { ink: "#56607A", tint: "#EEF1F6", label: s || "—" };
+  if (k === "green" || k.includes("track") || k === "deployed" || k === "active") return { ink: color.successInk, tint: color.successTint, label: s || "On track" };
+  if (k === "amber" || k.includes("risk") || k === "in progress" || k === "planned") return { ink: color.warningInk, tint: color.warningTint, label: s };
+  if (k === "red" || k.includes("critical")) return { ink: color.dangerInk, tint: color.dangerTint, label: s };
+  if (k === "hold" || k.includes("hold") || k === "cancelled") return { ink: color.subtle, tint: color.bg, label: s };
+  if (k === "completed") return { ink: color.primaryDark, tint: color.primaryTint2, label: s };
+  return { ink: color.subtle, tint: color.bg, label: s || "—" };
 }
 
 interface Item { type: Cat; id: string; name: string; owner: string; dept: string; status: string; progress: number | null; start: string; end: string }
@@ -106,7 +106,7 @@ export default function PortfolioOverview() {
           const tm = TYPE_META[i.type];
           const sp = statusPill(i.status);
           return (
-            <div key={`${i.type}-${i.id}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 2.4fr 1.2fr 1fr 1.2fr 0.9fr", alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={`${i.type}-${i.id}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 2.4fr 1.2fr 1fr 1.2fr 0.9fr", alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: tm.ink, background: tm.tint, padding: "3px 9px", borderRadius: 20 }}><Icon name={tm.icon} size={12} /> {tm.label}</span></div>
               <div style={{ minWidth: 0 }}>
                 <button onClick={() => open(i)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{i.name}</button>

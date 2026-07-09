@@ -38,7 +38,7 @@ export function AvailabilityTab() {
 
   const pill = (active: boolean): React.CSSProperties => ({
     padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-    fontFamily: "inherit", background: active ? color.primary : "transparent", color: active ? "#fff" : "#565F73",
+    fontFamily: "inherit", background: active ? color.primary : "transparent", color: active ? "#fff" : color.subtle,
   });
   const dateBox: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 9px", fontSize: 12.5, fontFamily: "inherit", color: color.text };
 
@@ -106,7 +106,7 @@ export function AvailabilityTab() {
               </div>
               <div style={{ width: 96, flex: "none", textAlign: "right" }}>
                 {p.onLeave ? (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", borderRadius: 6, padding: "3px 8px" }}>On leave{p.leaveNote ? ` · ${p.leaveNote}` : ""}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, borderRadius: 6, padding: "3px 8px" }}>On leave{p.leaveNote ? ` · ${p.leaveNote}` : ""}</span>
                 ) : (
                   <>
                     <span style={{ fontFamily: font.head, fontSize: 18, fontWeight: 700, color: p.free >= 50 ? "#0B6B37" : p.free > 0 ? color.warningAlt : color.faint2 }}>{p.free}%</span>

@@ -12,7 +12,7 @@ export function Sparkline({ points, stroke, width = 92, height = 30 }: {
   if (!points.length) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
-        <line x1={0} y1={height - 4} x2={width} y2={height - 4} stroke={chart.grid} strokeWidth={2} strokeDasharray="3 3" strokeLinecap="round" />
+        <line x1={0} y1={height - 4} x2={width} y2={height - 4} style={{ stroke: color.neutralTint }} strokeWidth={2} strokeDasharray="3 3" strokeLinecap="round" />
       </svg>
     );
   }
@@ -49,11 +49,11 @@ export function HealthDonut({ segments, size = 158, thickness = 24 }: {
   let acc = 0;
   const stops = total
     ? segments.map((s) => { const a = acc / total * 360; acc += s.value; const b = acc / total * 360; return `${s.color} ${a}deg ${b}deg`; }).join(",")
-    : `${chart.grid} 0deg 360deg`;
+    : `${color.neutralTint} 0deg 360deg`;
   const inner = size - thickness * 2;
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: `conic-gradient(${stops})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-      <div style={{ width: inner, height: inner, borderRadius: "50%", background: color.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `inset 0 0 0 1px ${chart.grid}` }}>
+      <div style={{ width: inner, height: inner, borderRadius: "50%", background: color.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `inset 0 0 0 1px ${color.neutralTint}` }}>
         <div style={{ fontFamily: font.head, fontSize: 34, fontWeight: 700, color: total ? color.ink : color.faint3, lineHeight: 1 }}>{total ? `${onTrackPct}%` : "—"}</div>
         <div style={{ fontSize: 10.5, color: color.faint2, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 4 }}>On track</div>
       </div>
@@ -69,7 +69,7 @@ export function BudgetChart({ months, planned, actual, max, width = 300, height 
   const iw = width - padL - padR, ih = height - padT - padB;
   const empty = !actual.length || !months.length;
   const grid = [0, 0.5, 1].map((f, i) => (
-    <line key={i} x1={padL} x2={width - padR} y1={padT + f * ih} y2={padT + f * ih} stroke={chart.grid} strokeWidth={1} />
+    <line key={i} x1={padL} x2={width - padR} y1={padT + f * ih} y2={padT + f * ih} style={{ stroke: color.neutralTint }} strokeWidth={1} />
   ));
   if (empty) {
     return (
@@ -110,7 +110,7 @@ export function Gauge({ pct, stroke, size = 96 }: { pct: number | null; stroke: 
   const r = size / 2 - 8, c = 2 * Math.PI * r, val = pct ?? 0;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={chart.grid} strokeWidth={8} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: color.neutralTint }} strokeWidth={8} />
       {pct != null && (
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke }} strokeWidth={8}
           strokeLinecap="round" strokeDasharray={`${(val / 100) * c} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />

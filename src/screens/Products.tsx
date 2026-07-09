@@ -35,20 +35,20 @@ const PRD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 const prdToDisplay = (iso: string): string => { if (!iso) return ""; const [y, m, dd] = iso.split("-").map(Number); return y && m && dd ? `${dd} ${PRD_MONTHS[m - 1]} ${y}` : ""; };
 type ProductStatus = "Active" | "Retired" | "Replaced";
 const PRODUCT_STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
-  Active: { ink: "#0B6B37", tint: "#E7F4EC" }, Retired: { ink: "#566077", tint: "#EEF0F4" }, Replaced: { ink: "#8A6300", tint: "#FBF2D7" },
+  Active: { ink: color.successInk, tint: color.successTint }, Retired: { ink: color.subtle, tint: color.neutralTint }, Replaced: { ink: color.warningInk, tint: color.warningTint },
 };
 
 const SOURCE_META: Record<Source, { label: string; c: string }> = {
   jira: { label: "Jira", c: "#2684FF" },
   ado: { label: "Azure DevOps", c: "#0078D7" },
-  manual: { label: "Manual", c: "#566077" },
+  manual: { label: "Manual", c: color.subtle },
 };
 const STATUS_COLOR: Record<string, { ink: string; tint: string }> = {
-  "Done": { ink: "#0B6B37", tint: "#E7F4EC" },
-  "In Progress": { ink: "#6A2E9E", tint: "#F0E8F7" },
-  "To Do": { ink: "#566077", tint: "#EEF0F4" },
-  "Backlog": { ink: "#566077", tint: "#EEF0F4" },
-  "Blocked": { ink: "#A1282B", tint: "#FBE7E8" },
+  "Done": { ink: color.successInk, tint: color.successTint },
+  "In Progress": { ink: "#6A2E9E", tint: color.accentTint },
+  "To Do": { ink: color.subtle, tint: color.neutralTint },
+  "Backlog": { ink: color.subtle, tint: color.neutralTint },
+  "Blocked": { ink: color.dangerInk, tint: color.dangerTint },
 };
 
 function useProducts() {
@@ -98,9 +98,9 @@ export default function Products() {
         <Button onClick={() => setModal(true)} disabled={!mayCreate} title={mayCreate ? undefined : "Your role can't create products"}><Icon name="plus" size={16} /> New product</Button>
       </div>
       {/* Products aren't deleted — they move through Active / Retired / Replaced. */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
         {(["Active", "Retired", "Replaced"] as ProductStatus[]).map((s) => (
-          <button key={s} onClick={() => setPstatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: pstatus === s ? "#fff" : "transparent", color: pstatus === s ? color.primary : "#565F73", boxShadow: pstatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+          <button key={s} onClick={() => setPstatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: pstatus === s ? color.surface : "transparent", color: pstatus === s ? color.primary : color.subtle, boxShadow: pstatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
             {s} · {countBy(s)}
           </button>
         ))}
@@ -352,7 +352,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
           ) : tasks.map((t, i) => {
             const sc = STATUS_COLOR[t.status] ?? STATUS_COLOR["To Do"];
             return (
-              <div key={t.id} style={{ display: "grid", gridTemplateColumns: taskCols, minWidth: 760, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div key={t.id} style={{ display: "grid", gridTemplateColumns: taskCols, minWidth: 760, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.primaryDark }}>{t.id}</div>
                 <div style={{ fontSize: 13, color: color.text, fontWeight: 500 }}>{t.title}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 9px", borderRadius: 6 }}>{t.status}</span></div>
@@ -531,7 +531,7 @@ function ProductTeamSection({ productId }: { productId: string }) {
                 No team members allocated yet.{canEdit ? "" : " A team manager allocates members from their Entra teams."}
               </div>
             ) : t.allocations.map((a) => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid #F4F6FA" }}>
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
                 <span style={{ width: 34, height: 34, borderRadius: "50%", background: avatarColor(a.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flex: "none" }}>{initials(a.name)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{a.name}</div>

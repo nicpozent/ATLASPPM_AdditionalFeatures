@@ -11,20 +11,20 @@ import { DecLabel } from "./shared";
 
 interface RaidItem { id: number; type: string; title: string; owner: string; status: string; auto?: boolean; }
 const RAID_TYPE_COLORS: Record<string, { ink: string; tint: string }> = {
-  Risk:       { ink: "#8A6300", tint: "#FBF2D7" },
-  Issue:      { ink: "#A1282B", tint: "#FBE7E8" },
-  Assumption: { ink: "#0C5798", tint: "#E6EFFB" },
-  Dependency: { ink: "#5E2E89", tint: "#F0E8F7" },
+  Risk:       { ink: color.warningInk, tint: color.warningTint },
+  Issue:      { ink: color.dangerInk, tint: color.dangerTint },
+  Assumption: { ink: color.primaryDark, tint: color.primaryTint2 },
+  Dependency: { ink: "#5E2E89", tint: color.accentTint },
 };
 const RAID_STATUS: Record<string, { ink: string; tint: string; dot: string }> = {
-  Open:       { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
-  Mitigating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  Validating: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  "On track": { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  Resolved:   { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  Closed:     { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
+  Open:       { ink: color.dangerInk, tint: color.dangerTint, dot: "#D13438" },
+  Mitigating: { ink: color.warningInk, tint: color.warningTint, dot: "#E0A100" },
+  Validating: { ink: color.warningInk, tint: color.warningTint, dot: "#E0A100" },
+  "On track": { ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
+  Resolved:   { ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
+  Closed:     { ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
 };
-const raidStatus = (s: string) => RAID_STATUS[s] ?? { ink: "#56607A", tint: "#EEF1F6", dot: "#8A92A6" };
+const raidStatus = (s: string) => RAID_STATUS[s] ?? { ink: color.subtle, tint: color.bg, dot: "#8A92A6" };
 const RAID_TYPES = ["Risk", "Issue", "Assumption", "Dependency"];
 const RAID_STATUSES = ["Open", "Mitigating", "Validating", "On track", "Resolved", "Closed"];
 
@@ -60,11 +60,11 @@ export function Raid({ projectId }: { projectId: string | null }) {
           const clickable = canEdit && !r.auto;
           return (
             <div key={r.id} onClick={() => clickable && setOpenId(r.id)}
-              style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: clickable ? "pointer" : "default" }}>
+              style={{ display: "grid", gridTemplateColumns: "0.9fr 3fr 1fr 1fr", alignItems: "start", padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: clickable ? "pointer" : "default" }}>
               <div><span style={{ fontSize: 11, fontWeight: 700, color: tc.ink, background: tc.tint, padding: "3px 10px", borderRadius: 6 }}>{r.type}</span></div>
               <div style={{ fontSize: 13.5, color: color.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 {r.title}
-                {r.auto && <span title="Auto-raised by Atlas from live project data — clears automatically when resolved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, borderRadius: 5, padding: "1px 7px", letterSpacing: "0.03em" }}>✦ AUTO</span>}
+                {r.auto && <span title="Auto-raised by Atlas from live project data — clears automatically when resolved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, borderRadius: 5, padding: "1px 7px", letterSpacing: "0.03em" }}>✦ AUTO</span>}
               </div>
               <div style={{ fontSize: 13, color: color.subtle }}>{r.owner}</div>
               <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: sc.ink, background: sc.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />{r.status}</span></div>
@@ -130,12 +130,12 @@ function RaidModal({ projectId, item, onClose }: { projectId: string; item?: Rai
         {item && (
           confirmDel ? (
             <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this item?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this item?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
               <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
           )
         )}
         <div style={{ flex: 1 }} />

@@ -38,9 +38,9 @@ const LINK_LABEL: Record<string, string> = { okr: "OKR", project: "Project", pro
 
 const STATUS_TINT: Record<string, { ink: string; bg: string }> = {
   Proposed: { ink: color.subtle, bg: color.bg },
-  Committed: { ink: "#0C5798", bg: "#E6EFFB" },
+  Committed: { ink: color.primaryDark, bg: color.primaryTint2 },
   "In progress": { ink: "#7A3FB0", bg: color.accentTint },
-  Done: { ink: "#0B6B37", bg: "#E7F4EC" },
+  Done: { ink: color.successInk, bg: color.successTint },
   Cancelled: { ink: color.faint2, bg: color.bg },
 };
 

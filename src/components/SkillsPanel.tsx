@@ -15,7 +15,7 @@ interface SkillsData { canEdit: boolean; skills: Skill[]; people: string[]; rati
 
 const LEVEL_LABEL = ["—", "1", "2", "3", "4"];
 const levelColor = (n: number) => (n >= 4 ? "#0B6B37" : n === 3 ? "#15A34A" : n >= 1 ? "#C98A00" : color.faint3);
-const levelTint = (n: number) => (n >= 4 ? "#E7F4EC" : n === 3 ? "#EAF7EE" : n >= 1 ? "#FBF2D7" : "transparent");
+const levelTint = (n: number) => (n >= 4 ? color.successTint : n === 3 ? color.successTint : n >= 1 ? color.warningTint : "transparent");
 
 export function SkillsPanel({ entityType, entityId }: { entityType: string; entityId: string }) {
   const { data } = useQuery({
@@ -55,7 +55,7 @@ export function SkillsPanel({ entityType, entityId }: { entityType: string; enti
           </div>
           {/* rows */}
           {people.map((p) => (
-            <div key={p} style={{ display: "flex", borderBottom: "1px solid #F4F6FA", alignItems: "stretch" }}>
+            <div key={p} style={{ display: "flex", borderBottom: `1px solid ${color.surfaceAlt}`, alignItems: "stretch" }}>
               <div style={{ width: NAME_COL, flex: "none", padding: "8px 20px", fontSize: 12.5, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</div>
               {skills.map((s) => {
                 const lvl = rating.get(`${s.id}|${p}`) ?? 0;

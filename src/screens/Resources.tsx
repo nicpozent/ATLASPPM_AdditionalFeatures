@@ -101,24 +101,24 @@ export default function Resources() {
       {unonboarded.length > 0 && <UnonboardedPanel people={unonboarded} />}
       {/* view tabs + sync badge + over-allocation flag */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
           {RES_TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
+                background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle, boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
               }}>{t.label}</button>
             );
           })}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "3px 8px", borderRadius: 5, letterSpacing: "0.04em" }}>SYNCED</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: color.successInk, background: color.successTint, padding: "3px 8px", borderRadius: 5, letterSpacing: "0.04em" }}>SYNCED</span>
           <span style={{ fontSize: 12, color: color.faint2 }}>from Entra ID &amp; project allocations</span>
         </div>
         <div style={{ flex: 1 }} />
         {overCount > 0 && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", padding: "6px 12px", borderRadius: 8 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: color.dangerTint, padding: "6px 12px", borderRadius: 8 }}>
             <Icon name="alert" size={16} /> {overCount} over-allocated
           </span>
         )}
@@ -139,7 +139,7 @@ export default function Resources() {
             return (
               <button key={p.id} onClick={() => setPeriod(p.id)} style={{
                 padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                background: active ? color.primary : "transparent", color: active ? "#fff" : "#565F73",
+                background: active ? color.primary : "transparent", color: active ? "#fff" : color.subtle,
               }}>{p.label}</button>
             );
           })}
@@ -189,13 +189,13 @@ function ByPersonTab({ resources, periodLabel, person }: { resources: Resource[]
         const over = util > 100;
         const utilColor = over ? "#D13438" : util >= 85 ? "#E0A100" : "#15A34A";
         return (
-          <div key={r.name} style={{ display: "grid", gridTemplateColumns: CAP_COLS, alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+          <div key={r.name} style={{ display: "grid", gridTemplateColumns: CAP_COLS, alignItems: "center", padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: r.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, fontFamily: font.head, flex: "none" }}>{r.initials}</div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.name}</span>
-                  {over && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#D13438", background: "#FBE7E8", borderRadius: 5, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}><Icon name="alert" size={14} /> +{util - 100}%</span>}
+                  {over && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#D13438", background: color.dangerTint, borderRadius: 5, padding: "1px 6px", fontSize: 10, fontWeight: 700 }}><Icon name="alert" size={14} /> +{util - 100}%</span>}
                 </div>
                 <div style={{ fontSize: 11.5, color: color.faint3 }}>{r.role} · {r.dept}</div>
               </div>
@@ -206,7 +206,7 @@ function ByPersonTab({ resources, periodLabel, person }: { resources: Resource[]
             <div style={{ paddingRight: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <div style={{ flex: 1, height: 8, background: color.bg, borderRadius: 4, overflow: "hidden", display: "flex" }}>
-                  <div style={{ height: "100%", width: `${Math.min(r.opsPct, 100)}%`, background: "#C7CEDB" }} />
+                  <div style={{ height: "100%", width: `${Math.min(r.opsPct, 100)}%`, background: color.border2 }} />
                   <div style={{ height: "100%", width: `${Math.min(r.projectPct, Math.max(0, 100 - r.opsPct))}%`, background: utilColor }} />
                   <div style={{ height: "100%", width: `${Math.min(r.productPct, Math.max(0, 100 - r.opsPct - r.projectPct))}%`, background: "#0E7C7B" }} />
                 </div>
@@ -290,7 +290,7 @@ function AllocMemberRow({ m, canEdit, onSet }: { m: AllocRow; canEdit: boolean; 
   const [open, setOpen] = useState(false);
   const range = m.startDate || m.endDate ? `${m.startDate || "?"} → ${m.endDate || "?"}` : "open-ended";
   return (
-    <div style={{ padding: "12px 20px", borderBottom: "1px solid #F2F4F9" }}>
+    <div style={{ padding: "12px 20px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 120px", alignItems: "center", gap: 12 }}>
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{m.name}</div>
@@ -382,7 +382,7 @@ function UnonboardedPanel({ people }: { people: Unonboarded[] }) {
     onError: toastError,
   });
   return (
-    <div style={{ background: "#FBF6E8", border: "1px solid #F0DFB0", borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
+    <div style={{ background: color.surfaceAlt, border: `1px solid ${color.warningTint}`, borderRadius: 14, padding: "14px 18px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={{ color: "#C98A00", display: "flex" }}><Icon name="alert" size={17} /></span>
         <span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>{people.length} assignee{people.length === 1 ? "" : "s"} not onboarded</span>

@@ -40,7 +40,7 @@ export function InsightsTab() {
     </div>
   );
   const personRow = (p: CapPerson, right: React.ReactNode) => (
-    <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 18px", borderBottom: "1px solid #F4F6FA" }}>
+    <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <Avatar initials={p.initials} color={p.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
@@ -102,7 +102,7 @@ export function InsightsTab() {
         <div style={{ padding: "13px 18px", borderBottom: `1px solid ${color.bg}` }}><span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Under-utilised (&lt;50%)</span></div>
         {(d?.under.length ?? 0) === 0
           ? <div style={{ padding: "16px 18px", fontSize: 12.5, color: color.faint3 }}>No under-utilised allocated people.</div>
-          : d!.under.map((p) => personRow(p, <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: "#0B6B37" }}>{p.free}% free</span>))}
+          : d!.under.map((p) => personRow(p, <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: color.successInk }}>{p.free}% free</span>))}
       </div>
 
       {/* By department */}
@@ -110,7 +110,7 @@ export function InsightsTab() {
         <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "13px 18px", borderBottom: `1px solid ${color.bg}` }}><span style={{ fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Capacity vs demand by department</span></div>
           {d!.byDept.map((dep) => (
-            <div key={dep.dept} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: "1px solid #F4F6FA" }}>
+            <div key={dep.dept} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ width: 150, flex: "none", fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dep.dept}</div>
               <div style={{ flex: 1, height: 9, background: color.bg, borderRadius: 4, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${Math.min(100, dep.loadedPct)}%`, background: dep.loadedPct > 100 ? color.danger : dep.loadedPct > 90 ? color.warningAlt : color.primary }} />
@@ -164,7 +164,7 @@ function StaffingFinder() {
         (data?.candidates.length ?? 0) === 0
           ? <div style={{ padding: "6px 18px 16px", fontSize: 12.5, color: color.faint3 }}>No one rated in “{query.skill}” has ≥{query.minFree}% free (or the skill isn't defined). Add skills & ratings in My Team.</div>
           : data!.candidates.map((c) => (
-            <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 18px", borderTop: "1px solid #F4F6FA" }}>
+            <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 18px", borderTop: `1px solid ${color.surfaceAlt}` }}>
               <Avatar initials={c.initials} color={c.color} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{c.name}</div>

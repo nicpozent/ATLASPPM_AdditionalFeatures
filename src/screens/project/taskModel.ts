@@ -4,6 +4,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
+import { color } from "@/theme";
 
 export interface Task {
   id: number; code: string; name: string; epic: string; assignee: string; status: string;
@@ -26,17 +27,17 @@ export const AGILE_WITH_SPRINTS = ["Scrum", "SAFe", "Scrumban", "Disciplined Agi
 export const isAgileWithSprints = (m?: string) => !!m && AGILE_WITH_SPRINTS.includes(m);
 
 export const BOARD_COLS = [
-  { label: "To Do", color: "#8A93A6", tint: "#EEF1F6", ink: "#56607A" },
-  { label: "In Progress", color: "#0F6CBD", tint: "#E6EFFB", ink: "#0C5798" },
-  { label: "In Review", color: "#E0A100", tint: "#FBF2D7", ink: "#8A6300" },
-  { label: "Done", color: "#15A34A", tint: "#E7F4EC", ink: "#0B6B37" },
-  { label: "Blocked", color: "#D13438", tint: "#FBE7E8", ink: "#A1282B" },
+  { label: "To Do", color: color.holdBorder, tint: color.neutralTint, ink: color.subtle },
+  { label: "In Progress", color: color.primary, tint: color.primaryTint2, ink: color.primaryDark },
+  { label: "In Review", color: color.warning, tint: color.warningTint, ink: color.warningInk },
+  { label: "Done", color: color.success, tint: color.successTint, ink: color.successInk },
+  { label: "Blocked", color: color.danger, tint: color.dangerTint, ink: color.dangerInk },
 ];
 export const TASK_PRIORITY: Record<string, { ink: string; tint: string }> = {
-  Critical: { ink: "#A1282B", tint: "#FBE7E8" },
-  High:     { ink: "#8A6300", tint: "#FBF2D7" },
-  Medium:   { ink: "#0C5798", tint: "#E6EFFB" },
-  Low:      { ink: "#56607A", tint: "#EEF1F6" },
+  Critical: { ink: color.dangerInk, tint: color.dangerTint },
+  High:     { ink: color.warningInk, tint: color.warningTint },
+  Medium:   { ink: color.primaryDark, tint: color.primaryTint2 },
+  Low:      { ink: color.subtle, tint: color.neutralTint },
 };
 export const TASK_PRIORITIES = ["Critical", "High", "Medium", "Low"];
 export const TASK_STATUSES = ["To Do", "In Progress", "In Review", "Done", "Blocked"];

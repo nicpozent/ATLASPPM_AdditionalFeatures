@@ -45,17 +45,17 @@ const STATUS_OPTS = [
 ];
 
 const STATUS_COLORS: Record<string, { ink: string; tint: string }> = {
-  Planned: { ink: "#566077", tint: "#EEF0F4" },
-  "In progress": { ink: "#0C5798", tint: "#E6EFFB" },
-  Deployed: { ink: "#0B6B37", tint: "#E7F4EC" },
-  "Rolled back": { ink: "#A1282B", tint: "#FBE7E8" },
-  Completed: { ink: "#0C5798", tint: "#E6EFFB" },
-  Cancelled: { ink: "#566077", tint: "#EEF0F4" },
+  Planned: { ink: color.subtle, tint: color.neutralTint },
+  "In progress": { ink: color.primaryDark, tint: color.primaryTint2 },
+  Deployed: { ink: color.successInk, tint: color.successTint },
+  "Rolled back": { ink: color.dangerInk, tint: color.dangerTint },
+  Completed: { ink: color.primaryDark, tint: color.primaryTint2 },
+  Cancelled: { ink: color.subtle, tint: color.neutralTint },
 };
 const RISK_COLORS: Record<string, { ink: string; tint: string }> = {
-  Low: { ink: "#0B6B37", tint: "#E7F4EC" },
-  Medium: { ink: "#8A6300", tint: "#FBF2D7" },
-  High: { ink: "#A1282B", tint: "#FBE7E8" },
+  Low: { ink: color.successInk, tint: color.successTint },
+  Medium: { ink: color.warningInk, tint: color.warningTint },
+  High: { ink: color.dangerInk, tint: color.dangerTint },
 };
 
 const GRID = "0.6fr 1.7fr 1.2fr 0.9fr 0.9fr 1fr 0.8fr 0.9fr 44px";
@@ -71,7 +71,7 @@ function PillBtn({ active, onClick, children }: { active: boolean; onClick: () =
     <button onClick={onClick} style={{
       padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer",
       fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-      background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
+      background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle,
       boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
     }}>{children}</button>
   );
@@ -145,7 +145,7 @@ export default function Releases() {
           {STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         {(archivedCount > 0 || showArchived) && (
-          <button onClick={() => setShowArchived((s) => !s)} style={{ ...selectStyle, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6, color: showArchived ? color.primary : color.textMuted, background: showArchived ? color.primaryTint : "#fff", border: `1px solid ${showArchived ? "#CFE0F4" : color.border2}` }}>
+          <button onClick={() => setShowArchived((s) => !s)} style={{ ...selectStyle, marginRight: 8, display: "inline-flex", alignItems: "center", gap: 6, color: showArchived ? color.primary : color.textMuted, background: showArchived ? color.primaryTint : "#fff", border: `1px solid ${showArchived ? color.primaryTint2 : color.border2}` }}>
             <Icon name="archive" size={14} /> Archived · {archivedCount}
           </button>
         )}
@@ -160,7 +160,7 @@ export default function Releases() {
           ["Total releases", stats.total, color.navy],
           ["Deployed", stats.deployed, color.successInk],
           ["In progress", stats.inProgress, color.primary],
-          ["Planned", stats.planned, "#566077"],
+          ["Planned", stats.planned, color.subtle],
         ].map(([label, value, c]) => (
           <div key={label as string} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 11.5, color: color.faint }}>{label}</div>
@@ -187,7 +187,7 @@ export default function Releases() {
       )}
 
       {/* view tabs */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
         <PillBtn active={view === "table"} onClick={() => setView("table")}>Table</PillBtn>
         <PillBtn active={view === "calendar"} onClick={() => setView("calendar")}>Calendar</PillBtn>
       </div>
@@ -210,7 +210,7 @@ export default function Releases() {
             const sc = STATUS_COLORS[r.status] ?? STATUS_COLORS.Planned;
             const rc = RISK_COLORS[r.risk] ?? RISK_COLORS.Low;
             return (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div style={{ fontFamily: font.mono, fontSize: 12, fontWeight: 700, color: color.text }}>{r.id}</div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -221,7 +221,7 @@ export default function Releases() {
                 </div>
                 <div style={{ minWidth: 0, fontSize: 12.5, color: color.text }}>
                   <div>{r.link || "—"}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#0C5798", textTransform: "uppercase", letterSpacing: "0.03em" }}>{r.scope}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: color.primaryDark, textTransform: "uppercase", letterSpacing: "0.03em" }}>{r.scope}</div>
                 </div>
                 <div style={{ fontSize: 12.5, color: color.textMuted }}>{r.date}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 9px", borderRadius: 6 }}>{r.env}</span></div>
@@ -286,7 +286,7 @@ export default function Releases() {
           <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
             Permanently delete <strong>{confirmDel.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span>?
           </div>
-          <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it or mark it Cancelled instead.</div>
+          <div style={{ fontSize: 12.5, color: color.dangerInk, background: color.dangerTint, borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it or mark it Cancelled instead.</div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <Button variant="secondary" onClick={() => setConfirmDel(null)}>Cancel</Button>
             <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 16px", borderRadius: 10, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>

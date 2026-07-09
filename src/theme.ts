@@ -44,9 +44,13 @@ const lightColors = {
   border: "#E7EBF2", border2: "#E0E5EE", border3: "#E4E8F0",
   // Status
   success: "#15A34A", successInk: "#0B6B37", warning: "#E0A100", warningAlt: "#C98A00",
-  danger: "#D13438", dangerInk: "#A1282B",
-  // Tints
+  warningInk: "#8A6300", danger: "#D13438", dangerInk: "#A1282B",
+  holdInk: "#4A5266", holdBorder: "#8A93A6",
+  // Tints (badge/chip washes — paired with the *Ink tokens above)
   primaryTint: "#EAF2FB", primaryTint2: "#E6EFFB", accentTint: "#F0E8F7", dangerTint: "#FBE7E8",
+  successTint: "#E7F4EC", warningTint: "#FBF2D7", neutralTint: "#EEF1F6",
+  // Tint-chip hairline borders (paired with warningTint / dangerTint)
+  warnBorder: "#F0E4B8", dangerBorder: "#F3C9CB",
 } as const;
 
 type ColorKey = keyof typeof lightColors;
@@ -62,8 +66,11 @@ const darkColors: Record<ColorKey, string> = {
   bg: "#0F1320", surface: "#1A1F30", surfaceAlt: "#202537", surfaceInput: "#252B3E",
   border: "#2C3247", border2: "#333A50", border3: "#2F3548",
   success: "#35C46B", successInk: "#7BE0A5", warning: "#F0B429", warningAlt: "#E0A100",
-  danger: "#F0656A", dangerInk: "#F4A0A2",
+  warningInk: "#EBC15C", danger: "#F0656A", dangerInk: "#F4A0A2",
+  holdInk: "#AEB6C6", holdBorder: "#6E778F",
   primaryTint: "#14233A", primaryTint2: "#17273F", accentTint: "#2A2140", dangerTint: "#3A2124",
+  successTint: "#193024", warningTint: "#332B14", neutralTint: "#2A3145",
+  warnBorder: "#5C4A1E", dangerBorder: "#5A2A2E",
 };
 
 export const colorPalettes: Record<ThemeMode, Record<ColorKey, string>> = {

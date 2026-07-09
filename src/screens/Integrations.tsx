@@ -10,8 +10,8 @@ import { syncAdo, adoSyncToast } from "@/lib/adoSync";
 // ---- Identity, email & directory (Microsoft 365) — persisted via /settings --
 interface Identity { key: string; name: string; icon: string; detail: string; tint: string; ink: string }
 const IDENTITY: Identity[] = [
-  { key: "integration.sso", name: "Microsoft Entra ID — Single Sign-On", icon: "shield", detail: "SAML 2.0 / OIDC · enforce MFA for all members", tint: "#E6EFFB", ink: color.primary },
-  { key: "integration.email", name: "Exchange Online — Email notifications", icon: "mail", detail: "Microsoft Graph · digest & alert delivery", tint: "#E7F4EC", ink: "#0B6B37" },
+  { key: "integration.sso", name: "Microsoft Entra ID — Single Sign-On", icon: "shield", detail: "SAML 2.0 / OIDC · enforce MFA for all members", tint: color.primaryTint2, ink: color.primary },
+  { key: "integration.email", name: "Exchange Online — Email notifications", icon: "mail", detail: "Microsoft Graph · digest & alert delivery", tint: color.successTint, ink: color.successInk },
   { key: "integration.adsync", name: "Active Directory — Users & Groups sync", icon: "users", detail: "Enterprise Application · SCIM provisioning", tint: color.accentTint, ink: color.accent },
 ];
 
@@ -36,7 +36,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
       aria-pressed={on}
       style={{ position: "relative", width: 42, height: 24, border: "none", padding: 0, cursor: "pointer", background: "transparent", flex: "none" }}
     >
-      <span style={{ position: "absolute", inset: 0, background: on ? color.success : "#C7CEDB", borderRadius: 20, transition: "background .15s" }} />
+      <span style={{ position: "absolute", inset: 0, background: on ? color.success : color.border2, borderRadius: 20, transition: "background .15s" }} />
       <span style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 18, height: 18, background: color.surface, borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left .15s" }} />
     </button>
   );
@@ -112,7 +112,7 @@ export default function Integrations() {
               <div style={{ fontSize: 14.5, fontWeight: 600, color: color.ink, marginBottom: 6, lineHeight: 1.3 }}>{x.name}</div>
               <div style={{ fontSize: 12.5, lineHeight: 1.5, color: color.faint }}>{x.detail}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: on ? color.success : "#C7CEDB" }} />
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: on ? color.success : color.border2 }} />
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? "#0B6B37" : color.faint }}>{on ? "Enabled" : "Not configured"}</span>
               </div>
             </div>
@@ -143,12 +143,12 @@ export default function Integrations() {
                   <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : "#566077", background: configured ? "#E7F4EC" : "#EEF0F4", padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : color.subtle, background: configured ? color.successTint : color.neutralTint, padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
                   <button
                     onClick={() => testJira.mutate()}
                     disabled={testJira.isPending || !jira?.canManage}
                     title={jira?.canManage ? (configured ? "Verify the Jira credentials" : "Set Jira credentials in config, then test") : "Needs Edit on Integrations & connectors"}
-                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testJira.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: testJira.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: testJira.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: testJira.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                   >{testJira.isPending ? "Testing…" : "Test connection"}</button>
                   {configured && (
                     <button
@@ -175,12 +175,12 @@ export default function Integrations() {
                   <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : "#566077", background: configured ? "#E7F4EC" : "#EEF0F4", padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: configured ? "#0B6B37" : color.subtle, background: configured ? color.successTint : color.neutralTint, padding: "3px 10px", borderRadius: 20 }}>{configured ? "Configured" : "Not configured"}</span>
                   <button
                     onClick={() => testAdo.mutate()}
                     disabled={testAdo.isPending || !ado?.canManage}
                     title={ado?.canManage ? (configured ? "Verify the Azure DevOps organisation & PAT" : "Set AzureDevOps:Organization and AzureDevOps:Pat in config, then test") : "Needs Edit on Integrations & connectors"}
-                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: testAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: testAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: testAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: testAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                   >{testAdo.isPending ? "Testing…" : "Test connection"}</button>
                   {configured && (
                     <>
@@ -188,7 +188,7 @@ export default function Integrations() {
                         onClick={() => syncAllAdo.mutate(true)}
                         disabled={syncAllAdo.isPending || !ado?.canManage}
                         title={ado?.canManage ? "Pull only work items changed since the last sync (faster)" : "Needs Edit on Integrations & connectors"}
-                        style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                        style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                       >Incremental</button>
                       <button
                         onClick={() => syncAllAdo.mutate(false)}
@@ -212,10 +212,10 @@ export default function Integrations() {
                 <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.detail}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: on ? "#0B6B37" : "#566077", background: on ? "#E7F4EC" : "#EEF0F4", padding: "3px 10px", borderRadius: 20 }}>{on ? "Connected" : "Not connected"}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: on ? "#0B6B37" : color.subtle, background: on ? color.successTint : color.neutralTint, padding: "3px 10px", borderRadius: 20 }}>{on ? "Connected" : "Not connected"}</span>
                 <button
                   onClick={toggle}
-                  style={{ fontSize: 12, fontWeight: 600, color: on ? color.textMuted : color.primary, background: color.surface, border: `1px solid ${on ? color.border2 : "#CFE0F4"}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+                  style={{ fontSize: 12, fontWeight: 600, color: on ? color.textMuted : color.primary, background: color.surface, border: `1px solid ${on ? color.border2 : color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
                 >{on ? "Disconnect" : "Connect"}</button>
               </div>
             </div>
@@ -252,15 +252,15 @@ function DiscoverJira() {
           Every project in your Jira site. Import one to create — or link — an Atlas project (optionally under a program); it stays editable from the project's details.
         </div>
         {data?.error ? (
-          <div style={{ padding: "18px", fontSize: 13, color: "#A1282B" }}>{data.error}</div>
+          <div style={{ padding: "18px", fontSize: 13, color: color.dangerInk }}>{data.error}</div>
         ) : projects.length === 0 ? (
           <div style={{ padding: "26px 18px", fontSize: 13, color: color.faint3, textAlign: "center" }}>No Jira projects returned. Check the service account's Browse Projects permission.</div>
         ) : projects.map((p) => (
-          <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: "1px solid #F2F4F9" }}>
+          <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: "#0052CC", background: color.primaryTint2, padding: "3px 9px", borderRadius: 6, flex: "none" }}>{p.key}</span>
             <span style={{ flex: 1, fontSize: 13.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
             {p.mappedProjectId ? (
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: color.successInk, background: color.successTint, padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
             ) : (
               <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Jira project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
                 style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
@@ -306,7 +306,7 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
         <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 6 }}>Map to</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
           {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"], ["ops", "A new Ops service (run-the-business)"]] as const).map(([v, label]) => (
-            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? "#EAF2FB" : "#F6F8FC", border: `1px solid ${target === v ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
+            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? color.primaryTint : color.surfaceAlt, border: `1px solid ${target === v ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
               <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
               {label}
             </button>
@@ -364,15 +364,15 @@ function DiscoverAdo() {
           Every project in your Azure DevOps organisation. Import one to create — or link — an Atlas project (optionally under a program); it stays editable from the project's details. Board &amp; work-item sync is a follow-up.
         </div>
         {data?.error ? (
-          <div style={{ padding: "18px", fontSize: 13, color: "#A1282B" }}>{data.error}</div>
+          <div style={{ padding: "18px", fontSize: 13, color: color.dangerInk }}>{data.error}</div>
         ) : projects.length === 0 ? (
           <div style={{ padding: "26px 18px", fontSize: 13, color: color.faint3, textAlign: "center" }}>No Azure DevOps projects returned. Check the PAT's Project &amp; Team (Read) scope.</div>
         ) : projects.map((p) => (
-          <div key={p.id || p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: "1px solid #F2F4F9" }}>
+          <div key={p.id || p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: "#0078D7", background: color.primaryTint2, padding: "3px 9px", borderRadius: 6, flex: "none" }}>AZ</span>
             <span style={{ flex: 1, fontSize: 13.5, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
             {p.mappedProjectId ? (
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: color.successInk, background: color.successTint, padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
             ) : (
               <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Azure DevOps project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
                 style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
@@ -416,7 +416,7 @@ function ImportAdoModal({ proj, onClose, onDone }: { proj: AdoProj; onClose: () 
         <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 6 }}>Map to</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
           {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"]] as const).map(([v, label]) => (
-            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? "#EAF2FB" : "#F6F8FC", border: `1px solid ${target === v ? "#CFE0F4" : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
+            <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? color.primaryTint : color.surfaceAlt, border: `1px solid ${target === v ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
               <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
               {label}
             </button>

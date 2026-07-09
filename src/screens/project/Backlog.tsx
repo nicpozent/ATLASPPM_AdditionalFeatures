@@ -64,7 +64,7 @@ export function Backlog({ projectId }: { projectId: string | null }) {
         ) : backlog.map((t) => {
           const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
           return (
-            <div key={t.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 1fr 0.7fr 0.7fr 1.1fr", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={t.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 1fr 0.7fr 0.7fr 1.1fr", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3 }}>{t.code}</div>
               <button onClick={() => setOpenId(t.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</button>
               <div style={{ fontSize: 12, color: color.subtle }}>{t.epic || "—"}</div>

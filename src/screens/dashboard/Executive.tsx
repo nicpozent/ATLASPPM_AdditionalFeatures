@@ -32,7 +32,7 @@ export function Executive({ d, onProject, onPortfolio }: {
                 <Sparkline points={k?.spark ?? []} stroke={def.color} />
               </div>
               <div style={{ marginTop: 9, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: k ? (k.good ? "#0B6B37" : "#A1282B") : color.faint3, background: k ? (k.good ? "#E7F4EC" : "#FBE7E8") : color.bg, padding: "1px 7px", borderRadius: 20 }}>{k?.delta ?? "—"}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: k ? (k.good ? "#0B6B37" : "#A1282B") : color.faint3, background: k ? (k.good ? color.successTint : color.dangerTint) : color.bg, padding: "1px 7px", borderRadius: 20 }}>{k?.delta ?? "—"}</span>
                 <span style={{ fontSize: 11.5, color: color.faint3 }}>vs last month</span>
               </div>
             </div>
@@ -98,7 +98,7 @@ export function Executive({ d, onProject, onPortfolio }: {
             {d.projects.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No active projects yet.</div>
             ) : d.projects.slice(0, 6).map((p) => (
-              <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.8fr 0.7fr 1.1fr 0.8fr", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid #F2F4F9`, cursor: "pointer" }}>
+              <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.8fr 0.7fr 1.1fr 0.8fr", alignItems: "center", padding: "13px 20px`, borderBottom: `1px solid ${color.surfaceAlt}`, cursor: `pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: statusDot(p.status), flex: "none" }} />
                   <div style={{ minWidth: 0 }}>
@@ -132,7 +132,7 @@ export function Executive({ d, onProject, onPortfolio }: {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {d.attention.map((a) => (
-                  <div key={a.id} onClick={() => onProject(a.id)} style={{ border: "1px solid #F0DDDE", background: a.severity === "red" ? "#FCEDED" : "#FBF6E8", borderRadius: 11, padding: "11px 12px", cursor: "pointer" }}>
+                  <div key={a.id} onClick={() => onProject(a.id)} style={{ border: `1px solid ${color.dangerBorder}`, background: a.severity === "red" ? color.dangerTint : color.surfaceAlt, borderRadius: 11, padding: "11px 12px", cursor: "pointer" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: a.severity === "red" ? chart.critical : chart.atRisk }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: color.text, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>

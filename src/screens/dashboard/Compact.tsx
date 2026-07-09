@@ -3,7 +3,7 @@ import { Card, ProgressBar, statusDot } from "@/components/ui";
 import { KPI_DEFS, PIPELINE_STAGES, type DashboardData } from "./data";
 
 const fmtBudget = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
-const HEALTH_INK: Record<string, string> = { green: "#0B6B37", amber: "#8A6300", red: "#A1282B", hold: "#4A5266" };
+const HEALTH_INK: Record<string, string> = { green: "#0B6B37", amber: "#8A6300", red: "#A1282B", hold: color.subtle };
 
 export function Compact({ d, onProject }: { d: DashboardData; onProject: (id: string) => void }) {
   const pipeMax = Math.max(1, ...PIPELINE_STAGES.map((s) => d.pipeline[s.key]?.count ?? 0));
@@ -32,7 +32,7 @@ export function Compact({ d, onProject }: { d: DashboardData; onProject: (id: st
         {d.projects.length === 0 ? (
           <div style={{ padding: "36px 18px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No projects to show.</div>
         ) : d.projects.map((p) => (
-          <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "24px 2.2fr 1fr 0.8fr 0.8fr 1fr 0.8fr", alignItems: "center", padding: "9px 18px", borderBottom: "1px solid #F4F6FA", cursor: "pointer", fontSize: 13 }}>
+          <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "24px 2.2fr 1fr 0.8fr 0.8fr 1fr 0.8fr", alignItems: "center", padding: "9px 18px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer", fontSize: 13 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusDot(p.status) }} />
             <span style={{ fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: 10 }}>{p.name}</span>
             <span style={{ color: color.subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.owner}</span>

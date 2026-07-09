@@ -50,7 +50,7 @@ function WidgetBody({ wkey, d }: { wkey: string; d: DashboardData }) {
     case "ontime": return <div style={{ textAlign: "center" }}><Gauge pct={null} stroke={chart.onTrack} /><div style={{ fontSize: 12, color: color.faint2, marginTop: 8 }}>Milestones delivered on time</div></div>;
     case "risk": return (
       <div style={{ display: "flex", gap: 8 }}>
-        {[["Risks", "#8A6300", "#FBF2D7"], ["Issues", "#A1282B", "#FBE7E8"], ["Assump.", "#0C5798", "#E6EFFB"], ["Deps", "#5E2E89", "#F0E8F7"]].map(([label, ink, tint]) => (
+        {[["Risks", "#8A6300", color.warningTint], ["Issues", "#A1282B", color.dangerTint], ["Assump.", "#0C5798", color.primaryTint2], ["Deps", "#5E2E89", color.accentTint]].map(([label, ink, tint]) => (
           <div key={label} style={{ flex: 1, textAlign: "center", background: tint, borderRadius: 10, padding: "10px 4px" }}>
             <div style={{ fontFamily: font.head, fontSize: 22, fontWeight: 700, color: ink }}>0</div>
             <div style={{ fontSize: 10.5, color: ink }}>{label}</div>
@@ -157,7 +157,7 @@ export function Custom({ d }: { d: DashboardData }) {
   const btn = (label: string, onClick: () => void, kind: "ghost" | "danger" = "ghost") => (
     <button onClick={onClick} style={{
       fontSize: 12.5, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
-      color: kind === "danger" ? "#A1282B" : color.textMuted, background: kind === "danger" ? "#FBE7E8" : "#fff",
+      color: kind === "danger" ? "#A1282B" : color.textMuted, background: kind === "danger" ? color.dangerTint : "#fff",
       border: kind === "danger" ? "none" : `1px solid ${color.border2}`,
     }}>{label}</button>
   );
@@ -167,7 +167,7 @@ export function Custom({ d }: { d: DashboardData }) {
       {/* canvas */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <button onClick={() => setHelpOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="help" size={16} /> How it works</button>
+          <button onClick={() => setHelpOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="help" size={16} /> How it works</button>
           <div style={{ flex: 1 }} />
           {btn("Reset", () => persist(DEFAULT_WIDGETS.map((key, i) => ({ uid: `w${i}`, key }))))}
           {btn("Clear all", () => persist([]), "danger")}
