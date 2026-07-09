@@ -3,7 +3,7 @@
 //  Planning screen (rollups, capacity math, calendar positioning). Kept out of
 //  the component so the logic is unit-testable and the screen stays thin.
 // ============================================================================
-import { chart } from "@/theme";
+import { chart, color } from "@/theme";
 
 export interface IncrementSummary {
   id: number; key: string; name: string; startDate: string; endDate: string; state: string;
@@ -37,22 +37,22 @@ export const LINK_TYPES = [
 ];
 
 export const STATE_PILL: Record<string, { ink: string; tint: string }> = {
-  Planning: { ink: "#4A5266", tint: "#EEF1F6" },
-  Active: { ink: "#0C5798", tint: "#E6EFFB" },
-  Completed: { ink: "#0B6B37", tint: "#E7F4EC" },
-  Cancelled: { ink: "#A1282B", tint: "#FBE7E8" },
+  Planning: { ink: color.subtle, tint: color.bg },
+  Active: { ink: color.primaryDark, tint: color.primaryTint2 },
+  Completed: { ink: color.successInk, tint: color.successTint },
+  Cancelled: { ink: color.dangerInk, tint: color.dangerTint },
 };
 export const OBJ_PILL: Record<string, { ink: string; tint: string; dot: string }> = {
-  Planned: { ink: "#4A5266", tint: "#EEF1F6", dot: chart.onHold },
-  "In Progress": { ink: "#0C5798", tint: "#E6EFFB", dot: "#0F6CBD" },
-  Done: { ink: "#0B6B37", tint: "#E7F4EC", dot: chart.onTrack },
-  Missed: { ink: "#A1282B", tint: "#FBE7E8", dot: chart.critical },
+  Planned: { ink: color.subtle, tint: color.bg, dot: chart.onHold },
+  "In Progress": { ink: color.primaryDark, tint: color.primaryTint2, dot: chart.pipeBacklog },
+  Done: { ink: color.successInk, tint: color.successTint, dot: chart.onTrack },
+  Missed: { ink: color.dangerInk, tint: color.dangerTint, dot: chart.critical },
 };
 export const DEP_COL: Record<string, { ink: string; tint: string; bar: string }> = {
-  Identified: { ink: "#4A5266", tint: "#EEF1F6", bar: chart.onHold },
-  Committed: { ink: "#0C5798", tint: "#E6EFFB", bar: "#0F6CBD" },
-  Resolved: { ink: "#0B6B37", tint: "#E7F4EC", bar: chart.onTrack },
-  Blocked: { ink: "#A1282B", tint: "#FBE7E8", bar: chart.critical },
+  Identified: { ink: color.subtle, tint: color.bg, bar: chart.onHold },
+  Committed: { ink: color.primaryDark, tint: color.primaryTint2, bar: chart.pipeBacklog },
+  Resolved: { ink: color.successInk, tint: color.successTint, bar: chart.onTrack },
+  Blocked: { ink: color.dangerInk, tint: color.dangerTint, bar: chart.critical },
 };
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

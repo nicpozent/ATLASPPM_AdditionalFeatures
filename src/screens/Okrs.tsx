@@ -59,9 +59,9 @@ const okrSelectStyle: React.CSSProperties = { fontSize: 13.5, padding: "8px 10px
 
 // Manual RAG health (set by PMO / Platform Admin).
 const RAG: Record<string, { label: string; ink: string; tint: string; dot: string }> = {
-  green: { label: "On track", ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A" },
-  amber: { label: "At risk", ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100" },
-  red: { label: "Off track", ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438" },
+  green: { label: "On track", ink: color.successInk, tint: color.successTint, dot: "#15A34A" },
+  amber: { label: "At risk", ink: color.warningInk, tint: color.warningTint, dot: "#E0A100" },
+  red: { label: "Off track", ink: color.dangerInk, tint: color.dangerTint, dot: "#D13438" },
 };
 const OKR_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const okrToDisplay = (iso: string) => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return y && m && d ? `${d} ${OKR_MONTHS[m - 1]} ${y}` : ""; };
@@ -164,9 +164,9 @@ export default function Okrs() {
       </div>
 
       {/* Objectives aren't deleted — a completed objective moves to Completed. */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
         {(["Active", "Completed"] as OkrStatus[]).map((s) => (
-          <button key={s} onClick={() => setOkrStatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: okrStatus === s ? "#fff" : "transparent", color: okrStatus === s ? color.primary : "#565F73", boxShadow: okrStatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+          <button key={s} onClick={() => setOkrStatus(s)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: okrStatus === s ? color.surface : "transparent", color: okrStatus === s ? color.primary : color.subtle, boxShadow: okrStatus === s ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
             {s} · {countBy(s)}
           </button>
         ))}
@@ -204,8 +204,8 @@ export default function Okrs() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{o.title}</span>
                       {/* At-risk / missed signals against the horizon. */}
-                      {t.missed && <span title="Missed — past its target date and not achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Missed</span>}
-                      {t.near && <span title="Close to its horizon and not yet achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Near horizon</span>}
+                      {t.missed && <span title="Missed — past its target date and not achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Missed</span>}
+                      {t.near && <span title="Close to its horizon and not yet achieved" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: color.warningInk, background: color.warningTint, padding: "2px 8px", borderRadius: 6 }}><Icon name="alert" size={13} /> Near horizon</span>}
                     </div>
                     <div style={{ fontSize: 11.5, color: color.faint3 }}>{o.id} · {o.owner} · {o.horizon}</div>
                   </div>
@@ -225,8 +225,8 @@ export default function Okrs() {
                   {canEdit && <button onClick={() => setEditObj(o)} title="Edit objective" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
                   {canEdit && (
                     (o.status ?? "Active") === "Completed"
-                      ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
-                      : <button onClick={() => setStatus.mutate({ id: o.id, status: "Completed" })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#0B6B37", background: "#E7F4EC", border: "1px solid #BFE6CE", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="check" size={14} /> Mark complete</button>
+                      ? <button onClick={() => setStatus.mutate({ id: o.id, status: "Active" })} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reopen</button>
+                      : <button onClick={() => setStatus.mutate({ id: o.id, status: "Completed" })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.successInk, background: color.successTint, border: "1px solid #BFE6CE", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}><Icon name="check" size={14} /> Mark complete</button>
                   )}
                   {canDelete && (
                     <RowMenu ariaLabel="Objective actions" width={168}>
@@ -245,7 +245,7 @@ export default function Okrs() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 10.5, color: color.faint3, fontFamily: font.mono }}>
                       <span>{o.startDate || "—"}</span>
-                      <span>{t.spillover && <span style={{ color: "#A1282B", fontWeight: 700, fontFamily: font.body }}>Spilled over · </span>}Target {o.targetDate || "—"}</span>
+                      <span>{t.spillover && <span style={{ color: color.dangerInk, fontWeight: 700, fontFamily: font.body }}>Spilled over · </span>}Target {o.targetDate || "—"}</span>
                     </div>
                   </div>
                 )}
@@ -256,7 +256,7 @@ export default function Okrs() {
                     </div>
                   )}
                   {o.krs.map((k) => (
-                    <div key={k.id} style={{ padding: "11px 0", borderBottom: "1px solid #F4F6FA" }}>
+                    <div key={k.id} style={{ padding: "11px 0", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                         <span style={{ flex: 1, fontSize: 13.5, color: color.text, fontWeight: 500 }}>{k.title}</span>
                         {k.link && (
@@ -289,7 +289,7 @@ export default function Okrs() {
                     </div>
                   ))}
                   {canEdit && (
-                    <button onClick={() => setModal({ kind: "kr", objId: o.id })} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={() => setModal({ kind: "kr", objId: o.id })} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>
                       <Icon name="plus" size={14} /> Add key result
                     </button>
                   )}
@@ -336,7 +336,7 @@ export default function Okrs() {
             <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
               Permanently delete <strong>{confirmDel.title}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span> and all of its key results?
             </div>
-            <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px" }}>This can't be undone. To keep the record, mark it complete instead.</div>
+            <div style={{ fontSize: 12.5, color: color.dangerInk, background: color.dangerTint, borderRadius: 8, padding: "9px 12px" }}>This can't be undone. To keep the record, mark it complete instead.</div>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
             <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>

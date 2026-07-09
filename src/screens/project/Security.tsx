@@ -27,9 +27,9 @@ const AI_TIERS: { value: string; label: string; note: string }[] = [
   { value: "prohibited", label: "Prohibited (Art. 5)", note: "Must not be placed on the EU market." },
 ];
 const AI_TIER_COLOR: Record<string, { ink: string; tint: string }> = {
-  "": { ink: "#56607A", tint: "#EEF1F6" }, minimal: { ink: "#0B6B37", tint: "#E7F4EC" },
-  limited: { ink: "#8A6300", tint: "#FBF2D7" }, high: { ink: "#A1282B", tint: "#FBE7E8" },
-  prohibited: { ink: "#7A1216", tint: "#F7D5D7" },
+  "": { ink: color.subtle, tint: color.bg }, minimal: { ink: color.successInk, tint: color.successTint },
+  limited: { ink: color.warningInk, tint: color.warningTint }, high: { ink: color.dangerInk, tint: color.dangerTint },
+  prohibited: { ink: color.dangerInk, tint: color.dangerTint },
 };
 interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
 interface SecReviewGate { id: number; name: string; type: string; reviewer: string; status: string; date: string; note: string; }
@@ -37,11 +37,11 @@ interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[
 const SRG_TYPES = ["Security", "Architecture", "Privacy", "Threat model", "Data protection"];
 const SRG_STATUSES = ["Scheduled", "Passed", "Failed", "Waived", "Not required"];
 const SRG_STATUS: Record<string, { ink: string; tint: string }> = {
-  Passed:         { ink: "#0B6B37", tint: "#E7F4EC" },
-  Scheduled:      { ink: "#0C5798", tint: "#E6EFFB" },
-  Failed:         { ink: "#A1282B", tint: "#FBE7E8" },
-  Waived:         { ink: "#8A6300", tint: "#FBF2D7" },
-  "Not required": { ink: "#56607A", tint: "#EEF1F6" },
+  Passed:         { ink: color.successInk, tint: color.successTint },
+  Scheduled:      { ink: color.primaryDark, tint: color.primaryTint2 },
+  Failed:         { ink: color.dangerInk, tint: color.dangerTint },
+  Waived:         { ink: color.warningInk, tint: color.warningTint },
+  "Not required": { ink: color.subtle, tint: color.bg },
 };
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
@@ -49,10 +49,10 @@ const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
 const FRAMEWORK_OPTS = ["ISO 27001", "ISO 42001", "GDPR", "PCI-DSS", "SOC 2", "NIS2", "NIST CSF 2.0", "EU AI Act", "Digital Product Passport (ESPR)", "Packaging (PPWR)", "EU Deforestation (EUDR)"];
 const CTL_STATUSES = ["Planned", "Partial", "Implemented", "Archived"];
 const CTL_STATUS: Record<string, { ink: string; tint: string }> = {
-  Implemented: { ink: "#0B6B37", tint: "#E7F4EC" },
-  Partial:     { ink: "#8A6300", tint: "#FBF2D7" },
-  Planned:     { ink: "#56607A", tint: "#EEF1F6" },
-  Archived:    { ink: "#5E2E89", tint: "#F0E8F7" },
+  Implemented: { ink: color.successInk, tint: color.successTint },
+  Partial:     { ink: color.warningInk, tint: color.warningTint },
+  Planned:     { ink: color.subtle, tint: color.bg },
+  Archived:    { ink: "#5E2E89", tint: color.accentTint },
 };
 const SEC_FLAGS: { key: keyof SecProfile; label: string; desc: string }[] = [
   { key: "gdpr", label: "GDPR", desc: "Personal data of EU/EEA data subjects" },
@@ -88,9 +88,9 @@ const REG_GUIDE: { key: keyof SecProfile; name: string; scope: string; obligatio
   },
 ];
 const DPIA_COLOR: Record<string, { ink: string; tint: string }> = {
-  Required:      { ink: "#A1282B", tint: "#FBE7E8" },
-  Recommended:   { ink: "#8A6300", tint: "#FBF2D7" },
-  "Not required":{ ink: "#0B6B37", tint: "#E7F4EC" },
+  Required:      { ink: color.dangerInk, tint: color.dangerTint },
+  Recommended:   { ink: color.warningInk, tint: color.warningTint },
+  "Not required":{ ink: color.successInk, tint: color.successTint },
 };
 function dpiaVerdict(p: SecProfile): { level: string; reason: string } {
   if (p.specialCategory || p.automatedDecisions || p.classification === "Restricted")
@@ -137,7 +137,7 @@ export function Security({ projectId }: { projectId: string | null }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.ink }}>Security, privacy &amp; compliance</div>
-        {canEdit && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "4px 11px", borderRadius: 20 }}>● Security governance enabled</span>}
+        {canEdit && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: color.successInk, background: color.successTint, padding: "4px 11px", borderRadius: 20 }}>● Security governance enabled</span>}
       </div>
 
       {/* data classification & privacy profile */}
@@ -171,7 +171,7 @@ export function Security({ projectId }: { projectId: string | null }) {
       {/* DPIA banner */}
       <div style={{ border: `1px solid ${dc.ink}`, background: dc.tint, borderRadius: 16, padding: "18px 22px", marginBottom: 16 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 700, color: dc.ink }}>DPIA / PIA — {dpia.level}</div>
-        <div style={{ fontSize: 13, color: "#3A4358", lineHeight: 1.55, marginTop: 8 }}>{dpia.reason}</div>
+        <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.55, marginTop: 8 }}>{dpia.reason}</div>
       </div>
 
       {/* compliance flags */}
@@ -183,7 +183,7 @@ export function Security({ projectId }: { projectId: string | null }) {
             const on = !!p[f.key];
             return (
               <div key={f.key} onClick={() => canEdit && patch.mutate({ [f.key]: !on } as Partial<SecProfile>)} style={{ minWidth: 150, borderRadius: 11, border: `1px solid ${color.border}`, overflow: "hidden", cursor: canEdit ? "pointer" : "default" }}>
-                <div style={{ background: on ? color.primary : "#EEF0F4", color: on ? "#fff" : "#7B849A", fontSize: 13, fontWeight: 700, padding: "9px 13px" }}>{f.label}</div>
+                <div style={{ background: on ? color.primary : color.neutralTint, color: on ? "#fff" : "#7B849A", fontSize: 13, fontWeight: 700, padding: "9px 13px" }}>{f.label}</div>
                 <div style={{ fontSize: 11, color: "#7B849A", padding: "8px 13px", lineHeight: 1.4 }}>{f.desc}</div>
               </div>
             );
@@ -217,7 +217,7 @@ export function Security({ projectId }: { projectId: string | null }) {
             </div>
             <div style={{ border: `1px solid ${tc.ink}`, background: tc.tint, borderRadius: 12, padding: "12px 16px", marginBottom: 14 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: tc.ink }}>{meta.label}</span>
-              <span style={{ fontSize: 12.5, color: "#3A4358", marginLeft: 8 }}>{meta.note}</span>
+              <span style={{ fontSize: 12.5, color: color.textMuted, marginLeft: 8 }}>{meta.note}</span>
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {aiToggles.map((t) => (
@@ -243,7 +243,7 @@ export function Security({ projectId }: { projectId: string | null }) {
                 <div key={r.key} style={{ border: `1px solid ${color.border}`, borderRadius: 12, padding: "15px 17px", opacity: active.length > 0 || !!p[r.key] ? 1 : 0.92 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: color.ink }}>{r.name}</span>
-                    {!!p[r.key] && <span style={{ fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "2px 8px", borderRadius: 20 }}>Applies</span>}
+                    {!!p[r.key] && <span style={{ fontSize: 10, fontWeight: 700, color: color.successInk, background: color.successTint, padding: "2px 8px", borderRadius: 20 }}>Applies</span>}
                   </div>
                   <div style={{ fontSize: 12, color: color.subtle, lineHeight: 1.5, marginBottom: 11 }}>{r.scope}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
@@ -286,7 +286,7 @@ export function Security({ projectId }: { projectId: string | null }) {
         ) : data.reviewGates.map((g) => {
           const gs = SRG_STATUS[g.status] ?? SRG_STATUS.Scheduled;
           return (
-            <div key={g.id} onClick={() => canEdit && setOpenGate(g)} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA", cursor: canEdit ? "pointer" : "default" }}>
+            <div key={g.id} onClick={() => canEdit && setOpenGate(g)} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canEdit ? "pointer" : "default" }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: canEdit ? color.primary : color.text }}>{g.name}{g.note && <div style={{ fontSize: 11, color: color.faint3, fontWeight: 400, marginTop: 2 }}>{g.note}</div>}</div>
               <div style={{ fontSize: 11.5, color: color.subtle }}>{g.type}</div>
               <div style={{ fontSize: 11.5, color: color.subtle }}>{g.reviewer || "—"}</div>
@@ -312,7 +312,7 @@ export function Security({ projectId }: { projectId: string | null }) {
           const sc = CTL_STATUS[c.status] ?? CTL_STATUS.Planned;
           const nextStatus = CTL_STATUSES[(CTL_STATUSES.indexOf(c.status) + 1) % CTL_STATUSES.length];
           return (
-            <div key={c.id} style={{ display: "grid", gridTemplateColumns: SEC_COLS, alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F5F7FA", opacity: c.status === "Archived" ? 0.6 : 1 }}>
+            <div key={c.id} style={{ display: "grid", gridTemplateColumns: SEC_COLS, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, opacity: c.status === "Archived" ? 0.6 : 1 }}>
               <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.code}</div>
               <div style={{ minWidth: 0 }}>
                 {canEdit ? (
@@ -383,12 +383,12 @@ function SecReviewGateModal({ projectId, gate, onClose }: { projectId: string; g
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {gate && (confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this gate?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this gate?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         ))}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -444,12 +444,12 @@ function EditControlModal({ projectId, ctl, onClose }: { projectId: string; ctl:
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Remove this control?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Removing…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Remove this control?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Removing…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Remove control</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Remove control</button>
         )}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -479,7 +479,7 @@ function SecTextField({ value, disabled, placeholder, onCommit }: { value: strin
 
 function Toggle({ on, label, disabled, onClick }: { on: boolean; label: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <div onClick={() => !disabled && onClick()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, padding: "9px 14px", borderRadius: 9, border: `1px solid ${color.border2}`, background: color.surfaceAlt, color: "#3A4358", cursor: disabled ? "default" : "pointer" }}>
+    <div onClick={() => !disabled && onClick()} style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, padding: "9px 14px", borderRadius: 9, border: `1px solid ${color.border2}`, background: color.surfaceAlt, color: color.textMuted, cursor: disabled ? "default" : "pointer" }}>
       <span style={{ width: 34, height: 19, borderRadius: 20, background: on ? "#15A34A" : "#CBD2DE", position: "relative", flex: "none", transition: "background .15s" }}>
         <span style={{ position: "absolute", top: 2, left: on ? 17 : 2, width: 15, height: 15, borderRadius: "50%", background: color.surface, transition: "left .15s" }} />
       </span>

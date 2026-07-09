@@ -48,18 +48,18 @@ interface RolesMatrix { capabilities: Capability[]; roles: RoleRow[]; canManage:
 
 // Permission legend — tinted cells per code (F Full, E Edit, V View, N None).
 const PERM_LEGEND: Record<PermLevel, { label: string; cell: string; ink: string; tint: string }> = {
-  F: { label: "F", cell: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
-  E: { label: "E", cell: "#0F6CBD", ink: "#0C5798", tint: "#E6EFFB" },
-  V: { label: "V", cell: "#C98A00", ink: "#8A6300", tint: "#FBF2D7" },
-  N: { label: "—", cell: "#D7DCE5", ink: "#9AA2B4", tint: "#F1F3F8" },
+  F: { label: "F", cell: "#15A34A", ink: color.successInk, tint: color.successTint },
+  E: { label: "E", cell: "#0F6CBD", ink: color.primaryDark, tint: color.primaryTint2 },
+  V: { label: "V", cell: "#C98A00", ink: color.warningInk, tint: color.warningTint },
+  N: { label: "—", cell: color.border2, ink: "#9AA2B4", tint: color.surfaceInput },
 };
 // Clicking a cell cycles through the levels (admins only).
 const NEXT_LEVEL: Record<PermLevel, PermLevel> = { N: "V", V: "E", E: "F", F: "N" };
 // Icons offered when creating a role — all exist in Icon.tsx.
 const ROLE_ICONS = ["shield", "shieldUser", "userCheck", "users", "folder", "trendUp", "key", "lock", "star", "briefcase", "building", "target", "flag", "award"];
 const ROLE_COLORS: [string, string][] = [
-  ["#11163A", "#E6EAF5"], ["#0F6CBD", "#E6EFFB"], ["#7A3FB0", "#F0E8F7"],
-  ["#15A34A", "#E7F4EC"], ["#C98A00", "#FBF2D7"], ["#0E7C7B", "#DEF2F1"], ["#B4232A", "#FBE6E7"],
+  ["#11163A", color.border3], ["#0F6CBD", color.primaryTint2], ["#7A3FB0", color.accentTint],
+  ["#15A34A", color.successTint], ["#C98A00", color.warningTint], ["#0E7C7B", "#DEF2F1"], ["#B4232A", color.dangerTint],
 ];
 
 type Guide = { id: string; name: string; sub: string; icon?: string; time?: string; brand?: string; initials?: string; steps: string[] };
@@ -107,9 +107,9 @@ export default function Admin() {
           return (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "10px 4px", margin: "0 18px 0 0", border: "none",
-              borderBottom: active ? "2.5px solid #0F6CBD" : "2.5px solid transparent",
+              borderBottom: active ? `2.5px solid ${color.primary}` : "2.5px solid transparent",
               background: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 700 : 500,
-              color: active ? color.primary : "#565F73", fontFamily: "inherit", whiteSpace: "nowrap",
+              color: active ? color.primary : color.subtle, fontFamily: "inherit", whiteSpace: "nowrap",
             }}>{t.label}</button>
           );
         })}
@@ -152,7 +152,7 @@ function TableCard({ title, subtitle, cols, headers, empty, rows }: {
       {!rows || rows.length === 0 ? (
         <EmptyBlock message={empty} />
       ) : rows.map((r, ri) => (
-        <div key={ri} style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5, color: color.text, alignItems: "center" }}>
+        <div key={ri} style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5, color: color.text, alignItems: "center" }}>
           {r.map((cell, ci) => <div key={ci} style={{ color: ci === 0 ? color.text : color.subtle, fontWeight: ci === 0 ? 600 : 400 }}>{cell}</div>)}
         </div>
       ))}
@@ -227,7 +227,7 @@ function RolesSection() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 13, fontSize: 11.5, color: color.faint }}>
-            {[["Full", "#15A34A"], ["Edit", "#0F6CBD"], ["View", "#C98A00"], ["None", "#D7DCE5"]].map(([label, c]) => (
+            {[["Full", "#15A34A"], ["Edit", "#0F6CBD"], ["View", "#C98A00"], ["None", color.border2]].map(([label, c]) => (
               <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <span style={{ width: 9, height: 9, borderRadius: 3, background: c }} />{label}
               </span>
@@ -241,7 +241,7 @@ function RolesSection() {
         {caps.length === 0 ? (
           <EmptyBlock message="No capabilities defined yet." />
         ) : caps.map((cap) => (
-          <div key={cap.key} style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", padding: "11px 22px", borderBottom: "1px solid #F4F6FA" }}>
+          <div key={cap.key} style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", padding: "11px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: color.text }}>{cap.label}</div>
             {roles.map((r) => {
               const code = (r.permissions[cap.key] ?? "N") as PermLevel;
@@ -414,7 +414,7 @@ function StakeholdersSection() {
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title / role" style={{ marginBottom: 11 }} />
           <Input value={org} onChange={(e) => setOrg(e.target.value)} placeholder="Organisation / unit" style={{ marginBottom: 11 }} />
           <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ marginBottom: 16 }} />
-          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Create contact</button>
+          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Create contact</button>
         </Card>
       </div>
     </div>
@@ -454,7 +454,7 @@ function ArchiveSection() {
         {d.requests.length === 0 ? (
           <EmptyBlock message="No pending deletion requests." />
         ) : d.requests.map((r) => (
-          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: "1px solid #F4F6FA" }}>
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{r.projectName}</div>
               <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{r.projectId} · by {r.requestedBy} ({r.requestedRole}) · {r.date}</div>
@@ -462,7 +462,7 @@ function ArchiveSection() {
             {d.canGovern ? (
               <>
                 <button onClick={() => approve.mutate(r.id)} disabled={approve.isPending} style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#15A34A", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Approve → Archive</button>
-                <button onClick={() => reject.mutate(r.id)} disabled={reject.isPending} style={{ fontSize: 12, fontWeight: 600, color: "#A1282B", background: "#FBE7E8", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
+                <button onClick={() => reject.mutate(r.id)} disabled={reject.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.dangerInk, background: color.dangerTint, border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Reject</button>
               </>
             ) : <span style={{ fontSize: 11.5, color: color.faint3 }}>Awaiting PMO</span>}
           </div>
@@ -476,13 +476,13 @@ function ArchiveSection() {
         {d.archived.length === 0 ? (
           <EmptyBlock message="Archive is empty." />
         ) : d.archived.map((a) => (
-          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: "1px solid #F4F6FA" }}>
+          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{a.name}</div>
               <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{a.id} · {a.dept} · {a.owner}</div>
             </div>
             {d.canGovern && (
-              <button onClick={() => restore.mutate(a.id)} disabled={restore.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
+              <button onClick={() => restore.mutate(a.id)} disabled={restore.isPending} style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Restore</button>
             )}
             {d.canDelete && !a.isSystem && (
               <button onClick={() => purge.mutate(a.id)} disabled={purge.isPending} title="Permanently delete (Platform Admin)" style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "7px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
@@ -528,7 +528,7 @@ function AuditSection() {
       {entries.length === 0 ? (
         <EmptyBlock message="No audit entries yet." />
       ) : entries.map((e, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: AUDIT_COLS, alignItems: "center", padding: "11px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+        <div key={i} style={{ display: "grid", gridTemplateColumns: AUDIT_COLS, alignItems: "center", padding: "11px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5 }}>
           <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{fmtAudit(e.at)}</div>
           <div style={{ color: color.text }}>
             <span style={{ fontWeight: 600 }}>{e.actor}</span>
@@ -610,7 +610,7 @@ function TeamsSection() {
         {d.groups.length === 0 ? (
           <EmptyBlock message={d.graphConfigured ? "No groups synced yet — click “Sync from Entra”." : "No groups yet — add one below or configure Graph to sync."} />
         ) : d.groups.map((g) => (
-          <div key={g.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 0.7fr 0.9fr 40px", alignItems: "center", padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+          <div key={g.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 0.7fr 0.9fr 40px", alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5 }}>
             <div style={{ fontWeight: 600, color: color.text }}>{g.displayName}</div>
             <div>
               {d.canManage ? (
@@ -621,7 +621,7 @@ function TeamsSection() {
               ) : (g.managerKey ? managerName(g.managerKey) : "— Unmapped —")}
             </div>
             <div style={{ fontFamily: font.mono, color: color.textMuted }}>{g.memberCount}</div>
-            <div><span style={{ fontSize: 11, fontWeight: 600, color: g.manual ? "#8A6300" : "#0C5798", background: g.manual ? "#FBF2D7" : "#E6EFFB", padding: "3px 9px", borderRadius: 6 }}>{g.manual ? "Manual" : "Entra"}</span></div>
+            <div><span style={{ fontSize: 11, fontWeight: 600, color: g.manual ? "#8A6300" : "#0C5798", background: g.manual ? color.warningTint : color.primaryTint2, padding: "3px 9px", borderRadius: 6 }}>{g.manual ? "Manual" : "Entra"}</span></div>
             <div style={{ textAlign: "right" }}>{d.canManage && <button onClick={() => delGroup.mutate(g.id)} title="Remove group" style={{ border: "none", background: "transparent", color: "#B0546A", cursor: "pointer", display: "flex", padding: 0, marginLeft: "auto" }}><Icon name="trash" size={14} /></button>}</div>
           </div>
         ))}
@@ -639,7 +639,7 @@ function TeamsSection() {
         <div style={{ padding: "6px 22px 14px" }}>
           <div style={{ fontSize: 12, color: color.faint2, margin: "10px 0 12px" }}>Set each manager's parent. A manager sees their own team plus every team beneath them.</div>
           {d.managers.map((m) => (
-            <div key={m.key} style={{ display: "grid", gridTemplateColumns: "1.4fr auto 1.2fr 0.7fr", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+            <div key={m.key} style={{ display: "grid", gridTemplateColumns: "1.4fr auto 1.2fr 0.7fr", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5 }}>
               <div style={{ fontWeight: 600, color: color.text }}>{m.label}</div>
               <div style={{ fontSize: 11.5, color: color.faint3 }}>reports to</div>
               <div>
@@ -671,10 +671,10 @@ interface RotationStatus {
   warnDays: number; criticalDays: number; canManage: boolean;
 }
 const ROTATION_UI: Record<RotationStatus["status"], { label: string; fg: string; bg: string }> = {
-  unknown:  { label: "Not recorded", fg: "#565F73", bg: "#EEF1F6" },
-  ok:       { label: "Healthy",      fg: "#15A34A", bg: "#E7F4EC" },
-  warn:     { label: "Rotate soon",  fg: "#9A6800", bg: "#FBF2D7" },
-  critical: { label: "Change it now!", fg: "#A1282B", bg: "#FBE7E8" },
+  unknown:  { label: "Not recorded", fg: color.subtle, bg: color.bg },
+  ok:       { label: "Healthy",      fg: "#15A34A", bg: color.successTint },
+  warn:     { label: "Rotate soon",  fg: "#9A6800", bg: color.warningTint },
+  critical: { label: "Change it now!", fg: "#A1282B", bg: color.dangerTint },
 };
 
 function SecretRotationCard() {
@@ -798,8 +798,8 @@ function PrivacySection() {
               </button>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12.5, color: "#A1282B", fontWeight: 600 }}>Anonymise every record referencing “{s}”? Rows are kept but identifiers are irreversibly pseudonymised.</span>
-                <Button onClick={() => erasing.mutate()} disabled={erasing.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{erasing.isPending ? "Erasing…" : "Confirm erasure"}</Button>
+                <span style={{ fontSize: 12.5, color: color.dangerInk, fontWeight: 600 }}>Anonymise every record referencing “{s}”? Rows are kept but identifiers are irreversibly pseudonymised.</span>
+                <Button onClick={() => erasing.mutate()} disabled={erasing.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{erasing.isPending ? "Erasing…" : "Confirm erasure"}</Button>
                 <Button variant="secondary" onClick={() => setConfirmErase(false)}>Cancel</Button>
               </div>
             )}
@@ -906,7 +906,7 @@ function BackupsSection() {
           {d.components.length === 0 ? (
             <EmptyBlock message="No backup components." />
           ) : d.components.map((c) => (
-            <div key={c.name} style={{ display: "grid", gridTemplateColumns: BACKUP_COLS, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+            <div key={c.name} style={{ display: "grid", gridTemplateColumns: BACKUP_COLS, alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5 }}>
               <div style={{ fontWeight: 600, color: color.text }}>{c.name}</div>
               <div style={{ color: color.subtle }}>{c.schedule}</div>
               <div style={{ color: color.subtle }}>{c.retention}</div>
@@ -924,12 +924,12 @@ function BackupsSection() {
         {d.runs.length === 0 ? (
           <EmptyBlock message="No backup runs recorded yet — click “Back up all now”." />
         ) : d.runs.map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 22px", borderBottom: "1px solid #F4F6FA", fontSize: 12.5 }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, fontSize: 12.5 }}>
             <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3, minWidth: 168 }}>{r.at}</span>
             <span style={{ flex: 1, color: color.text }}>{r.actor} <span style={{ color: color.faint3 }}>({r.role})</span></span>
             <span style={{ fontFamily: font.mono, color: color.textMuted }}>{r.records.toLocaleString()} records</span>
             <span style={{ fontFamily: font.mono, color: color.textMuted, minWidth: 70, textAlign: "right" }}>{r.size}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "3px 9px", borderRadius: 6 }}>{r.status}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: color.successInk, background: color.successTint, padding: "3px 9px", borderRadius: 6 }}>{r.status}</span>
           </div>
         ))}
       </Card>
@@ -948,7 +948,7 @@ function GuidesSection({ kind, openGuide, setOpenGuide }: {
   return (
     <>
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: "16px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 13 }}>
-        <span style={{ width: 40, height: 40, borderRadius: radius.lg, background: "#E6EAF5", color: color.navy, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={banner.icon} size={20} /></span>
+        <span style={{ width: 40, height: 40, borderRadius: radius.lg, background: color.border3, color: color.navy, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={banner.icon} size={20} /></span>
         <div><div style={sectionTitle}>{banner.title}</div><div style={{ fontSize: 12.5, color: color.faint2 }}>{banner.sub}</div></div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
@@ -1052,9 +1052,9 @@ function Stars({ n }: { n: number }) {
 }
 
 const RISK_TINT: Record<string, { ink: string; bg: string }> = {
-  High: { ink: "#A1282B", bg: "#FBE7E8" },
-  Medium: { ink: "#8A6300", bg: "#FBF2D7" },
-  Low: { ink: "#566077", bg: "#EEF0F4" },
+  High: { ink: color.dangerInk, bg: color.dangerTint },
+  Medium: { ink: color.warningInk, bg: color.warningTint },
+  Low: { ink: color.subtle, bg: color.neutralTint },
 };
 
 function EvaluationSection() {

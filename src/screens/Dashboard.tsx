@@ -45,13 +45,13 @@ export default function Dashboard() {
 
       {/* layout switcher */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
           {LAYOUT_TABS.map((t) => {
             const active = layout === t.id;
             return (
               <button key={t.id} onClick={() => setLayout(t.id)} style={{
                 padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
+                background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle,
                 boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
               }}>{t.label}</button>
             );

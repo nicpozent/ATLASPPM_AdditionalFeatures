@@ -29,11 +29,11 @@ const toDisplayDate = (iso: string): string => {
   return y && m && dd ? `${dd} ${MONTHS[m - 1]} ${y}` : "TBD";
 };
 const BLK_COLORS: Record<BlockerStatus, { dot: string; ink: string; tint: string }> = {
-  Active:        { dot: "#D13438", ink: "#A1282B", tint: "#FBE7E8" },
-  "In progress": { dot: "#E0A100", ink: "#8A6300", tint: "#FBF2D7" },
-  Resolved:      { dot: "#15A34A", ink: "#0B6B37", tint: "#E7F4EC" },
-  Cancelled:     { dot: "#8A93A6", ink: "#56607A", tint: "#EEF1F6" },
-  Archived:      { dot: "#7A6BB0", ink: "#5E2E89", tint: "#F0E8F7" },
+  Active:        { dot: "#D13438", ink: color.dangerInk, tint: color.dangerTint },
+  "In progress": { dot: "#E0A100", ink: color.warningInk, tint: color.warningTint },
+  Resolved:      { dot: "#15A34A", ink: color.successInk, tint: color.successTint },
+  Cancelled:     { dot: "#8A93A6", ink: color.subtle, tint: color.bg },
+  Archived:      { dot: "#7A6BB0", ink: "#5E2E89", tint: color.accentTint },
 };
 const BLK_STATUSES: BlockerStatus[] = ["Active", "In progress", "Resolved", "Cancelled", "Archived"];
 // Views group the lifecycle: Open = actionable, then one view per closed state.
@@ -108,7 +108,7 @@ export default function Portfolio() {
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* sub-tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
           <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>Overview</TabBtn>
           <TabBtn active={tab === "projects"} onClick={() => setTab("projects")}>Projects</TabBtn>
           <TabBtn active={tab === "blockers"} onClick={() => setTab("blockers")}>
@@ -119,7 +119,7 @@ export default function Portfolio() {
         </div>
         <div style={{ flex: 1 }} />
         {tab === "projects" && (
-          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+          <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
             {(["active", "completed", "archived"] as ProjectBucket[]).map((b) => (
               <TabBtn key={b} active={bucket === b} onClick={() => { setBucket(b); setFilter("all"); }}>
                 {b[0].toUpperCase() + b.slice(1)}
@@ -161,7 +161,7 @@ export default function Portfolio() {
                 {bucket === "archived" ? "No archived projects." : bucket === "completed" ? "No completed projects yet." : projects.length === 0 ? "No projects yet. Create one to populate the portfolio." : "No projects match this filter."}
               </div>
             ) : filtered.map((p) => (
-              <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer", opacity: p.archived ? 0.72 : 1 }}>
+              <div key={p.id} onClick={() => openProject(p.id)} style={{ position: "relative", display: "grid", gridTemplateColumns: "2fr 0.95fr 0.7fr 0.8fr 0.9fr 1fr 0.85fr", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer", opacity: p.archived ? 0.72 : 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", background: statusDot(p.status), flex: "none" }} />
                   <div style={{ minWidth: 0 }}>
@@ -171,10 +171,10 @@ export default function Portfolio() {
                         <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>
                       )}
                       {!p.archived && p.status === "completed" && (
-                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Completed</span>
+                        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Completed</span>
                       )}
                       {p.blockerCount > 0 && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flex: "none", color: "#D13438", background: "#FBE7E8", borderRadius: 6, padding: "1px 6px 1px 4px", fontSize: 10.5, fontWeight: 700 }}><Icon name="alert" size={12} />{p.blockerCount}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, flex: "none", color: "#D13438", background: color.dangerTint, borderRadius: 6, padding: "1px 6px 1px 4px", fontSize: 10.5, fontWeight: 700 }}><Icon name="alert" size={12} />{p.blockerCount}</span>
                       )}
                     </div>
                     <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{p.id} · {p.dept}</div>
@@ -322,7 +322,7 @@ function EditProjectModal({ project, onClose, onSaved }: { project: Project; onC
         <Field label="Budget (€k)"><Input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} /></Field>
         <Field label="Spent (€k)"><Input type="number" value={spent} onChange={(e) => setSpent(e.target.value)} /></Field>
       </div>
-      {save.error && <div style={{ fontSize: 12.5, color: "#A1282B", marginTop: 6 }}>{(save.error as Error).message}</div>}
+      {save.error && <div style={{ fontSize: 12.5, color: color.dangerInk, marginTop: 6 }}>{(save.error as Error).message}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button onClick={() => name.trim() && save.mutate()} disabled={save.isPending || !name.trim()}>{save.isPending ? "Saving…" : "Save changes"}</Button>
@@ -339,8 +339,8 @@ function ConfirmDeleteModal({ project, pending, error, onCancel, onConfirm }: {
       <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 6 }}>
         Permanently delete <strong>{project.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({project.id})</span> and all of its tasks, gates, artifacts, costs and other records?
       </div>
-      <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
-      {error && <div style={{ fontSize: 12.5, color: "#A1282B", marginBottom: 10 }}>{error.message}</div>}
+      <div style={{ fontSize: 12.5, color: color.dangerInk, background: color.dangerTint, borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
+      {error && <div style={{ fontSize: 12.5, color: color.dangerInk, marginBottom: 10 }}>{error.message}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <Button variant="secondary" onClick={onCancel}>Cancel</Button>
         <button onClick={onConfirm} disabled={pending} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 16px", borderRadius: 10, cursor: pending ? "not-allowed" : "pointer", opacity: pending ? 0.6 : 1, fontFamily: "inherit" }}>{pending ? "Deleting…" : "Delete permanently"}</button>
@@ -435,9 +435,9 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
 
         {/* view + project filters */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+          <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
             {BLK_VIEWS.map((v) => (
-              <button key={v.key} onClick={() => setView(v.key)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: view === v.key ? "#fff" : "transparent", color: view === v.key ? color.primary : "#565F73", boxShadow: view === v.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v.label}</button>
+              <button key={v.key} onClick={() => setView(v.key)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: view === v.key ? color.surface : "transparent", color: view === v.key ? color.primary : color.subtle, boxShadow: view === v.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v.label}</button>
             ))}
           </div>
           <div style={{ flex: 1 }} />
@@ -459,7 +459,7 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
           ) : shown.map((b) => {
             const bc = BLK_COLORS[b.status];
             return (
-              <div key={b.id} onClick={() => setOpenBlocker(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.4fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
+              <div key={b.id} onClick={() => setOpenBlocker(b)} style={{ display: "grid", gridTemplateColumns: "0.6fr 2.4fr 1.1fr 0.9fr 0.9fr", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
                 <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{b.id}</div>
                 <div style={{ paddingRight: 12, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 500, color: color.text }}>{b.title}</div>
@@ -541,12 +541,12 @@ function BlockerModal({ blocker, canEdit, onClose }: { blocker: Blocker; canEdit
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 8 }}>
         {canEdit && (confirmDel ? (
           <>
-            <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this blocker?</span>
-            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this blocker?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
             <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
           </>
         ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
         ))}
         <div style={{ flex: 1 }} />
         <Button variant="secondary" onClick={onClose}>{canEdit ? "Cancel" : "Close"}</Button>
@@ -560,7 +560,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button onClick={onClick} style={{
       padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-      background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73", boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
+      background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle, boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
     }}>{children}</button>
   );
 }

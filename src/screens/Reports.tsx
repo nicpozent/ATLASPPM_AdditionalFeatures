@@ -24,10 +24,10 @@ const REPORT_TYPES: ReportType[] = [
 
 interface Fmt { key: string; label: string; icon: string; tint: string; ink: string }
 const FORMATS: Fmt[] = [
-  { key: "pptx", label: "Slides", icon: "barChart", tint: "#FBEDE6", ink: "#C24A1F" },
-  { key: "pdf", label: "PDF", icon: "book", tint: "#FCEDED", ink: "#C0303A" },
-  { key: "xlsx", label: "Excel", icon: "sheet", tint: "#E7F4EC", ink: "#0B6B37" },
-  { key: "html", label: "HTML", icon: "globe", tint: "#E6EFFB", ink: color.primary },
+  { key: "pptx", label: "Slides", icon: "barChart", tint: color.warningTint, ink: "#C24A1F" },
+  { key: "pdf", label: "PDF", icon: "book", tint: color.dangerTint, ink: color.danger },
+  { key: "xlsx", label: "Excel", icon: "sheet", tint: color.successTint, ink: color.successInk },
+  { key: "html", label: "HTML", icon: "globe", tint: color.primaryTint2, ink: color.primary },
 ];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -133,14 +133,14 @@ function reportHtml(r: Report, slides: boolean): string {
     <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;margin:6px 0 4px">${esc(r.title)}</div>
     <div style="font-size:13px;opacity:.9">${esc(r.summary)} · Generated ${today}</div></div>`;
   const table = r.rows.length === 0
-    ? `<p style="color:#565F73;font-size:14px">No data for this report yet.</p>`
+    ? `<p style="color:${color.subtle};font-size:14px">No data for this report yet.</p>`
     : `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr>${r.columns.map((c) => `<th style="text-align:left;padding:9px 10px;background:#EEF3FB;color:#11163A;border-bottom:2px solid #0F6CBD">${esc(c)}</th>`).join("")}</tr></thead>
-        <tbody>${r.rows.map((row, i) => `<tr style="background:${i % 2 ? "#F8FAFD" : "#fff"}">${row.map((cell) => `<td style="padding:8px 10px;border-bottom:1px solid #EEF1F6;color:#26324A">${esc(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+        <tbody>${r.rows.map((row, i) => `<tr style="background:${i % 2 ? color.surfaceAlt : "#fff"}">${row.map((cell) => `<td style="padding:8px 10px;border-bottom:1px solid ${color.bg};color:#26324A">${esc(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
       </table>`;
   const body = `<div style="font-family:'Public Sans',Arial,sans-serif;max-width:${slides ? 1024 : 900}px;margin:0 auto;padding:28px;color:#141A3C">${head}${table}
     <div style="margin-top:26px;font-size:11px;color:#8A93A6">Atlas PPM · confidential · Birgma Group</div></div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.title)}</title></head><body style="margin:0;background:#F4F6FB">${body}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.title)}</title></head><body style="margin:0;background:${color.surfaceAlt}">${body}</body></html>`;
 }
 
 function reportCsv(r: Report): string {
@@ -249,8 +249,8 @@ export default function Reports() {
                     onClick={() => run(r.key, f.key)}
                     disabled={!!busy}
                     title={`Generate ${r.name} as ${f.label}`}
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 4px", border: `1px solid ${color.border}`, background: loading ? "#F6FAFE" : "#fff", borderRadius: 9, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy && !loading ? 0.6 : 1 }}
-                    onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.borderColor = color.primary; e.currentTarget.style.background = "#F6FAFE"; } }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 4px", border: `1px solid ${color.border}`, background: loading ? color.surfaceAlt : "#fff", borderRadius: 9, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy && !loading ? 0.6 : 1 }}
+                    onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.borderColor = color.primary; e.currentTarget.style.background = color.surfaceAlt; } }}
                     onMouseLeave={(e) => { if (!busy) { e.currentTarget.style.borderColor = color.border; e.currentTarget.style.background = "#fff"; } }}
                   >
                     <span style={{ width: 26, height: 26, borderRadius: 7, background: f.tint, color: f.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -267,7 +267,7 @@ export default function Reports() {
 
       {/* Monthly project report */}
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xxl, marginTop: 22, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 22px", borderBottom: "1px solid #EEF1F6", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 22px", borderBottom: `1px solid ${color.bg}`, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>Monthly portfolio report</div>
             <div style={{ fontSize: 12.5, color: color.faint2 }}>Projects, blockers &amp; demand pipeline — a single-file snapshot</div>

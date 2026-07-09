@@ -193,7 +193,7 @@ export default function Methodologies() {
             {g.items.map((m) => (
               <div key={m.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 19, position: "relative", display: "flex", flexDirection: "column" }}>
                 {m.default && (
-                  <span style={{ position: "absolute", top: 15, right: 15, fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "3px 9px", borderRadius: 20 }}>DEFAULT</span>
+                  <span style={{ position: "absolute", top: 15, right: 15, fontSize: 10, fontWeight: 700, color: color.successInk, background: color.successTint, padding: "3px 9px", borderRadius: 20 }}>DEFAULT</span>
                 )}
                 <div style={{ width: 42, height: 42, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 13 }}>
                   <Icon name={m.icon} size={21} />
@@ -208,7 +208,7 @@ export default function Methodologies() {
                   onClick={() => setTpl({ methodology: m.name, name: "", dept: "", owner: "", startDate: "", target: "", integration: "jira" })}
                   style={useBtn}
                   onMouseEnter={(e) => { e.currentTarget.style.background = color.primary; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = color.primary; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = color.primary; e.currentTarget.style.borderColor = "#CFE0F4"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = color.primary; e.currentTarget.style.borderColor = color.primaryTint2; }}
                 >Use template</button>
               </div>
             ))}
@@ -263,7 +263,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
   return (
     <Overlay onClose={onClose} width={580}>
       {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #EEF1F6" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${color.bg}` }}>
         <span style={{ width: 34, height: 34, borderRadius: 9, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
           <Icon name="template" size={18} />
         </span>
@@ -302,9 +302,9 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
               coherent, methodology-specific steps are visible before naming. */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 9 }}>The <b style={{ color: color.text }}>{tpl.methodology}</b> template will scaffold these work items:</div>
-            <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden" }}>
+            <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, overflow: "hidden" }}>
               {scaffold.map((it, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 13px", borderBottom: i < scaffold.length - 1 ? "1px solid #F4F6FA" : "none" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 13px", borderBottom: i < scaffold.length - 1 ? `1px solid ${color.surfaceAlt}` : "none" }}>
                   <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5, minWidth: 38, textAlign: "center" }}>{it.type}</span>
                   <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
                 </div>
@@ -322,9 +322,9 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
       {step === 2 && (
         <div>
           <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 11 }}>These work items will be created from the <b style={{ color: color.text }}>{tpl.methodology}</b> template:</div>
-          <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden", marginBottom: 18 }}>
+          <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, overflow: "hidden", marginBottom: 18 }}>
             {scaffold.map((it, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderBottom: "1px solid #F4F6FA" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5, width: 38, textAlign: "center" }}>{it.type}</span>
                 <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
                 {i === 0 && <span style={{ fontSize: 10.5, fontWeight: 600, color: color.primaryDark }}>↗ pushed to tracker</span>}
@@ -346,7 +346,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
       {step === 3 && created && (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#E7F4EC", color: "#0B6B37", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+            <span style={{ width: 42, height: 42, borderRadius: "50%", background: color.successTint, color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
               <Icon name="check" size={20} />
             </span>
             <div>
@@ -354,10 +354,10 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
               <div style={{ fontSize: 12.5, color: color.faint2 }}>{created.methodology} · {created.dept} · {created.owner}</div>
             </div>
           </div>
-          <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden" }}>
+          <div style={{ border: `1px solid ${color.bg}`, borderRadius: 11, overflow: "hidden" }}>
             {created.items.map((it, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderBottom: "1px solid #F4F6FA" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#C7CEDB" }} />
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: color.border2 }} />
                 <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
                 {it.pushed && <span style={{ fontFamily: font.mono, fontSize: 11, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "2px 8px", borderRadius: 5 }}>{it.ext} ↗</span>}
               </div>
@@ -373,4 +373,4 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
 }
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
-const useBtn: React.CSSProperties = { width: "100%", fontSize: 13, fontWeight: 600, color: color.primary, background: color.surface, border: "1px solid #CFE0F4", padding: 9, borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
+const useBtn: React.CSSProperties = { width: "100%", fontSize: 13, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: 9, borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

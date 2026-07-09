@@ -51,11 +51,11 @@ const ITEM_STATUSES = ["Open", "In progress", "Blocked", "Done"];
 const PRIORITY_COLOR: Record<string, string> = { Critical: color.danger, High: color.warningAlt, Medium: color.primary, Low: color.faint2 };
 const STATUS_TINT: Record<string, { ink: string; bg: string }> = {
   Open: { ink: color.subtle, bg: color.bg },
-  "In progress": { ink: "#0C5798", bg: "#E6EFFB" },
-  Blocked: { ink: "#A1282B", bg: "#FBE7E8" },
-  Done: { ink: "#0B6B37", bg: "#E7F4EC" },
-  Active: { ink: "#0B6B37", bg: "#E7F4EC" },
-  Paused: { ink: "#8A6300", bg: "#FBF2D7" },
+  "In progress": { ink: color.primaryDark, bg: color.primaryTint2 },
+  Blocked: { ink: color.dangerInk, bg: color.dangerTint },
+  Done: { ink: color.successInk, bg: color.successTint },
+  Active: { ink: color.successInk, bg: color.successTint },
+  Paused: { ink: color.warningInk, bg: color.warningTint },
   Retired: { ink: color.faint2, bg: color.bg },
 };
 
@@ -172,7 +172,7 @@ export default function Ops() {
           <span style={{ fontSize: 12.5, fontWeight: 700, color: color.primaryDark }}>{selected.size} item{selected.size === 1 ? "" : "s"} selected</span>
           <div style={{ flex: 1 }} />
           <Button variant="secondary" onClick={clearSelection}>Clear</Button>
-          <Button onClick={() => bulkDelete.mutate([...selected])} disabled={bulkDelete.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>
+          <Button onClick={() => bulkDelete.mutate([...selected])} disabled={bulkDelete.isPending} style={{ background: "#D13438", borderColor: color.danger }}>
             <Icon name="trash" size={15} /> {bulkDelete.isPending ? "Deleting…" : `Delete ${selected.size} selected`}
           </Button>
         </div>
@@ -264,7 +264,7 @@ function ServiceCard({ service, mayEdit, statusFilter, selected, onToggleSelect,
         <div style={{ borderBottom: `1px solid ${color.bg}` }}>
           <div style={{ padding: "8px 20px 4px", fontSize: 10.5, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em" }}>Linked tasks</div>
           {linked.map((t) => (
-            <div key={t.taskId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 20px", borderTop: "1px solid #F7F9FC" }}>
+            <div key={t.taskId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 20px", borderTop: `1px solid ${color.surfaceAlt}` }}>
               <Icon name="link" size={13} color={color.faint3} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.code} {t.name}</div>
@@ -284,7 +284,7 @@ function ServiceCard({ service, mayEdit, statusFilter, selected, onToggleSelect,
       ) : (
         <div>
           {items.map((i) => (
-            <div key={i.id} style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #F4F6FA", background: selected.has(i.id) ? color.primaryTint : "none" }}>
+            <div key={i.id} style={{ display: "flex", alignItems: "center", borderBottom: `1px solid ${color.surfaceAlt}`, background: selected.has(i.id) ? color.primaryTint : "none" }}>
               {mayEdit && (
                 <label style={{ display: "flex", alignItems: "center", padding: "0 4px 0 16px", cursor: "pointer" }} title="Select for bulk delete" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.has(i.id)} onChange={() => onToggleSelect(i.id)} aria-label={`Select ${i.title}`} />
@@ -295,7 +295,7 @@ function ServiceCard({ service, mayEdit, statusFilter, selected, onToggleSelect,
                 <span style={{ width: 6, height: 6, borderRadius: "50%", flex: "none", background: PRIORITY_COLOR[i.priority] ?? color.faint2 }} title={i.priority} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                    {i.type === "Epic" && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#6B4CC4", background: "#EDE7F9", borderRadius: 5, padding: "1px 6px", flex: "none" }}>EPIC</span>}
+                    {i.type === "Epic" && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#6B4CC4", background: color.accentTint, borderRadius: 5, padding: "1px 6px", flex: "none" }}>EPIC</span>}
                     {i.jiraKey && <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{i.jiraKey}</span>}
                     <span style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</span>
                   </div>
@@ -496,12 +496,12 @@ function ItemModal({ item, service, projects, onClose }: { item?: OpsItem; servi
         {editing && (
           confirmDel ? (
             <>
-              <span style={{ fontSize: 12, color: "#A1282B", fontWeight: 600 }}>Delete this item?</span>
-              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: "#D13438" }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+              <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this item?</span>
+              <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
               <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
             </>
           ) : (
-            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#A1282B", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+            <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
           )
         )}
         <div style={{ flex: 1 }} />

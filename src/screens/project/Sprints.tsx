@@ -18,14 +18,14 @@ interface SprintItem {
 }
 const SPRINT_STATUSES = ["Planned", "Started", "Halted", "Completed", "Cancelled"];
 const SPRINT_STATUS: Record<string, { ink: string; tint: string }> = {
-  Started:   { ink: "#0B6B37", tint: "#E7F4EC" },
-  Planned:   { ink: "#56607A", tint: "#EEF1F6" },
-  Halted:    { ink: "#8A6300", tint: "#FBF2D7" },
-  Completed: { ink: "#0C5798", tint: "#E6EFFB" },
-  Cancelled: { ink: "#A1282B", tint: "#FBE7E8" },
+  Started:   { ink: color.successInk, tint: color.successTint },
+  Planned:   { ink: color.subtle, tint: color.bg },
+  Halted:    { ink: color.warningInk, tint: color.warningTint },
+  Completed: { ink: color.primaryDark, tint: color.primaryTint2 },
+  Cancelled: { ink: color.dangerInk, tint: color.dangerTint },
   // legacy values from before the lifecycle expansion
-  Active:    { ink: "#0B6B37", tint: "#E7F4EC" },
-  Closed:    { ink: "#0C5798", tint: "#E6EFFB" },
+  Active:    { ink: color.successInk, tint: color.successTint },
+  Closed:    { ink: color.primaryDark, tint: color.primaryTint2 },
 };
 
 export function Sprints({ projectId }: { projectId: string | null }) {
@@ -82,7 +82,7 @@ export function Sprints({ projectId }: { projectId: string | null }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
                       <span style={{ fontFamily: font.head, fontSize: 15.5, fontWeight: 700, color: color.ink }}>{s.name}</span>
                       <span style={{ fontSize: 10.5, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "2px 9px", borderRadius: 20 }}>{s.status}</span>
-                      {s.spilledCount > 0 && <span title={`${s.spilledCount} task(s) carried in from another sprint`} style={{ fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }}>{s.spilledCount} spilled-in</span>}
+                      {s.spilledCount > 0 && <span title={`${s.spilledCount} task(s) carried in from another sprint`} style={{ fontSize: 10, fontWeight: 700, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 5, padding: "1px 6px" }}>{s.spilledCount} spilled-in</span>}
                     </div>
                     {s.goal && <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 4 }}>{s.goal}</div>}
                     <div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{s.startDate || "—"} → {s.endDate || "—"}</div>
@@ -90,7 +90,7 @@ export function Sprints({ projectId }: { projectId: string | null }) {
                   {canEdit && (
                     <div style={{ display: "flex", gap: 7 }}>
                       <Button variant="secondary" onClick={() => setEdit(s)}><Icon name="edit" size={15} /> Edit</Button>
-                      <button onClick={() => { if (confirm(`Delete sprint “${s.name}”? Tasks stay, but lose this iteration.`)) del.mutate(s.id); }} title="Delete sprint" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: `1px solid ${color.border}`, background: color.surface, cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={15} /></button>
+                      <button onClick={() => { if (confirm(`Delete sprint “${s.name}”? Tasks stay, but lose this iteration.`)) del.mutate(s.id); }} title="Delete sprint" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: `1px solid ${color.border}`, background: color.surface, cursor: "pointer", color: color.dangerInk }}><Icon name="trash" size={15} /></button>
                     </div>
                   )}
                 </div>

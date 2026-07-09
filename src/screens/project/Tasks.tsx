@@ -78,9 +78,9 @@ export function Tasks({ projectId }: { projectId: string | null }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2 }}>
           {(["board", "table"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", textTransform: "capitalize", background: view === v ? "#fff" : "transparent", color: view === v ? color.primary : "#565F73", boxShadow: view === v ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v}</button>
+            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", textTransform: "capitalize", background: view === v ? color.surface : "transparent", color: view === v ? color.primary : color.subtle, boxShadow: view === v ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{v}</button>
           ))}
         </div>
         {assignees.length > 0 && (
@@ -113,10 +113,10 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                   const t = tasks.find((x) => x.id === id);
                   if (id && t && t.status !== c.label) move.mutate({ id, status: c.label });
                 }}
-                style={{ background: over ? "#EAF2FB" : "#F5F7FA", border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : "#EAEEF4"}`, borderRadius: 13, padding: 10, minHeight: 120 }}>
+                style={{ background: over ? color.primaryTint : color.surfaceAlt, border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : color.border3}`, borderRadius: 13, padding: 10, minHeight: 120 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px" }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#3A4358" }}>{c.label}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: color.textMuted }}>{c.label}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: c.ink, background: c.tint, padding: "1px 8px", borderRadius: 20 }}>{cards.length}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -135,17 +135,17 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                         {(isSpilled(t) || t.assigneeOnLeave || t.assigneeKnown === false) && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
                             {isSpilled(t) && (
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 5, padding: "1px 6px" }} title={`Baselined in ${t.baseline}, now in ${t.sprint}`}>
                                 <Icon name="alert" size={11} /> Spilled · {t.baseline} → {t.sprint}
                               </span>
                             )}
                             {t.assigneeOnLeave && (
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} is on leave during this task's scheduled window`}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, border: `1px solid ${color.dangerBorder}`, borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} is on leave during this task's scheduled window`}>
                                 <Icon name="alert" size={11} /> Assignee on leave
                               </span>
                             )}
                             {t.assigneeKnown === false && (
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} isn't an onboarded team member (not synced from Entra).`}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9.5, fontWeight: 700, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 5, padding: "1px 6px" }} title={`${t.assignee} isn't an onboarded team member (not synced from Entra).`}>
                                 <Icon name="alert" size={11} /> Assignee not onboarded
                               </span>
                             )}
@@ -177,12 +177,12 @@ export function Tasks({ projectId }: { projectId: string | null }) {
           ) : shown.map((t) => {
             const col = BOARD_COLS.find((c) => c.label === t.status) ?? BOARD_COLS[0];
             return (
-              <div key={t.id} style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+              <div key={t.id} style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr", alignItems: "center", padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
                   <button onClick={() => setOpenId(t.id)} style={{ fontSize: 13.5, fontWeight: 600, color: color.primary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{t.name}</button>
-                  {t.assigneeOnLeave && <span title={`${t.assignee} is on leave during this task's scheduled window`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3CFD0", borderRadius: 4, padding: "0 5px" }}>ON LEAVE</span>}
-                  {t.assigneeKnown === false && <span title={`${t.assignee} isn't an onboarded team member (not synced from Entra) — add them to a team or check the name.`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 4, padding: "0 5px" }}>⚠ NOT ONBOARDED</span>}
+                  {t.assigneeOnLeave && <span title={`${t.assignee} is on leave during this task's scheduled window`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, border: `1px solid ${color.dangerBorder}`, borderRadius: 4, padding: "0 5px" }}>ON LEAVE</span>}
+                  {t.assigneeKnown === false && <span title={`${t.assignee} isn't an onboarded team member (not synced from Entra) — add them to a team or check the name.`} style={{ flex: "none", fontSize: 9, fontWeight: 700, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 4, padding: "0 5px" }}>⚠ NOT ONBOARDED</span>}
                 </div>
                 <div style={{ fontSize: 12.5, color: color.subtle }}>{t.epic || "—"}</div>
                 <div style={{ fontSize: 13, color: color.textMuted }}>{t.assignee}</div>
@@ -193,7 +193,7 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                       onBlur={(e) => { const v = e.target.value.trim(); if (v !== t.sprint) replan.mutate({ id: t.id, sprint: v }); }}
                       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                       placeholder="—" title="Re-plan sprint — moving off the baseline flags it as spilled"
-                      style={{ width: 84, fontFamily: font.mono, fontSize: 12, fontWeight: isSpilled(t) ? 700 : 400, color: isSpilled(t) ? "#8A6300" : color.textMuted, background: isSpilled(t) ? "#FBF2D7" : "#fff", border: `1px solid ${isSpilled(t) ? "#F0E4B8" : color.border}`, borderRadius: 6, padding: "4px 7px" }}
+                      style={{ width: 84, fontFamily: font.mono, fontSize: 12, fontWeight: isSpilled(t) ? 700 : 400, color: isSpilled(t) ? "#8A6300" : color.textMuted, background: isSpilled(t) ? color.warningTint : "#fff", border: `1px solid ${isSpilled(t) ? color.warnBorder : color.border}`, borderRadius: 6, padding: "4px 7px" }}
                     />
                   ) : (
                     <span style={{ fontSize: 12, fontFamily: font.mono, fontWeight: isSpilled(t) ? 700 : 400, color: isSpilled(t) ? "#8A6300" : color.faint }}>{t.sprint || "—"}</span>
@@ -201,7 +201,7 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                 </div>
                 <div style={{ fontSize: 12, color: color.faint, fontFamily: font.mono, display: "flex", alignItems: "center", gap: 6 }}>
                   {t.baseline || "—"}
-                  {isSpilled(t) && <span title={`Baselined in ${t.baseline}`} style={{ fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 4, padding: "0 5px" }}>SPILLED</span>}
+                  {isSpilled(t) && <span title={`Baselined in ${t.baseline}`} style={{ fontSize: 9, fontWeight: 700, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 4, padding: "0 5px" }}>SPILLED</span>}
                 </div>
                 <div><span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: col.ink, background: col.tint, padding: "3px 10px", borderRadius: 20 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: col.color }} />{t.status}</span></div>
               </div>

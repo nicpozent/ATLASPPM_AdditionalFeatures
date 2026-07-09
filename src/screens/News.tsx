@@ -99,14 +99,14 @@ function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
               <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: color.faint3 }}>Announcement</span>
             </div>
             <div style={{ fontFamily: font.head, fontSize: 18, fontWeight: 600, color: color.navy, marginBottom: 6, lineHeight: 1.25 }}>{b.title}</div>
-            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#4A5468" }}>{b.body}</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: color.subtle }}>{b.body}</div>
           </>
         )}
       </BlockWrap>
     );
   }
   if (b.kind === "highlight") {
-    const grad = "linear-gradient(135deg,#F6FAFE,#EAF2FB)";
+    const grad = `linear-gradient(135deg,${color.surfaceAlt},${color.primaryTint})`;
     return (
       <BlockWrap editing={editing} extra={{ background: grad }} onRemove={remove}>
         {editing ? (
@@ -125,7 +125,7 @@ function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
     );
   }
   if (b.kind === "shoutout") {
-    const grad = "linear-gradient(135deg,#FFFDF5,#FBF2D7)";
+    const grad = `linear-gradient(135deg,${color.surfaceAlt},${color.warningTint})`;
     return (
       <BlockWrap editing={editing} extra={{ background: grad }} onRemove={remove}>
         {editing ? (
@@ -140,7 +140,7 @@ function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
               <span style={{ display: "flex", color: color.warning }}><Icon name="star" size={16} strokeWidth={1.8} /></span>
               <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{b.who}</span>
             </div>
-            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#4A5468" }}>{b.body}</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: color.subtle }}>{b.body}</div>
           </>
         )}
       </BlockWrap>
@@ -177,7 +177,7 @@ function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
               <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: color.faint3 }}>Milestone · {b.date}</span>
             </div>
             <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.navy, marginBottom: 5 }}>{b.title}</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, color: "#4A5468" }}>{b.body}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: color.subtle }}>{b.body}</div>
           </>
         )}
       </BlockWrap>
@@ -194,7 +194,7 @@ function NewsBlockEl({ block, editing, onField, onCommit, onRemove }: {
         </>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 40, height: 40, borderRadius: 10, background: "#FCEDED", color: "#C0303A", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+          <span style={{ width: 40, height: 40, borderRadius: 10, background: color.dangerTint, color: color.danger, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
             <Icon name="sheet" size={20} strokeWidth={1.8} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -297,7 +297,7 @@ export default function News() {
           title={canEdit ? undefined : "Your role can't edit the news wall"} style={{
           display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, cursor: canEdit ? "pointer" : "not-allowed", fontFamily: "inherit",
           color: edit ? "#fff" : color.primary, background: edit ? color.primary : color.primaryTint,
-          border: `1px solid ${edit ? color.primary : "#CFE0F4"}`, padding: "7px 13px", borderRadius: 8,
+          border: `1px solid ${edit ? color.primary : color.primaryTint2}`, padding: "7px 13px", borderRadius: 8,
           opacity: canEdit ? 1 : 0.55,
         }}>
           <Icon name={edit ? "check" : "edit"} size={15} /> {edit ? "Done editing" : "Edit wall"}
@@ -314,13 +314,13 @@ export default function News() {
         </div>
         <span style={{ width: 1, height: 24, background: color.border3 }} />
         <span style={{ fontSize: 11.5, color: color.faint3 }}>Layout</span>
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 8, padding: 2, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 8, padding: 2, gap: 2 }}>
           {LAYOUTS.map((lo) => {
             const a = layout === lo.key;
             return (
               <button key={lo.key} onClick={() => chooseLayout(lo.key)} disabled={!canEdit} style={{
                 padding: "5px 11px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
-                background: a ? "#fff" : "transparent", color: a ? color.primary : "#565F73",
+                background: a ? color.surface : "transparent", color: a ? color.primary : color.subtle,
               }}>{lo.label}</button>
             );
           })}
@@ -334,7 +334,7 @@ export default function News() {
           {PALETTE.map((ab) => (
             <button key={ab.kind} onClick={() => addBlock.mutate(ab.kind)} style={{
               display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: color.primary,
-              background: color.surface, border: "1px solid #CFE0F4", padding: "8px 12px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
+              background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: "8px 12px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
             }}>
               <Icon name={ab.icon} size={16} /> {ab.label}
             </button>

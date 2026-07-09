@@ -110,14 +110,14 @@ export default function Pip() {
       ) : (
         <>
           <IncrementHeader inc={inc} canEdit={inc.canEdit} />
-          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, margin: "16px 0" }}>
+          <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, margin: "16px 0" }}>
             {([
               ["objectives", "PI Objectives", inc.objectiveList.length],
               ["calendar", "Calendar", inc.iterationList.length],
               ["capacity", "Capacity & Load", inc.iterationList.length],
               ["dependencies", "Dependencies", inc.dependencyList.length],
             ] as const).map(([key, label, n]) => (
-              <button key={key} onClick={() => setTab(key)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: tab === key ? "#fff" : "transparent", color: tab === key ? color.primary : "#565F73", boxShadow: tab === key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+              <button key={key} onClick={() => setTab(key)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: tab === key ? color.surface : "transparent", color: tab === key ? color.primary : color.subtle, boxShadow: tab === key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
                 {label}{n ? ` · ${n}` : ""}
               </button>
             ))}
@@ -384,14 +384,14 @@ function PiAvailability({ from, to }: { from: string; to: string }) {
         <div style={{ fontFamily: font.head, fontSize: 14, fontWeight: 700, color: color.ink }}>Team availability across this PI</div>
         <span style={{ fontSize: 11.5, color: color.faint2 }}>{from} → {to} · free = capacity free across the whole window; booked time-off shown</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0B6B37" }}>{people.filter((p) => p.free >= 50 && !p.onLeave).length} with ≥50% free</span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.successInk }}>{people.filter((p) => p.free >= 50 && !p.onLeave).length} with ≥50% free</span>
       </div>
       {people.length === 0 ? (
         <EmptyBlock message="No people to assess — attach a team to the increment's projects/programs, or check the PI dates." minHeight={80} />
       ) : (
         <div style={{ maxHeight: 260, overflowY: "auto" }}>
           {people.map((p) => (
-            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 18px", borderBottom: "1px solid #F4F6FA" }}>
+            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ width: 190, flex: "none", minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
                 <div style={{ fontSize: 10.5, color: color.faint3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
@@ -403,7 +403,7 @@ function PiAvailability({ from, to }: { from: string; to: string }) {
               </div>
               <div style={{ width: 92, flex: "none", textAlign: "right" }}>
                 {p.onLeave
-                  ? <span style={{ fontSize: 11, fontWeight: 700, color: "#A1282B" }}>On leave</span>
+                  ? <span style={{ fontSize: 11, fontWeight: 700, color: color.dangerInk }}>On leave</span>
                   : <span style={{ fontFamily: font.mono, fontSize: 13, fontWeight: 700, color: freeColor(p.free) }}>{p.free}% free</span>}
               </div>
             </div>

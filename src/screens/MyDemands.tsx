@@ -8,11 +8,11 @@ import { usePermissions } from "@/components/usePermissions";
 
 type StageKey = "draft" | "backlog" | "approved" | "progress" | "hold";
 const STAGE_META: Record<StageKey, { label: string; tint: string; ink: string }> = {
-  draft:    { label: "Draft",       tint: "#EEF0F4", ink: "#566077" },
-  backlog:  { label: "Backlog",     tint: "#E6EFFB", ink: "#0C5798" },
-  approved: { label: "Approved",    tint: "#E7F4EC", ink: "#0B6B37" },
-  progress: { label: "In Progress", tint: "#F0E8F7", ink: "#5E2E89" },
-  hold:     { label: "On Hold",     tint: "#FBF2D7", ink: "#8A6300" },
+  draft:    { label: "Draft",       tint: color.neutralTint, ink: color.subtle },
+  backlog:  { label: "Backlog",     tint: color.primaryTint2, ink: color.primaryDark },
+  approved: { label: "Approved",    tint: color.successTint, ink: color.successInk },
+  progress: { label: "In Progress", tint: color.accentTint, ink: "#5E2E89" },
+  hold:     { label: "On Hold",     tint: color.warningTint, ink: color.warningInk },
 };
 const PRIORITIES = ["Critical", "High", "Medium", "Low"] as const;
 type Priority = (typeof PRIORITIES)[number];
@@ -56,7 +56,7 @@ export default function MyDemands() {
       </div>
 
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: "1px solid #EEF1F6" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", padding: "13px 20px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
           <div>ID</div><div>Demand</div><div>Submitted</div><div>Status</div><div></div>
         </div>
         {demands.length === 0 ? (
@@ -66,7 +66,7 @@ export default function MyDemands() {
         ) : demands.map((d) => {
           const sm = STAGE_META[d.stage] ?? STAGE_META.draft;
           return (
-            <div key={d.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={d.id} style={{ display: "grid", gridTemplateColumns: "0.7fr 2.4fr 0.9fr 1fr auto", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.faint3 }}>{d.id}</div>
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{d.title}</div>

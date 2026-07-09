@@ -15,10 +15,10 @@ interface ArtifactItem { id: number; name: string; type: string; owner: string; 
 const ARTIFACT_TYPES = ["Governance", "Waterfall", "Agile", "Design", "Test", "Other"];
 const ARTIFACT_STATUSES = ["Draft", "In review", "Approved", "Living"];
 const ARTIFACT_STATUS: Record<string, { ink: string; tint: string }> = {
-  Approved:    { ink: "#0B6B37", tint: "#E7F4EC" },
-  "In review": { ink: "#8A6300", tint: "#FBF2D7" },
-  Living:      { ink: "#0C5798", tint: "#E6EFFB" },
-  Draft:       { ink: "#56607A", tint: "#EEF1F6" },
+  Approved:    { ink: color.successInk, tint: color.successTint },
+  "In review": { ink: color.warningInk, tint: color.warningTint },
+  Living:      { ink: color.primaryDark, tint: color.primaryTint2 },
+  Draft:       { ink: color.subtle, tint: color.bg },
 };
 
 export function Artifacts({ projectId }: { projectId: string | null }) {
@@ -48,7 +48,7 @@ export function Artifacts({ projectId }: { projectId: string | null }) {
         ) : artifacts.map((a) => {
           const sc = ARTIFACT_STATUS[a.status] ?? ARTIFACT_STATUS.Draft;
           return (
-            <div key={a.id} onClick={() => setOpenId(a.id)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
+            <div key={a.id} onClick={() => setOpenId(a.id)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
               <span style={{ color: color.primary, display: "flex" }}><Icon name="sheet" size={20} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{a.name}</div>
@@ -141,7 +141,7 @@ function ArtifactWindow({ projectId, artifact, canEdit, onClose }: { projectId: 
       ) : (
         <div style={{ border: `1px solid ${color.border}`, borderRadius: 12, overflow: "hidden" }}>
           {artifact.versions.map((v) => (
-            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <span style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 700, color: color.primary, background: color.primaryTint, padding: "2px 8px", borderRadius: 6 }}>v{v.version}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: color.text, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.fileName}</div>

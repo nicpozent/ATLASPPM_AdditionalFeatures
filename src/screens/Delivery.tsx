@@ -60,7 +60,7 @@ const pct = (part: number | undefined, total: number) =>
 // ---- pill tab helpers ----------------------------------------------------
 function pillBar(children: React.ReactNode) {
   return (
-    <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
+    <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
       {children}
     </div>
   );
@@ -70,7 +70,7 @@ function PillBtn({ active, onClick, children }: { active: boolean; onClick: () =
     <button onClick={onClick} style={{
       padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer",
       fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-      background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
+      background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle,
       boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
     }}>{children}</button>
   );
@@ -176,14 +176,14 @@ export default function Delivery() {
           </div>
 
           {/* Sprint spillover — live across the portfolio (tasks past their baseline). */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: (spill?.total ?? 0) > 0 ? "#FDF8E9" : color.surface, border: `1px solid ${(spill?.total ?? 0) > 0 ? "#F0E4B8" : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: (spill?.total ?? 0) > 0 ? color.warningTint : color.surface, border: `1px solid ${(spill?.total ?? 0) > 0 ? color.warnBorder : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, flex: "none" }}>
               <span style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: (spill?.total ?? 0) > 0 ? "#8A6300" : color.ink }}>{spill?.total ?? 0}</span>
               <span style={{ fontSize: 12.5, color: color.faint }}>tasks spilled over{spill && spill.projects > 0 ? ` · ${spill.projects} project${spill.projects === 1 ? "" : "s"}` : ""}</span>
             </div>
             <div style={{ flex: 1, minWidth: 200, display: "flex", gap: 8, flexWrap: "wrap" }}>
               {(spill?.byProject ?? []).slice(0, 5).map((p) => (
-                <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: "#8A6300", background: "#FBF2D7", border: "1px solid #F0E4B8", borderRadius: 20, padding: "3px 11px" }}>
+                <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 20, padding: "3px 11px" }}>
                   {p.name} <span style={{ fontFamily: font.mono, fontWeight: 700 }}>{p.count}</span>
                 </span>
               ))}
@@ -192,13 +192,13 @@ export default function Delivery() {
           </div>
 
           {/* Operational deviations — active ops work impacting delivery, portfolio-wide. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: opsHigh > 0 ? "#FDEEEF" : color.surface, border: `1px solid ${opsHigh > 0 ? "#F3C9CB" : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: opsHigh > 0 ? color.dangerTint : color.surface, border: `1px solid ${opsHigh > 0 ? color.dangerBorder : color.border}`, borderRadius: 14, padding: "14px 18px", marginBottom: 18 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, flex: "none" }}>
               <span style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: opsHigh > 0 ? "#A1282B" : color.ink }}>{opsActiveItems.length}</span>
               <span style={{ fontSize: 12.5, color: color.faint }}>active operational item{opsActiveItems.length === 1 ? "" : "s"}{opsProjects > 0 ? ` · ${opsProjects} project${opsProjects === 1 ? "" : "s"}` : ""}</span>
             </div>
             <div style={{ flex: 1, minWidth: 200, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              {opsHigh > 0 && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#A1282B", background: "#FBE7E8", border: "1px solid #F3C9CB", borderRadius: 20, padding: "3px 11px" }}>{opsHigh} high / critical</span>}
+              {opsHigh > 0 && <span style={{ fontSize: 11.5, fontWeight: 700, color: color.dangerInk, background: color.dangerTint, border: `1px solid ${color.dangerBorder}`, borderRadius: 20, padding: "3px 11px" }}>{opsHigh} high / critical</span>}
               {["Incident", "Change", "Maintenance"].map((t) => {
                 const n = opsActiveItems.filter((o) => o.type === t).length;
                 return n > 0 ? <span key={t} style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, borderRadius: 20, padding: "3px 11px" }}>{t} <span style={{ fontFamily: font.mono, fontWeight: 700 }}>{n}</span></span> : null;
@@ -216,13 +216,13 @@ export default function Delivery() {
                 <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 14, background: color.bg }}>
                   <div style={{ width: `${completedPct}%`, background: "#15A34A" }} />
                   <div style={{ width: `${inProgressPct}%`, background: "#0F6CBD" }} />
-                  <div style={{ width: `${plannedPct}%`, background: "#C7CEDB" }} />
+                  <div style={{ width: `${plannedPct}%`, background: color.border2 }} />
                 </div>
                 <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
                   {[
                     ["#15A34A", "Completed", dd?.completed],
                     ["#0F6CBD", "In progress", dd?.inProgress],
-                    ["#C7CEDB", "Planned", dd?.planned],
+                    [color.border2, "Planned", dd?.planned],
                   ].map(([c, lbl, v]) => (
                     <span key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: color.textMuted }}>
                       <span style={{ width: 10, height: 10, borderRadius: 3, background: c as string }} />{lbl} · {num(v as number | undefined)}
@@ -250,11 +250,11 @@ export default function Delivery() {
               <Card padding={19}>
                 <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 13 }}>Blockers</div>
                 <div style={{ display: "flex", gap: 12 }}>
-                  <div style={{ flex: 1, textAlign: "center", background: "#E7F4EC", borderRadius: 11, padding: "13px 4px" }}>
+                  <div style={{ flex: 1, textAlign: "center", background: color.successTint, borderRadius: 11, padding: "13px 4px" }}>
                     <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: color.successInk }}>{num(dd?.blockersCleared)}</div>
                     <div style={{ fontSize: 11, color: color.successInk }}>Cleared</div>
                   </div>
-                  <div style={{ flex: 1, textAlign: "center", background: "#FBE7E8", borderRadius: 11, padding: "13px 4px" }}>
+                  <div style={{ flex: 1, textAlign: "center", background: color.dangerTint, borderRadius: 11, padding: "13px 4px" }}>
                     <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: color.dangerInk }}>{num(dd?.blockersOpen)}</div>
                     <div style={{ fontSize: 11, color: color.dangerInk }}>Still open</div>
                   </div>

@@ -19,10 +19,10 @@ const STAGES = [
 type StageKey = (typeof STAGES)[number]["key"];
 
 const PRIORITY = {
-  High:     { ink: "#8A6300", tint: "#FBF2D7" },
-  Medium:   { ink: "#0C5798", tint: "#E6EFFB" },
-  Critical: { ink: "#A1282B", tint: "#FBE7E8" },
-  Low:      { ink: "#566077", tint: "#EEF0F4" },
+  High:     { ink: color.warningInk, tint: color.warningTint },
+  Medium:   { ink: color.primaryDark, tint: color.primaryTint2 },
+  Critical: { ink: color.dangerInk, tint: color.dangerTint },
+  Low:      { ink: color.subtle, tint: color.neutralTint },
 } as const;
 
 interface Demand {
@@ -41,7 +41,7 @@ function Meter({ n, color: c }: { n: number; color: string }) {
   return (
     <span style={{ display: "inline-flex", gap: 3 }}>
       {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < n ? c : "#E4E8F0" }} />
+        <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < n ? c : color.border3 }} />
       ))}
     </span>
   );
@@ -110,7 +110,7 @@ export default function Demands() {
                 if (s.key === "approved" && !mayApprove) { toast("Only a Platform Administrator or PMO can approve demands.", "error"); return; }
                 advanceDemand.mutate({ id, stage: s.key });
               }}
-              style={{ width: 280, flex: "none", background: over ? "#EAF2FB" : "#F4F6FA", border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : color.border}`, borderRadius: 14, padding: "13px 12px", transition: "background .1s" }}>
+              style={{ width: 280, flex: "none", background: over ? color.primaryTint : color.surfaceAlt, border: `1px ${over ? "dashed" : "solid"} ${over ? color.primary : color.border}`, borderRadius: 14, padding: "13px 12px", transition: "background .1s" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 13, padding: "0 3px" }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.color }} />
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: color.text }}>{s.label}</span>
@@ -139,7 +139,7 @@ export default function Demands() {
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 10.5, color: color.faint3, textTransform: "uppercase" }}>Value</span><Meter n={d.value} color="#0F6CBD" /></div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 10.5, color: color.faint3, textTransform: "uppercase" }}>Effort</span><Meter n={d.effort} color="#C98A00" /></div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #F2F4F9", paddingTop: 9 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: `1px solid ${color.surfaceAlt}`, paddingTop: 9 }}>
                         <span style={{ fontSize: 11.5, color: color.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }}>{d.requester} · {d.dept}</span>
                         <span style={{ fontSize: 11, color: color.faint3 }}>{d.date}</span>
                       </div>

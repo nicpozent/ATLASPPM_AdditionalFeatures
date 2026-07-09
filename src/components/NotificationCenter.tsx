@@ -17,11 +17,11 @@ interface Inbox { unreadCount: number; items: Notif[]; }
 interface Pref { eventType: string; label: string; detail: string; entityScoped: boolean; inApp: boolean; email: boolean; }
 
 const EVENT_TINT: Record<string, { ink: string; bg: string; icon: string }> = {
-  risk: { ink: "#A1282B", bg: "#FBE7E8", icon: "alert" },
-  date_slip: { ink: "#8A6300", bg: "#FBF2D7", icon: "clock" },
-  status_change: { ink: "#6A2E9E", bg: "#F0E8F7", icon: "refresh" },
-  approval: { ink: "#0B6B37", bg: "#E7F4EC", icon: "check" },
-  created: { ink: "#0F6CBD", bg: "#EEF3FB", icon: "plus" },
+  risk: { ink: color.dangerInk, bg: color.dangerTint, icon: "alert" },
+  date_slip: { ink: color.warningInk, bg: color.warningTint, icon: "clock" },
+  status_change: { ink: "#6A2E9E", bg: color.accentTint, icon: "refresh" },
+  approval: { ink: color.successInk, bg: color.successTint, icon: "check" },
+  created: { ink: "#0F6CBD", bg: color.primaryTint, icon: "plus" },
 };
 
 function relTime(iso: string): string {
@@ -55,8 +55,8 @@ export function NotificationCenter() {
     <>
       <button onClick={() => setOpen((v) => !v)} title="Notifications" style={{
         position: "relative", width: 40, height: 40, borderRadius: 9,
-        border: `1px solid ${color.border3}`, background: open ? "#EEF3FB" : color.surface,
-        display: "flex", alignItems: "center", justifyContent: "center", color: open ? color.primary : "#56607A", cursor: "pointer",
+        border: `1px solid ${color.border3}`, background: open ? color.primaryTint : color.surface,
+        display: "flex", alignItems: "center", justifyContent: "center", color: open ? color.primary : color.subtle, cursor: "pointer",
       }}>
         <Icon name="bell" size={18} />
         {inbox.unreadCount > 0 && (
@@ -95,7 +95,7 @@ export function NotificationCenter() {
                 const t = EVENT_TINT[n.eventType] ?? EVENT_TINT.status_change;
                 return (
                   <div key={n.id} onClick={() => !n.read && markRead.mutate({ ids: [n.id] })}
-                    style={{ display: "flex", gap: 11, padding: "12px 16px", borderBottom: "1px solid #F4F6FA", cursor: n.read ? "default" : "pointer", background: n.read ? "#fff" : "#F7FAFE" }}>
+                    style={{ display: "flex", gap: 11, padding: "12px 16px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: n.read ? "default" : "pointer", background: n.read ? "#fff" : color.surfaceAlt }}>
                     <span style={{ width: 30, height: 30, borderRadius: 8, background: t.bg, color: t.ink, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={t.icon} size={15} /></span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{n.title}</div>

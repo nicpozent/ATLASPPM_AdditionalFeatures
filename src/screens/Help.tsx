@@ -25,9 +25,9 @@ const ROLE_TABS: { id: string; label: string }[] = [
 const roleLabel = (id: string) => ROLE_TABS.find((r) => r.id === id)?.label ?? id;
 
 const CAT_TINT: Record<string, { ink: string; tint: string; icon: string }> = {
-  NET: { ink: "#0C5798", tint: "#E6EFFB", icon: "cloud" }, AUTH: { ink: "#5E2E89", tint: "#F0E8F7", icon: "key" },
-  VAL: { ink: "#8A6300", tint: "#FBF2D7", icon: "edit" }, SRV: { ink: "#A1282B", tint: "#FBE7E8", icon: "server" },
-  INT: { ink: "#0B6B37", tint: "#E7F4EC", icon: "plug" }, APP: { ink: "#A1282B", tint: "#FBE7E8", icon: "alert" },
+  NET: { ink: color.primaryDark, tint: color.primaryTint2, icon: "cloud" }, AUTH: { ink: "#5E2E89", tint: color.accentTint, icon: "key" },
+  VAL: { ink: color.warningInk, tint: color.warningTint, icon: "edit" }, SRV: { ink: color.dangerInk, tint: color.dangerTint, icon: "server" },
+  INT: { ink: color.successInk, tint: color.successTint, icon: "plug" }, APP: { ink: color.dangerInk, tint: color.dangerTint, icon: "alert" },
 };
 
 export default function Help() {
@@ -124,13 +124,13 @@ export default function Help() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>Guides</span>
         {!searching && (
-          <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
+          <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
             {ROLE_TABS.map((rt) => {
               const active = role === rt.id;
               return (
                 <button key={rt.id} onClick={() => setRole(rt.id)} style={{
                   padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                  background: active ? "#fff" : "transparent", color: active ? color.primary : "#565F73",
+                  background: active ? color.surface : "transparent", color: active ? color.primary : color.subtle,
                   boxShadow: active ? "0 1px 3px rgba(20,26,60,0.12)" : "none",
                 }}>{rt.label}</button>
               );
@@ -148,7 +148,7 @@ export default function Help() {
           {guides.length === 0 ? (
             <div style={{ padding: "28px 22px", textAlign: "center", color: color.faint3, fontSize: 13 }}>{searching ? "No guides match your search." : "No guides for this role yet."}</div>
           ) : guides.map((art) => (
-            <div key={art.id} style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={art.id} style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <span style={{ color: color.primary, display: "flex", marginTop: 2 }}><Icon name="book" size={18} /></span>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -168,7 +168,7 @@ export default function Help() {
           ))}
         </Card>
         <Card padding={22}>
-          <div style={{ width: 46, height: 46, borderRadius: 12, background: "#E7F4EC", color: "#0B6B37", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><Icon name="message" size={20} /></div>
+          <div style={{ width: 46, height: 46, borderRadius: 12, background: color.successTint, color: color.successInk, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><Icon name="message" size={20} /></div>
           <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 6 }}>Contact the PMO</div>
           <div style={{ fontSize: 13, lineHeight: 1.55, color: color.subtle, marginBottom: 12 }}>Can't find an answer here? Email the Atlas support team and we'll respond within one business day.</div>
           <div style={{ fontSize: 12, lineHeight: 1.5, color: color.faint2, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>

@@ -32,19 +32,19 @@ const pgToDisplay = (iso: string): string => {
 
 const STATUS_OPTS = ["Planning", "On track", "At risk", "Critical", "On hold", "Completed", "Closed"] as const;
 const STATUS_COLOR: Record<string, { tint: string; ink: string; dot: string }> = {
-  "Planning": { tint: "#EEF0F4", ink: "#566077", dot: "#8A93A6" },
-  "On track": { tint: "#E7F4EC", ink: "#0B6B37", dot: "#15A34A" },
-  "At risk": { tint: "#FBF2D7", ink: "#8A6300", dot: "#E0A100" },
-  "Critical": { tint: "#FBE7E8", ink: "#A1282B", dot: "#D13438" },
-  "On hold": { tint: "#EEF0F4", ink: "#566077", dot: "#8A93A6" },
-  "Completed": { tint: "#E6EFFB", ink: "#0C5798", dot: "#0F6CBD" },
-  "Closed": { tint: "#EEF0F4", ink: "#566077", dot: "#566077" },
+  "Planning": { tint: color.neutralTint, ink: color.subtle, dot: "#8A93A6" },
+  "On track": { tint: color.successTint, ink: color.successInk, dot: "#15A34A" },
+  "At risk": { tint: color.warningTint, ink: color.warningInk, dot: "#E0A100" },
+  "Critical": { tint: color.dangerTint, ink: color.dangerInk, dot: "#D13438" },
+  "On hold": { tint: color.neutralTint, ink: color.subtle, dot: "#8A93A6" },
+  "Completed": { tint: color.primaryTint2, ink: color.primaryDark, dot: "#0F6CBD" },
+  "Closed": { tint: color.neutralTint, ink: color.subtle, dot: color.subtle },
 };
 const HEALTH: Record<Health, { ink: string; tint: string; dot: string; label: string }> = {
-  green: { ink: "#0B6B37", tint: "#E7F4EC", dot: "#15A34A", label: "On track" },
-  amber: { ink: "#8A6300", tint: "#FBF2D7", dot: "#E0A100", label: "At risk" },
-  red: { ink: "#A1282B", tint: "#FBE7E8", dot: "#D13438", label: "Critical" },
-  hold: { ink: "#566077", tint: "#EEF0F4", dot: "#8A93A6", label: "Planning" },
+  green: { ink: color.successInk, tint: color.successTint, dot: "#15A34A", label: "On track" },
+  amber: { ink: color.warningInk, tint: color.warningTint, dot: "#E0A100", label: "At risk" },
+  red: { ink: color.dangerInk, tint: color.dangerTint, dot: "#D13438", label: "Critical" },
+  hold: { ink: color.subtle, tint: color.neutralTint, dot: "#8A93A6", label: "Planning" },
 };
 
 const fmt = (v: number) => "€" + (v / 1000).toFixed(1) + "M";
@@ -115,9 +115,9 @@ export default function Programs() {
       </div>
 
       {(archivedCount > 0 || showArchived) && (
-        <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
+        <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 }}>
           {[["Active", false, activeCount], ["Archived", true, archivedCount]].map(([label, arch, n]) => (
-            <button key={label as string} onClick={() => setShowArchived(arch as boolean)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: showArchived === arch ? "#fff" : "transparent", color: showArchived === arch ? color.primary : "#565F73", boxShadow: showArchived === arch ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
+            <button key={label as string} onClick={() => setShowArchived(arch as boolean)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: showArchived === arch ? color.surface : "transparent", color: showArchived === arch ? color.primary : color.subtle, boxShadow: showArchived === arch ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
               {label as string} · {n as number}
             </button>
           ))}
@@ -192,7 +192,7 @@ export default function Programs() {
           <div style={{ fontSize: 13.5, color: color.text, lineHeight: 1.5, marginBottom: 8 }}>
             Permanently delete <strong>{confirmDel.name}</strong> <span style={{ fontFamily: font.mono, color: color.faint3 }}>({confirmDel.id})</span>? Its linked projects are not deleted.
           </div>
-          <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
+          <div style={{ fontSize: 12.5, color: color.dangerInk, background: color.dangerTint, borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
             <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 18px", borderRadius: 9, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
@@ -322,7 +322,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
         ) : projectRows.map((p) => {
           const ph = HEALTH[p.status ?? "hold"] ?? HEALTH.hold;
           return (
-            <div key={p.id} style={{ display: "grid", gridTemplateColumns: mayEdit ? "2fr 1fr 0.9fr 1fr 0.8fr 40px" : "2fr 1fr 0.9fr 1fr 0.8fr", alignItems: "center", padding: "14px 22px", borderBottom: "1px solid #F2F4F9" }}>
+            <div key={p.id} style={{ display: "grid", gridTemplateColumns: mayEdit ? "2fr 1fr 0.9fr 1fr 0.8fr 40px" : "2fr 1fr 0.9fr 1fr 0.8fr", alignItems: "center", padding: "14px 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <span style={{ width: 9, height: 9, borderRadius: "50%", background: ph.dot, flex: "none" }} />
                 <div><div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.name}</div><div style={{ fontSize: 11.5, color: color.faint3, fontFamily: font.mono }}>{p.id}</div></div>
@@ -430,8 +430,8 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
         ) : projectOpts.map((o) => {
           const on = selected.includes(o.id);
           return (
-            <div key={o.id} onClick={() => toggle(o.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 13px", borderBottom: "1px solid #F4F6FA", cursor: "pointer" }}>
-              <span style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid #C7CEDB", background: on ? color.primary : "#fff", color: on ? "#fff" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>✓</span>
+            <div key={o.id} onClick={() => toggle(o.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 13px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
+              <span style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${color.border2}`, background: on ? color.primary : color.surface, color: on ? "#fff" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>✓</span>
               <span style={{ fontSize: 13, color: color.text }}>{o.name}</span>
             </div>
           );

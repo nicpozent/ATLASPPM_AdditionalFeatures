@@ -89,9 +89,9 @@ export default function Financials() {
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* scope tabs — overall figures for the selected object type */}
-      <div style={{ display: "inline-flex", background: "#E4E8F1", borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
+      <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, marginBottom: 14 }}>
         {SCOPE_TABS.map((t) => (
-          <button key={t.key} onClick={() => setScope(t.key)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === t.key ? "#fff" : "transparent", color: scope === t.key ? color.primary : "#565F73", boxShadow: scope === t.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{t.label}</button>
+          <button key={t.key} onClick={() => setScope(t.key)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: scope === t.key ? color.surface : "transparent", color: scope === t.key ? color.primary : color.subtle, boxShadow: scope === t.key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>{t.label}</button>
         ))}
       </div>
 
@@ -99,7 +99,7 @@ export default function Financials() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Budget vs actual, CapEx/OpEx split, forecast at completion &amp; benefit — click a row to edit its cost lines (spent &amp; forecast).</div>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setRoiInfo(true)} title="How ROI is calculated" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="help" size={14} /> ROI method</button>
+        <button onClick={() => setRoiInfo(true)} title="How ROI is calculated" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="help" size={14} /> ROI method</button>
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Source</span>
         <select value={source} onChange={(e) => setSource(e.target.value)} style={{
           border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5,
@@ -163,7 +163,7 @@ export default function Financials() {
           const varColor = f.variance < 0 ? color.dangerInk : color.successInk;
           const mono = { fontFamily: font.mono, fontSize: 12.5, color: color.textMuted };
           return (
-            <div key={f.id} onClick={() => setEditCost({ id: f.id, name: f.name })} title="Edit cost lines" style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", padding: "13px 22px", borderBottom: "1px solid #F2F4F9", cursor: "pointer" }}>
+            <div key={f.id} onClick={() => setEditCost({ id: f.id, name: f.name })} title="Edit cost lines" style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", padding: "13px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600, color: color.text }}><span style={{ color: color.successInk, display: "flex" }}><Icon name="coins" size={14} /></span><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span></div>
                 <div style={{ fontSize: 10.5, color: color.faint3, marginTop: 3 }}>Labor: Dev {fmt(f.laborDev)} · Arch {fmt(f.laborArch)} · Infra {fmt(f.laborInfra)}</div>
@@ -182,7 +182,7 @@ export default function Financials() {
               <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}
                 onClick={(e) => { if (data?.canEditRoi) { e.stopPropagation(); setEditRoi(f); } }}
                 title={data?.canEditRoi ? "Set / clear a manual ROI" : undefined}>
-                {f.roiManual && <span style={{ fontSize: 9, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>Manual</span>}
+                {f.roiManual && <span style={{ fontSize: 9, fontWeight: 700, color: color.warningInk, background: color.warningTint, borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>Manual</span>}
                 {(() => { const show = f.roiManual || f.savings > 0; return (
                   <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: !show ? color.faint3 : f.roi >= 0 ? color.successInk : color.dangerInk, cursor: data?.canEditRoi ? "pointer" : "default" }}>{show ? `${f.roi}%` : "—"}</span>
                 ); })()}
@@ -197,9 +197,9 @@ export default function Financials() {
       {roiInfo && (
         <Modal onClose={() => setRoiInfo(false)} width={520} label="How ROI is calculated">
           <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 12 }}>How ROI is calculated</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#0C5798", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Automatic</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: color.primaryDark, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Automatic</div>
           <div style={{ fontSize: 13, color: color.text, lineHeight: 1.55, marginBottom: 16 }}>{data?.roiAutoNote || "ROI = (Benefit − Investment) / Investment × 100."}</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#8A6300", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Manual</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: color.warningInk, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Manual</div>
           <div style={{ fontSize: 13, color: color.text, lineHeight: 1.55 }}>{data?.roiManualNote || "A manual value overrides the automatic figure."}</div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}><Button onClick={() => setRoiInfo(false)}>Got it</Button></div>
         </Modal>

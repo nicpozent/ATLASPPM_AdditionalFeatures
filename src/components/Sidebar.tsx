@@ -92,7 +92,7 @@ export function Sidebar({ drawer = false, onNavigate }: { drawer?: boolean; onNa
           display: "flex", flexDirection: "column", alignItems: "center", gap: 9,
         }}>
           <img src="/assets/birgma-logo-trim.png" alt="Birgma" style={{ height: 18, width: "auto", display: "block" }} />
-          <span style={{ width: "70%", height: 1, background: "#E8ECF3" }} />
+          <span style={{ width: "70%", height: 1, background: color.border3 }} />
           <img src="/assets/biltema-logo-trim.png" alt="Biltema" style={{ height: 18, width: "auto", display: "block" }} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 12, paddingLeft: 3 }}>

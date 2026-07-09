@@ -9,10 +9,10 @@ type Level = "High" | "Low";
 
 // Power/interest quadrant classification (Mendelow).
 function quadrant(power: string, interest: string): { label: string; dot: string; tint: string } {
-  if (power === "High" && interest === "High") return { label: "Manage closely", dot: "#D13438", tint: "#FBE7E8" };
-  if (power === "High") return { label: "Keep satisfied", dot: "#C98A00", tint: "#FBF2D7" };
-  if (interest === "High") return { label: "Keep informed", dot: "#0F6CBD", tint: "#E6EFFB" };
-  return { label: "Monitor", dot: "#565F73", tint: "#EEF1F6" };
+  if (power === "High" && interest === "High") return { label: "Manage closely", dot: "#D13438", tint: color.dangerTint };
+  if (power === "High") return { label: "Keep satisfied", dot: "#C98A00", tint: color.warningTint };
+  if (interest === "High") return { label: "Keep informed", dot: "#0F6CBD", tint: color.primaryTint2 };
+  return { label: "Monitor", dot: color.subtle, tint: color.bg };
 }
 
 // Persisted power/interest stakeholder matrix for a project or program.
@@ -77,7 +77,7 @@ export function StakeholderMatrixCard({ scopeType, scopeId }: { scopeType: "proj
               {stakeholders.map((s) => {
                 const q = quadrant(s.power, s.interest);
                 return (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", borderBottom: "1px solid #F4F6FA" }}>
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", borderBottom: `1px solid ${color.surfaceAlt}` }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: q.dot, flex: "none" }} />
                     <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: color.text }}>{s.name}</span>
                     <span style={{ fontSize: 11, color: color.faint2 }}>{s.role} · {q.label}</span>
