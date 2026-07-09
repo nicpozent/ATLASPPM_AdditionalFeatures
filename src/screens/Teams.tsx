@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
 import { SubTeamManager } from "@/components/TeamPanel";
+import { useRole } from "@/components/RoleContext";
 import { laborHours, laborCost, HOURS_PER_DAY, DAYS_PER_MONTH } from "@/lib/labor";
 
 // ---------------------------------------------------------------------------
@@ -106,17 +107,21 @@ export default function Teams() {
 const RATE_LEVEL_LABELS: Record<string, string> = {
   junior: "Junior", semiSenior: "Semi-Senior", senior: "Senior", specialist: "Specialist", expert: "Expert",
 };
-const RATE_DISC_LABELS: Record<string, string> = { dev: "Dev", infra: "Infra" };
+const RATE_DISC_LABELS: Record<string, string> = { dev: "Dev", infra: "Infra", architect: "Architect", pm: "PM", po: "PO" };
 
 interface RateCard { canEdit: boolean; disciplines: string[]; levels: string[]; rates: Record<string, number>; }
 
 function LaborRateCard() {
   const qc = useQueryClient();
+  // Each discipline's rate is need-to-know (server-filtered by the effective UI
+  // identity), so key the query by the selected role — switching persona in the
+  // header refetches the rates that persona may see.
+  const { role } = useRole();
   const { data } = useQuery({
-    queryKey: ["labor-rates"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<RateCard> => (await api<RateCard>("/labor-rates")) ?? { canEdit: false, disciplines: ["dev", "infra"], levels: ["junior", "semiSenior", "senior", "specialist", "expert"], rates: {} },
+    queryKey: ["labor-rates", role], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<RateCard> => (await api<RateCard>("/labor-rates")) ?? { canEdit: false, disciplines: [], levels: ["junior", "semiSenior", "senior", "specialist", "expert"], rates: {} },
   });
-  const disciplines = data?.disciplines ?? ["dev", "infra"];
+  const disciplines = data?.disciplines ?? [];
   const levels = data?.levels ?? ["junior", "semiSenior", "senior", "specialist", "expert"];
   const rates = data?.rates ?? {};
   const canEdit = data?.canEdit ?? false;
@@ -141,14 +146,16 @@ function LaborRateCard() {
     setDraft(d); setEditing(true);
   };
 
-  // Calculator state.
+  // Calculator state. The discipline defaults to the first one this persona may
+  // see (the list is need-to-know), falling back gracefully as it changes.
   const [calcDisc, setCalcDisc] = useState("dev");
   const [calcLevel, setCalcLevel] = useState("senior");
   const [months, setMonths] = useState("0");
   const [days, setDays] = useState("0");
   const [hours, setHours] = useState("0");
+  const effCalcDisc = disciplines.includes(calcDisc) ? calcDisc : (disciplines[0] ?? "");
   const totalHours = laborHours(Number(months), Number(days), Number(hours));
-  const calcRate = rateOf(calcDisc, calcLevel);
+  const calcRate = rateOf(effCalcDisc, calcLevel);
   const cost = laborCost(Number(months), Number(days), Number(hours), calcRate);
   const euro = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -167,6 +174,14 @@ function LaborRateCard() {
         </>}
       </div>
 
+      {/* Rates are need-to-know: a persona with no owned discipline sees none. */}
+      {disciplines.length === 0 ? (
+        <div style={{ padding: "22px", fontSize: 12.5, color: color.faint2, display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon name="lock" size={15} />
+          Internal-labour rates are restricted. Each discipline's rate (Dev, Infra, Architect, PM, PO) is visible only to the managers who own it, plus CTO / CIO. Switch to a role that owns a rate to view or edit it.
+        </div>
+      ) : (
+      <>
       {/* Rate grid */}
       <div style={{ overflowX: "auto", padding: "6px 22px 16px" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
@@ -193,7 +208,7 @@ function LaborRateCard() {
             ))}
           </tbody>
         </table>
-        {!canEdit && <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 8 }}>Rates are set by PMO / PM Lead. €/hour.</div>}
+        <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 8 }}>€/hour. You see only the discipline(s) your role owns (CTO / CIO see all).</div>
       </div>
 
       {/* Calculator */}
@@ -201,7 +216,7 @@ function LaborRateCard() {
         <div style={{ fontSize: 12.5, fontWeight: 700, color: color.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Cost calculator</div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <CalcField label="Discipline">
-            <select value={calcDisc} onChange={(e) => setCalcDisc(e.target.value)} style={selStyle}>
+            <select value={effCalcDisc} onChange={(e) => setCalcDisc(e.target.value)} style={selStyle}>
               {disciplines.map((d) => <option key={d} value={d}>{RATE_DISC_LABELS[d] ?? d}</option>)}
             </select>
           </CalcField>
@@ -221,6 +236,8 @@ function LaborRateCard() {
         </div>
         <div style={{ fontSize: 11, color: color.faint3, marginTop: 10 }}>1 month = {DAYS_PER_MONTH} working days · 1 day = {HOURS_PER_DAY} h. {calcRate === 0 && "Set a rate above to compute a cost."}</div>
       </div>
+      </>
+      )}
     </Card>
   );
 }

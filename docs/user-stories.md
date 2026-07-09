@@ -235,9 +235,16 @@ full (F) levels. Authorization is always server-side.
   roll-up view, so that I see my org._
 - **US-TEAM-2** — _As a **manager**, I want a customizable skills/competency matrix
   (name-keyed ratings), so that I plan by capability._
-- **US-TEAM-3** — _As a **PMO/PM Lead**, I want an internal-labor rate card
+- **US-TEAM-3** — _As a **manager**, I want an internal-labour rate card
   (Junior→Expert) with a day/month/hour calculator, so that I estimate internal
   cost._
+  **Acceptance:** each discipline's rate is **need-to-know** — visible **and**
+  editable only by the identities that own it: **Dev** → Global Engineering Mgr,
+  Developers Mgr, CTO, CIO; **Infra** → Infrastructure Mgr, Global Service Mgr,
+  CTO, CIO; **Architect** → Chief Architect, CTO, CIO; **PM** and **PO** → PMO,
+  PM Lead, CTO, CIO. The API returns only the disciplines the caller may see (no
+  hidden rate on the wire); a persona owning none sees a restricted state
+  (ADR-0055).
 
 ## 16. Methodologies & Create-Project Wizard
 
