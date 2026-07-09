@@ -68,6 +68,7 @@ function useNarrow(breakpoint = 900) {
 
 export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
   const narrow = useNarrow();
+  const [info, setInfo] = useState<null | "privacy" | "support">(null);
 
   return (
     <div style={{
@@ -223,9 +224,22 @@ export function LoginScreen({ onSignIn }: { onSignIn: () => void }) {
             <div>© 2026 Birgma International · Biltema Group</div>
             <div>
               Atlas PPM · v1.0 ·{" "}
-              <a href="#" style={{ color: color.primary, textDecoration: "none" }}>Privacy</a> ·{" "}
-              <a href="#" style={{ color: color.primary, textDecoration: "none" }}>Support</a>
+              <button type="button" onClick={() => setInfo(info === "privacy" ? null : "privacy")} aria-expanded={info === "privacy"} style={{ background: "none", border: "none", padding: 0, font: "inherit", fontSize: 12, color: color.primary, cursor: "pointer" }}>Privacy</button> ·{" "}
+              <button type="button" onClick={() => setInfo(info === "support" ? null : "support")} aria-expanded={info === "support"} style={{ background: "none", border: "none", padding: 0, font: "inherit", fontSize: 12, color: color.primary, cursor: "pointer" }}>Support</button>
             </div>
+            {info === "support" && (
+              <div style={{ marginTop: 6, fontSize: 11.5, color: color.textMuted, lineHeight: 1.5, maxWidth: 340, marginInline: "auto" }}>
+                Need help? Email{" "}
+                <a href="mailto:ServiceDesk@Birgma.com" style={{ color: color.primary }}>ServiceDesk@Birgma.com</a>{" "}or{" "}
+                <a href="mailto:Helpdesk@biltema.com" style={{ color: color.primary }}>Helpdesk@biltema.com</a>.
+              </div>
+            )}
+            {info === "privacy" && (
+              <div style={{ marginTop: 6, fontSize: 11.5, color: color.textMuted, lineHeight: 1.5, maxWidth: 340, marginInline: "auto" }}>
+                Atlas stores only the portfolio, resource and integration data your organisation configures, and applies GDPR data-subject and retention controls. Privacy questions:{" "}
+                <a href="mailto:ServiceDesk@Birgma.com" style={{ color: color.primary }}>ServiceDesk@Birgma.com</a>.
+              </div>
+            )}
           </div>
         </div>
       </div>

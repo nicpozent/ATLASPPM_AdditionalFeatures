@@ -333,7 +333,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         {phases.length === 0 ? (
           (sprints.length === 0 || !hasProject) && (
             <div style={{ minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 22px", fontSize: 12.5, color: color.faint3, textAlign: "center" }}>
-              {hasProject ? "No phases or sprints scheduled yet — add a phase, or sync sprints from Jira." : "Select a project."}
+              {hasProject ? "No phases or sprints scheduled yet. For a Jira/ADO project, run a sync (Integrations → Sync) to import its sprints; or add a phase or sprint manually." : "Select a project."}
             </div>
           )
         ) : phases.map((p) => (
