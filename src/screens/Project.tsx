@@ -914,6 +914,8 @@ const FRAMEWORK_TINT: Record<string, { ink: string; tint: string }> = {
   "ISO 27001": { ink: "#0C5798", tint: "#E6EFFB" }, "ISO 42001": { ink: "#5E2E89", tint: "#F0E8F7" },
   GDPR: { ink: "#0B6B37", tint: "#E7F4EC" }, "PCI-DSS": { ink: "#A1282B", tint: "#FBE7E8" },
   "MITRE ATT&CK": { ink: "#8A6300", tint: "#FBF2D7" }, "PMO governance": { ink: "#56607A", tint: "#EEF1F6" },
+  "NIST CSF 2.0": { ink: "#0C5798", tint: "#E6EFFB" }, "SOC 2": { ink: "#5E2E89", tint: "#F0E8F7" },
+  NIS2: { ink: "#8A6300", tint: "#FBF2D7" }, "EU AI Act": { ink: "#A1282B", tint: "#FBE7E8" },
 };
 
 function RiskRow({ r }: { r: RiskFinding }) {
