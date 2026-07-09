@@ -7,7 +7,7 @@ import { Button, Card, EmptyBlock, Input, Modal, Select, Textarea } from "@/comp
 import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { toast, toastError } from "@/components/Toast";
-import { EVALUATION, USER_STORY_SECTIONS, USER_STORY_INTRO, type EvalDimension } from "@/data/adminDocs";
+import { EVALUATION, USER_STORY_SECTIONS, USER_STORY_INTRO, SECURITY_POSTURE, type EvalDimension } from "@/data/adminDocs";
 
 // ---------------------------------------------------------------------------
 // Administration — built 1:1 from the prototype (design/Atlas PPM.dc.html,
@@ -31,6 +31,7 @@ const ADMIN_TABS: { id: string; label: string; adminOnly?: boolean }[] = [
   { id: "backups", label: "Backups & Restore" },
   { id: "install", label: "Installation Guides" },
   { id: "integrations", label: "Integration Setup" },
+  { id: "security", label: "Security Posture" },
   { id: "evaluation", label: "Application Evaluation" },
   { id: "userstories", label: "User Stories" },
 ];
@@ -124,6 +125,7 @@ export default function Admin() {
       {tab === "backups" && <BackupsSection />}
       {tab === "install" && <GuidesSection kind="install" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
       {tab === "integrations" && <GuidesSection kind="int" openGuide={openGuide} setOpenGuide={setOpenGuide} />}
+      {tab === "security" && <SecurityPostureSection />}
       {tab === "evaluation" && <EvaluationSection />}
       {tab === "userstories" && <UserStoriesSection />}
     </div>
@@ -984,6 +986,59 @@ function GuidesSection({ kind, openGuide, setOpenGuide }: {
         })}
       </div>
     </>
+  );
+}
+
+// ---- Security posture (structured docs, from @/data/adminDocs) -------------
+function SecurityPostureSection() {
+  const s = SECURITY_POSTURE;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <Card>
+        <div style={sectionTitle}>Application security posture</div>
+        <div style={{ fontSize: 12.5, color: color.textMuted, lineHeight: 1.6, marginTop: 8 }}>{s.intro}</div>
+      </Card>
+
+      <Card padding={0}>
+        <div style={{ padding: "14px 20px 8px" }}><div style={sectionTitle}>Automated scanners</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 2.6fr 1.4fr", gap: 0, padding: "0 20px 6px", ...colHeadStyle }}>
+          <div>Tool</div><div>Type</div><div>Covers</div><div>Enforcement</div>
+        </div>
+        {s.scanners.map((sc) => (
+          <div key={sc.name} style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 2.6fr 1.4fr", gap: 0, padding: "10px 20px", borderTop: `1px solid ${color.bg}`, alignItems: "start" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: color.text }}>{sc.name}</div>
+            <div style={{ fontSize: 12, color: color.textMuted }}>{sc.kind}</div>
+            <div style={{ fontSize: 12, color: color.textMuted, lineHeight: 1.5 }}>{sc.covers}</div>
+            <div style={{ fontSize: 12, color: color.textMuted }}>{sc.gating}</div>
+          </div>
+        ))}
+      </Card>
+
+      <Card>
+        <div style={sectionTitle}>How it's run</div>
+        <ul style={{ margin: "10px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 }}>
+          {s.howToRun.map((t, i) => <li key={i} style={{ fontSize: 12.5, color: color.textMuted, lineHeight: 1.55 }}>{t}</li>)}
+        </ul>
+      </Card>
+
+      <Card padding={0}>
+        <div style={{ padding: "14px 20px 8px" }}><div style={sectionTitle}>Accepted exceptions (documented risk acceptances)</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 3fr", gap: 0, padding: "0 20px 6px", ...colHeadStyle }}>
+          <div>Item</div><div>Why</div>
+        </div>
+        {s.exceptions.map((x, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 3fr", gap: 0, padding: "10px 20px", borderTop: `1px solid ${color.bg}`, alignItems: "start" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text }}>{x.item}</div>
+            <div style={{ fontSize: 12, color: color.textMuted, lineHeight: 1.5 }}>{x.why}</div>
+          </div>
+        ))}
+      </Card>
+
+      <Card>
+        <div style={sectionTitle}>Manual penetration test</div>
+        <div style={{ fontSize: 12.5, color: color.textMuted, lineHeight: 1.6, marginTop: 8 }}>{s.manual}</div>
+      </Card>
+    </div>
   );
 }
 

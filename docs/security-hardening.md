@@ -103,6 +103,14 @@ Beyond the supply-chain gates (`npm audit`, `dotnet list --vulnerable`), the
   probes a *running* test environment from the outside (never production) — the
   same run-against-a-test-server model as the k6 perf suite.
 
+**Run it without GitHub.** `scripts/security-scan.sh` fires the same SAST + SCA
+(and optional `--dast <url>`) from any machine or on-prem build agent — no GitHub
+connection, and the running app is never involved (SAST/SCA read the source on
+disk). It auto-honours `.semgrepignore` / `.trivyignore`, so the exceptions below
+apply identically. The posture is also viewable in-app at **Admin → Security
+Posture** (a static reference — the app runs no scans and reaches nothing
+external).
+
 SAST + Trivy are **gating** — a HIGH/CRITICAL finding fails the build (ADR-0053,
 after the baseline triage below). GitHub-native **CodeQL** is complementary and
 enabled via the repo's *Code scanning → Default setup* toggle. A human

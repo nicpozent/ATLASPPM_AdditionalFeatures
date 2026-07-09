@@ -26,7 +26,7 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-09 · main @ appsec-gating",
+  lastReviewed: "2026-07-09 · main @ appsec-posture",
   overall: "4.8 / 5 — 15 of 18 dimensions at ★★★★★.",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
@@ -37,7 +37,7 @@ export const EVALUATION: Evaluation = {
     { n: 6, name: "Data & persistence", stars: 5, evidence: "PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups.", gaps: "—" },
     { n: 7, name: "Integrations", stars: 4, evidence: "Jira (full sync + attachments; Ops import incl. epics), Microsoft Graph, Azure DevOps (discovery + work-item sync, backgrounded, with delta/changed-since pulls).", gaps: "ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic." },
     { n: 8, name: "Async / background work", stars: 5, evidence: "Hosted services: Jira + ADO background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; web/worker process split (Atlas__Role) runs the recurring timer jobs in their own container off the request path (ADR-0048).", gaps: "—" },
-    { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role + non-root API image, secrets via env/Docker secrets + Dependabot cooldown, dependency audit gate, idle-logout; gating AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (OWASP ZAP).", gaps: "Human pen-test + automated secret rotation outstanding." },
+    { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role + non-root API image, secrets via env/Docker secrets + Dependabot cooldown, dependency audit gate, idle-logout; gating AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (OWASP ZAP); portable scripts/security-scan.sh (runs off GitHub) + in-app Security Posture page.", gaps: "Human pen-test + automated secret rotation outstanding." },
     { n: 10, name: "Accessibility (WCAG 2 AA)", stars: 5, evidence: "jsdom axe on primitives + browser axe sweep gated incl. colour-contrast; mobile drawer; focus/dialog/menu semantics.", gaps: "Sweep covers representative routes; extend as views grow." },
     { n: 11, name: "Observability", stars: 5, evidence: "OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs; domain metrics + tuned dashboards + Prometheus alert rules.", gaps: "—" },
     { n: 12, name: "Testing", stars: 5, evidence: "Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047); CI-gated.", gaps: "Full load/stress runs operated against a seeded test env (smoke is CI-ready); NBomber not used." },
@@ -69,6 +69,45 @@ export const EVALUATION: Evaluation = {
   ],
   verdict:
     "Production-ready. The core PPM product is complete, data-wired, tested across stacks (backend xUnit, frontend vitest, Playwright axe + full-journey e2e, k6 load/perf), accessible (AA-gated), observable, and documented to a professional standard (ABB/SBB traceability, ADRs, HLD/LLD). Entra SSO is verified end-to-end on a live tenant. Remaining items are enhancements, not blockers: broadening connector coverage beyond Jira/Azure DevOps, automated security scanning, and a release/k8s pipeline once a target host is chosen.",
+};
+
+// ---- Security posture (automated application-security scanning) -------------
+// Static reference, mirroring docs/security-hardening.md §6 + ADR-0051/0053.
+// This surfaces the AppSec pipeline in-app WITHOUT any live connection to GitHub
+// or the CI system — the app runs no scans and reaches nothing external.
+
+export interface SecurityScanner { name: string; kind: string; covers: string; gating: string; }
+export interface SecurityPosture {
+  intro: string;
+  howToRun: string[];
+  scanners: SecurityScanner[];
+  exceptions: { item: string; why: string }[];
+  manual: string;
+}
+
+export const SECURITY_POSTURE: SecurityPosture = {
+  intro:
+    "Atlas runs the automated half of a penetration test — the bulk of the OWASP Top 10 — on every change. The scanners execute in the delivery pipeline (or on demand via scripts/security-scan.sh); the running application performs no scans and has no connection to GitHub or the internet at runtime. A human penetration test / red-team is a separate, manual engagement this complements but does not replace.",
+  howToRun: [
+    "CI: security-scan.yml runs SAST + SCA on every push/PR (gating) and weekly; DAST on demand (workflow_dispatch with a target URL).",
+    "Anywhere, no GitHub: run scripts/security-scan.sh from the repo on a laptop or an on-prem build agent — SAST + SCA read the source on disk, DAST (--dast <url>) probes a target you own.",
+    "Air-gapped: pre-mirror the Semgrep rulesets and the Trivy vulnerability DB, then point the tools at the mirror — no outbound access needed.",
+  ],
+  scanners: [
+    { name: "Semgrep", kind: "SAST — source", covers: "Injection, authz, crypto, hardcoded secrets across C# + TypeScript (OWASP Top 10, security-audit, secrets rulesets).", gating: "Gating — fails the build on a finding" },
+    { name: "Trivy", kind: "SCA · secrets · IaC", covers: "Dependency CVEs, committed secrets, and Dockerfile/compose misconfiguration.", gating: "Gating — fails on HIGH/CRITICAL" },
+    { name: "OWASP ZAP", kind: "DAST — running app", covers: "Probes a running deployment from the outside (passive + safe-active baseline).", gating: "On demand, against a test environment" },
+    { name: "CodeQL (optional)", kind: "SAST — GitHub-native", covers: "Complementary deep SAST, enabled via the repo's Code-scanning default-setup toggle.", gating: "Reports to the Security tab" },
+  ],
+  exceptions: [
+    { item: "nginx edge runs as root (DS-0002)", why: "The TLS-edge master must bind privileged ports 80/443 and read certs; workers drop to the nginx user. The API image is non-root (USER 1654). Unprivileged-nginx migration tracked." },
+    { item: "Actions pinned to major-version tags", why: "Kept current by Dependabot's github-actions ecosystem; full SHA-pinning deferred." },
+    { item: "Trivy installed via curl | sh", why: "Official installer fetched over TLS from the vendor repository." },
+    { item: "nginx reverse-proxy host rules", why: "Standard same-origin reverse proxy; the upstream is an internal config value, not attacker input." },
+    { item: "design/ excluded from SAST", why: "The approved prototype reference — never bundled or served, so it isn't application AppSec." },
+  ],
+  manual:
+    "Recommended next: commission a scoped external penetration test / red-team against a staging deployment (rules of engagement + remediation register), and automate secret rotation. The automated scanners above keep the baseline clean between engagements.",
 };
 
 // ---- User stories ----------------------------------------------------------
