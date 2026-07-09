@@ -26,7 +26,7 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-09 · main @ perf-smoke-pentest-scope",
+  lastReviewed: "2026-07-09 · main @ docs-catchup (dark mode, region rates + roles, Jira sprint discovery)",
   overall: "4.9 / 5 — 16 of 18 dimensions at ★★★★★ (the two non-max: Integrations & Security, both ★★★★☆).",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },

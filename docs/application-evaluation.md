@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ perf-smoke-pentest-scope._
+_Last reviewed: 2026-07-09 · main @ docs-catchup (dark mode, region rates + roles, Jira sprint discovery)._
 
 ## 1. Scorecard
 
@@ -17,7 +17,7 @@ _Last reviewed: 2026-07-09 · main @ perf-smoke-pentest-scope._
 |---|-----------|--------|----------|-------------|
 | 1 | **Functional coverage** (screens vs prototype) | ★★★★★ | All Workspace + Configuration screens built and data-wired; 128 tracked features complete | Ongoing prototype-fidelity spot-checks |
 | 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 57 ADRs | — |
-| 3 | **Frontend engineering** | ★★★★★ | React 18 + TS strict + Vite 8; inline design tokens; route code-splitting + vendor chunks; **lint clean (0 warnings)** | — |
+| 3 | **Frontend engineering** | ★★★★★ | React 18 + TS strict + Vite 8; inline design tokens with **per-profile dark mode (CSS-variable palettes, ADR-0056)**; route code-splitting + vendor chunks; **lint clean (0 warnings)** | — |
 | 4 | **Identity & access** | ★★★★★ | Entra SSO (MSAL, PKCE) **verified end-to-end on a live tenant**; server-authoritative RBAC capability matrix; **15-min idle-logout** | — |
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |

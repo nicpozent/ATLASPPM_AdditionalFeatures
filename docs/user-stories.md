@@ -16,9 +16,14 @@ User stories for every feature and capability in Atlas, organised by **section**
 `ProjectManager`, `TeamMember`, `Executive`, `Stakeholder`. The API enforces
 these; UI role checks are cosmetic.
 
-**UI identities (cosmetic, 9):** Platform Admin, PMO, PM (+ PM Lead = PM
-permissions), Engineering Manager, Service Manager, Dev Manager, Infra Manager,
-Chief Architect, Stakeholder. Switching identity changes visible nav + affordances.
+**UI identities (cosmetic, 16 — extensible):** Platform Admin, PMO, PM, PM Lead,
+Global Engineering Manager, Global Service Manager, Developers Manager, Dev APAC
+Manager, BLOG IT Manager, Infrastructure Manager, Infrastructure Manager APAC,
+Chief Architect, CTO, CIO, Quality Manager, Stakeholder. Switching identity
+changes visible nav + affordances (and which internal-labour rate lines are
+visible). The regional managers (Dev APAC, BLOG IT, Infra APAC) clone a base
+role's capabilities and differ only in rate visibility (ADR-0057). More can be
+created in Admin → Roles & permissions.
 
 **Capabilities** (examples): `cap-projects`, `cap-demands`, `cap-integrations`,
 `cap-ops`, `cap-roadmap`, `cap-financials`, `cap-okrs`, view (V) / edit (E) /

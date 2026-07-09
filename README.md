@@ -24,12 +24,15 @@ npm run dev               # http://localhost:5173
   footer) and topbar (title/subtitle, role switcher, notifications, Export).
 - **Routing** — every screen has a route (`src/App.tsx`).
 - **Design tokens** — `src/theme.ts` (colors, fonts, radius, layout), extracted
-  from the prototype. Fonts: Space Grotesk / Public Sans / Space Mono.
+  from the prototype, with **per-profile dark mode** (light/dark CSS-variable
+  palettes; ADR-0056). Fonts: Space Grotesk / Public Sans / Space Mono.
 - **Screen catalogue & roles** — `src/nav.ts`.
-- **API + auth helpers** — `src/api.ts` (typed fetch + React Query ready),
+- **API + auth helpers** — `src/api.ts` (typed fetch + React Query),
   `src/auth.ts` (Entra/MSAL, disabled by default).
-- **Every screen stubbed** — `src/screens/*.tsx` render an `EmptyState`; replace
-  each body with the real screen.
+- **All screens built & data-wired** — `src/screens/*.tsx` implement each screen
+  against `/api/v1` with loading/empty/error states (empty by default until data
+  loads). See `docs/architecture/` (HLD/LLD/ADRs), `docs/application-evaluation.md`
+  and `docs/user-stories.md` for the full picture.
 
 ## The reference
 
