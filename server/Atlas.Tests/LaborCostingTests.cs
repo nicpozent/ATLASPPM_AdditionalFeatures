@@ -41,51 +41,64 @@ public class LaborCostingTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
-    public async Task Rate_card_is_need_to_know_PM_lead_sees_and_edits_only_pm_and_po()
+    public async Task Rate_card_is_region_scoped_PM_lead_sees_only_sweden_pm_and_po()
     {
         var lead = As("pmlead");
         var before = await lead.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
         Assert.True(before.GetProperty("canEdit").GetBoolean());
         var disc = before.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
-        Assert.Contains("pm", disc);
-        Assert.Contains("po", disc);
-        Assert.DoesNotContain("dev", disc);     // not owned by PM Lead
-        Assert.DoesNotContain("infra", disc);
+        Assert.Contains("pmSweden", disc);
+        Assert.Contains("poSweden", disc);
+        Assert.DoesNotContain("pmCh", disc);       // CH lines are PMO/CTO/CIO only
+        Assert.DoesNotContain("poCh", disc);
+        Assert.DoesNotContain("devSweden", disc);   // not owned by PM Lead
 
-        // Owned disciplines persist; a non-owned one (dev) is silently ignored.
-        var put = await lead.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["pm.senior"] = 95m, ["po.expert"] = 110m, ["dev.senior"] = 999m } });
+        // Owned region lines persist; non-owned ones are silently ignored.
+        var put = await lead.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["pmSweden.senior"] = 95m, ["poSweden.expert"] = 110m, ["pmCh.senior"] = 999m } });
         Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 
         var after = await lead.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.Equal(95m, after.GetProperty("rates").GetProperty("pm.senior").GetDecimal());
-        Assert.Equal(110m, after.GetProperty("rates").GetProperty("po.expert").GetDecimal());
-        Assert.False(after.GetProperty("rates").TryGetProperty("dev.senior", out _)); // never visible/saved for PM Lead
+        Assert.Equal(95m, after.GetProperty("rates").GetProperty("pmSweden.senior").GetDecimal());
+        Assert.Equal(110m, after.GetProperty("rates").GetProperty("poSweden.expert").GetDecimal());
+        Assert.False(after.GetProperty("rates").TryGetProperty("pmCh.senior", out _)); // not owned → not saved/visible
     }
 
     [Fact]
-    public async Task Rate_card_infra_visible_to_infra_manager_dev_hidden()
+    public async Task Rate_card_regional_managers_see_only_their_region()
     {
+        // Infrastructure Manager (Sweden) sees Infra · Sweden, not APAC/CH.
         var infra = As("inframgr");
-        var view = await infra.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.True(view.GetProperty("canEdit").GetBoolean());
-        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
-        Assert.Contains("infra", disc);
-        Assert.DoesNotContain("dev", disc);
-        Assert.DoesNotContain("pm", disc);
+        var iDisc = (await infra.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Contains("infraSweden", iDisc);
+        Assert.DoesNotContain("infraApac", iDisc);
+        Assert.DoesNotContain("infraCh", iDisc);
 
-        var put = await infra.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["infra.senior"] = 88m } });
-        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
-        var after = await infra.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.Equal(88m, after.GetProperty("rates").GetProperty("infra.senior").GetDecimal());
+        // Infrastructure Manager APAC sees only Infra · APAC.
+        var apac = As("inframgr_apac");
+        var aDisc = (await apac.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Contains("infraApac", aDisc);
+        Assert.DoesNotContain("infraSweden", aDisc);
+
+        // Global Service Manager sees all three infra regions.
+        var svc = As("svcmgr");
+        var sDisc = (await svc.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        foreach (var d in new[] { "infraSweden", "infraApac", "infraCh" }) Assert.Contains(d, sDisc);
+
+        // BLOG IT Manager sees only Dev · BLOG.
+        var blog = As("blogit");
+        var bDisc = (await blog.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Contains("devBlog", bDisc);
+        Assert.DoesNotContain("devSweden", bDisc);
+        Assert.DoesNotContain("devApac", bDisc);
     }
 
     [Fact]
-    public async Task Rate_card_cto_sees_every_discipline()
+    public async Task Rate_card_cto_sees_every_region_line()
     {
         var cto = As("cto");
-        var view = await cto.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
-        foreach (var d in new[] { "dev", "infra", "architect", "pm", "po" }) Assert.Contains(d, disc);
+        var disc = (await cto.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        foreach (var d in new[] { "infraSweden", "infraApac", "infraCh", "devSweden", "devApac", "devBlog", "devCh", "architectSweden", "architectCh", "pmSweden", "pmCh", "poSweden", "poCh" })
+            Assert.Contains(d, disc);
     }
 
     [Fact]

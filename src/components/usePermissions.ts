@@ -20,6 +20,7 @@ const RANK: Record<string, number> = { F: 3, E: 2, V: 1, N: 0 };
 const UI_TO_ROLE: Record<string, string> = {
   admin: "admin", pmo: "pmo", pm: "pm", pmlead: "pmlead",
   teammgr: "team", svcmgr: "team", devmgr: "team", inframgr: "team",
+  devapac: "team", blogit: "team", inframgr_apac: "team",
   architect: "pmo", cto: "exec", cio: "exec", stakeholder: "stkhldr",
 };
 
