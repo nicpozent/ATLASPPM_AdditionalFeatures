@@ -41,27 +41,60 @@ public class LaborCostingTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
-    public async Task Rate_card_reads_defaults_and_PM_lead_can_set_rates()
+    public async Task Rate_card_is_need_to_know_PM_lead_sees_and_edits_only_pm_and_po()
     {
         var lead = As("pmlead");
         var before = await lead.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
         Assert.True(before.GetProperty("canEdit").GetBoolean());
-        Assert.Contains("dev", before.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()));
+        var disc = before.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Contains("pm", disc);
+        Assert.Contains("po", disc);
+        Assert.DoesNotContain("dev", disc);     // not owned by PM Lead
+        Assert.DoesNotContain("infra", disc);
 
-        var put = await lead.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["dev.senior"] = 95m, ["infra.expert"] = 130m } });
+        // Owned disciplines persist; a non-owned one (dev) is silently ignored.
+        var put = await lead.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["pm.senior"] = 95m, ["po.expert"] = 110m, ["dev.senior"] = 999m } });
         Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
 
         var after = await lead.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.Equal(95m, after.GetProperty("rates").GetProperty("dev.senior").GetDecimal());
-        Assert.Equal(130m, after.GetProperty("rates").GetProperty("infra.expert").GetDecimal());
+        Assert.Equal(95m, after.GetProperty("rates").GetProperty("pm.senior").GetDecimal());
+        Assert.Equal(110m, after.GetProperty("rates").GetProperty("po.expert").GetDecimal());
+        Assert.False(after.GetProperty("rates").TryGetProperty("dev.senior", out _)); // never visible/saved for PM Lead
     }
 
     [Fact]
-    public async Task Rate_card_editing_is_denied_for_unprivileged_roles()
+    public async Task Rate_card_infra_visible_to_infra_manager_dev_hidden()
+    {
+        var infra = As("inframgr");
+        var view = await infra.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
+        Assert.True(view.GetProperty("canEdit").GetBoolean());
+        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Contains("infra", disc);
+        Assert.DoesNotContain("dev", disc);
+        Assert.DoesNotContain("pm", disc);
+
+        var put = await infra.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["infra.senior"] = 88m } });
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        var after = await infra.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
+        Assert.Equal(88m, after.GetProperty("rates").GetProperty("infra.senior").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Rate_card_cto_sees_every_discipline()
+    {
+        var cto = As("cto");
+        var view = await cto.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
+        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        foreach (var d in new[] { "dev", "infra", "architect", "pm", "po" }) Assert.Contains(d, disc);
+    }
+
+    [Fact]
+    public async Task Rate_card_hidden_and_uneditable_for_roles_without_an_owned_discipline()
     {
         var stk = As("stakeholder");
         var view = await stk.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.False(view.GetProperty("canEdit").GetBoolean());   // can read, not edit
+        Assert.False(view.GetProperty("canEdit").GetBoolean());
+        Assert.Empty(view.GetProperty("disciplines").EnumerateArray());
         var put = await stk.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["dev.junior"] = 10m } });
         Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
     }

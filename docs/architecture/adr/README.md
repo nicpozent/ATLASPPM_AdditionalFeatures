@@ -61,5 +61,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0052](./0052-release-pipeline-ghcr.md) | Tag-triggered release pipeline publishing versioned images to GHCR | Accepted |
 | [0053](./0053-appsec-baseline-triage-gating.md) | AppSec baseline triage → gating SAST + Trivy with scoped exceptions | Accepted |
 | [0054](./0054-on-prem-single-node-docker.md) | On-prem single-node Docker as the delivery target (k8s parked) | Accepted |
+| [0055](./0055-need-to-know-labour-rates.md) | Need-to-know internal-labour rate card (per-discipline view+edit, +Architect/PM/PO) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
