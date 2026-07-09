@@ -268,16 +268,36 @@ public class JiraSyncMappingTests
           "closedSprints": [{"id":41,"name":"Sprint 6","state":"closed","completeDate":"2026-05-31T00:00:00.000Z"}]
         }
         """).RootElement;
-        var ids = Jira.SprintsFromIssue(fields)
+        var ids = Jira.SprintsFromIssue(fields, "customfield_10020")
             .Select(s => s.GetProperty("id").GetInt32()).OrderBy(x => x).ToArray();
         Assert.Equal(new[] { 41, 42 }, ids);
+    }
+
+    [Fact]
+    public void Sprints_are_derived_from_the_jira_sprint_custom_field()
+    {
+        // A JQL/board-less search returns the Sprint field as a CUSTOM field
+        // (default customfield_10020), an array of sprint objects — these must
+        // become Sprint rows so sprints aren't 0 without a readable board.
+        var fields = System.Text.Json.JsonDocument.Parse("""
+        {
+          "summary": "GIT-329",
+          "customfield_10020": [
+            {"id":101,"name":"IP Sprint 1","state":"closed","startDate":"2026-01-05T00:00:00.000Z","endDate":"2026-01-19T00:00:00.000Z"},
+            {"id":102,"name":"IP Sprint 2","state":"active","startDate":"2026-01-20T00:00:00.000Z","endDate":"2026-02-03T00:00:00.000Z"}
+          ]
+        }
+        """).RootElement;
+        var ids = Jira.SprintsFromIssue(fields, "customfield_10020")
+            .Select(s => s.GetProperty("id").GetInt32()).OrderBy(x => x).ToArray();
+        Assert.Equal(new[] { 101, 102 }, ids);
     }
 
     [Fact]
     public void Sprints_from_issue_tolerates_absent_fields()
     {
         var fields = System.Text.Json.JsonDocument.Parse("""{"summary":"x"}""").RootElement;
-        Assert.Empty(Jira.SprintsFromIssue(fields));
+        Assert.Empty(Jira.SprintsFromIssue(fields, "customfield_10020"));
     }
 
     [Theory]
