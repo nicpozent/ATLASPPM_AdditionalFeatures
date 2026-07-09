@@ -47,7 +47,7 @@ export function SkillsPanel({ entityType, entityId }: { entityType: string; enti
       <div style={{ overflowX: "auto" }}>
         <div style={{ minWidth: NAME_COL + skills.length * 64 }}>
           {/* header */}
-          <div style={{ display: "flex", borderBottom: `1px solid ${color.bg}`, background: "#FBFCFE" }}>
+          <div style={{ display: "flex", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
             <div style={{ width: NAME_COL, flex: "none", padding: "9px 20px", fontSize: 11, fontWeight: 600, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase" }}>Person</div>
             {skills.map((s) => (
               <div key={s.id} title={s.name} style={{ width: 64, flex: "none", padding: "9px 4px", textAlign: "center", fontSize: 11, fontWeight: 600, color: color.subtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>

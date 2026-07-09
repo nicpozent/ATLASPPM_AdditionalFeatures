@@ -70,7 +70,7 @@ export default function Help() {
       <div style={{ background: "linear-gradient(115deg,#11163A,#0F6CBD)", borderRadius: 18, padding: "34px 32px", marginBottom: 24, color: "#fff", textAlign: "center" }}>
         <div style={{ fontFamily: font.head, fontSize: 25, fontWeight: 600, marginBottom: 7 }}>How can we help?</div>
         <div style={{ fontSize: 14, color: "#C9D6EE", marginBottom: 20 }}>Role guides, troubleshooting and release notes — or reach the PMO support team.</div>
-        <div style={{ maxWidth: 540, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 11, padding: "10px 14px" }}>
+        <div style={{ maxWidth: 540, margin: "0 auto", display: "flex", alignItems: "center", gap: 10, background: color.surface, borderRadius: 11, padding: "10px 14px" }}>
           <span style={{ color: color.faint3, display: "flex" }}><Icon name="search" size={18} /></span>
           <input
             value={query}
@@ -153,7 +153,7 @@ export default function Help() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: color.text }}>{art.title}</span>
-                  {searching && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#56607A", background: "#EEF1F6", padding: "2px 7px", borderRadius: 5 }}>{roleLabel(art.audience)}</span>}
+                  {searching && <span style={{ fontSize: 10.5, fontWeight: 700, color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5 }}>{roleLabel(art.audience)}</span>}
                 </div>
                 {art.summary && <div style={{ fontSize: 12.5, color: color.faint2, marginTop: 2 }}>{art.summary}</div>}
                 {art.body && art.body !== art.summary && <div style={{ fontSize: 12.5, color: color.subtle, marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{art.body}</div>}
@@ -184,7 +184,7 @@ export default function Help() {
             Contact the PMO
           </button>
           <button onClick={() => { setQuery(""); setRole("all"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-            style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>
+            style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>
             Browse getting-started guides
           </button>
         </Card>
@@ -243,7 +243,7 @@ function EditArticleModal({ article, defaultAudience, onClose }: { article: Arti
 }
 
 function Lbl({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", margin: "12px 0 5px" }}>{children}</label>;
+  return <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, margin: "12px 0 5px" }}>{children}</label>;
 }
 
 function ContactModal({ role, code, onClose }: { role: string; code: string; onClose: () => void }) {
@@ -260,7 +260,7 @@ function ContactModal({ role, code, onClose }: { role: string; code: string; onC
   });
   return (
     <Modal onClose={onClose} width={520} label="Contact the PMO">
-      <div style={{ fontSize: 12.5, color: "#56607A", marginBottom: 14 }}>Your role ({role}){code ? ` and error code ${code}` : ""} are included automatically.</div>
+      <div style={{ fontSize: 12.5, color: color.subtle, marginBottom: 14 }}>Your role ({role}){code ? ` and error code ${code}` : ""} are included automatically.</div>
       <Lbl>Subject</Lbl>
       <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
       <Lbl>Screen you were on (optional)</Lbl>

@@ -45,7 +45,7 @@ export function AvailabilityTab() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", background: "#fff", border: `1px solid ${color.border3}`, borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: color.surface, border: `1px solid ${color.border3}`, borderRadius: 10, padding: 3, gap: 2 }}>
           <button onClick={() => setMode("day")} style={pill(mode === "day")}>On a date</button>
           <button onClick={() => setMode("range")} style={pill(mode === "range")}>Across a window</button>
         </div>
@@ -59,7 +59,7 @@ export function AvailabilityTab() {
           </>
         )}
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A" }}>Min. free</span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Min. free</span>
         <select value={minFree} onChange={(e) => setMinFree(Number(e.target.value))} aria-label="Minimum free capacity" style={selectStyle}>
           {[0, 20, 50, 80, 100].map((v) => <option key={v} value={v}>{v === 0 ? "Any" : `≥ ${v}%`}</option>)}
         </select>
@@ -85,7 +85,7 @@ export function AvailabilityTab() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {people.map((p) => (
-            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 14, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 12, padding: "12px 16px" }}>
+            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 14, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 12, padding: "12px 16px" }}>
               <span style={{ width: 30, height: 30, borderRadius: "50%", background: p.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>{p.initials}</span>
               <div style={{ width: 170, flex: "none", minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
@@ -93,7 +93,7 @@ export function AvailabilityTab() {
               </div>
               {/* stacked allocation bar */}
               <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ display: "flex", height: 16, borderRadius: 5, overflow: "hidden", background: "#EEF1F6", border: `1px solid ${color.border3}` }} title={p.slices.map((s) => `${s.entityName} ${s.pct}%`).join(" · ")}>
+                <div style={{ display: "flex", height: 16, borderRadius: 5, overflow: "hidden", background: color.bg, border: `1px solid ${color.border3}` }} title={p.slices.map((s) => `${s.entityName} ${s.pct}%`).join(" · ")}>
                   {p.slices.map((s, i) => (
                     <div key={i} style={{ width: `${Math.min(100, s.pct)}%`, background: SLICE_COLOR[s.type] ?? color.faint2 }} title={`${SLICE_LABEL[s.type] ?? s.type}: ${s.entityName} — ${s.pct}%`} />
                   ))}

@@ -213,7 +213,7 @@ export default function Delivery() {
               <Card>
                 <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 4 }}>Work breakdown</div>
                 <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Completed vs in-progress vs planned — {meta.report}</div>
-                <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 14, background: "#EEF1F6" }}>
+                <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 14, background: color.bg }}>
                   <div style={{ width: `${completedPct}%`, background: "#15A34A" }} />
                   <div style={{ width: `${inProgressPct}%`, background: "#0F6CBD" }} />
                   <div style={{ width: `${plannedPct}%`, background: "#C7CEDB" }} />
@@ -266,7 +266,7 @@ export default function Delivery() {
                   <span style={{ fontFamily: font.head, fontSize: 26, fontWeight: 700, color: color.navy }}>{dd?.budgetBurn ?? dash}</span>
                   <span style={{ fontSize: 12, color: color.faint2 }}>spent · {dd ? `${dd.spendPct}%` : dash}</span>
                 </div>
-                <div style={{ height: 8, background: "#EEF1F6", borderRadius: 5, overflow: "hidden", marginTop: 10 }}>
+                <div style={{ height: 8, background: color.bg, borderRadius: 5, overflow: "hidden", marginTop: 10 }}>
                   <div style={{ height: "100%", width: `${dd?.spendPct ?? 0}%`, background: "#E0A100" }} />
                 </div>
               </Card>

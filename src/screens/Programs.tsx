@@ -125,7 +125,7 @@ export default function Programs() {
       )}
 
       {shown.length === 0 ? (
-        <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
+        <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "56px 22px", textAlign: "center", color: color.faint3, fontSize: 13.5 }}>
           {showArchived ? "No archived programs." : "No programs yet. Create one to aggregate related projects."}
         </div>
       ) : (
@@ -134,13 +134,13 @@ export default function Programs() {
             const sc = STATUS_COLOR[pg.status] ?? STATUS_COLOR.Planning;
             const h = HEALTH[pg.health] ?? HEALTH.hold;
             return (
-              <div key={pg.id} onClick={() => setSelectedId(pg.id)} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer", opacity: pg.archived ? 0.72 : 1 }}>
+              <div key={pg.id} onClick={() => setSelectedId(pg.id)} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: 20, cursor: "pointer", opacity: pg.archived ? 0.72 : 1 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 13, marginBottom: 14 }}>
                   <div style={folderBadge(42)}><Icon name="folders" size={20} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <div style={{ fontSize: 15.5, fontWeight: 600, color: color.navy, lineHeight: 1.25 }}>{pg.name}</div>
-                      {pg.archived && <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "#566077", background: "#EEF0F4", borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
+                      {pg.archived && <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: color.subtle, background: color.surfaceAlt, borderRadius: 5, padding: "1px 6px", letterSpacing: "0.03em", textTransform: "uppercase" }}>Archived</span>}
                     </div>
                     <div style={{ fontSize: 12, color: color.faint2, marginTop: 2 }}>{pg.goal}</div>
                   </div>
@@ -194,7 +194,7 @@ export default function Programs() {
           </div>
           <div style={{ fontSize: 12.5, color: "#A1282B", background: "#FBE7E8", borderRadius: 8, padding: "9px 12px", marginBottom: 14 }}>This can't be undone. To keep the record, archive it instead.</div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
-            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={() => setConfirmDel(null)} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
             <button onClick={() => del.mutate(confirmDel.id)} disabled={del.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "#D13438", border: "none", padding: "10px 18px", borderRadius: 9, cursor: del.isPending ? "not-allowed" : "pointer", opacity: del.isPending ? 0.6 : 1, fontFamily: "inherit" }}>{del.isPending ? "Deleting…" : "Delete permanently"}</button>
           </div>
         </Overlay>
@@ -244,7 +244,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
       <button onClick={onClose} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: color.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", marginBottom: 14, padding: 0 }}>← All programs</button>
 
       {/* header */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "22px 24px", marginBottom: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "22px 24px", marginBottom: 18 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div style={folderBadge(46)}><Icon name="folders" size={22} /></div>
           <div style={{ flex: 1, minWidth: 240 }}>
@@ -284,7 +284,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
       </div>
 
       {/* aggregated cost */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 4 }}>Aggregated cost · all program projects</div>
         <div style={{ fontSize: 12, color: color.faint2, marginBottom: 16 }}>Rolled up from every project's cost lines</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 13 }}>
@@ -300,7 +300,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
       </div>
 
       {/* projects in this program */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ padding: "16px 22px", borderBottom: `1px solid ${color.bg}`, display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy }}>Projects in this program</div>
           <div style={{ flex: 1 }} />
@@ -341,7 +341,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
                     disabled={setProjects.isPending}
                     title="Unlink from this program"
                     aria-label={`Unlink ${p.name}`}
-                    style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 14, lineHeight: 1 }}
+                    style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer", fontSize: 14, lineHeight: 1 }}
                   >×</button>
                 </div>
               )}
@@ -385,7 +385,7 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
       projects: selected, startDate: pgToDisplay(startDate), endDate: pgToDisplay(endDate), dept,
     });
   };
-  const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
+  const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
 
   return (
     <Overlay onClose={onClose} width={560}>
@@ -438,7 +438,7 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
         })}
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
-        <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: "#fff", border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+        <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
         <button onClick={submit} disabled={submitting} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 18px", borderRadius: 9, cursor: submitting ? "default" : "pointer", fontFamily: "inherit", opacity: submitting ? 0.6 : 1 }}>{submitting ? "Creating…" : "Create program"}</button>
       </div>
     </Overlay>
@@ -446,5 +446,5 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
 }
 
 function folderBadge(size: number, br = 12): React.CSSProperties {
-  return { width: size, height: size, borderRadius: br, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
+  return { width: size, height: size, borderRadius: br, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 }

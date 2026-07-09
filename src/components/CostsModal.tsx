@@ -67,7 +67,7 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
 
       {lines.map((ln) => (
         <div key={ln.id} style={{ marginBottom: 12 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>
             <span>{ln.label} <span style={{ color: color.faint3 }}>· {ln.note}</span></span>
             <div style={{ flex: 1 }} />
             {data0.canManage && !ln.isSystem && (
@@ -87,7 +87,7 @@ export function CostsModal({ scope, id, name, onClose }: { scope: CostScope; id:
       {/* Add custom line (PMO / Admin) */}
       {data0.canManage && (adding
         ? <AddLineForm scope={scope} id={id} kind={kind} onDone={() => { setAdding(false); invalidate(); }} onCancel={() => setAdding(false)} />
-        : <button onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}><Icon name="plus" size={14} /> Add custom cost line</button>
+        : <button onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}><Icon name="plus" size={14} /> Add custom cost line</button>
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
@@ -110,7 +110,7 @@ function AddLineForm({ scope, id, kind, onDone, onCancel }: { scope: CostScope; 
   });
   return (
     <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 14, marginTop: 6, background: color.bg }}>
-      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>New cost line</label>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>New cost line</label>
       <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. External audit · consultancy" style={{ marginBottom: 10 }} />
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.8fr", gap: 10 }}>
         <Select value={String(ownerIdx)} onChange={(e) => setOwnerIdx(Number(e.target.value))}>

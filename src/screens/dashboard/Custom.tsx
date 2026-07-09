@@ -183,7 +183,7 @@ export function Custom({ d }: { d: DashboardData }) {
                 ["3", <><b style={{ color: color.text }}>Reset</b> restores the default set; <b style={{ color: color.text }}>Clear all</b> empties the canvas. Your layout is saved to this view.</>],
               ].map(([n, txt]) => (
                 <div key={n as string} style={{ display: "flex", gap: 11 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: font.head, flex: "none" }}>{n}</div>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: font.head, flex: "none" }}>{n}</div>
                   <div style={{ fontSize: 12.5, lineHeight: 1.5, color: color.subtle }}>{txt}</div>
                 </div>
               ))}
@@ -207,7 +207,7 @@ export function Custom({ d }: { d: DashboardData }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderBottom: `1px solid ${color.bg}`, cursor: "grab" }}>
                     <span style={{ display: "flex", color: color.faint3 }}><Icon name="gripDots" size={13} /></span>
                     <span style={{ flex: 1, fontFamily: font.head, fontSize: 13.5, fontWeight: 600, color: color.ink }}>{def.title}</span>
-                    <button onClick={() => removeWidget(w.uid)} title="Remove" style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>×</button>
+                    <button onClick={() => removeWidget(w.uid)} title="Remove" style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>×</button>
                   </div>
                   <div style={{ padding: 14, flex: 1 }}><WidgetBody wkey={w.key} d={d} /></div>
                 </div>
@@ -229,8 +229,8 @@ export function Custom({ d }: { d: DashboardData }) {
                 {g.items.map((w) => (
                   <div key={w.key} draggable onClick={() => addWidget(w.key)}
                     onDragStart={(e) => { drag.current = { kind: "add", key: w.key }; try { e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("text/plain", w.key); } catch { /* */ } }}
-                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: `1px solid ${color.border}`, borderRadius: 10, cursor: "grab", background: "#FBFCFE" }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 8, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={w.icon} size={16} /></span>
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: `1px solid ${color.border}`, borderRadius: 10, cursor: "grab", background: color.surfaceAlt }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><Icon name={w.icon} size={16} /></span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.title}</div>
                       <div style={{ fontSize: 10.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.desc}</div>

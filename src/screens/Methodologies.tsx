@@ -195,7 +195,7 @@ export default function Methodologies() {
                 {m.default && (
                   <span style={{ position: "absolute", top: 15, right: 15, fontSize: 10, fontWeight: 700, color: "#0B6B37", background: "#E7F4EC", padding: "3px 9px", borderRadius: 20 }}>DEFAULT</span>
                 )}
-                <div style={{ width: 42, height: 42, borderRadius: 11, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 13 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 11, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 13 }}>
                   <Icon name={m.icon} size={21} />
                 </div>
                 <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 5 }}>{m.name}</div>
@@ -264,11 +264,11 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
     <Overlay onClose={onClose} width={580}>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #EEF1F6" }}>
-        <span style={{ width: 34, height: 34, borderRadius: 9, background: "#EEF3FB", color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+        <span style={{ width: 34, height: 34, borderRadius: 9, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
           <Icon name="template" size={18} />
         </span>
         <div style={{ flex: 1, fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>New project from {tpl.methodology} template</div>
-        <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${color.border3}`, background: "#fff", color: "#56607A", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+        <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${color.border3}`, background: color.surface, color: color.subtle, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <Icon name="x" size={16} />
         </button>
       </div>
@@ -305,7 +305,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
             <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden" }}>
               {scaffold.map((it, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 13px", borderBottom: i < scaffold.length - 1 ? "1px solid #F4F6FA" : "none" }}>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#566077", background: color.bg, padding: "2px 7px", borderRadius: 5, minWidth: 38, textAlign: "center" }}>{it.type}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5, minWidth: 38, textAlign: "center" }}>{it.type}</span>
                   <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
                 </div>
               ))}
@@ -325,7 +325,7 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
           <div style={{ border: "1px solid #EEF1F6", borderRadius: 11, overflow: "hidden", marginBottom: 18 }}>
             {scaffold.map((it, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 13px", borderBottom: "1px solid #F4F6FA" }}>
-                <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#566077", background: color.bg, padding: "2px 7px", borderRadius: 5, width: 38, textAlign: "center" }}>{it.type}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5, width: 38, textAlign: "center" }}>{it.type}</span>
                 <span style={{ flex: 1, fontSize: 13, color: color.text }}>{it.title}</span>
                 {i === 0 && <span style={{ fontSize: 10.5, fontWeight: 600, color: color.primaryDark }}>↗ pushed to tracker</span>}
               </div>
@@ -372,5 +372,5 @@ function TemplateWizard({ tpl, setTpl, onClose }: { tpl: TplState; setTpl: (t: T
   );
 }
 
-const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 };
-const useBtn: React.CSSProperties = { width: "100%", fontSize: 13, fontWeight: 600, color: color.primary, background: "#fff", border: "1px solid #CFE0F4", padding: 9, borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };
+const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
+const useBtn: React.CSSProperties = { width: "100%", fontSize: 13, fontWeight: 600, color: color.primary, background: color.surface, border: "1px solid #CFE0F4", padding: 9, borderRadius: 9, cursor: "pointer", fontFamily: "inherit" };

@@ -343,20 +343,20 @@ function LinkTaskModal({ serviceId, serviceName, linkedIds, onClose }: { service
   return (
     <Modal onClose={onClose} label={`Link a task to ${serviceName}`}>
       <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink, marginBottom: 12 }}>Link a project task</div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Project</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Project</div>
       <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} aria-label="Project" style={{ marginBottom: 14 }}>
         <option value="">{projects.length ? "— Select a project —" : "No projects yet"}</option>
         {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </Select>
       {projectId && (
         <>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Task</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Task</div>
           {tasks.length === 0
             ? <div style={{ fontSize: 12.5, color: color.faint3, padding: "8px 0" }}>No linkable tasks in this project.</div>
             : <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
                 {tasks.map((t) => (
                   <button key={t.id} onClick={() => link.mutate(t.id)} disabled={link.isPending}
-                    style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left", background: "#F6F8FC", border: `1px solid ${color.border}`, borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: color.text }}>
+                    style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left", background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: color.text }}>
                     <Icon name="plus" size={14} color={color.primary} />
                     <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{t.code}</span>
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>

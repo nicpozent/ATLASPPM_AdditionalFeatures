@@ -306,7 +306,7 @@ function Overview({ projectId }: { projectId: string | null }) {
           </div>
           <div style={{ fontSize: 12.5, color: "#AEBEDC", lineHeight: 1.5, marginBottom: 14 }}>Draft an executive status report or scan this project for delivery risks — generated from live project data.</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={() => projectId && setModal("report")} disabled={!projectId} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#0F1B3D", background: "#fff", border: "none", padding: "10px 16px", borderRadius: 9, cursor: projectId ? "pointer" : "not-allowed", opacity: projectId ? 1 : 0.55, fontFamily: "inherit" }}>✦ Draft status report</button>
+            <button onClick={() => projectId && setModal("report")} disabled={!projectId} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#0F1B3D", background: color.surface, border: "none", padding: "10px 16px", borderRadius: 9, cursor: projectId ? "pointer" : "not-allowed", opacity: projectId ? 1 : 0.55, fontFamily: "inherit" }}>✦ Draft status report</button>
             <button onClick={() => projectId && setModal("risks")} disabled={!projectId} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", padding: "10px 16px", borderRadius: 9, cursor: projectId ? "pointer" : "not-allowed", opacity: projectId ? 1 : 0.55, fontFamily: "inherit" }}>◆ Detect risks</button>
           </div>
         </div>
@@ -376,15 +376,15 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
   const options = data?.options ?? [];
   const roRow = (label: string, val: string) => (
     <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
-      <span style={{ flex: 1, fontSize: 12.5, color: "#56607A" }}>{label}</span>
+      <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <span style={{ fontSize: 12.5, fontWeight: 600, color: val ? "#1C2233" : "#B0B7C5" }}>{val === "N/A" ? "N/A" : val || "Unassigned"}</span>
     </div>
   );
   const selRow = (key: string, label: string, val: string) => (
     <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #F4F6FA" }}>
-      <span style={{ flex: 1, fontSize: 12.5, color: "#56607A" }}>{label}</span>
+      <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <select value={val || ""} onChange={(e) => assign.mutate({ key, person: e.target.value })} disabled={!projectId || assign.isPending}
-        style={{ border: "1px solid #E0E5EE", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: "#1C2233", background: "#fff", cursor: "pointer", minWidth: 190 }}>
+        style={{ border: "1px solid #E0E5EE", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer", minWidth: 190 }}>
         <option value="">— Unassigned —</option>
         <option value="N/A">N/A</option>
         {options.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -395,7 +395,7 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
   return (
     <Card padding="20px 22px">
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: "#11163A" }}>People &amp; roles</div>
+        <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy }}>People &amp; roles</div>
         <div style={{ flex: 1 }} />
       </div>
       <div style={{ fontSize: 11.5, color: "#8A92A6", lineHeight: 1.45, marginBottom: 14 }}>
@@ -452,7 +452,7 @@ function TeamCapacity({ projectId }: { projectId: string | null }) {
                 {p.highOps && !p.over && <span title="Heavy operational load" style={{ fontSize: 10, fontWeight: 700, color: "#8A6300", background: "#FBF2D7", borderRadius: 5, padding: "1px 6px" }}>HIGH OPS</span>}
                 <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 700, color: p.over ? "#A1282B" : color.textMuted }}>{p.util}%</span>
               </div>
-              <div style={{ display: "flex", height: 8, borderRadius: 5, overflow: "hidden", background: "#EEF1F6", boxShadow: p.over ? "0 0 0 1.5px #D13438" : "none" }}>
+              <div style={{ display: "flex", height: 8, borderRadius: 5, overflow: "hidden", background: color.bg, boxShadow: p.over ? "0 0 0 1.5px #D13438" : "none" }}>
                 {seg(p.opsPct, "#E0A100")}
                 {seg(p.projectPct, color.primary)}
                 {seg(p.productPct, "#0E7C7B")}
@@ -539,14 +539,14 @@ function OperationalImpact({ projectId }: { projectId: string | null }) {
                 <span style={{ flex: "none", fontSize: 10.5, fontWeight: 700, color: sev.ink, background: sev.tint, padding: "2px 8px", borderRadius: 6 }}>{o.severity}</span>
                 {canEdit ? (
                   <select value={o.status} onChange={(e) => patch.mutate({ id: o.id, status: e.target.value })}
-                    style={{ flex: "none", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", color: color.textMuted, background: "#fff", border: `1px solid ${color.border}`, borderRadius: 7, padding: "5px 8px", cursor: "pointer" }}>
+                    style={{ flex: "none", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", color: color.textMuted, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 7, padding: "5px 8px", cursor: "pointer" }}>
                     {OPS_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 ) : (
                   <span style={{ flex: "none", fontSize: 11.5, fontWeight: 600, color: color.textMuted }}>{o.status}</span>
                 )}
                 {canEdit && (
-                  <button onClick={() => remove.mutate(o.id)} title="Remove" style={{ flex: "none", width: 28, height: 28, borderRadius: 7, border: `1px solid ${color.border}`, background: "#fff", color: color.faint2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trash" size={14} /></button>
+                  <button onClick={() => remove.mutate(o.id)} title="Remove" style={{ flex: "none", width: 28, height: 28, borderRadius: 7, border: `1px solid ${color.border}`, background: color.surface, color: color.faint2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trash" size={14} /></button>
                 )}
               </div>
             );
@@ -1305,7 +1305,7 @@ function Vacations({ projectId }: { projectId: string | null }) {
 
       {/* add absence */}
       {canEdit && (
-        <div style={{ background: "#F8FAFD", border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+        <div style={{ background: color.surfaceAlt, border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add an absence</div>
           <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center" }}>
             <Input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Resource name" style={{ width: 180 }} />
@@ -1336,7 +1336,7 @@ function Vacations({ projectId }: { projectId: string | null }) {
 interface WowItem { label: string; detail: string; }
 interface WaysOfWorkingData { methodology: string; cadence: string; summary: string; ceremonies: WowItem[]; artifacts: string[]; roles: string[]; canEdit?: boolean; }
 
-const WOW_UPPER: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#56607A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 };
+const WOW_UPPER: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: color.subtle, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 9 };
 
 function WaysOfWorking({ projectId }: { projectId: string | null }) {
   const qc = useQueryClient();
@@ -1368,7 +1368,7 @@ function WaysOfWorking({ projectId }: { projectId: string | null }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
         <SectionTitle>Ways of working</SectionTitle>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0C5798", background: "#E6EFFB", padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#0C5798", background: color.primaryTint2, padding: "3px 10px", borderRadius: 20 }}>{data.methodology}</span>
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.textMuted, background: color.bg, padding: "3px 10px", borderRadius: 20 }}>{data.cadence}</span>
         {data.canEdit && <button onClick={() => setDraft({ ...data, ceremonies: data.ceremonies.map((c) => ({ ...c })), artifacts: [...data.artifacts], roles: [...data.roles] })} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 8, padding: "5px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="edit" size={14} /> Edit</button>}
       </div>
@@ -1437,7 +1437,7 @@ function WowEditor({ draft, setDraft, onSave, onCancel, saving }: {
           <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr 28px", gap: 8, alignItems: "center" }}>
             <Input value={c.label} placeholder="Ceremony" onChange={(e) => set({ ceremonies: draft.ceremonies.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
             <Input value={c.detail} placeholder="What happens" onChange={(e) => set({ ceremonies: draft.ceremonies.map((x, j) => j === i ? { ...x, detail: e.target.value } : x) })} />
-            <button onClick={() => set({ ceremonies: draft.ceremonies.filter((_, j) => j !== i) })} title="Remove" style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 14 }}>×</button>
+            <button onClick={() => set({ ceremonies: draft.ceremonies.filter((_, j) => j !== i) })} title="Remove" style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer", fontSize: 14 }}>×</button>
           </div>
         ))}
       </div>
@@ -1563,7 +1563,7 @@ function CommunicationPlan({ projectId }: { projectId: string | null }) {
       </div>
 
       {canEdit && (
-        <div style={{ background: "#F8FAFD", border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+        <div style={{ background: color.surfaceAlt, border: "1px solid #EEF1F6", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: color.ink, marginBottom: 10 }}>Add a communication</div>
           <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1.2fr 1fr", gap: 9, marginBottom: 9 }}>
             <Input value={stakeholder} onChange={(e) => setStakeholder(e.target.value)} placeholder="Stakeholder / group" />
@@ -1606,7 +1606,7 @@ function CommRow({ entry, canEdit, grid, onPatch, onRemove }: {
       <select value={entry.commType} onChange={(e) => onPatch({ commType: e.target.value })} style={cellSelect}>{COMM_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}</select>
       <select value={entry.schedule} onChange={(e) => onPatch({ schedule: e.target.value })} style={cellSelect}>{COMM_SCHEDULES.map((c) => <option key={c} value={c}>{c}</option>)}</select>
       <input value={owner} onChange={(e) => setOwner(e.target.value)} onBlur={() => owner !== entry.owner && onPatch({ owner })} placeholder="—" style={cellInput} />
-      <button onClick={onRemove} title="Remove" style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: "#fff", color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
+      <button onClick={onRemove} title="Remove" style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${color.border3}`, background: color.surface, color: color.faint3, cursor: "pointer", fontSize: 13, lineHeight: 1 }}>×</button>
     </div>
   );
 }

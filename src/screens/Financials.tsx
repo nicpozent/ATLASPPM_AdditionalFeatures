@@ -100,10 +100,10 @@ export default function Financials() {
         <div style={{ fontSize: 13.5, color: color.subtle }}>Budget vs actual, CapEx/OpEx split, forecast at completion &amp; benefit — click a row to edit its cost lines (spent &amp; forecast).</div>
         <div style={{ flex: 1 }} />
         <button onClick={() => setRoiInfo(true)} title="How ROI is calculated" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "1px solid #CFE0F4", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontFamily: "inherit" }}><Icon name="help" size={14} /> ROI method</button>
-        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#56607A" }}>Source</span>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Source</span>
         <select value={source} onChange={(e) => setSource(e.target.value)} style={{
           border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 10px", fontSize: 12.5,
-          fontWeight: 600, fontFamily: "inherit", color: color.text, background: "#fff", cursor: "pointer",
+          fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer",
         }}>
           {FIN_SOURCES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -113,7 +113,7 @@ export default function Financials() {
       {/* KPI row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 18 }}>
         {kpis.map((k) => (
-          <div key={k.label} style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 14, padding: 16 }}>
+          <div key={k.label} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, color: color.faint }}>{k.label}</div>
             <div style={{ fontFamily: font.head, fontSize: 24, fontWeight: 700, color: k.ink, marginTop: 4 }}>{k.value}</div>
           </div>
@@ -121,7 +121,7 @@ export default function Financials() {
       </div>
 
       {/* CapEx / OpEx split */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 14 }}>CapEx / OpEx split</div>
         <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 9, background: color.bg }}>
           <div style={{ width: `${capexPct}%`, background: "#0F6CBD" }} />
@@ -134,7 +134,7 @@ export default function Financials() {
       </div>
 
       {/* Cost composition by source */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 14 }}>Cost composition by source</div>
         <div style={{ display: "flex", height: 16, borderRadius: 8, overflow: "hidden", marginBottom: 9, background: color.bg }}>
           <div style={{ width: cw(cLabor), background: "#0F6CBD" }} />
@@ -151,7 +151,7 @@ export default function Financials() {
       </div>
 
       {/* per-project table */}
-      <div style={{ background: "#fff", border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: cols, padding: "13px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
           <div>{SCOPE_TABS.find((t) => t.key === scope)!.label.replace(/s$/, "")}</div><div>Budget</div><div>Spent</div><div>CapEx</div><div>Forecast</div><div>Variance</div><div style={{ textAlign: "right" }}>ROI</div>
         </div>
@@ -222,7 +222,7 @@ function RoiModal({ scope, row, onClose }: { scope: FinScope; row: FinRow; onClo
     <Modal onClose={onClose} width={420} label={`ROI · ${row.name}`}>
       <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 6 }}>Manual ROI · {row.name}</div>
       <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 14 }}>Automatic ROI is <strong>{row.roiManual ? "overridden" : `${row.roi}%`}</strong>. Enter a value to override it, or clear it to return to automatic (benefit vs forecast).</div>
-      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Manual ROI %</label>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Manual ROI %</label>
       <Input type="number" value={value} onChange={(e) => setValue(e.target.value)} placeholder="e.g. 18" style={{ width: 140, fontFamily: font.mono }} />
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={() => set.mutate(null)} disabled={set.isPending}>Use automatic</Button>

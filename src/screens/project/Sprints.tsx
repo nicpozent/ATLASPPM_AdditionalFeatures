@@ -90,7 +90,7 @@ export function Sprints({ projectId }: { projectId: string | null }) {
                   {canEdit && (
                     <div style={{ display: "flex", gap: 7 }}>
                       <Button variant="secondary" onClick={() => setEdit(s)}><Icon name="edit" size={15} /> Edit</Button>
-                      <button onClick={() => { if (confirm(`Delete sprint “${s.name}”? Tasks stay, but lose this iteration.`)) del.mutate(s.id); }} title="Delete sprint" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: `1px solid ${color.border}`, background: "#fff", cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={15} /></button>
+                      <button onClick={() => { if (confirm(`Delete sprint “${s.name}”? Tasks stay, but lose this iteration.`)) del.mutate(s.id); }} title="Delete sprint" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: `1px solid ${color.border}`, background: color.surface, cursor: "pointer", color: "#A1282B" }}><Icon name="trash" size={15} /></button>
                     </div>
                   )}
                 </div>

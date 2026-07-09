@@ -73,7 +73,7 @@ export function NotificationCenter() {
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
           <div style={{
             position: "absolute", top: 58, right: 26, width: 380, maxHeight: 520, zIndex: 50,
-            background: "#fff", border: `1px solid ${color.border}`, borderRadius: 14,
+            background: color.surface, border: `1px solid ${color.border}`, borderRadius: 14,
             boxShadow: "0 12px 40px rgba(20,26,60,0.18)", display: "flex", flexDirection: "column", overflow: "hidden",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 16px", borderBottom: `1px solid ${color.bg}` }}>
@@ -143,7 +143,7 @@ function NotificationPrefs({ onClose }: { onClose: () => void }) {
       {prefs.map((p) => (
         <div key={p.eventType} style={{ display: "grid", gridTemplateColumns: "1fr 62px 62px", alignItems: "center", padding: "11px 4px", borderTop: `1px solid ${color.bg}` }}>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.label}{!p.entityScoped && <span style={{ fontSize: 10, fontWeight: 700, color: "#0F6CBD", background: "#EEF3FB", borderRadius: 5, padding: "1px 6px", marginLeft: 7, textTransform: "uppercase" }}>Portfolio</span>}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: color.text }}>{p.label}{!p.entityScoped && <span style={{ fontSize: 10, fontWeight: 700, color: "#0F6CBD", background: color.primaryTint, borderRadius: 5, padding: "1px 6px", marginLeft: 7, textTransform: "uppercase" }}>Portfolio</span>}</div>
             <div style={{ fontSize: 11.5, color: color.faint3, marginTop: 1 }}>{p.detail}</div>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}><Toggle on={p.inApp} onChange={(v) => setPref.mutate({ ev: p.eventType, inApp: v, email: p.email })} /></div>
@@ -161,7 +161,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer", position: "relative",
       background: on ? color.primary : "#CBD2DE", transition: "background 0.15s", flex: "none",
     }}>
-      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: color.surface, transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
     </button>
   );
 }

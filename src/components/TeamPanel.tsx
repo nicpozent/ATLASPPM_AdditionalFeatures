@@ -229,11 +229,11 @@ function AttachModal({ entityType, entityId, available, onClose, invalidate }: {
 
   return (
     <Modal onClose={onClose} width={520} label="Attach a sub-team">
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Sub-team</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Sub-team</div>
       <Select value={String(subId)} onChange={(e) => pick(Number(e.target.value))} style={{ marginBottom: 14 }}>
         {available.map((s) => <option key={s.id} value={s.id}>{s.name}{s.managerLabel ? ` · ${s.managerLabel}` : ""}</option>)}
       </Select>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Who's working on this {entityType}? ({selected.size})</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 6 }}>Who's working on this {entityType}? ({selected.size})</div>
       <MemberChecklist members={sub?.members ?? []} selected={selected} onToggle={toggle} edits={edits} onEdit={onEdit} />
       <div style={{ fontSize: 11, color: color.faint3, marginTop: 8 }}>Set each person's allocation as a % or weekly hours (40h = 100%), with an optional start/end and an extension if the work runs long.</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
@@ -263,7 +263,7 @@ function MembersModal({ assignment, subTeam, onClose, invalidate }: { assignment
 
   return (
     <Modal onClose={onClose} width={520} label={`Members · ${assignment.subTeamName}`}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 6 }}>Who's working on this? ({selected.size})</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 6 }}>Who's working on this? ({selected.size})</div>
       <MemberChecklist members={roster} selected={selected} onToggle={toggle} edits={edits} onEdit={onEdit} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -295,7 +295,7 @@ function IndividualModal({ entityType, entityId, onClose, invalidate }: { entity
 
   return (
     <Modal onClose={onClose} width={520} label={`Assign an individual to this ${entityType}`}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Person</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Person</div>
       {!manual && dir.length > 0 ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
           <Select value={name} onChange={(e) => pick(e.target.value)} style={{ flex: 1 }}>
@@ -311,7 +311,7 @@ function IndividualModal({ entityType, entityId, onClose, invalidate }: { entity
           {dir.length > 0 && <button onClick={() => setManual(false)} style={{ background: "none", border: "none", cursor: "pointer", color: color.primary, fontSize: 11.5, fontFamily: "inherit" }}>from directory</button>}
         </div>
       )}
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 2 }}>Allocation</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 2 }}>Allocation</div>
       <AllocEditor value={alloc} onChange={setAlloc} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -428,9 +428,9 @@ function SubTeamEditModal({ team, onClose, onDone }: { team?: SubTeamT; onClose:
   });
   return (
     <Modal onClose={onClose} width={420} label={team ? "Edit sub-team" : "New sub-team"}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Name</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Name</div>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Payments squad" style={{ marginBottom: 13 }} />
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#56607A", marginBottom: 5 }}>Description (optional)</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Description (optional)</div>
       <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this team does" />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
