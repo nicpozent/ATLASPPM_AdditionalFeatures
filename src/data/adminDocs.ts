@@ -30,7 +30,7 @@ export const EVALUATION: Evaluation = {
   overall: "4.9 / 5 — 16 of 18 dimensions at ★★★★★ (the two non-max: Integrations & Security, both ★★★★☆).",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
-    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 56 ADRs.", gaps: "—" },
+    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 57 ADRs.", gaps: "—" },
     { n: 3, name: "Frontend engineering", stars: 5, evidence: "React 18 + TS strict + Vite; inline design tokens; route code-splitting + vendor chunks; lint clean (0 warnings).", gaps: "—" },
     { n: 4, name: "Identity & access", stars: 5, evidence: "Entra SSO (MSAL, PKCE) verified end-to-end on a live tenant; server-authoritative RBAC; 15-min idle-logout.", gaps: "—" },
     { n: 5, name: "Authorization model", stars: 5, evidence: "6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests.", gaps: "—" },
@@ -45,7 +45,7 @@ export const EVALUATION: Evaluation = {
     { n: 14, name: "Delivery & runtime", stars: 5, evidence: "On-prem single-node Docker (docker compose: web/worker/db/nginx edge) as the chosen, documented target (ADR-0054); images promoted from GHCR (ADR-0052); migrations on start; health-gated; secrets overlay; upgrade = pull-and-recreate.", gaps: "k8s parked (no scale/HA need at portfolio scale); HA is a single-node trade-off." },
     { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK with a generic per-framework coverage rule; EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050); Zero-Trust posture mapping (ADR-0049).", gaps: "—" },
     { n: 16, name: "Internationalisation", stars: 5, evidence: "6 locales; completeness test gates missing keys.", gaps: "—" },
-    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 56 ADRs, in-app Help + Security Posture page, setup guides, this evaluation, user stories.", gaps: "—" },
+    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 57 ADRs, in-app Help + Security Posture page, setup guides, this evaluation, user stories.", gaps: "—" },
     { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules (Project.tsx down to ~1,600 with Tasks/Backlog/Sprints/Epics extracted).", gaps: "—" },
   ],
   notes: [
@@ -220,7 +220,7 @@ export const USER_STORY_SECTIONS: UserStorySection[] = [
   { title: "15. My Team, Skills & Labor Rates", stories: [
     { id: "TEAM-1", role: "Manager", want: "My Team with members, skills, and a roll-up view", benefit: "I see my org" },
     { id: "TEAM-2", role: "Manager", want: "a customizable skills/competency matrix (name-keyed ratings)", benefit: "I plan by capability" },
-    { id: "TEAM-3", role: "Manager", want: "an internal-labour rate card (Junior→Expert) with a day/month/hour calculator", benefit: "I estimate internal cost", acceptance: "each discipline's rate is need-to-know — visible AND editable only by its owners: Dev → Global Eng Mgr, Developers Mgr, CTO, CIO; Infra → Infra Mgr, Global Service Mgr, CTO, CIO; Architect → Chief Architect, CTO, CIO; PM & PO → PMO, PM Lead, CTO, CIO. The API returns only disciplines the caller may see; a persona owning none sees a restricted state (ADR-0055)." },
+    { id: "TEAM-3", role: "Manager", want: "an internal-labour rate card (Junior→Expert) with a day/month/hour calculator", benefit: "I estimate internal cost", acceptance: "rates are region-scoped and need-to-know — each discipline×region line is visible AND editable only by its owners, filtered server-side. Infra Sweden/APAC/CH, Dev Sweden/APAC/BLOG/CH, Architect Sweden/CH, PM & PO Sweden/CH; regional managers see only their region, CTO/CIO see all. Three new identities (Infrastructure Manager APAC, Dev APAC Manager, BLOG IT Manager) clone their base role and differ only in rate visibility (ADR-0055, ADR-0057)." },
   ]},
   { title: "16. Methodologies & Create-Project Wizard", stories: [
     { id: "METH-1", role: "PMO/PM", want: "a methodology library (Waterfall, V-Model, Stage-Gate, Scrum, Kanban, SAFe, Scrumban, Spiral, Iterative, RAD, DevOps)", benefit: "projects follow a chosen way of working" },

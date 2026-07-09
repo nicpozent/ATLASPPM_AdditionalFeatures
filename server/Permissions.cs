@@ -27,6 +27,9 @@ public static class Permissions
         // UI switcher identities (nav.ts ROLES)
         ["admin"] = "admin", ["pmo"] = "pmo", ["pm"] = "pm", ["pmlead"] = "pmlead",
         ["teammgr"] = "team", ["svcmgr"] = "team", ["devmgr"] = "team", ["inframgr"] = "team",
+        // Regional manager identities clone their base manager's capabilities
+        // (all "team"); they differ only in labour-rate visibility (ADR-0057).
+        ["devapac"] = "team", ["blogit"] = "team", ["inframgr_apac"] = "team",
         ["architect"] = "pmo", ["stakeholder"] = "stkhldr",
         // CTO / CIO — leadership identities enforced at Executive level (their
         // distinct persona lives in the header switcher + ManagerKey).
@@ -75,7 +78,9 @@ public static class Permissions
         ["teammgr"] = "teammgr", ["GlobalEngineeringManager"] = "teammgr",
         ["svcmgr"] = "svcmgr", ["GlobalServiceManager"] = "svcmgr",
         ["devmgr"] = "devmgr", ["DevelopersManager"] = "devmgr",
+        ["devapac"] = "devmgr", ["blogit"] = "devmgr",
         ["inframgr"] = "inframgr", ["InfrastructureManager"] = "inframgr",
+        ["inframgr_apac"] = "inframgr",
         ["architect"] = "architect", ["ChiefArchitect"] = "architect",
         ["pmo"] = "pmo", ["PMO"] = "pmo",
         ["pmlead"] = "pmlead", ["PMLead"] = "pmlead",

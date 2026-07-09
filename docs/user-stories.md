@@ -245,13 +245,18 @@ full (F) levels. Authorization is always server-side.
 - **US-TEAM-3** — _As a **manager**, I want an internal-labour rate card
   (Junior→Expert) with a day/month/hour calculator, so that I estimate internal
   cost._
-  **Acceptance:** each discipline's rate is **need-to-know** — visible **and**
-  editable only by the identities that own it: **Dev** → Global Engineering Mgr,
-  Developers Mgr, CTO, CIO; **Infra** → Infrastructure Mgr, Global Service Mgr,
-  CTO, CIO; **Architect** → Chief Architect, CTO, CIO; **PM** and **PO** → PMO,
-  PM Lead, CTO, CIO. The API returns only the disciplines the caller may see (no
-  hidden rate on the wire); a persona owning none sees a restricted state
-  (ADR-0055).
+  **Acceptance:** rates are **region-scoped** and **need-to-know** — each
+  discipline×region line is visible **and** editable only by its owners, filtered
+  server-side (no hidden rate on the wire); a persona owning none sees a restricted
+  state. Lines & owners: Infra Sweden (Infra Mgr, Global Service Mgr, CTO, CIO),
+  Infra APAC (Infra Mgr APAC, Global Service Mgr, CTO, CIO), Infra CH (Global
+  Service Mgr, CTO, CIO); Dev Sweden (Global Eng Mgr, Developers Mgr, CTO, CIO),
+  Dev APAC (Global Eng Mgr, Dev APAC Mgr, CTO, CIO), Dev BLOG (Global Eng Mgr,
+  BLOG IT Manager, CTO, CIO), Dev CH (Global Eng Mgr, CTO, CIO); Architect
+  Sweden/CH (Chief Architect, CTO, CIO); PM/PO Sweden (PMO, PM Lead, CTO, CIO),
+  PM/PO CH (PMO, CTO, CIO). Three regional manager identities (Infrastructure
+  Manager APAC, Dev APAC Manager, BLOG IT Manager) clone their base role's
+  capabilities and differ only in rate visibility (ADR-0055, ADR-0057).
 
 ## 16. Methodologies & Create-Project Wizard
 

@@ -63,5 +63,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0054](./0054-on-prem-single-node-docker.md) | On-prem single-node Docker as the delivery target (k8s parked) | Accepted |
 | [0055](./0055-need-to-know-labour-rates.md) | Need-to-know internal-labour rate card (per-discipline view+edit, +Architect/PM/PO) | Accepted |
 | [0056](./0056-per-profile-dark-mode.md) | Per-profile dark mode via CSS variables (no global stylesheet) | Accepted |
+| [0057](./0057-region-scoped-labour-rates.md) | Region-scoped labour rate lines + regional manager roles (APAC/BLOG) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

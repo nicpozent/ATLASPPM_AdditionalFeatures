@@ -107,7 +107,13 @@ export default function Teams() {
 const RATE_LEVEL_LABELS: Record<string, string> = {
   junior: "Junior", semiSenior: "Semi-Senior", senior: "Senior", specialist: "Specialist", expert: "Expert",
 };
-const RATE_DISC_LABELS: Record<string, string> = { dev: "Dev", infra: "Infra", architect: "Architect", pm: "PM", po: "PO" };
+const RATE_DISC_LABELS: Record<string, string> = {
+  infraSweden: "Infra · Sweden", infraApac: "Infra · APAC", infraCh: "Infra · CH",
+  devSweden: "Dev · Sweden", devApac: "Dev · APAC", devBlog: "Dev · BLOG", devCh: "Dev · CH",
+  architectSweden: "Architect · Sweden", architectCh: "Architect · CH",
+  pmSweden: "PM · Sweden", pmCh: "PM · CH",
+  poSweden: "PO · Sweden", poCh: "PO · CH",
+};
 
 interface RateCard { canEdit: boolean; disciplines: string[]; levels: string[]; rates: Record<string, number>; }
 
@@ -178,7 +184,7 @@ function LaborRateCard() {
       {disciplines.length === 0 ? (
         <div style={{ padding: "22px", fontSize: 12.5, color: color.faint2, display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="lock" size={15} />
-          Internal-labour rates are restricted. Each discipline's rate (Dev, Infra, Architect, PM, PO) is visible only to the managers who own it, plus CTO / CIO. Switch to a role that owns a rate to view or edit it.
+          Internal-labour rates are restricted. Each region rate line (e.g. Infra · Sweden, Dev · APAC, PM · CH) is visible only to the managers who own that region, plus CTO / CIO. Switch to a role that owns a rate to view or edit it.
         </div>
       ) : (
       <>

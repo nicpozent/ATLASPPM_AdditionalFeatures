@@ -21,17 +21,35 @@ public record LaborRatesReq(Dictionary<string, decimal>? Rates);
 // ============================================================================
 public static class LaborRates
 {
-    public static readonly string[] Disciplines = { "dev", "infra", "architect", "pm", "po" };
+    // Region-scoped rate lines (discipline × region). Keys stay dot-free so the
+    // Settings key `rate.<discipline>.<level>` still splits cleanly. See ADR-0057.
+    public static readonly string[] Disciplines =
+    {
+        "infraSweden", "infraApac", "infraCh",
+        "devSweden", "devApac", "devBlog", "devCh",
+        "architectSweden", "architectCh",
+        "pmSweden", "pmCh",
+        "poSweden", "poCh",
+    };
     public static readonly string[] Levels = { "junior", "semiSenior", "senior", "specialist", "expert" };
 
-    // discipline → UI identities that may view *and* edit that discipline's rate.
+    // region rate line → UI identities that may view *and* edit it. CTO/CIO see
+    // every line; each regional manager sees only their own region's line.
     static readonly Dictionary<string, string[]> Access = new()
     {
-        ["dev"]       = new[] { "teammgr", "devmgr", "cto", "cio" },
-        ["infra"]     = new[] { "inframgr", "svcmgr", "cto", "cio" },
-        ["architect"] = new[] { "architect", "cto", "cio" },
-        ["pm"]        = new[] { "pmo", "pmlead", "cto", "cio" },
-        ["po"]        = new[] { "pmo", "pmlead", "cto", "cio" },
+        ["infraSweden"]     = new[] { "inframgr", "svcmgr", "cto", "cio" },
+        ["infraApac"]       = new[] { "inframgr_apac", "svcmgr", "cto", "cio" },
+        ["infraCh"]         = new[] { "svcmgr", "cto", "cio" },
+        ["devSweden"]       = new[] { "teammgr", "devmgr", "cto", "cio" },
+        ["devApac"]         = new[] { "teammgr", "devapac", "cto", "cio" },
+        ["devBlog"]         = new[] { "teammgr", "blogit", "cto", "cio" },
+        ["devCh"]           = new[] { "teammgr", "cto", "cio" },
+        ["architectSweden"] = new[] { "architect", "cto", "cio" },
+        ["architectCh"]     = new[] { "architect", "cto", "cio" },
+        ["pmSweden"]        = new[] { "pmo", "pmlead", "cto", "cio" },
+        ["pmCh"]            = new[] { "pmo", "cto", "cio" },
+        ["poSweden"]        = new[] { "pmo", "pmlead", "cto", "cio" },
+        ["poCh"]            = new[] { "pmo", "cto", "cio" },
     };
 
     static string Key(string disc, string level) => $"rate.{disc}.{level}";
