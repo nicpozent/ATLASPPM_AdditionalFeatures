@@ -1,0 +1,12 @@
+# Paths excluded from the Semgrep SAST scan (security-scan.yml).
+
+# The approved prototype reference — the single source of visual truth, not
+# shipped application code (see CLAUDE.md §2). It is never bundled or served, so
+# its demo helpers (e.g. postMessage to "*") are out of scope for AppSec.
+design/
+
+# Build output / deps (also default-ignored, listed for clarity).
+dist/
+node_modules/
+server/bin/
+server/obj/

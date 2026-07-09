@@ -1,6 +1,8 @@
 # Dependabot — dependency security alerts and update PRs.
 # Free on private repositories. Version-update PRs are grouped to keep the
 # noise down; security fixes are always opened individually and immediately.
+# A 7-day cooldown delays adopting a newly-published version — a window against
+# compromised/yanked releases (supply-chain hardening).
 version: 2
 updates:
   # Frontend (React/Vite) — root package.json / package-lock.json.
@@ -10,6 +12,8 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
     groups:
       # Roll routine minor/patch bumps into one PR per week.
       frontend-minor-patch:
@@ -24,6 +28,8 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
     groups:
       backend-minor-patch:
         update-types:
@@ -37,3 +43,5 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7

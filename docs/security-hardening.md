@@ -103,8 +103,27 @@ Beyond the supply-chain gates (`npm audit`, `dotnet list --vulnerable`), the
   probes a *running* test environment from the outside (never production) — the
   same run-against-a-test-server model as the k6 perf suite.
 
-SAST + Trivy are **report-only** during rollout (findings surface in the job log
-without failing the build); flip them to gating once the current baseline is
-triaged. GitHub-native **CodeQL** is complementary and enabled via the repo's
-*Code scanning → Default setup* toggle. A human penetration test / red-team is a
-separate external engagement this does not replace.
+SAST + Trivy are **gating** — a HIGH/CRITICAL finding fails the build (ADR-0053,
+after the baseline triage below). GitHub-native **CodeQL** is complementary and
+enabled via the repo's *Code scanning → Default setup* toggle. A human
+penetration test / red-team is a separate external engagement this does not
+replace.
+
+### Baseline triage & scoped exceptions (ADR-0053)
+
+The first scan was triaged to a clean, gating baseline.
+
+**Fixed:** the API image runs non-root (`server/Dockerfile` → `USER 1654`);
+Dependabot got a 7-day `cooldown` on every ecosystem (delays adopting a freshly
+published — possibly compromised — version).
+
+**Accepted (scoped, documented) exceptions** — deliberate risk acceptances, not a
+blanket disable:
+
+| Exception | Where | Why |
+|-----------|-------|-----|
+| nginx edge runs as root (DS-0002 / `missing-user`) | `.trivyignore` (`AVD-DS-0002`) + Semgrep `--exclude-rule` | Master binds privileged 80/443 + reads certs; workers drop to the `nginx` user. The API image is non-root (USER 1654), so this applies only to the nginx edge. Unprivileged-nginx (8080/8443) tracked. |
+| `mutable-action-tag` | Semgrep `--exclude-rule` | Actions pinned to major versions, kept current by Dependabot's `github-actions` ecosystem; SHA-pinning deferred. |
+| `gha-curl-pipe-shell` | Semgrep `--exclude-rule` | Official Trivy installer over TLS from the vendor repo. |
+| nginx `request-host` / `dynamic-proxy-host` / `missing-internal` | Semgrep `--exclude-rule` | Standard same-origin reverse proxy; the `proxy_pass` upstream is an internal config value, not attacker input. |
+| `design/` (prototype reference) | `.semgrepignore` | The approved prototype (CLAUDE.md §2) — never bundled or served, so its demo helpers aren't application AppSec. |

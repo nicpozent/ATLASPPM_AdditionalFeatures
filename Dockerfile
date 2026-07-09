@@ -29,6 +29,11 @@ COPY . .
 RUN npm run build
 
 # ---------------------------------------------------------------------------
+# The nginx master starts as root to bind the privileged TLS edge ports (80/443)
+# and read certs; its workers drop to the unprivileged `nginx` user. Trivy
+# DS-0002 (no non-root USER) is a documented, accepted exception for this reason
+# (see .trivyignore + security-hardening.md); migrating to nginx-unprivileged
+# (8080/8443) is tracked as a follow-up.
 FROM nginx:1.27-alpine AS runtime
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
