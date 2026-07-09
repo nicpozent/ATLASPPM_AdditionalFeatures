@@ -26,17 +26,17 @@ export interface Evaluation {
 }
 
 export const EVALUATION: Evaluation = {
-  lastReviewed: "2026-07-09 · main @ perf-suite",
+  lastReviewed: "2026-07-09 · main @ web-worker-split",
   overall: "4.8 / 5 — 14 of 18 dimensions at ★★★★★.",
   scorecard: [
     { n: 1, name: "Functional coverage (screens vs prototype)", stars: 5, evidence: "All Workspace + Configuration screens built and data-wired; tracked features complete.", gaps: "Ongoing prototype-fidelity spot-checks." },
-    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 47 ADRs.", gaps: "—" },
+    { n: 2, name: "Architecture & modularity", stars: 5, evidence: "Modular monolith; minimal API grouped /api/v1; one C# file per domain; HLD + LLD + 48 ADRs.", gaps: "—" },
     { n: 3, name: "Frontend engineering", stars: 5, evidence: "React 18 + TS strict + Vite; inline design tokens; route code-splitting + vendor chunks; lint clean (0 warnings).", gaps: "—" },
     { n: 4, name: "Identity & access", stars: 5, evidence: "Entra SSO (MSAL, PKCE) verified end-to-end on a live tenant; server-authoritative RBAC; 15-min idle-logout.", gaps: "—" },
     { n: 5, name: "Authorization model", stars: 5, evidence: "6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests.", gaps: "—" },
     { n: 6, name: "Data & persistence", stars: 5, evidence: "PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups.", gaps: "—" },
     { n: 7, name: "Integrations", stars: 4, evidence: "Jira (full sync + attachments; Ops import incl. epics), Microsoft Graph, Azure DevOps (discovery + work-item sync, backgrounded, with delta/changed-since pulls).", gaps: "ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic." },
-    { n: 8, name: "Async / background work", stars: 5, evidence: "Hosted services: Jira + ADO background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts.", gaps: "—" },
+    { n: 8, name: "Async / background work", stars: 5, evidence: "Hosted services: Jira + ADO background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; web/worker process split (Atlas__Role) runs the recurring timer jobs in their own container off the request path (ADR-0048).", gaps: "—" },
     { n: 9, name: "Security & hardening", stars: 4, evidence: "Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout.", gaps: "Pen-test not performed; secrets rotation manual." },
     { n: 10, name: "Accessibility (WCAG 2 AA)", stars: 5, evidence: "jsdom axe on primitives + browser axe sweep gated incl. colour-contrast; mobile drawer; focus/dialog/menu semantics.", gaps: "Sweep covers representative routes; extend as views grow." },
     { n: 11, name: "Observability", stars: 5, evidence: "OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs; domain metrics + tuned dashboards + Prometheus alert rules.", gaps: "—" },
@@ -45,7 +45,7 @@ export const EVALUATION: Evaluation = {
     { n: 14, name: "Delivery & runtime", stars: 4, evidence: "Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay.", gaps: "Single-node compose; no k8s manifests yet." },
     { n: 15, name: "Governance & compliance", stars: 5, evidence: "Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention.", gaps: "—" },
     { n: 16, name: "Internationalisation", stars: 5, evidence: "6 locales; completeness test gates missing keys.", gaps: "—" },
-    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 47 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
+    { n: 17, name: "Documentation", stars: 5, evidence: "HLD, LLD, building-blocks (ABB/SBB), 48 ADRs, in-app Help, setup guides, this evaluation, user stories.", gaps: "—" },
     { n: 18, name: "Maintainability / DX", stars: 5, evidence: "Consistent patterns, typed models, dependabot; large screens decomposed into per-tab modules (Project.tsx down to ~1,600 with Tasks/Backlog/Sprints/Epics extracted).", gaps: "—" },
   ],
   notes: [
@@ -55,6 +55,7 @@ export const EVALUATION: Evaluation = {
     "Accessibility: the design greys meet WCAG AA and the browser axe sweep gates colour-contrast alongside structural rules, so regressions fail CI.",
     "Maintainability: the outsized screens are decomposed into per-tab modules (project/, resources/) with shared/util helpers; Project.tsx is down to ~1,600 after extracting the agile Tasks/Backlog/Sprints/Epics tabs and their shared task model.",
     "Testing: Playwright e2e now covers full user journeys (navigation across every screen, role-driven nav, dashboard layouts, a mocked demand data → render → drill-in flow) on top of the axe accessibility sweep; a k6 load/perf suite (perf/ — smoke·load·stress + an API-driven volume seeder, Prometheus remote-write) drives the hot roll-up endpoints against a seeded test env (ADR-0047).",
+    "Runtime topology: the backend runs in a selectable process role (Atlas__Role = web/worker/all; ADR-0048). The recurring timer jobs (scheduled Jira sync, retention, capacity alerts) run in a separate worker container so a heavy unattended pass can't starve user requests; a worker service is in docker-compose. Default 'all' keeps single-container behaviour. The monolith is intentionally not split into microservices — read roll-ups join across domains in one transaction — so the split is request-serving vs. recurring background work; on-demand sync consumers stay in the web role pending a durable-queue follow-up.",
   ],
   risks: [
     { priority: "Low", item: "Automated security scanning (SAST/DAST)", why: "No pen-test performed; CodeQL + OWASP ZAP would cover the automated OWASP-Top-10 half." },

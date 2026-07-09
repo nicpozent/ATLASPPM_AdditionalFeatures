@@ -1,14 +1,42 @@
 # ============================================================================
 #  Atlas PPM — full-stack compose (frontend + .NET API + PostgreSQL).
-#  `db`   : PostgreSQL with a persistent named volume.
-#  `api`  : the .NET backend (server/), builds here; runs EF migrations + seed
-#           on startup, then serves /api/v1 from the database.
-#  `web`  : the frontend, built and served by nginx, same-origin /api -> api.
+#  `db`    : PostgreSQL with a persistent named volume.
+#  `api`   : the .NET backend (server/), role=web — runs EF migrations + seed on
+#            startup, then serves /api/v1 (incl. on-demand syncs) from the database.
+#  `worker`: the same image, role=worker — runs the recurring background jobs
+#            (scheduled Jira sync, retention, capacity alerts) off the request
+#            path so a portfolio-wide pass can't starve user requests (ADR-0048).
+#  `web`   : the frontend, built and served by nginx, same-origin /api -> api.
 #
 #  Bring up the whole stack:  docker compose up --build
 #  Frontend:                  http://localhost:${WEB_PORT:-8080}
 #  Frontend only (no data):   docker compose up --build web
+#  Single-container backend:  omit `worker` and set api Atlas__Role=all.
 # ============================================================================
+
+# Shared backend environment — reused verbatim by the api (web) and worker
+# services so they run the same code against the same database.
+x-atlas-api-env: &atlas-api-env
+  ConnectionStrings__Postgres: "Host=db;Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};Password=${POSTGRES_PASSWORD:-atlas}"
+  Auth__Enabled: ${VITE_AUTH_ENABLED:-false}
+  Auth__TenantId: ${VITE_AUTH_TENANT_ID:-}
+  Auth__Audience: ${VITE_API_AUDIENCE:-api://atlas-ppm}
+  Seed__Enabled: ${SEED_DEMO_DATA:-false}
+  Graph__TenantId: ${GRAPH_TENANT_ID:-}
+  Graph__ClientId: ${GRAPH_CLIENT_ID:-}
+  Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
+  Graph__SyncAppRoleId: ${GRAPH_SYNC_APP_ROLE_ID:-}
+  Jira__BaseUrl: ${JIRA_BASE_URL:-}
+  Jira__Email: ${JIRA_EMAIL:-}
+  Jira__ApiToken: ${JIRA_API_TOKEN:-}
+  Jira__StoryPointsField: ${JIRA_STORY_POINTS_FIELD:-}
+  Jira__ImportComments: ${JIRA_IMPORT_COMMENTS:-}
+  Jira__ImportAttachments: ${JIRA_IMPORT_ATTACHMENTS:-}
+  Jira__MaxAttachmentBytes: ${JIRA_MAX_ATTACHMENT_BYTES:-}
+  AzureDevOps__Organization: ${ADO_ORG:-}
+  AzureDevOps__Pat: ${ADO_PAT:-}
+  AzureDevOps__MaxWorkItems: ${ADO_MAX_WORK_ITEMS:-}
+
 services:
   db:
     image: postgres:16-alpine
@@ -29,42 +57,33 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    # Serve the API only; the recurring background jobs run in `worker`.
+    # (Drop the `worker` service and set Atlas__Role: all to run both here.)
     environment:
-      ConnectionStrings__Postgres: "Host=db;Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};Password=${POSTGRES_PASSWORD:-atlas}"
-      # Entra API token validation — mirror the frontend's auth settings.
-      Auth__Enabled: ${VITE_AUTH_ENABLED:-false}
-      Auth__TenantId: ${VITE_AUTH_TENANT_ID:-}
-      Auth__Audience: ${VITE_API_AUDIENCE:-api://atlas-ppm}
-      # Demo portfolio seed — off by default; set SEED_DEMO_DATA=true to preload it.
-      Seed__Enabled: ${SEED_DEMO_DATA:-false}
-      # Microsoft Graph (Teams → directory sync). Use the ATLAS PPM *API* app
-      # registration (confidential client) with a client secret and the
-      # GroupMember.Read.All APPLICATION permission (admin-consented). Empty ⇒
-      # sync stays in manual-add mode. Prefer a Docker secret for the secret
-      # in production (see docs/secrets.md); env is fine to get started.
-      Graph__TenantId: ${GRAPH_TENANT_ID:-}
-      Graph__ClientId: ${GRAPH_CLIENT_ID:-}
-      Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
-      # Optional: sync only groups assigned to the "Atlas Team Group" app role.
-      Graph__SyncAppRoleId: ${GRAPH_SYNC_APP_ROLE_ID:-}
-      # Jira Cloud (pull-only). Site URL + a service-account email and API token
-      # (Basic auth). Empty ⇒ the Jira integration stays dormant. Prefer a Docker
-      # secret for JIRA_API_TOKEN in production. See docs/jira-setup.md.
-      Jira__BaseUrl: ${JIRA_BASE_URL:-}
-      Jira__Email: ${JIRA_EMAIL:-}
-      Jira__ApiToken: ${JIRA_API_TOKEN:-}
-      Jira__StoryPointsField: ${JIRA_STORY_POINTS_FIELD:-}
-      Jira__ImportComments: ${JIRA_IMPORT_COMMENTS:-}
-      Jira__ImportAttachments: ${JIRA_IMPORT_ATTACHMENTS:-}
-      Jira__MaxAttachmentBytes: ${JIRA_MAX_ATTACHMENT_BYTES:-}
-      AzureDevOps__Organization: ${ADO_ORG:-}
-      AzureDevOps__Pat: ${ADO_PAT:-}
-      AzureDevOps__MaxWorkItems: ${ADO_MAX_WORK_ITEMS:-}
+      <<: *atlas-api-env
+      Atlas__Role: web
     depends_on:
       db:
         condition: service_healthy
     expose:
       - "8080"
+    restart: unless-stopped
+
+  # Recurring background workers (scheduled Jira sync, retention, capacity
+  # alerts) — same image, role=worker, no HTTP API surface (just health probes).
+  # Starts after `api`, which owns migrations/seed. See ADR-0048.
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      <<: *atlas-api-env
+      Atlas__Role: worker
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
 
   web:

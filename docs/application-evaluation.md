@@ -9,7 +9,7 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ perf-suite._
+_Last reviewed: 2026-07-09 · main @ web-worker-split._
 
 ## 1. Scorecard
 
@@ -22,7 +22,7 @@ _Last reviewed: 2026-07-09 · main @ perf-suite._
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
-| 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts | — |
+| 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role, secrets via env/Docker secrets, dependency audit gate, idle-logout | Pen-test not performed; secrets rotation manual |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
@@ -31,7 +31,7 @@ _Last reviewed: 2026-07-09 · main @ perf-suite._
 | 14 | **Delivery & runtime** | ★★★★☆ | Docker + compose + nginx edge; migrations on start; health-gated; secrets overlay | Single-node compose; no k8s manifests yet |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention | — |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 47 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 48 ADRs, in-app Help, setup guides, this evaluation, user stories | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -47,7 +47,13 @@ _Last reviewed: 2026-07-09 · main @ perf-suite._
   Graph directory/mail. Remaining connector cards are structural chrome pending
   backend work; each will mirror the Jira/ADO pattern (ADR-0006/0035/0036).
 - **Async (8).** Jira and ADO each have an in-process queue + hosted worker so a
-  portfolio-wide pull can't time out; ADR-0030/0039.
+  portfolio-wide pull can't time out; ADR-0030/0039. The process now runs in a
+  selectable **role** (`Atlas__Role` = web/worker/all; ADR-0048): the recurring
+  timer jobs (scheduled sync, retention, capacity alerts) run in a separate
+  worker container so a heavy unattended pass can't starve user requests. The
+  monolith is intentionally **not** split into microservices — the read roll-ups
+  join across domains in one transaction; the justified split is request-serving
+  vs. recurring background work.
 - **Observability (11).** Domain metrics (sync duration, queue depth, capacity
   alerts, DB command latency), a tuned operations dashboard and Prometheus alert
   rules on top of the reference stack; ADR-0040.
@@ -97,3 +103,9 @@ load/perf._
 _Update 2026-07-09: added a k6 load/perf suite (`perf/` — smoke·load·stress +
 API-driven volume seeder, Prometheus remote-write; ADR-0047), closing the last
 Testing gap (★★★★★). **Overall 4.8/5 — 14 of 18 dimensions at ★★★★★.**_
+
+_Update 2026-07-09: web/worker process split (`Atlas__Role`; ADR-0048) — the
+recurring timer jobs run in their own container off the request path, with a
+`worker` service added to compose; default `all` keeps single-container
+behaviour. No rating change (Async/Architecture already ★★★★★); on-demand sync
+consumers stay in the web role pending a durable-queue follow-up._

@@ -5,6 +5,18 @@ using Atlas.Api;
 var builder = WebApplication.CreateBuilder(args);
 var cfg = builder.Configuration;
 
+// Process role — split the request-serving API from the recurring background
+// workers so a portfolio-wide sync / retention / capacity pass can't starve user
+// requests (ADR-0048). "all" (default) runs everything in one container, exactly
+// as before; "web" serves the API only; "worker" runs the timer-driven
+// background services only. On-demand sync consumers stay with the web role
+// (their queue is in-process) — see ADR-0048 for the durable-queue follow-up.
+var role = (cfg["Atlas:Role"] ?? "all").Trim().ToLowerInvariant();
+if (role is not ("web" or "worker" or "all"))
+    throw new InvalidOperationException($"Atlas:Role must be 'web', 'worker' or 'all' (got '{role}').");
+var runWeb = role is "web" or "all";
+var runWorker = role is "worker" or "all";
+
 // Layer in file-mounted (Docker/K8s) secrets and, when configured, Azure Key
 // Vault — before anything reads a connection string. Inert unless configured.
 builder.AddAtlasSecrets();
@@ -42,27 +54,36 @@ if (openApiEnabled)
 // configured (see Observability.cs and docs/observability.md).
 builder.AddAtlasObservability();
 
+// ---- Recurring background workers (worker role) ------------------------------
+// These fire unattended on a timer and can be portfolio-wide, so they run in the
+// worker container to keep heavy scans off the request-serving path (ADR-0048).
+
 // Daily data-retention pass (anonymises records past the window; default 10y).
 // On by default; nothing is touched until records actually age out.
-if (cfg.GetValue("Retention:Enabled", true))
+if (runWorker && cfg.GetValue("Retention:Enabled", true))
     builder.Services.AddHostedService<RetentionHostedService>();
 
 // Scheduled Jira sync (on by default; idle until a Jira connector is configured).
-if (cfg.GetValue("Jira:ScheduledSync", true))
+if (runWorker && cfg.GetValue("Jira:ScheduledSync", true))
     builder.Services.AddHostedService<JiraSyncService>();
-
-// Background Jira sync queue + worker — lets manual syncs run off the request
-// path so a large re-sync can't 504 the browser (ADR-0030).
-builder.Services.AddSingleton<JiraSyncQueue>();
-builder.Services.AddHostedService<JiraSyncWorker>();
-// Same background pattern for Azure DevOps work-item pulls (ADR-0039).
-builder.Services.AddSingleton<AdoSyncQueue>();
-builder.Services.AddHostedService<AdoSyncWorker>();
 
 // Periodic over-allocation alerts (on by default; emits only to users who opt
 // into the "over_allocation" event, so it's silent until someone subscribes).
-if (cfg.GetValue("Capacity:Alerts", true))
+if (runWorker && cfg.GetValue("Capacity:Alerts", true))
     builder.Services.AddHostedService<CapacityAlertService>();
+
+// ---- On-demand sync queues + workers (web role) ------------------------------
+// Manual syncs enqueue a job and return 202 so a large re-sync can't 504 the
+// browser (ADR-0030/0039). The queue is in-process, so the consuming worker
+// lives with the endpoints that enqueue into it (the web role). The singletons
+// register in every role so the enqueue endpoints and the depth gauge resolve.
+builder.Services.AddSingleton<JiraSyncQueue>();
+builder.Services.AddSingleton<AdoSyncQueue>();
+if (runWeb)
+{
+    builder.Services.AddHostedService<JiraSyncWorker>();
+    builder.Services.AddHostedService<AdoSyncWorker>();
+}
 
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
 builder.Services.AddAtlasRateLimiter();
@@ -102,7 +123,8 @@ if (authEnabled)
 
 var app = builder.Build();
 var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Atlas.Startup");
-startupLog.LogInformation("Atlas API starting — auth {AuthMode}", authEnabled ? "ENABLED (Entra bearer)" : "disabled (anonymous, dev)");
+startupLog.LogInformation("Atlas {Role} starting — auth {AuthMode}",
+    role, authEnabled ? "ENABLED (Entra bearer)" : "disabled (anonymous, dev)");
 // Give the static notification emit path a real logger for email diagnostics.
 Notifications.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 // Expose background-sync queue depth as an observable gauge (per connector).
@@ -111,9 +133,13 @@ AtlasTelemetry.RegisterQueueGauges(
     () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
-// Apply migrations on startup. Demo seed is OFF by default — production starts
-// empty and fills with real data; set Seed:Enabled=true (env Seed__Enabled) to
-// preload the demo portfolio for a walkthrough. Seeding is idempotent.
+// Apply migrations on startup. The web/all role owns the schema (a single
+// migrator avoids two containers racing Migrate()); the worker role skips this
+// and starts after the web container has initialised the database (compose
+// depends_on / a k8s migration job). Demo seed is OFF by default — production
+// starts empty and fills with real data; set Seed:Enabled=true (env
+// Seed__Enabled) to preload the demo portfolio for a walkthrough. Idempotent.
+if (runWeb)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
@@ -182,9 +208,12 @@ app.MapGet("/readyz", async (AtlasDbContext db) =>
     await db.Database.CanConnectAsync()
         ? Results.Ok(new { status = "ready" })
         : Results.Json(new { status = "unavailable", error = "Database is not reachable." }, statusCode: StatusCodes.Status503ServiceUnavailable));
-app.MapAtlasEndpoints();
+// The API surface is served only by the web/all role; the worker exposes just
+// the liveness/readiness probes above (for orchestrator health checks).
+if (runWeb)
+    app.MapAtlasEndpoints();
 
-startupLog.LogInformation("Atlas API ready.");
+startupLog.LogInformation("Atlas {Role} ready.", role);
 app.Run();
 
 // Exposed so WebApplicationFactory<Program> can host the app in integration
