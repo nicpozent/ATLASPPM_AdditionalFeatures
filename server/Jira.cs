@@ -620,15 +620,28 @@ public static class Jira
         // a key-only mapping (board id is optional at import) still gets its
         // sprints, past/current/future. Kanban boards have no sprints, so only
         // scrum boards are queried (their /sprint endpoint would 400 otherwise).
+        //
+        // Sprint import is BEST-EFFORT: the Agile board APIs need Browse-board
+        // permission the service account may lack, and can 400/403/404. Any such
+        // failure must NOT abort the sync — tasks/epics (and task-derived sprint
+        // names) still import — so each Agile call is isolated in try/catch.
         var sprintBoards = new List<int>();
         if (board is int bMapped) sprintBoards.Add(bMapped);
         else
-            foreach (var jb in await FetchPagedAsync(c, $"rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(projectKey)}", "values", () => truncated = true))
-                if (string.Equals(Str(jb, "type"), "scrum", StringComparison.OrdinalIgnoreCase) && IntProp(jb, "id") is int bid && bid > 0)
-                    sprintBoards.Add(bid);
+            try
+            {
+                foreach (var jb in await FetchPagedAsync(c, $"rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(projectKey)}", "values", () => truncated = true))
+                    if (string.Equals(Str(jb, "type"), "scrum", StringComparison.OrdinalIgnoreCase) && IntProp(jb, "id") is int bid && bid > 0)
+                        sprintBoards.Add(bid);
+            }
+            catch { /* board listing unavailable (permission / non-agile project) — fall back to issue-derived sprint names */ }
         foreach (var sb in sprintBoards.Distinct())
-            foreach (var js in await FetchPagedAsync(c, $"rest/agile/1.0/board/{sb}/sprint", "values", () => truncated = true))
-                UpsertSprint(js, sb);
+            try
+            {
+                foreach (var js in await FetchPagedAsync(c, $"rest/agile/1.0/board/{sb}/sprint", "values", () => truncated = true))
+                    UpsertSprint(js, sb);
+            }
+            catch { /* this board's sprints unavailable — skip it, keep syncing the rest */ }
 
         // --- Epics: board endpoint if available, else derived from issues ----
         var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
