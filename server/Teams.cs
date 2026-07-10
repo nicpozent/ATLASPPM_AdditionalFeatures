@@ -22,16 +22,19 @@ public static class Teams
     // The team-manager slots — aligned to the role-switcher identities.
     public static readonly (string Key, string Label)[] Slots =
     {
-        ("teammgr",   "Global Engineering Manager"),
-        ("svcmgr",    "Global Service Manager"),
-        ("devmgr",    "Developers Manager"),
-        ("inframgr",  "Infrastructure Manager"),
-        ("architect", "Chief Architect"),
-        ("secofficer","Security Officer"),
-        ("pmo",       "PMO"),
-        ("pmlead",    "PM Lead"),
-        ("cto",       "CTO"),
-        ("cio",       "CIO"),
+        ("teammgr",       "Global Engineering Manager"),
+        ("svcmgr",        "Global Service Manager"),
+        ("devmgr",        "Developers Manager"),
+        ("devapac",       "Dev APAC Manager"),
+        ("blogit",        "BLOG IT Manager"),
+        ("inframgr",      "Infrastructure Manager"),
+        ("inframgr_apac", "Infrastructure Manager APAC"),
+        ("architect",     "Chief Architect"),
+        ("secofficer",    "Security Officer"),
+        ("pmo",           "PMO"),
+        ("pmlead",        "PM Lead"),
+        ("cto",           "CTO"),
+        ("cio",           "CIO"),
     };
     static string Label(string key) => Slots.FirstOrDefault(s => s.Key == key).Label ?? key;
     public static string SlotLabel(string key) => string.IsNullOrEmpty(key) ? "" : Label(key);
