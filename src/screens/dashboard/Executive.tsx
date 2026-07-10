@@ -98,7 +98,7 @@ export function Executive({ d, onProject, onPortfolio }: {
             {d.projects.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center", color: color.faint3, fontSize: 13 }}>No active projects yet.</div>
             ) : d.projects.slice(0, 6).map((p) => (
-              <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.8fr 0.7fr 1.1fr 0.8fr", alignItems: "center", padding: "13px 20px`, borderBottom: `1px solid ${color.surfaceAlt}`, cursor: `pointer" }}>
+              <div key={p.id} onClick={() => onProject(p.id)} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.8fr 0.7fr 1.1fr 0.8fr", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: statusDot(p.status), flex: "none" }} />
                   <div style={{ minWidth: 0 }}>

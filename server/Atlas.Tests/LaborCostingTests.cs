@@ -102,19 +102,24 @@ public class LaborCostingTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
-    public async Task Rate_card_platform_admin_sees_and_edits_every_line()
+    public async Task Rate_card_platform_admin_sees_nothing_and_cannot_edit()
     {
+        // Platform Admin owns no rate line — it must see NO costs and cannot write.
         var admin = As("admin");
         var view = await admin.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.True(view.GetProperty("canEdit").GetBoolean());
-        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
-        foreach (var d in new[] { "infraSweden", "infraApac", "infraCh", "devSweden", "devApac", "devBlog", "devCh", "architectSweden", "architectCh", "pmSweden", "pmCh", "poSweden", "poCh" })
-            Assert.Contains(d, disc);
-        // Admin can persist any line (the superuser who manages the card).
+        Assert.False(view.GetProperty("canEdit").GetBoolean());
+        Assert.Empty(view.GetProperty("disciplines").EnumerateArray());
         var put = await admin.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["infraCh.expert"] = 130m } });
-        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
-        var after = await admin.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
-        Assert.Equal(130m, after.GetProperty("rates").GetProperty("infraCh.expert").GetDecimal());
+        Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rate_card_chief_architect_sees_only_architect_lines()
+    {
+        // Impersonating a role shows exactly that role's lines — no more.
+        var arch = As("architect");
+        var disc = (await arch.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates")).GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        Assert.Equal(new[] { "architectSweden", "architectCh" }.OrderBy(x => x), disc.OrderBy(x => x));
     }
 
     [Fact]
