@@ -681,9 +681,12 @@ public static class Jira
         // A delta run always uses the JQL search (with the updated-since filter),
         // even when a board is mapped, so the watermark applies; a full run with a
         // board keeps the board issue endpoint for its backlog ordering.
+        // `expand=changelog` carries each issue's status history inline so we can
+        // derive when work first left the backlog (StartedAt). Best-effort: if an
+        // endpoint ignores or omits it, StartedAt just stays empty.
         var jiraIssues = board is int bIssue && !deltaActive
-            ? await FetchIssuesAsync(c, $"rest/agile/1.0/board/{bIssue}/issue", fields, () => truncated = true)
-            : await FetchJqlAsync(c, $"project = \"{projectKey}\"{deltaClause} ORDER BY updated ASC", fields, () => truncated = true);
+            ? await FetchIssuesAsync(c, $"rest/agile/1.0/board/{bIssue}/issue", fields, () => truncated = true, expand: "changelog")
+            : await FetchJqlAsync(c, $"project = \"{projectKey}\"{deltaClause} ORDER BY updated ASC", fields, () => truncated = true, expand: "changelog");
         var existingTasks = await db.ProjectTasks.Where(t => t.ProjectId == p.Id).ToListAsync();
         var taskOrd = existingTasks.Select(t => t.Ord).DefaultIfEmpty(0).Max();
         // Which Jira attachment/comment ids each existing task already holds — so a
@@ -746,6 +749,12 @@ public static class Jira
             t.TimeSpentHours = SecondsToHours(LongProp(f, "timespent"));
             t.JiraCreated = Str(f, "created");
             t.JiraUpdated = Str(f, "updated");
+            // Lifecycle: resolved date from Jira's resolutiondate (fall back to the
+            // last-updated stamp for a Done issue that carries no resolution date);
+            // started date from the earliest status transition in the changelog.
+            t.ResolvedAt = DatePart(Str(f, "resolutiondate"));
+            if (t.ResolvedAt.Length == 0 && t.Status == "Done") t.ResolvedAt = DatePart(t.JiraUpdated);
+            if (StartedAtFromChangelog(ji) is { Length: > 0 } startedIso) t.StartedAt = startedIso;
             t.JiraUrl = browseBase.Length > 0 ? $"{browseBase}/browse/{key}" : "";
 
             // Comments — upsert by Jira comment id into the task's thread.
@@ -865,6 +874,32 @@ public static class Jira
         if (s.Length == 0) return "";
         var t = s.IndexOf('T');
         return t > 0 ? s[..t] : s;
+    }
+
+    // The date work first left the backlog: the earliest changelog history that
+    // includes a status transition. This is workflow-agnostic (no dependency on
+    // status names/categories) — the moment an issue first changes status is a
+    // solid proxy for "started". Returns "" when the changelog is absent (not
+    // expanded / no Browse permission) or the issue never moved. Pure.
+    public static string StartedAtFromChangelog(JsonElement issue)
+    {
+        if (Prop(issue, "changelog") is not { } cl) return "";
+        if (Prop(cl, "histories") is not { ValueKind: JsonValueKind.Array } hs) return "";
+        DateTime? bestDt = null;
+        var best = "";
+        foreach (var h in hs.EnumerateArray())
+        {
+            if (Prop(h, "items") is not { ValueKind: JsonValueKind.Array } items) continue;
+            var hasStatus = false;
+            foreach (var it in items.EnumerateArray())
+                if (string.Equals(Str(it, "field"), "status", StringComparison.OrdinalIgnoreCase)) { hasStatus = true; break; }
+            if (!hasStatus) continue;
+            var created = Str(h, "created");
+            if (created.Length == 0) continue;
+            var dt = ParseAt(created);
+            if (bestDt is null || dt < bestDt) { bestDt = dt; best = created; }
+        }
+        return DatePart(best);
     }
 
     // ---- JSON helpers -------------------------------------------------------
@@ -1077,14 +1112,17 @@ public static class Jira
     }
 
     // Page an issues[] endpoint (uses total/startAt/maxResults for termination).
-    static async Task<List<JsonElement>> FetchIssuesAsync(HttpClient c, string path, string fields, Action onTruncate)
+    // `expand` (e.g. "changelog") is passed through so callers can pull the issue
+    // history alongside the fields in a single request.
+    static async Task<List<JsonElement>> FetchIssuesAsync(HttpClient c, string path, string fields, Action onTruncate, string expand = "")
     {
         var all = new List<JsonElement>();
         int startAt = 0, page = 0;
         var fieldQuery = Uri.EscapeDataString(fields);
+        var expandQuery = expand.Length > 0 ? $"&expand={Uri.EscapeDataString(expand)}" : "";
         while (page++ < MaxPages)
         {
-            var res = await c.GetAsync($"{path}?startAt={startAt}&maxResults={PageSize}&fields={fieldQuery}");
+            var res = await c.GetAsync($"{path}?startAt={startAt}&maxResults={PageSize}&fields={fieldQuery}{expandQuery}");
             if (!res.IsSuccessStatusCode)
                 throw new InvalidOperationException($"Jira returned {(int)res.StatusCode} {res.ReasonPhrase} for {path}. Check the board id and the service account's Browse Projects permission.");
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
@@ -1103,16 +1141,17 @@ public static class Jira
     // Page an enhanced JQL search (rest/api/3/search/jql) — used when a project
     // has no board, so it can be synced by project key alone. Pages via the
     // opaque nextPageToken the endpoint returns until it's absent.
-    static async Task<List<JsonElement>> FetchJqlAsync(HttpClient c, string jql, string fields, Action onTruncate)
+    static async Task<List<JsonElement>> FetchJqlAsync(HttpClient c, string jql, string fields, Action onTruncate, string expand = "")
     {
         var all = new List<JsonElement>();
         var fq = Uri.EscapeDataString(fields);
         var jq = Uri.EscapeDataString(jql);
+        var expandQuery = expand.Length > 0 ? $"&expand={Uri.EscapeDataString(expand)}" : "";
         string? token = null;
         int page = 0;
         while (page++ < MaxPages)
         {
-            var url = $"rest/api/3/search/jql?jql={jq}&maxResults={PageSize}&fields={fq}"
+            var url = $"rest/api/3/search/jql?jql={jq}&maxResults={PageSize}&fields={fq}{expandQuery}"
                 + (token is not null ? $"&nextPageToken={Uri.EscapeDataString(token)}" : "");
             var res = await c.GetAsync(url);
             if (!res.IsSuccessStatusCode)

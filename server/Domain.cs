@@ -792,8 +792,10 @@ public class ProjectTask
     public string ParentKey { get; set; } = "";           // parent issue key (sub-tasks / stories under an epic)
     public string EpicKey { get; set; } = "";             // stable Jira epic key (survives epic renames)
     public int TimeSpentHours { get; set; }               // logged work (Jira timespent, rounded to hours)
-    public string JiraCreated { get; set; } = "";         // ISO timestamp from Jira
+    public string JiraCreated { get; set; } = "";         // ISO timestamp from Jira (issue created)
     public string JiraUpdated { get; set; } = "";         // ISO timestamp from Jira (drives "last synced" freshness)
+    public string StartedAt { get; set; } = "";           // ISO date work first left the backlog (earliest status change, Jira changelog)
+    public string ResolvedAt { get; set; } = "";          // ISO date the issue was resolved/closed (Jira resolutiondate)
     public string JiraUrl { get; set; } = "";             // deep link, e.g. https://site/browse/GIT-123
     public List<TaskComment> Comments { get; set; } = new();
     public List<TaskAttachment> Attachments { get; set; } = new();
