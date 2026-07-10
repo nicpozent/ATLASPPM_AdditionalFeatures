@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
@@ -31,7 +31,41 @@ const TASK_BAR: Record<string, { bg: string; border: string }> = {
 const monthOfIso = (s: string): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getMonth(); };
 
 const LABEL_W = 286;
-const nowLeft = `${(new Date().getMonth() + 0.5) / 12 * 100}%`;
+
+// ── Timeline window (absolute months) ───────────────────────────────────────
+// Absolute month = year*12 + monthIndex(0..11). The visible window is a calendar
+// range the user picks (From/To, capped at 5 years), so a project running e.g.
+// 2027→2030 lays out correctly across years. Items with real dates are placed by
+// them; a bare month-of-year (phases, derived sprints) is anchored to a base
+// year supplied by its context (its project's start year).
+interface Win { start: number; span: number }
+const nowAbs = () => { const d = new Date(); return d.getFullYear() * 12 + d.getMonth(); };
+const WinCtx = createContext<Win>({ start: Math.floor(nowAbs() / 12) * 12, span: 12 });
+const useWin = () => useContext(WinCtx);
+const absOfIso = (s?: string | null): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getFullYear() * 12 + d.getMonth(); };
+const ymToAbs = (ym: string): number => { const [y, m] = ym.split("-").map(Number); return (y || 0) * 12 + ((m || 1) - 1); };
+const absToYm = (abs: number): string => `${Math.floor(abs / 12)}-${String((abs % 12) + 1).padStart(2, "0")}`;
+const monthAbbr = (abs: number) => MONTHS[((abs % 12) + 12) % 12];
+const yearOf = (abs: number) => Math.floor(abs / 12);
+const MAX_SPAN = 60; // 5 years
+
+// Window-relative bar geometry (absolute months). Bars fully outside the window
+// are hidden; bars crossing an edge are clipped to it.
+function barAbs(a0: number, a1: number, win: Win): React.CSSProperties {
+  const lo = Math.min(a0, a1), hi = Math.max(a0, a1), winEnd = win.start + win.span - 1;
+  if (hi < win.start || lo > winEnd) return { display: "none" };
+  const s = Math.max(lo, win.start), e = Math.min(hi, winEnd);
+  const left = (s - win.start) / win.span * 100;
+  const width = Math.max(0.7, (e - s + 1) / win.span * 100);
+  return { position: "absolute", left: `${left}%`, width: `${width}%`, top: 9, height: 20 };
+}
+const gridBg = (win: Win): React.CSSProperties => ({
+  backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`,
+  backgroundSize: `${100 / win.span}% 100%`,
+});
+// Centre-of-month position (%) within the window, or null when outside it.
+const centerPct = (abs: number, win: Win): number | null =>
+  abs < win.start || abs > win.start + win.span - 1 ? null : (abs - win.start + 0.5) / win.span * 100;
 
 function useOpts(path: string, key: string) {
   return useQuery({
@@ -49,6 +83,18 @@ export default function Gantt() {
   const [addMs, setAddMs] = useState(false);
   const [addPhase, setAddPhase] = useState(false);
   const [editPhase, setEditPhase] = useState<Phase | null>(null);
+  // Visible calendar window — default = the current year (identical to the old
+  // 12-month grid); the From/To pickers widen it up to 5 years ahead.
+  const thisYear = new Date().getFullYear();
+  const [fromYM, setFromYM] = useState(`${thisYear}-01`);
+  const [toYM, setToYM] = useState(`${thisYear}-12`);
+  const win = useMemo<Win>(() => {
+    const start = ymToAbs(fromYM);
+    let span = ymToAbs(toYM) - start + 1;
+    if (span < 1) span = 1;
+    if (span > MAX_SPAN) span = MAX_SPAN;
+    return { start, span };
+  }, [fromYM, toYM]);
   const qc = useQueryClient();
 
   const { data: projects = [] } = useOpts("/projects", "projects");
@@ -208,6 +254,22 @@ export default function Gantt() {
           </div>
         </div>
 
+        {/* timeline window — calendar range, up to 5 years ahead */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase" }}>Window</span>
+          <input type="month" value={fromYM} max={absToYm(ymToAbs(toYM))} onChange={(e) => e.target.value && setFromYM(e.target.value)} aria-label="Timeline from month" style={winInput} />
+          <span style={{ fontSize: 12, color: color.faint2 }}>→</span>
+          <input type="month" value={toYM} min={fromYM} onChange={(e) => e.target.value && setToYM(e.target.value)} aria-label="Timeline to month" style={winInput} />
+          <span style={{ fontSize: 11.5, color: color.faint3 }}>
+            {win.span} mo{win.span >= 12 ? ` · ${(win.span / 12).toFixed(win.span % 12 ? 1 : 0)} yr` : ""}
+          </span>
+          <div style={{ flex: 1 }} />
+          {([["1y", 12], ["2y", 24], ["3y", 36], ["5y", 60]] as const).map(([lbl, n]) => (
+            <button key={lbl} onClick={() => setToYM(absToYm(ymToAbs(fromYM) + n - 1))} title={`Show ${n / 12} year${n > 12 ? "s" : ""} from the start month`} style={winBtn}>{lbl}</button>
+          ))}
+          <button onClick={() => { setFromYM(`${thisYear}-01`); setToYM(`${thisYear}-12`); }} title="Reset to the current calendar year" style={winBtn}>This year</button>
+        </div>
+
         {/* view tabs (project/program only) */}
         {scope !== "portfolio" && (
           <div style={{ display: "flex", gap: 0, padding: "0 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
@@ -218,6 +280,7 @@ export default function Gantt() {
           </div>
         )}
 
+        <WinCtx.Provider value={win}>
         {scope === "portfolio" ? (
           <PortfolioSchedule items={(portfolio?.items ?? []).filter((i) => cat === "all" || i.type === cat)} cat={cat} />
         ) : view === "schedule" ? (
@@ -243,6 +306,7 @@ export default function Gantt() {
             ? <Note text="Switch to a project to view sprints." />
             : <SprintView projectId={activeProjectId} />
         )}
+        </WinCtx.Provider>
       </div>
 
       {addMs && <AddMilestoneModal onClose={() => setAddMs(false)} onAdd={(b) => addMilestone.mutate(b)} pending={addMilestone.isPending} />}
@@ -255,18 +319,17 @@ export default function Gantt() {
 }
 
 // ---- Bar geometry ----------------------------------------------------------
-function barStyle(startMonth: number, endMonth: number): React.CSSProperties {
-  const left = startMonth / 12 * 100;
-  const width = Math.max(1, (endMonth - startMonth + 1)) / 12 * 100;
-  return { position: "absolute", left: `${left}%`, width: `${width}%`, top: 9, height: 20 };
-}
+// Month-of-year (0-11) → absolute month, anchored to a base year (the item's
+// project start year). Used for phases/derived sprints that carry no year.
+const anchored = (base: number, m: number) => base + m;
 
-function PhaseBar({ phase, editable, onEdit }: { phase: Phase; editable?: boolean; onEdit?: () => void }) {
+function PhaseBar({ phase, base, editable, onEdit }: { phase: Phase; base: number; editable?: boolean; onEdit?: () => void }) {
+  const win = useWin();
   return (
     <div style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <div title={`${phase.name} · ${MONTHS[phase.startMonth]}–${MONTHS[phase.endMonth]} · ${phase.progress}%`}
         onClick={editable ? onEdit : undefined}
-        style={{ ...barStyle(phase.startMonth, phase.endMonth), borderRadius: 6, background: color.primaryTint2, border: `1px solid ${color.primary}`, overflow: "hidden", cursor: editable ? "pointer" : "default" }}>
+        style={{ ...barAbs(anchored(base, phase.startMonth), anchored(base, phase.endMonth), win), borderRadius: 6, background: color.primaryTint2, border: `1px solid ${color.primary}`, overflow: "hidden", cursor: editable ? "pointer" : "default" }}>
         <div style={{ height: "100%", width: `${phase.progress}%`, background: "#0F6CBD" }} />
       </div>
     </div>
@@ -274,16 +337,35 @@ function PhaseBar({ phase, editable, onEdit }: { phase: Phase; editable?: boolea
 }
 
 function MonthHeader() {
+  const win = useWin();
+  const wide = win.span > 18;
+  const cells = Array.from({ length: win.span }, (_, i) => win.start + i);
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(12,1fr)", height: 38, borderBottom: `1px solid ${color.bg}` }}>
-      {MONTHS.map((m) => <div key={m} style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, color: color.faint, fontWeight: 600, borderRight: `1px solid ${color.surfaceAlt}` }}>{m}</div>)}
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${win.span},1fr)`, height: 38, borderBottom: `1px solid ${color.bg}` }}>
+      {cells.map((abs, i) => {
+        const jan = ((abs % 12) + 12) % 12 === 0;
+        return (
+          <div key={abs} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontSize: wide ? 9 : 11.5, color: color.faint, fontWeight: 600, borderRight: `1px solid ${jan ? color.border2 : color.surfaceAlt}`, overflow: "hidden", lineHeight: 1.15 }}>
+            {wide
+              ? (jan || i === 0) && <span style={{ fontWeight: 700, color: color.faint2 }}>{yearOf(abs)}</span>
+              : <>
+                  <span>{monthAbbr(abs)}</span>
+                  {(jan || i === 0) && <span style={{ fontSize: 8.5, color: color.faint3 }}>{`’${String(yearOf(abs)).slice(2)}`}</span>}
+                </>}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function NowLine() {
+  const win = useWin();
+  const a = nowAbs();
+  if (a < win.start || a > win.start + win.span - 1) return null;   // today outside the window
+  const left = `${(a - win.start + 0.5) / win.span * 100}%`;
   return (
-    <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: "#D13438", left: nowLeft, zIndex: 5 }}>
+    <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: "#D13438", left, zIndex: 5 }}>
       <span style={{ position: "absolute", top: -1, left: -18, fontSize: 9, fontWeight: 700, color: "#fff", background: "#D13438", padding: "1px 5px", borderRadius: 4 }}>NOW</span>
     </div>
   );
@@ -308,14 +390,21 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
 }) {
+  const win = useWin();
+  const gb = gridBg(win);
+  // Anchor bare month-of-year values (phases, derived sprints) to the project's
+  // start year; items with real dates are placed by those dates directly.
+  const base = yearOf(absOfIso(startDate) ?? win.start) * 12;
   // Collapse the phase grid when there are no phases but sprints exist, so the
   // sprint band sits directly under the window and the columns stay aligned.
   const rowsHeight = phases.length ? Math.max(200, phases.length * 38) : (sprints.length ? 0 : 200);
   const hasWindow = projectStart != null && projectEnd != null;
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set());
   const toggleSprint = (id: number) => setOpenSprints((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const winStart = Math.min(projectStart ?? 0, projectEnd ?? 0);
-  const winEnd = Math.max(projectStart ?? 0, projectEnd ?? 0);
+  // Project window bar in absolute months: prefer the real project dates (span
+  // years), else anchor the derived month window to the base year.
+  const winA = absOfIso(startDate) ?? base + Math.min(projectStart ?? 0, projectEnd ?? 0);
+  const winB = absOfIso(endDate) ?? base + Math.max(projectStart ?? 0, projectEnd ?? 0);
   return (
     <div style={{ display: "flex" }}>
       {/* left labels */}
@@ -383,14 +472,14 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
         {hasWindow && (
-          <div style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
-            <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barStyle(winStart, winEnd), top: 8, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
+          <div style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt, ...gb }}>
+            <div title={`Project ${startDate || "?"} → ${endDate || "?"}`} style={{ ...barAbs(winA, winB, win), top: 8, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
           </div>
         )}
-        <div style={{ position: "relative", minHeight: rowsHeight, height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", minHeight: rowsHeight, height: rowsHeight, ...gb }}>
           <NowLine />
           <div>
-            {phases.map((p) => <PhaseBar key={p.id} phase={p} editable={canEdit} onEdit={() => onEditPhase(p)} />)}
+            {phases.map((p) => <PhaseBar key={p.id} phase={p} base={base} editable={canEdit} onEdit={() => onEditPhase(p)} />)}
           </div>
         </div>
         {sprints.length > 0 && (
@@ -401,17 +490,17 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               const open = openSprints.has(s.id);
               return (
                 <div key={s.id}>
-                  <div style={{ position: "relative", height: 34, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+                  <div style={{ position: "relative", height: 34, ...gb }}>
                     <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                      style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                      style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
-                    ? <div style={{ height: 28, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }} />
+                    ? <div style={{ height: 28, ...gb }} />
                     : s.tasks.map((t) => {
                       const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
                       return (
-                        <div key={t.id} style={{ position: "relative", height: 28, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
-                          <div title={`${t.name} · ${t.status}`} style={{ ...barStyle(t.startMonth, t.endMonth), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
+                        <div key={t.id} style={{ position: "relative", height: 28, ...gb }}>
+                          <div title={`${t.name} · ${t.status}`} style={{ ...barAbs(anchored(base, t.startMonth), anchored(base, t.endMonth), win), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
                         </div>
                       );
                     }))}
@@ -421,14 +510,18 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
           </div>
         )}
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
-          {milestones.map((ms) => (
-            <div key={ms.id} style={{ position: "absolute", top: 0, left: `${(ms.month + 0.5) / 12 * 100}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
+          {milestones.map((ms) => {
+            const p = centerPct(absOfIso(ms.date) ?? base + ms.month, win);
+            if (p === null) return null;   // milestone outside the visible window
+            return (
+            <div key={ms.id} style={{ position: "absolute", top: 0, left: `${p}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
               <span style={{ display: "block", width: 16, height: 16, background: "#E0A100", transform: "rotate(45deg)", margin: "10px auto 0", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.22)", cursor: canEdit ? "pointer" : "default" }}
                 title={canEdit ? "Remove milestone" : ms.label} onClick={canEdit ? () => onRemoveMilestone(ms.id) : undefined} />
               <span style={{ display: "block", fontSize: 10.5, fontWeight: 700, color: color.text, whiteSpace: "nowrap", textAlign: "center", marginTop: 8, overflow: "hidden", textOverflow: "ellipsis" }}>{ms.label}</span>
               <span style={{ display: "block", fontSize: 9, color: color.faint3, textAlign: "center" }}>{ms.date}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -443,6 +536,11 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
   release: { ink: color.warningInk, tint: color.warningTint, bar: "#E0A100", label: "Release" },
 };
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
+  const win = useWin();
+  const gb = gridBg(win);
+  // Dated items (startLabel/endLabel are ISO/display dates) place across years;
+  // items with only a derived month window anchor to the window's start year.
+  const itemAbs = (label: string, month: number) => absOfIso(label) ?? yearOf(win.start) * 12 + month;
   if (items.length === 0) return <Note text={cat === "all" ? "Nothing with dates in the portfolio yet. Set start/end dates on projects, programs, products or releases to see them here." : "No dated items in this category."} />;
   const rowsHeight = Math.max(120, items.length * 38);
   return (
@@ -462,14 +560,14 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
       </div>
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", height: rowsHeight, ...gb }}>
           <NowLine />
           {items.map((i) => {
             const t = PF_TYPE[i.type] ?? PF_TYPE.project;
             return (
               <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
-                  style={{ ...barStyle(i.startMonth, i.endMonth), borderRadius: 6, background: t.tint, border: `1px solid ${t.bar}`, overflow: "hidden" }}>
+                  style={{ ...barAbs(itemAbs(i.startLabel, i.startMonth), itemAbs(i.endLabel, i.endMonth), win), borderRadius: 6, background: t.tint, border: `1px solid ${t.bar}`, overflow: "hidden" }}>
                   {i.progress !== null && <div style={{ height: "100%", width: `${i.progress}%`, background: t.bar }} />}
                 </div>
               </div>
@@ -483,6 +581,9 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
 
 // ---- Program schedule (aggregate) ------------------------------------------
 function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones: Milestone[] }) {
+  const win = useWin();
+  const gb = gridBg(win);
+  const msBase = yearOf(win.start) * 12;
   if (rows.length === 0) return <Note text="No projects in this program, or no program selected." />;
   return (
     <div style={{ display: "flex" }}>
@@ -522,26 +623,27 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
       {/* right grid */}
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+        <div style={{ position: "relative", ...gb }}>
           <NowLine />
           {rows.map((r) => {
             const hasWindow = r.startMonth != null && r.endMonth != null;
             const empty = !hasWindow && r.phases.length === 0 && (r.sprints?.length ?? 0) === 0;
+            const base = yearOf(absOfIso(r.startDate) ?? win.start) * 12;   // this row's anchor year
             return (
               <div key={r.projectId}>
                 <div style={{ height: 30, borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
                 {hasWindow && (
                   <div style={{ position: "relative", height: 30, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
-                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barStyle(Math.min(r.startMonth!, r.endMonth!), Math.max(r.startMonth!, r.endMonth!)), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
+                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barAbs(absOfIso(r.startDate) ?? base + Math.min(r.startMonth!, r.endMonth!), absOfIso(r.endDate) ?? base + Math.max(r.startMonth!, r.endMonth!), win), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
                   </div>
                 )}
-                {r.phases.map((p) => <PhaseBar key={p.id} phase={p} />)}
+                {r.phases.map((p) => <PhaseBar key={p.id} phase={p} base={base} />)}
                 {(r.sprints ?? []).map((s) => {
                   const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
                   return (
-                    <div key={s.id} style={{ position: "relative", height: 34, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+                    <div key={s.id} style={{ position: "relative", height: 34, ...gb }}>
                       <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                        style={{ ...barStyle(s.startMonth, s.endMonth), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                        style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                     </div>
                   );
                 })}
@@ -551,12 +653,16 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
           })}
         </div>
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
-          {milestones.map((ms) => (
-            <div key={ms.id} style={{ position: "absolute", top: 0, left: `${(ms.month + 0.5) / 12 * 100}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
+          {milestones.map((ms) => {
+            const p = centerPct(absOfIso(ms.date) ?? msBase + ms.month, win);
+            if (p === null) return null;
+            return (
+            <div key={ms.id} style={{ position: "absolute", top: 0, left: `${p}%`, transform: "translateX(-50%)", width: 90, textAlign: "center" }}>
               <span style={{ display: "block", width: 14, height: 14, background: "#E0A100", transform: "rotate(45deg)", margin: "12px auto 0", border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.22)" }} />
               <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: color.text, whiteSpace: "nowrap", marginTop: 8, overflow: "hidden", textOverflow: "ellipsis" }}>{ms.label}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -664,19 +770,22 @@ function SprintView({ projectId }: { projectId: string }) {
 
 // ---- Task timeline (project tasks placed by their own dates) ---------------
 function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boolean }) {
+  const win = useWin();
+  const gb = gridBg(win);
   const nowM = new Date().getMonth();
+  const yBase = yearOf(win.start) * 12;   // anchor undated tasks to the window year
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const statuses = useMemo(() => Array.from(new Set(tasks.map((t) => t.status).filter(Boolean))), [tasks]);
   const rows = useMemo(() => tasks
     .filter((t) => statusFilter === "all" || t.status === statusFilter)
     .map((t) => {
-      const a = monthOfIso(t.startDate), b = monthOfIso(t.targetDate);
-      const scheduled = a !== null || b !== null;
-      const s = a ?? b ?? nowM, e = b ?? a ?? nowM;
-      return { ...t, startMonth: Math.min(s, e), endMonth: Math.max(s, e), scheduled };
+      const aa = absOfIso(t.startDate), ab = absOfIso(t.targetDate);
+      const scheduled = aa !== null || ab !== null;
+      const as = aa ?? ab ?? (yBase + nowM), ae = ab ?? aa ?? (yBase + nowM);
+      return { ...t, absStart: Math.min(as, ae), absEnd: Math.max(as, ae), scheduled };
     })
-    .sort((x, y) => x.startMonth - y.startMonth || x.code.localeCompare(y.code)),
-  [tasks, statusFilter, nowM]);
+    .sort((x, y) => x.absStart - y.absStart || x.code.localeCompare(y.code)),
+  [tasks, statusFilter, nowM, yBase]);
 
   if (!hasProject) return <Note text="Select a project." />;
   if (tasks.length === 0) return <Note text="No tasks for this project yet. Tasks (created here or synced from Jira) will appear on this timeline." />;
@@ -714,14 +823,14 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
         {/* right grid */}
         <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
           <MonthHeader />
-          <div style={{ position: "relative", height: rowsHeight, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "8.3333% 100%" }}>
+          <div style={{ position: "relative", height: rowsHeight, ...gb }}>
             <NowLine />
             {rows.map((t) => {
               const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
               return (
                 <div key={t.id} style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                   <div title={`${t.code} ${t.name} · ${t.status}${t.scheduled ? "" : " · unscheduled"}`}
-                    style={{ ...barStyle(t.startMonth, t.endMonth), top: 8, height: 18, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}`, opacity: t.scheduled ? 1 : 0.5, display: "flex", alignItems: "center", paddingLeft: 7, fontSize: 10, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>
+                    style={{ ...barAbs(t.absStart, t.absEnd, win), top: 8, height: 18, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}`, opacity: t.scheduled ? 1 : 0.5, display: "flex", alignItems: "center", paddingLeft: 7, fontSize: 10, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>
                     {t.status}
                   </div>
                 </div>
@@ -792,5 +901,7 @@ function Legend({ swatch, children }: { swatch: React.ReactNode; children: React
   return <span style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch}{children}</span>;
 }
 const selectStyle: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.primary, background: color.surface, cursor: "pointer", maxWidth: 280 };
+const winInput: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 7, padding: "5px 8px", fontSize: 12, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer" };
+const winBtn: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "5px 10px", borderRadius: 7, border: `1px solid ${color.border}`, background: color.surface, color: color.textMuted };
 const addBtn: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: color.primary, background: color.primaryTint, border: `1px solid ${color.primaryTint2}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", textTransform: "none", letterSpacing: 0 };
 const lbl: React.CSSProperties = { display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 };
