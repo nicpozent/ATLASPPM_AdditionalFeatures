@@ -102,6 +102,22 @@ public class LaborCostingTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Rate_card_platform_admin_sees_and_edits_every_line()
+    {
+        var admin = As("admin");
+        var view = await admin.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
+        Assert.True(view.GetProperty("canEdit").GetBoolean());
+        var disc = view.GetProperty("disciplines").EnumerateArray().Select(x => x.GetString()).ToList();
+        foreach (var d in new[] { "infraSweden", "infraApac", "infraCh", "devSweden", "devApac", "devBlog", "devCh", "architectSweden", "architectCh", "pmSweden", "pmCh", "poSweden", "poCh" })
+            Assert.Contains(d, disc);
+        // Admin can persist any line (the superuser who manages the card).
+        var put = await admin.PutAsJsonAsync("/api/v1/labor-rates", new { rates = new Dictionary<string, decimal> { ["infraCh.expert"] = 130m } });
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        var after = await admin.GetFromJsonAsync<JsonElement>("/api/v1/labor-rates");
+        Assert.Equal(130m, after.GetProperty("rates").GetProperty("infraCh.expert").GetDecimal());
+    }
+
+    [Fact]
     public async Task Rate_card_hidden_and_uneditable_for_roles_without_an_owned_discipline()
     {
         var stk = As("stakeholder");
