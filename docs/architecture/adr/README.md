@@ -64,5 +64,7 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0055](./0055-need-to-know-labour-rates.md) | Need-to-know internal-labour rate card (per-discipline view+edit, +Architect/PM/PO) | Accepted |
 | [0056](./0056-per-profile-dark-mode.md) | Per-profile dark mode via CSS variables (no global stylesheet) | Accepted |
 | [0057](./0057-region-scoped-labour-rates.md) | Region-scoped labour rate lines + regional manager roles (APAC/BLOG) | Accepted |
+| [0058](./0058-five-year-calendar-timeline-window.md) | Calendar timeline window (up to 5 years) on an absolute-month model | Accepted |
+| [0059](./0059-task-lifecycle-timeline.md) | Task lifecycle timeline + Jira changelog-derived started/resolved timestamps | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

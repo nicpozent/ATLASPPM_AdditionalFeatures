@@ -31,8 +31,9 @@ npm run dev               # http://localhost:5173
   `src/auth.ts` (Entra/MSAL, disabled by default).
 - **All screens built & data-wired** — `src/screens/*.tsx` implement each screen
   against `/api/v1` with loading/empty/error states (empty by default until data
-  loads). See `docs/architecture/` (HLD/LLD/ADRs), `docs/application-evaluation.md`
-  and `docs/user-stories.md` for the full picture.
+  loads). See `docs/architecture/` (HLD/LLD/ABB-SBB/ADRs), `docs/requirements.md`
+  (functional/non-functional/candidate), `docs/application-evaluation.md` and
+  `docs/user-stories.md` for the full picture.
 
 ## The reference
 

@@ -161,6 +161,19 @@ full (F) levels. Authorization is always server-side.
   projects, tasks and sprints, so that cross-project schedule is visible._
 - **US-GANTT-5** — _As a **PM**, I want Resources and Sprints views on the timeline,
   so that I see allocation and cadence in context._
+- **US-GANTT-6** — _As a **PMO/PM**, I want to choose a calendar window of up to five
+  years (From/To + 1y/2y/3y/5y presets), so that I can see multi-year project,
+  programme and portfolio schedules end-to-end._
+  **Acceptance:** absolute-month layout spanning year boundaries; default is the
+  current year; items outside the window are clipped/hidden (ADR-0058)._
+- **US-GANTT-7** — _As a **PM**, I want the Tasks timeline to show each work-item's
+  lifecycle (created → work-started → resolved) rather than a flat bar, so that I
+  can see real progress and what's aging in the backlog._
+  **Acceptance:** age track + status-coloured active segment + created/started/
+  resolved markers; To-Do shows aging only; open runs to NOW; done ends at resolved;
+  sort + status filter; virtualized for large backlogs; `StartedAt` from the Jira
+  changelog's first status change and `ResolvedAt` from `resolutiondate`, best-effort
+  and populated on the next sync (ADR-0059)._
 
 ## 7. Programs
 

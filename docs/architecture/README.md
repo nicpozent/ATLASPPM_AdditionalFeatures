@@ -10,6 +10,7 @@ decision log and ARB sign-off) which customers use to govern *their* projects.
 | [Low Level Design (LLD)](./lld.md) | Data model, module/endpoint map, RBAC internals, request lifecycle, background jobs, sync algorithms, plus decisions & trade-offs | Engineers implementing/maintaining Atlas |
 | [Building Blocks (ABB / SBB)](./building-blocks.md) | TOGAF-style catalogue of Architecture Building Blocks and their Solution Building Block realisations, with a traceability matrix | Architects, procurement, assurance |
 | [ADR log](./adr/) | Architecture Decision Records — each significant decision, its context, options, decision and consequences | Everyone; the "why" behind the design |
+| [Requirements](../requirements.md) | Consolidated functional / non-functional / candidate requirements (SHALL/SHOULD/MAY), traced to ABB/SBB & ADRs | Product, assurance, reviewers |
 
 ## How these relate
 
