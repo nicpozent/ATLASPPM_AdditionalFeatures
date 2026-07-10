@@ -300,6 +300,36 @@ public class JiraSyncMappingTests
         Assert.Empty(Jira.SprintsFromIssue(fields, "customfield_10020"));
     }
 
+    [Fact]
+    public void Started_at_is_the_earliest_status_transition_in_the_changelog()
+    {
+        // Histories out of order; only status-field changes count. The earliest
+        // one (To Do → In Progress) is the start date, ignoring a later change
+        // and a non-status (assignee) history.
+        var issue = System.Text.Json.JsonDocument.Parse("""
+        {
+          "key": "GIT-329",
+          "changelog": { "histories": [
+            { "created": "2026-03-10T09:00:00.000+0000", "items": [{"field":"status","fromString":"In Progress","toString":"Done"}] },
+            { "created": "2026-02-01T08:30:00.000+0000", "items": [{"field":"status","fromString":"To Do","toString":"In Progress"}] },
+            { "created": "2026-01-15T08:00:00.000+0000", "items": [{"field":"assignee","toString":"Jane"}] }
+          ] }
+        }
+        """).RootElement;
+        Assert.Equal("2026-02-01", Jira.StartedAtFromChangelog(issue));
+    }
+
+    [Fact]
+    public void Started_at_is_empty_without_a_changelog_or_status_change()
+    {
+        var noLog = System.Text.Json.JsonDocument.Parse("""{"key":"GIT-1"}""").RootElement;
+        Assert.Equal("", Jira.StartedAtFromChangelog(noLog));
+        var noStatus = System.Text.Json.JsonDocument.Parse("""
+        { "changelog": { "histories": [ { "created": "2026-02-01T08:00:00.000+0000", "items": [{"field":"assignee","toString":"Jane"}] } ] } }
+        """).RootElement;
+        Assert.Equal("", Jira.StartedAtFromChangelog(noStatus));
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(-5, 0)]

@@ -59,7 +59,10 @@ public record ProjectTaskDto(int Id, string Code, string Name, string Epic, stri
     string Resolution = "", List<string>? Labels = null, List<string>? Components = null,
     List<string>? FixVersions = null, string ParentKey = "", string EpicKey = "",
     int TimeSpentHours = 0, string JiraKey = "", string JiraUrl = "", string JiraCreated = "",
-    string JiraUpdated = "", int AttachmentCount = 0, int CommentCount = 0);
+    string JiraUpdated = "", int AttachmentCount = 0, int CommentCount = 0,
+    // Lifecycle timestamps (Jira-synced): when work started (first status change)
+    // and when it was resolved/closed. Empty for backlog / locally-created rows.
+    string StartedAt = "", string ResolvedAt = "");
 public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
 public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At, bool FromJira = false);
 public record TaskAttachmentDto(int Id, string FileName, string ContentType, long Size, string Author, string CreatedAt);

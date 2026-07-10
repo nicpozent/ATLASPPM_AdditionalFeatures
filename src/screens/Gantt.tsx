@@ -1,4 +1,4 @@
-import { useState, useMemo, createContext, useContext } from "react";
+import { useState, useMemo, useRef, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
@@ -20,7 +20,7 @@ interface Opt { id: string; name: string; }
 interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
 type PortfolioCat = "all" | "project" | "program" | "product" | "release";
 interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
-interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; }
+interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; jiraCreated?: string; startedAt?: string; resolvedAt?: string; assignee?: string; }
 const TASK_BAR: Record<string, { bg: string; border: string }> = {
   "To Do":       { bg: color.neutralTint,  border: color.holdBorder },
   "In Progress": { bg: color.primaryTint2, border: color.primary },
@@ -58,6 +58,15 @@ function barAbs(a0: number, a1: number, win: Win): React.CSSProperties {
   const left = (s - win.start) / win.span * 100;
   const width = Math.max(0.7, (e - s + 1) / win.span * 100);
   return { position: "absolute", left: `${left}%`, width: `${width}%`, top: 9, height: 20 };
+}
+// Left/width (%) of a [a0,a1] span within the window, clipped to its edges, or
+// null when the span is fully outside. Like barAbs but geometry-only, so callers
+// can style their own height/top (used by the lifecycle bars' stacked segments).
+function segPct(a0: number, a1: number, win: Win): { left: number; width: number } | null {
+  const lo = Math.min(a0, a1), hi = Math.max(a0, a1), winEnd = win.start + win.span - 1;
+  if (hi < win.start || lo > winEnd) return null;
+  const s = Math.max(lo, win.start), e = Math.min(hi, winEnd);
+  return { left: (s - win.start) / win.span * 100, width: Math.max(0.6, (e - s + 1) / win.span * 100) };
 }
 const gridBg = (win: Win): React.CSSProperties => ({
   backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`,
@@ -769,31 +778,73 @@ function SprintView({ projectId }: { projectId: string }) {
 }
 
 // ---- Task timeline (project tasks placed by their own dates) ---------------
+// Order tasks are shown/sorted in.
+type TaskSort = "created" | "createdDesc" | "status" | "age";
+const TASK_SORTS: [TaskSort, string][] = [
+  ["created", "Created (oldest)"], ["createdDesc", "Created (newest)"],
+  ["status", "By status"], ["age", "Longest-running"],
+];
+const STATUS_ORDER: Record<string, number> = { "To Do": 0, "In Progress": 1, "In Review": 2, Blocked: 3, Done: 4 };
+const ROW_H = 34;
+const VIEWPORT_H = 520;   // scroll-window height for the virtualized body
+
+// The Tasks view is a LIFECYCLE timeline, not a duration Gantt: each work-item is
+// drawn along its real life — created → (work started) → resolved — because a Jira
+// issue rarely has a planned start/end span (which is why a plain bar looked like
+// noise). A faint track shows how long it has existed (age); the solid segment is
+// the active/working period; markers pin the created / started / resolved dates.
 function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boolean }) {
   const win = useWin();
   const gb = gridBg(win);
-  const nowM = new Date().getMonth();
-  const yBase = yearOf(win.start) * 12;   // anchor undated tasks to the window year
+  const now = nowAbs();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sort, setSort] = useState<TaskSort>("created");
+  const [scrollTop, setScrollTop] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const statuses = useMemo(() => Array.from(new Set(tasks.map((t) => t.status).filter(Boolean))), [tasks]);
-  const rows = useMemo(() => tasks
-    .filter((t) => statusFilter === "all" || t.status === statusFilter)
-    .map((t) => {
-      const aa = absOfIso(t.startDate), ab = absOfIso(t.targetDate);
-      const scheduled = aa !== null || ab !== null;
-      const as = aa ?? ab ?? (yBase + nowM), ae = ab ?? aa ?? (yBase + nowM);
-      return { ...t, absStart: Math.min(as, ae), absEnd: Math.max(as, ae), scheduled };
-    })
-    .sort((x, y) => x.absStart - y.absStart || x.code.localeCompare(y.code)),
-  [tasks, statusFilter, nowM, yBase]);
+
+  const rows = useMemo(() => {
+    const mapped = tasks
+      .filter((t) => statusFilter === "all" || t.status === statusFilter)
+      .map((t) => {
+        const isDone = t.status === "Done";
+        const cat: "todo" | "active" | "done" | "blocked" =
+          isDone ? "done" : t.status === "Blocked" ? "blocked" : t.status === "To Do" || !t.status ? "todo" : "active";
+        const createdA = absOfIso(t.jiraCreated) ?? absOfIso(t.startDate);
+        const startedA = absOfIso(t.startedAt);
+        const resolvedA = absOfIso(t.resolvedAt) ?? (isDone ? absOfIso(t.targetDate) : null);
+        const originA = createdA ?? startedA ?? resolvedA;
+        const endA = isDone ? (resolvedA ?? startedA ?? originA ?? now) : now;
+        // "todo" items have no active period — they're still sitting in the backlog.
+        const activeA = cat === "todo" ? null : (startedA ?? createdA ?? originA);
+        const scheduled = originA !== null;
+        const span = originA === null ? 0 : Math.max(0, (isDone ? (resolvedA ?? now) : now) - originA);
+        return { ...t, cat, createdA, startedA, resolvedA, originA, endA, activeA, scheduled, span };
+      });
+    const byCode = (a: typeof mapped[number], b: typeof mapped[number]) => a.code.localeCompare(b.code, undefined, { numeric: true });
+    const o = (v: number | null) => v ?? Number.POSITIVE_INFINITY;
+    switch (sort) {
+      case "createdDesc": return [...mapped].sort((a, b) => o(b.originA) - o(a.originA) || byCode(a, b));
+      case "status": return [...mapped].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) || o(a.originA) - o(b.originA) || byCode(a, b));
+      case "age": return [...mapped].sort((a, b) => b.span - a.span || byCode(a, b));
+      default: return [...mapped].sort((a, b) => o(a.originA) - o(b.originA) || byCode(a, b));
+    }
+  }, [tasks, statusFilter, sort, now]);
 
   if (!hasProject) return <Note text="Select a project." />;
   if (tasks.length === 0) return <Note text="No tasks for this project yet. Tasks (created here or synced from Jira) will appear on this timeline." />;
 
-  const rowsHeight = Math.max(120, rows.length * 34);
+  const total = rows.length * ROW_H;
+  const first = Math.max(0, Math.floor(scrollTop / ROW_H) - 8);
+  const last = Math.min(rows.length, Math.ceil((scrollTop + VIEWPORT_H) / ROW_H) + 8);
+  const visible = rows.slice(first, last);
+  const chip = (label: string, sw: React.ReactNode) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: color.faint2 }}>{sw}{label}</span>
+  );
+
   return (
     <div>
-      {/* status filter */}
+      {/* status filter + sort */}
       <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap", padding: "12px 22px", borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle, marginRight: 2 }}>Status</span>
         {(["all", ...statuses]).map((s) => {
@@ -802,43 +853,90 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
           return (
             <button key={s} onClick={() => setStatusFilter(s)} style={{
               fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "4px 11px", borderRadius: 20,
-              border: `1px solid ${active ? c.border : color.border}`, background: active ? (s === "all" ? color.primary : c.bg) : "#fff",
+              border: `1px solid ${active ? c.border : color.border}`, background: active ? (s === "all" ? color.primary : c.bg) : color.surface,
               color: active && s === "all" ? "#fff" : active ? c.border : color.textMuted,
             }}>{s === "all" ? "All" : s} · {s === "all" ? tasks.length : tasks.filter((t) => t.status === s).length}</button>
           );
         })}
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Sort</span>
+        <Select value={sort} onChange={(e) => setSort(e.target.value as TaskSort)} style={{ width: 168, height: 30, padding: "0 8px", fontSize: 12 }}>
+          {TASK_SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </Select>
       </div>
-      <div style={{ display: "flex" }}>
-        {/* left labels */}
-        <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
-          <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Task</div>
-          {rows.map((t) => (
-            <div key={t.id} style={{ height: 34, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
-              <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
-              <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
-              {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
-            </div>
-          ))}
+      {/* legend */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", padding: "7px 22px", borderBottom: `1px solid ${color.bg}` }}>
+        {chip("Created", <span style={{ width: 9, height: 9, borderRadius: 9, background: color.surface, border: `2px solid ${color.faint2}` }} />)}
+        {chip("Work started", <span style={{ width: 8, height: 8, background: color.primary, transform: "rotate(45deg)", display: "inline-block" }} />)}
+        {chip("Resolved", <span style={{ width: 9, height: 9, borderRadius: 9, background: color.success }} />)}
+        {chip("Active period", <span style={{ width: 18, height: 8, borderRadius: 3, background: color.primaryTint2, border: `1px solid ${color.primary}` }} />)}
+        {chip("Age", <span style={{ width: 18, height: 3, borderRadius: 2, background: color.border2 }} />)}
+        <span style={{ marginLeft: "auto", fontSize: 10.5, color: color.faint3 }}>Markers outside the selected dates are hidden — widen From / To above.</span>
+      </div>
+      {/* header row (label + months), non-scrolling */}
+      <div style={{ display: "flex", borderBottom: `1px solid ${color.bg}` }}>
+        <div style={{ width: LABEL_W, flex: "none", height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderRight: `1px solid ${color.bg}` }}>
+          Task · {rows.length}
         </div>
-        {/* right grid */}
-        <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
-          <MonthHeader />
-          <div style={{ position: "relative", height: rowsHeight, ...gb }}>
+        <div style={{ flex: 1, minWidth: 560 }}><MonthHeader /></div>
+      </div>
+      {/* virtualized scrolling body — only visible rows are rendered */}
+      <div ref={scrollRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        style={{ maxHeight: VIEWPORT_H, overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ display: "flex" }}>
+          {/* left labels */}
+          <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}`, position: "relative", height: total }}>
+            {visible.map((t, i) => (
+              <div key={t.id} style={{ position: "absolute", top: (first + i) * ROW_H, left: 0, right: 0, height: ROW_H, display: "flex", alignItems: "center", gap: 8, padding: "0 14px 0 22px", borderBottom: `1px solid ${color.surfaceAlt}`, boxSizing: "border-box" }}>
+                <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint3, flex: "none" }}>{t.code}</span>
+                <span style={{ flex: 1, fontSize: 12, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+                {t.sprint && <span style={{ fontSize: 9.5, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.sprint}</span>}
+              </div>
+            ))}
+          </div>
+          {/* right grid */}
+          <div style={{ flex: 1, minWidth: 560, position: "relative", height: total, ...gb }}>
             <NowLine />
-            {rows.map((t) => {
-              const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
-              return (
-                <div key={t.id} style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}` }}>
-                  <div title={`${t.code} ${t.name} · ${t.status}${t.scheduled ? "" : " · unscheduled"}`}
-                    style={{ ...barAbs(t.absStart, t.absEnd, win), top: 8, height: 18, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}`, opacity: t.scheduled ? 1 : 0.5, display: "flex", alignItems: "center", paddingLeft: 7, fontSize: 10, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>
-                    {t.status}
-                  </div>
-                </div>
-              );
-            })}
+            {visible.map((t, i) => (
+              <TaskLifeRow key={t.id} t={t} top={(first + i) * ROW_H} win={win} now={now} />
+            ))}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// One task's lifecycle row: faint age track + active segment + created/started/
+// resolved markers, all positioned by real dates within the window.
+function TaskLifeRow({ t, top, win, now }: {
+  t: { code: string; name: string; status: string; cat: "todo" | "active" | "done" | "blocked"; scheduled: boolean;
+    createdA: number | null; startedA: number | null; resolvedA: number | null; originA: number | null; endA: number; activeA: number | null;
+    jiraCreated?: string; startedAt?: string; resolvedAt?: string };
+  top: number; win: Win; now: number;
+}) {
+  const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
+  const track = t.originA === null ? null : segPct(t.originA, t.endA, win);
+  const active = t.activeA === null ? null : segPct(t.activeA, t.endA, win);
+  const createdPct = t.originA === null ? null : centerPct(t.originA, win);
+  const startedPct = t.startedA !== null && t.originA !== null && t.startedA > t.originA && t.cat !== "todo" ? centerPct(t.startedA, win) : null;
+  const resolvedPct = t.cat === "done" && t.resolvedA !== null ? centerPct(t.resolvedA, win) : null;
+  const ageMonths = t.originA === null ? 0 : Math.max(0, (t.cat === "done" ? (t.resolvedA ?? now) : now) - (t.activeA ?? t.originA));
+  const tip = [`${t.code} ${t.name}`, t.status,
+    t.jiraCreated ? `Created ${t.jiraCreated}` : "", t.startedAt ? `Started ${t.startedAt}` : "",
+    t.resolvedAt ? `Resolved ${t.resolvedAt}` : (t.cat !== "done" && t.originA !== null ? `Open ${ageMonths}mo` : ""),
+    !t.scheduled ? "No dates" : ""].filter(Boolean).join(" · ");
+  const dot = (pct: number, style: React.CSSProperties) => (
+    <div title={tip} style={{ position: "absolute", left: `${pct}%`, marginLeft: -5, zIndex: 3, ...style }} />
+  );
+  return (
+    <div style={{ position: "absolute", top, left: 0, right: 0, height: ROW_H, borderBottom: `1px solid ${color.surfaceAlt}`, boxSizing: "border-box" }}>
+      {track && <div title={tip} style={{ position: "absolute", left: `${track.left}%`, width: `${track.width}%`, top: 15, height: 4, borderRadius: 2, background: color.border2 }} />}
+      {active && <div title={tip} style={{ position: "absolute", left: `${active.left}%`, width: `${active.width}%`, top: 9, height: 16, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />}
+      {createdPct !== null && dot(createdPct, { top: 10.5, width: 9, height: 9, borderRadius: 9, background: color.surface, border: `2px solid ${tc.border}`, boxSizing: "border-box" })}
+      {startedPct !== null && dot(startedPct, { top: 11, width: 8, height: 8, marginLeft: -4, background: color.primary, transform: "rotate(45deg)" })}
+      {resolvedPct !== null && dot(resolvedPct, { top: 10.5, width: 9, height: 9, borderRadius: 9, background: color.success })}
+      {!t.scheduled && <span style={{ position: "absolute", left: 6, top: 9, fontSize: 10, color: color.faint3, fontStyle: "italic" }}>No dates</span>}
     </div>
   );
 }

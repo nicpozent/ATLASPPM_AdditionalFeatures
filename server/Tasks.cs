@@ -283,7 +283,8 @@ public static class Tasks
             t.StartDate, t.TargetDate, t.Points, t.Size, t.EstimateHours, onLeave, assigneeKnown,
             t.Description, t.IssueType, t.Reporter, t.StatusName, t.Resolution,
             t.Labels, t.Components, t.FixVersions, t.ParentKey, t.EpicKey,
-            t.TimeSpentHours, t.JiraKey, t.JiraUrl, t.JiraCreated, t.JiraUpdated, atts, coms);
+            t.TimeSpentHours, t.JiraKey, t.JiraUrl, t.JiraCreated, t.JiraUpdated, atts, coms,
+            t.StartedAt, t.ResolvedAt);
     }
 
     // The assignee is "on leave" if any of their absences overlaps the task's
