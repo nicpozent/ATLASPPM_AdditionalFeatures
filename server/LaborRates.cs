@@ -78,26 +78,40 @@ public static class LaborRates
         ["cio"] = "cio", ["CIO"] = "cio",
     };
 
-    // The caller's fine rate-owning identities (a set — a user may hold several
-    // Entra roles). Auth on: every role claim; auth off: the X-Atlas-Role header.
-    static HashSet<string> RateIdentities(HttpContext http, IConfiguration cfg)
+    static HashSet<string> Resolve(string v)
     {
         var ids = new HashSet<string>();
-        void Add(string v) { if (!string.IsNullOrWhiteSpace(v) && RateRole.TryGetValue(v.Trim(), out var k)) ids.Add(k); }
-        if (cfg.GetValue("Auth:Enabled", false))
-            foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role))) Add(c.Value);
-        else
-            Add(http.Request.Headers["X-Atlas-Role"].ToString());
+        if (!string.IsNullOrWhiteSpace(v) && RateRole.TryGetValue(v.Trim(), out var k)) ids.Add(k);
         return ids;
     }
 
-    // Disciplines the caller may see/edit. Platform Admin sees & edits every line
-    // (the superuser who manages the card); CTO/CIO are in every line's owner
-    // list; each manager sees only the lines their identity owns. Empty ⇒ none.
+    // The active identity's fine rate-owning keys. The rate card follows the
+    // ACTIVE role so a Platform Admin — who owns no rate line, and therefore sees
+    // NOTHING as themselves — can preview a role's rates by switching to it:
+    //   • auth off (dev): the X-Atlas-Role switcher IS the identity;
+    //   • auth on: the Entra role claims are authoritative, so a real manager is
+    //     pinned to their own lines and can't elevate via the header — EXCEPT a
+    //     Platform Admin, who may impersonate any role through the switcher.
+    // Need-to-know UI filter, not a hard security boundary (ADR-0057).
+    static HashSet<string> RateIdentities(HttpContext http, IConfiguration cfg)
+    {
+        var header = http.Request.Headers["X-Atlas-Role"].ToString();
+        if (!cfg.GetValue("Auth:Enabled", false)) return Resolve(header);
+
+        var tokenIds = new HashSet<string>();
+        foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role)))
+            if (RateRole.TryGetValue(c.Value, out var k)) tokenIds.Add(k);
+        // A Platform Admin may impersonate via the switcher; everyone else is
+        // pinned to their real role claims (the header can't grant them a line).
+        if (tokenIds.Contains("admin") && !string.IsNullOrWhiteSpace(header)) return Resolve(header);
+        return tokenIds;
+    }
+
+    // Disciplines the active identity may see/edit — exactly the lines whose owner
+    // list contains it. CTO/CIO are in every line's list (they see all); Platform
+    // Admin is in NO line's list (owns none), so it sees nothing. Empty ⇒ none.
     static string[] VisibleDisciplines(HashSet<string> ids) =>
-        ids.Contains("admin")
-            ? Disciplines
-            : Disciplines.Where(d => Access.TryGetValue(d, out var roles) && roles.Any(ids.Contains)).ToArray();
+        Disciplines.Where(d => Access.TryGetValue(d, out var roles) && roles.Any(ids.Contains)).ToArray();
 
     public static void MapLaborRateEndpoints(this RouteGroupBuilder api)
     {
