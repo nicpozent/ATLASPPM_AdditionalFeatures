@@ -62,6 +62,7 @@ prototype.
 
 Setup & ops guides live in [`docs/`](./docs/) (setup, docker, sso, secrets,
 observability, retention, security hardening, Jira, [notification email via
-Microsoft Graph](./docs/email-graph-setup.md)). The **architecture reference**
+Microsoft Graph](./docs/email-graph-setup.md), [Teams channel
+notifications](./docs/teams-setup.md)). The **architecture reference**
 — High Level Design, Low Level Design, ABB/SBB catalogue and ADRs, with diagrams —
 is in [`docs/architecture/`](./docs/architecture/).

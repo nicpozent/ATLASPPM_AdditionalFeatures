@@ -66,5 +66,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0057](./0057-region-scoped-labour-rates.md) | Region-scoped labour rate lines + regional manager roles (APAC/BLOG) | Accepted |
 | [0058](./0058-five-year-calendar-timeline-window.md) | Calendar timeline window (up to 5 years) on an absolute-month model | Accepted |
 | [0059](./0059-task-lifecycle-timeline.md) | Task lifecycle timeline + Jira changelog-derived started/resolved timestamps | Accepted |
+| [0060](./0060-teams-notification-channel.md) | Microsoft Teams as a third notification channel (channel webhook + Adaptive Card) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

@@ -94,6 +94,21 @@ export default function Integrations() {
     onError: (e) => toast((e as Error).message, "error"),
   });
 
+  // Microsoft Teams is a live connector: a channel webhook turns every Atlas
+  // notification into an Adaptive Card in a Teams channel (ADR-0060). The raw
+  // webhook URL is never returned — status carries only a masked host + flags.
+  const { data: teams } = useQuery({
+    queryKey: ["teams-status"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ configured: boolean; enabled: boolean; host: string; canManage: boolean }> =>
+      (await api<{ configured: boolean; enabled: boolean; host: string; canManage: boolean }>("/integrations/teams/status")) ?? { configured: false, enabled: false, host: "", canManage: false },
+  });
+  const testTeams = useMutation({
+    mutationFn: () => api<{ ok: boolean; error?: string }>("/integrations/teams/test", { method: "POST" }),
+    onSuccess: (r) => toast(r?.ok ? "Test posted to the Teams channel." : (r?.error ?? "Teams test failed."), r?.ok ? "info" : "error"),
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const [configuringTeams, setConfiguringTeams] = useState(false);
+
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto" }}>
       {/* Identity & platform */}
@@ -202,6 +217,39 @@ export default function Integrations() {
               </div>
             );
           }
+          // Microsoft Teams is wired to the real backend (channel webhook config
+          // + live test). Configured ⇒ notifications post as Adaptive Cards.
+          if (a.name === "Microsoft Teams") {
+            const configured = !!teams?.configured;
+            const live = configured && !!teams?.enabled;
+            const detail = configured && teams?.host ? `Channel webhook · ${teams.host}` : a.detail;
+            return (
+              <div key={a.name} style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.lg, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: a.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", fontFamily: font.head, fontSize: 15, fontWeight: 700 }}>{a.initials}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+                  <div style={{ fontSize: 12, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{detail}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: live ? "#0B6B37" : color.subtle, background: live ? color.successTint : color.neutralTint, padding: "3px 10px", borderRadius: 20 }}>{live ? "Connected" : configured ? "Muted" : "Not connected"}</span>
+                  <button
+                    onClick={() => teams?.canManage && setConfiguringTeams(true)}
+                    disabled={!teams?.canManage}
+                    title={teams?.canManage ? "Set the Teams channel webhook & delivery" : "Needs Edit on Integrations & connectors"}
+                    style={{ fontSize: 12, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.primaryTint2}`, padding: "7px 12px", borderRadius: 8, cursor: teams?.canManage ? "pointer" : "not-allowed", opacity: teams?.canManage ? 1 : 0.6, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                  >Configure</button>
+                  {configured && (
+                    <button
+                      onClick={() => testTeams.mutate()}
+                      disabled={testTeams.isPending || !teams?.canManage}
+                      title={teams?.canManage ? "Post a test card to the channel" : "Needs Edit on Integrations & connectors"}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: testTeams.isPending || !teams?.canManage ? "not-allowed" : "pointer", opacity: testTeams.isPending || !teams?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                    >{testTeams.isPending ? "Sending…" : "Send test"}</button>
+                  )}
+                </div>
+              </div>
+            );
+          }
           const on = !!connected[a.name];
           const toggle = () => setConnected((s) => ({ ...s, [a.name]: !s[a.name] }));
           return (
@@ -225,6 +273,79 @@ export default function Integrations() {
 
       {jira?.configured && <DiscoverJira />}
       {ado?.configured && <DiscoverAdo />}
+
+      {configuringTeams && (
+        <ConfigureTeamsModal
+          enabled={!!teams?.enabled}
+          configured={!!teams?.configured}
+          onClose={() => setConfiguringTeams(false)}
+          onDone={() => { setConfiguringTeams(false); qc.invalidateQueries({ queryKey: ["teams-status"] }); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---- Microsoft Teams channel configuration (ADR-0060) ----------------------
+function ConfigureTeamsModal({ enabled, configured, onClose, onDone }: { enabled: boolean; configured: boolean; onClose: () => void; onDone: () => void }) {
+  // The webhook URL is write-only — the server never returns it — so the field
+  // starts blank: leave it empty to keep the stored URL, or paste a new one.
+  const [webhook, setWebhook] = useState("");
+  // Default delivery ON for a first-time setup so paste-and-save just works;
+  // for an already-configured channel, reflect its current state.
+  const [on, setOn] = useState(configured ? enabled : true);
+
+  const save = useMutation({
+    mutationFn: () => api("/integrations/teams/config", {
+      method: "POST",
+      body: JSON.stringify({
+        // Only send the URL when the user typed one (blank ⇒ leave unchanged).
+        ...(webhook.trim() ? { webhookUrl: webhook.trim() } : {}),
+        enabled: on,
+      }),
+    }),
+    onSuccess: () => { toast("Teams channel saved.", "info"); onDone(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const clear = useMutation({
+    mutationFn: () => api("/integrations/teams/config", { method: "POST", body: JSON.stringify({ webhookUrl: "" }) }),
+    onSuccess: () => { toast("Teams channel disconnected.", "info"); onDone(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(17,22,60,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: color.surface, borderRadius: 14, padding: 22, width: 480, maxWidth: "92vw" }}>
+        <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Microsoft Teams channel</div>
+        <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Post every Atlas notification to a Teams channel as an Adaptive Card.</div>
+
+        <div style={{ fontSize: 12, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>Incoming webhook URL</div>
+        <input
+          value={webhook}
+          onChange={(e) => setWebhook(e.target.value)}
+          type="url"
+          placeholder={configured ? "•••••••• (leave blank to keep current)" : "https://…/workflows/…"}
+          aria-label="Teams incoming webhook URL"
+          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${color.border}`, fontSize: 13, fontFamily: "inherit" }}
+        />
+        <div style={{ fontSize: 11, color: color.faint3, marginTop: 5, lineHeight: 1.5 }}>
+          In Teams, add <b>Workflows → “Post to a channel when a webhook request is received”</b> to the target channel and paste the generated URL here. See <b>docs/teams-setup.md</b>.
+        </div>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, cursor: "pointer" }}>
+          <Toggle on={on} onClick={() => setOn((v) => !v)} />
+          <span style={{ fontSize: 13, color: color.text }}>Deliver notifications to this channel</span>
+        </label>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 22 }}>
+          {configured && (
+            <button onClick={() => clear.mutate()} disabled={clear.isPending} style={{ fontSize: 13, fontWeight: 600, color: color.dangerInk, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: clear.isPending ? "not-allowed" : "pointer", fontFamily: "inherit", marginRight: "auto" }}>{clear.isPending ? "Disconnecting…" : "Disconnect"}</button>
+          )}
+          <div style={{ flex: configured ? "none" : 1 }} />
+          <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button onClick={() => save.mutate()} disabled={save.isPending || (!configured && !webhook.trim())} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: save.isPending || (!configured && !webhook.trim()) ? "not-allowed" : "pointer", opacity: save.isPending || (!configured && !webhook.trim()) ? 0.6 : 1, fontFamily: "inherit" }}>{save.isPending ? "Saving…" : "Save"}</button>
+        </div>
+      </div>
     </div>
   );
 }

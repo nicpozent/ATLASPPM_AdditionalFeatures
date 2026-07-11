@@ -132,6 +132,7 @@ AtlasTelemetry.RegisterQueueGauges(
     () => app.Services.GetRequiredService<JiraSyncQueue>().Pending,
     () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
+TeamsNotify.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
 // Apply migrations on startup. The web/all role owns the schema (a single
 // migrator avoids two containers racing Migrate()); the worker role skips this
