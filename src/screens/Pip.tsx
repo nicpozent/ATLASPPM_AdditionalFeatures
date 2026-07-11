@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font, chart } from "@/theme";
 import { Icon } from "@/components/Icon";
@@ -11,6 +11,9 @@ import {
   STATES, OBJ_STATUSES, DEP_STATUSES, LINK_TYPES, STATE_PILL, OBJ_PILL, DEP_COL,
   parseTs, toDisplay, confColor, isOverAllocated, iterationTotals, objectiveRollup, timelineSpan, barPos, monthTicks,
 } from "./pip/data";
+
+// Lazy so the SignalR client only loads when the live board is opened (ADR-0027).
+const ProgramBoard = lazy(() => import("./pip/ProgramBoard"));
 
 // ============================================================================
 //  Program Increment Planning (PIP) — quarterly PI planning across the whole
@@ -46,7 +49,7 @@ export default function Pip() {
   const { can } = usePermissions();
   const canEdit = can("cap-schedule", "E");
   const [selected, setSelected] = useState<number | null>(null);
-  const [tab, setTab] = useState<"objectives" | "calendar" | "capacity" | "dependencies">("objectives");
+  const [tab, setTab] = useState<"board" | "objectives" | "calendar" | "capacity" | "dependencies">("objectives");
   const [showNew, setShowNew] = useState(false);
   const [quickCreate, setQuickCreate] = useState<null | "project" | "program">(null);
   const canCreatePortfolio = can("cap-projects", "F");
@@ -112,6 +115,7 @@ export default function Pip() {
           <IncrementHeader inc={inc} canEdit={inc.canEdit} />
           <div style={{ display: "inline-flex", background: color.border3, borderRadius: 10, padding: 3, gap: 2, margin: "16px 0" }}>
             {([
+              ["board", "Program Board", 0],
               ["objectives", "PI Objectives", inc.objectiveList.length],
               ["calendar", "Calendar", inc.iterationList.length],
               ["capacity", "Capacity & Load", inc.iterationList.length],
@@ -123,6 +127,11 @@ export default function Pip() {
             ))}
           </div>
 
+          {tab === "board" && (
+            <Suspense fallback={<Card><EmptyBlock message="Loading board…" /></Card>}>
+              <ProgramBoard inc={inc} />
+            </Suspense>
+          )}
           {tab === "objectives" && <ObjectivesView inc={inc} />}
           {tab === "calendar" && <CalendarView inc={inc} />}
           {tab === "capacity" && <CapacityView inc={inc} />}

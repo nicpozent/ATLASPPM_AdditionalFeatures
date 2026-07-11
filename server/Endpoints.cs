@@ -56,6 +56,7 @@ public static class Endpoints
         api.MapCommentEndpoints();
         api.MapStakeholderEndpoints();
         api.MapPipEndpoints();
+        api.MapPiBoardEndpoints();
         api.MapResourceEndpoints();
         api.MapAvailabilityEndpoints();
         api.MapAllocationReportEndpoints();

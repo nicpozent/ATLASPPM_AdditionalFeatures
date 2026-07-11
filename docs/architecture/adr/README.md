@@ -67,5 +67,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0058](./0058-five-year-calendar-timeline-window.md) | Calendar timeline window (up to 5 years) on an absolute-month model | Accepted |
 | [0059](./0059-task-lifecycle-timeline.md) | Task lifecycle timeline + Jira changelog-derived started/resolved timestamps | Accepted |
 | [0060](./0060-teams-notification-channel.md) | Microsoft Teams as a third notification channel (channel webhook + Adaptive Card) | Accepted |
+| [0061](./0061-realtime-pi-program-board.md) | Real-time PI Program Board (SignalR presence/cursors + notify-and-refetch) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
