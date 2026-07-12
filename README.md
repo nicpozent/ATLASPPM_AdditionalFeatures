@@ -65,4 +65,5 @@ observability, retention, security hardening, Jira, [notification email via
 Microsoft Graph](./docs/email-graph-setup.md), [Teams channel
 notifications](./docs/teams-setup.md)). The **architecture reference**
 — High Level Design, Low Level Design, ABB/SBB catalogue and ADRs, with diagrams —
-is in [`docs/architecture/`](./docs/architecture/).
+is in [`docs/architecture/`](./docs/architecture/). Open engineering follow-ups
+are tracked in [`docs/pi-board-followups.md`](./docs/pi-board-followups.md).
