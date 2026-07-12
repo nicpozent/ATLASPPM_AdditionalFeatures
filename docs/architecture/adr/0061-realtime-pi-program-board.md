@@ -32,8 +32,11 @@ follow-up. Dependency arrows are drawn between lanes from the existing
 **presence**, **peer cursors**, and a **change ping**. Crucially, *no domain
 data travels over the hub* — all reads/writes still go through the REST API
 (`cap-schedule`), and the ping is contentless ("refetch"). Clients are grouped
-per increment (`pi:{id}`). Placement moves and dependency links call REST, then
-emit the ping so peers refetch the authoritative state (notify-and-refetch — no
+per increment (`pi:{id}`). The ping is **server-driven**: the REST mutation
+endpoints (objectives, dependencies, iterations, and board placement) call
+`BoardHub.NotifyGroupAsync` after committing, so a change reaches every open
+board whether it was made *on* the board or on another tab / by another API
+client — not just changes the board UI itself makes (notify-and-refetch — no
 CRDT). The client is lazy-loaded so the SignalR bundle only loads with the board.
 
 ## Security & compliance

@@ -71,11 +71,8 @@ export function useBoardRealtime(incrementId: number | null, myName: string, onC
     c.invoke("Cursor", incrementId, x, y).catch(() => {});
   }, [incrementId]);
 
-  // Tell peers I changed the board (after a successful REST write) so they refetch.
-  const notifyChanged = useCallback(() => {
-    const c = connRef.current;
-    if (c && incrementId != null) c.invoke("NotifyChanged", incrementId).catch(() => {});
-  }, [incrementId]);
-
-  return { peers, cursors: Object.values(cursors), connected, sendCursor, notifyChanged };
+  // Note: change broadcasts are server-driven — the REST mutation endpoints ping
+  // the increment group (BoardHub.NotifyGroupAsync), so the client doesn't relay
+  // changes over the hub. This hook only sources presence + cursors.
+  return { peers, cursors: Object.values(cursors), connected, sendCursor };
 }

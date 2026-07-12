@@ -38,12 +38,15 @@ export default function ProgramBoard({ inc }: { inc: IncrementDetail }) {
     qc.invalidateQueries({ queryKey: ["increment", inc.id] });
     qc.invalidateQueries({ queryKey: ["increment-board", inc.id] });
   }, [qc, inc.id]);
-  const { peers, cursors, connected, sendCursor, notifyChanged } = useBoardRealtime(inc.id, identity.name, onChanged);
+  // Peers are refreshed by the server-side broadcast (the REST mutation endpoints
+  // ping the increment group), so the client doesn't relay changes itself — it
+  // just optimistically refetches its own view for instant feedback.
+  const { peers, cursors, connected, sendCursor } = useBoardRealtime(inc.id, identity.name, onChanged);
 
   const move = useMutation({
     mutationFn: (v: { objectiveId: number; iterationId: number | null }) =>
       api(`/increments/${inc.id}/board/placement`, { method: "PUT", body: JSON.stringify(v) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["increment-board", inc.id] }); notifyChanged(); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["increment-board", inc.id] }),
     onError: toastError,
   });
 
@@ -194,7 +197,7 @@ export default function ProgramBoard({ inc }: { inc: IncrementDetail }) {
         <LinkDependencyModal
           incId={inc.id} from={linkFrom} to={linkTo}
           onClose={() => { setLinkFrom(null); setLinkTo(null); }}
-          onDone={() => { setLinkFrom(null); setLinkTo(null); qc.invalidateQueries({ queryKey: ["increment", inc.id] }); notifyChanged(); }}
+          onDone={() => { setLinkFrom(null); setLinkTo(null); qc.invalidateQueries({ queryKey: ["increment", inc.id] }); }}
         />
       )}
     </div>
