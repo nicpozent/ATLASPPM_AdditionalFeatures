@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -65,7 +66,7 @@ public static class PiBoard
         // Place an objective in an iteration column (or clear it → null moves the
         // card back to the "Unscheduled" column). Validates that both the
         // objective and the iteration belong to this increment before persisting.
-        api.MapPut("/increments/{id:int}/board/placement", async (int id, SetPlacementReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPut("/increments/{id:int}/board/placement", async (int id, SetPlacementReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.ProgramIncrements.AnyAsync(i => i.Id == id)) return Results.NotFound();
@@ -83,6 +84,7 @@ public static class PiBoard
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "PI Planning", "Moved board card",
                 $"objective {req.ObjectiveId} → {(req.IterationId?.ToString() ?? "unscheduled")}"));
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, id);
             return Results.NoContent();
         });
     }

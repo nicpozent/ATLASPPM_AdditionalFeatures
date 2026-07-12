@@ -45,6 +45,18 @@ public class BoardHub : Hub
 
     static string Group(int incrementId) => $"pi:{incrementId}";
 
+    // Broadcast a "board changed, refetch" ping to everyone viewing an increment,
+    // from OUTSIDE the hub (a REST mutation). This is how server-side changes —
+    // an objective edited on another tab, a dependency added via the API — reach
+    // open boards live, not just changes made on the board itself. Contentless,
+    // like the in-hub ping; peers refetch the authoritative state. Best-effort:
+    // a transport hiccup must never fail the originating write.
+    public static async Task NotifyGroupAsync(IHubContext<BoardHub> hub, int incrementId)
+    {
+        try { await hub.Clients.Group(Group(incrementId)).SendAsync("BoardChanged"); }
+        catch { /* the REST write already succeeded; the ping is advisory */ }
+    }
+
     // A stable, pleasant colour per connection (no identity leak — derived from
     // the opaque connection id, not from the user).
     static readonly string[] Palette =
@@ -109,15 +121,6 @@ public class BoardHub : Hub
         static double Clamp(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
         await Clients.OthersInGroup(Group(incrementId))
             .SendAsync("Cursor", Context.ConnectionId, Clamp(x), Clamp(y));
-    }
-
-    // A peer changed the board via REST (moved a card, edited a dependency, …).
-    // Relay a contentless ping so peers refetch from the authoritative API. No
-    // data rides the hub, so this can't be used to inject state.
-    public async Task NotifyChanged(int incrementId)
-    {
-        if (CurrentBoard != incrementId) return;
-        await Clients.OthersInGroup(Group(incrementId)).SendAsync("BoardChanged");
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

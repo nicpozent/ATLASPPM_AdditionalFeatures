@@ -168,8 +168,16 @@ public static class Backups
         });
 
         // ---- Operator settings (integration/backup toggles) ----------------
+        // Any signed-in user may read the operator toggles, but SECRET values
+        // (e.g. the Teams channel webhook URL) must never be returned here — the
+        // connector's own status endpoint exposes only a masked host. A key is
+        // treated as secret when it ends in "webhookurl"/"secret"/"token"/
+        // "password" (case-insensitive), so a new secret setting is redacted by
+        // default rather than leaking. See ADR-0060.
         api.MapGet("/settings", async (AtlasDbContext db) =>
-            Results.Ok(await db.Settings.ToDictionaryAsync(s => s.Key, s => s.Value)));
+            Results.Ok((await db.Settings.ToListAsync())
+                .Where(s => !IsSecretSetting(s.Key))
+                .ToDictionary(s => s.Key, s => s.Value)));
 
         api.MapPatch("/settings/{key}", async (string key, SettingReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
@@ -182,5 +190,14 @@ public static class Backups
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+    }
+
+    // A setting whose value is a secret and must not be returned by GET /settings.
+    // Suffix-based so future secret keys are redacted by default.
+    static readonly string[] SecretSettingSuffixes = { "webhookurl", "secret", "token", "password" };
+    static bool IsSecretSetting(string key)
+    {
+        var k = key.ToLowerInvariant();
+        return SecretSettingSuffixes.Any(suffix => k.EndsWith(suffix));
     }
 }

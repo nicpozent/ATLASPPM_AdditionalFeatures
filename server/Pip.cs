@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -119,7 +120,7 @@ public static class Pip
         });
 
         // ---- Iterations -------------------------------------------------------
-        api.MapPost("/increments/{id:int}/iterations", async (int id, CreateIterationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/increments/{id:int}/iterations", async (int id, CreateIterationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.ProgramIncrements.AnyAsync(i => i.Id == id)) return Results.NotFound();
@@ -133,10 +134,11 @@ public static class Pip
             };
             db.PiIterations.Add(it);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, id);
             return Results.Created($"/api/v1/increments/{id}", new PiIterationDto(it.Id, it.Name, it.StartDate, it.EndDate, it.Capacity, it.Load));
         });
 
-        api.MapPatch("/pi-iterations/{iterId:int}", async (int iterId, UpdateIterationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/pi-iterations/{iterId:int}", async (int iterId, UpdateIterationReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var it = await db.PiIterations.FindAsync(iterId);
@@ -151,21 +153,23 @@ public static class Pip
             if (req.Capacity is not null) it.Capacity = Math.Max(0, req.Capacity.Value);
             if (req.Load is not null) it.Load = Math.Max(0, req.Load.Value);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, it.IncrementId);
             return Results.Ok(new PiIterationDto(it.Id, it.Name, it.StartDate, it.EndDate, it.Capacity, it.Load));
         });
 
-        api.MapDelete("/pi-iterations/{iterId:int}", async (int iterId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapDelete("/pi-iterations/{iterId:int}", async (int iterId, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var it = await db.PiIterations.FindAsync(iterId);
             if (it is null) return Results.NotFound();
             db.PiIterations.Remove(it);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, it.IncrementId);
             return Results.NoContent();
         });
 
         // ---- Objectives -------------------------------------------------------
-        api.MapPost("/increments/{id:int}/objectives", async (int id, CreatePiObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/increments/{id:int}/objectives", async (int id, CreatePiObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.ProgramIncrements.AnyAsync(i => i.Id == id)) return Results.NotFound();
@@ -184,10 +188,11 @@ public static class Pip
             };
             db.PiObjectives.Add(o);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, id);
             return Results.Created($"/api/v1/increments/{id}", ToObjectiveDto(o, await LoadTargetsAsync(db), await LoadOkrTitlesAsync(db)));
         });
 
-        api.MapPatch("/pi-objectives/{objId:int}", async (int objId, UpdatePiObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/pi-objectives/{objId:int}", async (int objId, UpdatePiObjectiveReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var o = await db.PiObjectives.FindAsync(objId);
@@ -215,21 +220,24 @@ public static class Pip
             }
             if (req.ObjectiveLink is not null) o.ObjectiveLink = req.ObjectiveLink.Trim();
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, o.IncrementId);
             return Results.Ok(ToObjectiveDto(o, await LoadTargetsAsync(db), await LoadOkrTitlesAsync(db)));
         });
 
-        api.MapDelete("/pi-objectives/{objId:int}", async (int objId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapDelete("/pi-objectives/{objId:int}", async (int objId, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var o = await db.PiObjectives.FindAsync(objId);
             if (o is null) return Results.NotFound();
+            var incId = o.IncrementId;
             db.PiObjectives.Remove(o);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, incId);
             return Results.NoContent();
         });
 
         // ---- Dependencies -----------------------------------------------------
-        api.MapPost("/increments/{id:int}/dependencies", async (int id, CreateDependencyReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/increments/{id:int}/dependencies", async (int id, CreateDependencyReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.ProgramIncrements.AnyAsync(i => i.Id == id)) return Results.NotFound();
@@ -248,11 +256,12 @@ public static class Pip
             };
             db.PiDependencies.Add(d);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, id);
             var names = await LoadTargetsAsync(db);
             return Results.Created($"/api/v1/increments/{id}", ToDependencyDto(d, names));
         });
 
-        api.MapPatch("/pi-dependencies/{depId:int}", async (int depId, UpdateDependencyReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/pi-dependencies/{depId:int}", async (int depId, UpdateDependencyReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var d = await db.PiDependencies.FindAsync(depId);
@@ -282,17 +291,20 @@ public static class Pip
                 d.Status = req.Status;
             }
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, d.IncrementId);
             var names = await LoadTargetsAsync(db);
             return Results.Ok(ToDependencyDto(d, names));
         });
 
-        api.MapDelete("/pi-dependencies/{depId:int}", async (int depId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapDelete("/pi-dependencies/{depId:int}", async (int depId, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             var d = await db.PiDependencies.FindAsync(depId);
             if (d is null) return Results.NotFound();
+            var incId = d.IncrementId;
             db.PiDependencies.Remove(d);
             await db.SaveChangesAsync();
+            await BoardHub.NotifyGroupAsync(hub, incId);
             return Results.NoContent();
         });
     }
