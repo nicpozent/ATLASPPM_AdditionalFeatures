@@ -47,6 +47,7 @@ public static class Endpoints
         api.MapSubTeamEndpoints();
         api.MapJiraEndpoints();
         api.MapAzureDevOpsEndpoints();
+        api.MapTeamsConnectorEndpoints();
         api.MapNotificationEndpoints();
         api.MapHelpEndpoints();
         api.MapGdprEndpoints();
@@ -55,6 +56,7 @@ public static class Endpoints
         api.MapCommentEndpoints();
         api.MapStakeholderEndpoints();
         api.MapPipEndpoints();
+        api.MapPiBoardEndpoints();
         api.MapResourceEndpoints();
         api.MapAvailabilityEndpoints();
         api.MapAllocationReportEndpoints();

@@ -117,9 +117,31 @@ if (authEnabled)
         {
             o.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
             o.TokenValidationParameters.ValidAudiences = validAudiences;
+            // Browsers can't set an Authorization header on the WebSocket
+            // handshake, so the SignalR client passes the bearer token as an
+            // access_token query-string value on the hub URL. Accept it only for
+            // the hub path — everything else still requires the header (ADR-0061).
+            o.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = ctx =>
+                {
+                    var accessToken = ctx.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) &&
+                        ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        ctx.Token = accessToken;
+                    return Task.CompletedTask;
+                },
+            };
         });
     builder.Services.AddAuthorization();
 }
+
+// Real-time transport for the PI Program Board (presence, cursors, change
+// pings). No domain writes ride the hub — see BoardHub / ADR-0061. Force
+// camelCase payloads so the hub's Peer record matches the TS client's fields
+// regardless of the SignalR default.
+builder.Services.AddSignalR().AddJsonProtocol(o =>
+    o.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
 
 var app = builder.Build();
 var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Atlas.Startup");
@@ -132,6 +154,7 @@ AtlasTelemetry.RegisterQueueGauges(
     () => app.Services.GetRequiredService<JiraSyncQueue>().Pending,
     () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
+TeamsNotify.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
 // Apply migrations on startup. The web/all role owns the schema (a single
 // migrator avoids two containers racing Migrate()); the worker role skips this
@@ -211,7 +234,13 @@ app.MapGet("/readyz", async (AtlasDbContext db) =>
 // The API surface is served only by the web/all role; the worker exposes just
 // the liveness/readiness probes above (for orchestrator health checks).
 if (runWeb)
+{
     app.MapAtlasEndpoints();
+    // PI Program Board real-time hub. Same-origin (proxied at /hubs by nginx);
+    // requires auth in lock-step with the API when Auth:Enabled.
+    var board = app.MapHub<BoardHub>("/hubs/board");
+    if (authEnabled) board.RequireAuthorization();
+}
 
 startupLog.LogInformation("Atlas {Role} ready.", role);
 app.Run();

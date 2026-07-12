@@ -134,6 +134,7 @@ blanket disable:
 | `mutable-action-tag` | Semgrep `--exclude-rule` | Actions pinned to major versions, kept current by Dependabot's `github-actions` ecosystem; SHA-pinning deferred. |
 | `gha-curl-pipe-shell` | Semgrep `--exclude-rule` | Official Trivy installer over TLS from the vendor repo. |
 | nginx `request-host` / `dynamic-proxy-host` / `missing-internal` | Semgrep `--exclude-rule` | Standard same-origin reverse proxy; the `proxy_pass` upstream is an internal config value, not attacker input. |
+| nginx `possible-h2c-smuggling` | Semgrep `--exclude-rule` | Purely-syntactic rule that fires on any WebSocket proxy (`proxy_http_version 1.1` + `Upgrade` + `Connection` together), which the `/hubs` SignalR proxy requires. The actual h2c vector **is** mitigated: `$atlas_ws_upgrade`/`$atlas_ws_connection` maps emit `websocket`/`upgrade` only for a genuine WebSocket request and clear both headers for any other Upgrade token (incl. `h2c`), so a cleartext upgrade can't be smuggled to the backend (ADR-0061). |
 | `design/` (prototype reference) | `.semgrepignore` | The approved prototype (CLAUDE.md §2) — never bundled or served, so its demo helpers aren't application AppSec. |
 
 ### CodeQL (GitHub-native, complementary)

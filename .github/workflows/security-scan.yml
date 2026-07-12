@@ -51,6 +51,11 @@ jobs:
           #  - gha-curl-pipe-shell: the official Trivy installer over TLS.
           #  - nginx request-host/dynamic-proxy/missing-internal: standard
           #    same-origin reverse proxy; the upstream is an internal config value.
+          #  - nginx possible-h2c-smuggling: purely-syntactic rule that fires on
+          #    any WebSocket proxy (proxy_http_version 1.1 + Upgrade + Connection
+          #    together). The /hubs SignalR proxy needs those; the actual h2c
+          #    vector is mitigated by the $atlas_ws_upgrade/$atlas_ws_connection
+          #    maps that clear both headers for non-`websocket` Upgrade tokens.
           #  - dockerfile missing-user: nginx edge master binds 80/443 (see
           #    .trivyignore.yaml).
           semgrep scan --error \
@@ -62,6 +67,7 @@ jobs:
             --exclude-rule generic.nginx.security.request-host-used.request-host-used \
             --exclude-rule generic.nginx.security.dynamic-proxy-host.dynamic-proxy-host \
             --exclude-rule generic.nginx.security.missing-internal.missing-internal \
+            --exclude-rule generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling \
             --exclude-rule dockerfile.security.missing-user.missing-user \
             --metrics off \
             --oss-only \

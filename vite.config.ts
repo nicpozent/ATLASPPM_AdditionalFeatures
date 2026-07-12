@@ -36,6 +36,12 @@ export default defineConfig({
         target: process.env.VITE_API_PROXY || "http://localhost:8081",
         changeOrigin: true,
       },
+      // PI Program Board SignalR hub — needs WebSocket upgrade (ws: true).
+      "/hubs": {
+        target: process.env.VITE_API_PROXY || "http://localhost:8081",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });

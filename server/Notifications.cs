@@ -69,6 +69,7 @@ public static class Notifications
         }
         await db.SaveChangesAsync();
         await SendEmailsAsync(cfg, emails, title, body);
+        await TeamsNotify.EmitAsync(db, title, body);
     }
 
     // Deliver a portfolio event (e.g. created) to users who opted into it.
@@ -88,6 +89,7 @@ public static class Notifications
         }
         await db.SaveChangesAsync();
         await SendEmailsAsync(cfg, emails, title, body);
+        await TeamsNotify.EmitAsync(db, title, body);
     }
 
     // A notification addressed to a role rather than a person, so everyone
@@ -118,6 +120,7 @@ public static class Notifications
             db.Notifications.Add(NewRow(RolePrefix + k, ev, title, body, targetType, targetId));
         await db.SaveChangesAsync();
         await SendRoleEmailsAsync(db, cfg, ev, targets, title, body);
+        await TeamsNotify.EmitAsync(db, title, body);
     }
 
     // Resolve the people in the target roles (via the in-app group→role mapping)
