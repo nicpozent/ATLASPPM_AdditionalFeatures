@@ -109,7 +109,7 @@ export default function ProgramBoard({ inc }: { inc: IncrementDetail }) {
       {/* Toolbar: live status + presence + legend */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: connected ? color.successInk : color.faint }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? "#16A34A" : color.border2, boxShadow: connected ? "0 0 0 3px rgba(22,163,74,0.15)" : "none" }} />
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? color.success : color.border2, boxShadow: connected ? `0 0 0 3px ${color.successTint}` : "none" }} />
           {connected ? "Live" : "Offline"}
         </div>
         <PresenceRow peers={peers} />
