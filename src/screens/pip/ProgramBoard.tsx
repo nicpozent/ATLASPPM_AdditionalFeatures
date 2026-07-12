@@ -259,7 +259,7 @@ function LaneRow({
             onDragLeave={() => setOver((o) => (o === key ? null : o))}
             onDrop={canEdit ? (e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) onDropCard(id, c.id); } : undefined}
             style={{ padding: 8, borderBottom: `1px solid ${color.border}`, borderLeft: `1px solid ${color.border}`, background: over === key ? color.primaryTint : c.id == null ? color.bg : color.surface, minHeight: 64, display: "flex", flexDirection: "column", gap: 7 }}>
-            {cards.map((o) => <ObjectiveCard key={o.id} obj={o} canEdit={canEdit} />)}
+            {cards.map((o) => <ObjectiveCard key={o.id} obj={o} canEdit={canEdit} cols={cols} colId={c.id} onMove={onDropCard} />)}
           </div>
         );
       })}
@@ -267,7 +267,11 @@ function LaneRow({
   );
 }
 
-function ObjectiveCard({ obj, canEdit }: { obj: Objective; canEdit: boolean }) {
+function ObjectiveCard({ obj, canEdit, cols, colId, onMove }: {
+  obj: Objective; canEdit: boolean;
+  cols: { id: number | null; name: string }[]; colId: number | null;
+  onMove: (objId: number, colId: number | null) => void;
+}) {
   const pill = OBJ_PILL[obj.status] ?? OBJ_PILL.Planned;
   return (
     <div draggable={canEdit}
@@ -279,6 +283,18 @@ function ObjectiveCard({ obj, canEdit }: { obj: Objective; canEdit: boolean }) {
         <span title="Business value" style={{ fontSize: 10, fontWeight: 700, color: color.subtle, background: color.bg, padding: "2px 7px", borderRadius: 5, fontFamily: font.mono }}>BV {obj.businessValue}</span>
         {!obj.committed && <span style={{ fontSize: 10, fontWeight: 700, color: color.faint, background: color.bg, padding: "2px 7px", borderRadius: 5 }}>Stretch</span>}
       </div>
+      {/* Keyboard-accessible alternative to dragging: move the card between
+          iterations from a native select (mouse users can still drag). */}
+      {canEdit && (
+        <select
+          value={colId == null ? "" : String(colId)}
+          onChange={(e) => onMove(obj.id, e.target.value === "" ? null : Number(e.target.value))}
+          aria-label={`Move “${obj.title}” to iteration`}
+          style={{ marginTop: 7, width: "100%", fontSize: 10.5, fontFamily: "inherit", color: color.subtle, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 6, padding: "3px 5px", cursor: "pointer" }}
+        >
+          {cols.map((c) => <option key={String(c.id)} value={c.id == null ? "" : String(c.id)}>{c.name}</option>)}
+        </select>
+      )}
     </div>
   );
 }
