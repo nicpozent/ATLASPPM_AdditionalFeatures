@@ -66,7 +66,10 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
 - **Individual development plans** — a per-person Strengths / Growth areas /
   Goals note on *My Team*, manager-scoped and **manager-visible only** (never
   shown to the person). Development-framed (not SWOT); sensitive personal data,
-  redacted + audited. See ADR-0062.
+  redacted + audited. See ADR-0062. Both Team SWOT and development plans are
+  **gated off by default** behind a personnel-data processing flag (Integrations
+  → Governance), enforced server-side, until DPIA + MBL §11 sign-off — see
+  ADR-0063 · `docs/compliance-sweden.md`.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs

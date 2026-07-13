@@ -37,13 +37,13 @@ export default function Teams() {
   const qc = useQueryClient();
   const { data: swot } = useQuery({
     queryKey: ["teamswot"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; items: Record<string, TeamSwot> }> =>
-      (await api<{ canEdit: boolean; items: Record<string, TeamSwot> }>("/teams/swot")) ?? { canEdit: false, items: {} },
+    queryFn: async (): Promise<{ enabled: boolean; canEdit: boolean; items: Record<string, TeamSwot> }> =>
+      (await api<{ enabled: boolean; canEdit: boolean; items: Record<string, TeamSwot> }>("/teams/swot")) ?? { enabled: false, canEdit: false, items: {} },
   });
   const { data: dev } = useQuery({
     queryKey: ["devplans"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; items: Record<string, DevPlan> }> =>
-      (await api<{ canEdit: boolean; items: Record<string, DevPlan> }>("/devplans")) ?? { canEdit: false, items: {} },
+    queryFn: async (): Promise<{ enabled: boolean; canEdit: boolean; items: Record<string, DevPlan> }> =>
+      (await api<{ enabled: boolean; canEdit: boolean; items: Record<string, DevPlan> }>("/devplans")) ?? { enabled: false, canEdit: false, items: {} },
   });
   const [devPlanFor, setDevPlanFor] = useState<string | null>(null);
 
@@ -92,7 +92,7 @@ export default function Teams() {
                               <div style={{ fontSize: 13, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.displayName}</div>
                               <div style={{ fontSize: 11.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.jobTitle || m.email || "—"}</div>
                             </div>
-                            {dev?.canEdit && (
+                            {dev?.enabled && dev?.canEdit && (
                               <button onClick={() => setDevPlanFor(m.displayName)} title="Development plan (managers only)" aria-label={`Development plan for ${m.displayName}`}
                                 style={{ border: "none", background: "transparent", color: dev.items[m.displayName] ? color.primary : color.faint2, cursor: "pointer", padding: 5, borderRadius: 7, lineHeight: 0, flex: "none" }}>
                                 <Icon name="userCheck" size={15} />
@@ -105,12 +105,14 @@ export default function Teams() {
                   ))}
                 </div>
               )}
-              <TeamSwotPanel
-                teamKey={t.key}
-                canEdit={!!swot?.canEdit}
-                swot={swot?.items[t.key]}
-                onSaved={() => qc.invalidateQueries({ queryKey: ["teamswot"] })}
-              />
+              {swot?.enabled && (
+                <TeamSwotPanel
+                  teamKey={t.key}
+                  canEdit={!!swot?.canEdit}
+                  swot={swot?.items[t.key]}
+                  onSaved={() => qc.invalidateQueries({ queryKey: ["teamswot"] })}
+                />
+              )}
             </Card>
           ))}
         </div>

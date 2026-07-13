@@ -135,6 +135,22 @@ export default function Integrations() {
         })}
       </div>
 
+      {/* Governance — personnel-data processing gate (SWOT & development plans) */}
+      <div style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 13 }}>Governance</div>
+      <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: radius.xl, padding: 19, marginBottom: 30, maxWidth: 720 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: color.ink, marginBottom: 6 }}>Personnel-data processing — Team SWOT &amp; development plans</div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.5, color: color.faint }}>Manager assessment features on <b>My Team</b>. These process sensitive employee personal data, so they stay <b>off</b> until your data-processing sign-off (DPIA + MBL §11 union negotiation). See <b>docs/compliance-sweden.md</b>.</div>
+          </div>
+          <Toggle on={settings["personnel.assessmentsEnabled"] === "true"} onClick={() => setSetting.mutate({ key: "personnel.assessmentsEnabled", value: settings["personnel.assessmentsEnabled"] !== "true" })} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: settings["personnel.assessmentsEnabled"] === "true" ? color.success : color.border2 }} />
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: settings["personnel.assessmentsEnabled"] === "true" ? "#0B6B37" : color.faint }}>{settings["personnel.assessmentsEnabled"] === "true" ? "Enabled" : "Disabled — pending data-processing approval"}</span>
+        </div>
+      </div>
+
       {/* Connected apps */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 13 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase" }}>Connected tools &amp; data sources</span>

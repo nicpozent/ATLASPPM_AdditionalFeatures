@@ -69,5 +69,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0060](./0060-teams-notification-channel.md) | Microsoft Teams as a third notification channel (channel webhook + Adaptive Card) | Accepted |
 | [0061](./0061-realtime-pi-program-board.md) | Real-time PI Program Board (SignalR presence/cursors + notify-and-refetch) | Accepted |
 | [0062](./0062-individual-development-plans.md) | Individual development plans (manager-scoped, development-framed, redacted) | Accepted |
+| [0063](./0063-personnel-data-processing-gate.md) | Personnel-data processing gate (SWOT/dev-plans off until DPIA + MBL sign-off) + Sweden compliance map | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

@@ -60,6 +60,15 @@ public static class Teams
         return DescendantsOf(mgr, await ParentMapAsync(db));
     }
 
+    // Compliance gate for the personnel-assessment features (Team SWOT +
+    // individual development plans). OFF by default: these process sensitive
+    // employee personal data, so they stay disabled until an org sign-off
+    // (DPIA + MBL §11 negotiation — see docs/compliance-sweden.md, ADR-0062/0063)
+    // sets this flag. A Platform Admin flips it in Integrations & Settings.
+    public const string PersonnelFlagKey = "personnel.assessmentsEnabled";
+    static async Task<bool> PersonnelEnabledAsync(AtlasDbContext db) =>
+        (await db.Settings.FindAsync(PersonnelFlagKey))?.Value == "true";
+
     // The distinct member display names the caller manages (members of any team
     // in their scope). The authorization set for individual development plans.
     public static async Task<HashSet<string>> MembersInScopeAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http)
@@ -284,6 +293,8 @@ public static class Teams
         // only ever read back through this scoped endpoint.
         api.MapGet("/teams/swot", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (!await PersonnelEnabledAsync(db))
+                return Results.Ok(new { enabled = false, canEdit = false, items = new Dictionary<string, TeamSwot>() });
             var scope = await ScopeAsync(db, cfg, http);
             var items = new Dictionary<string, TeamSwot>();
             foreach (var key in scope)
@@ -293,11 +304,13 @@ public static class Teams
                 try { if (JsonSerializer.Deserialize<TeamSwot>(raw) is { } s) items[key] = s; }
                 catch { /* tolerate a hand-edited/corrupt value */ }
             }
-            return Results.Ok(new { canEdit = scope.Count > 0, items });
+            return Results.Ok(new { enabled = true, canEdit = scope.Count > 0, items });
         });
 
         api.MapPut("/teams/{key}/swot", async (string key, SetSwotReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (!await PersonnelEnabledAsync(db))
+                return Results.Json(new { error = "Personnel-data features are disabled pending data-processing approval." }, statusCode: StatusCodes.Status403Forbidden);
             if (!IsValidSlot(key)) return Results.NotFound();
             var scope = await ScopeAsync(db, cfg, http);
             if (!scope.Contains(key))
@@ -326,6 +339,8 @@ public static class Teams
         // Development-focused framing on purpose (no weaknesses/threats).
         api.MapGet("/devplans", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (!await PersonnelEnabledAsync(db))
+                return Results.Ok(new { enabled = false, canEdit = false, items = new Dictionary<string, DevPlan>() });
             var names = await MembersInScopeAsync(db, cfg, http);
             var items = new Dictionary<string, DevPlan>();
             foreach (var name in names)
@@ -335,11 +350,13 @@ public static class Teams
                 try { if (JsonSerializer.Deserialize<DevPlan>(raw) is { } p) items[name] = p; }
                 catch { /* tolerate a hand-edited/corrupt value */ }
             }
-            return Results.Ok(new { canEdit = names.Count > 0, items });
+            return Results.Ok(new { enabled = true, canEdit = names.Count > 0, items });
         });
 
         api.MapPut("/devplans", async (SetDevPlanReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (!await PersonnelEnabledAsync(db))
+                return Results.Json(new { error = "Personnel-data features are disabled pending data-processing approval." }, statusCode: StatusCodes.Status403Forbidden);
             var person = (req.Person ?? "").Trim();
             if (person.Length == 0) return Results.BadRequest(new { error = "A person is required." });
             var names = await MembersInScopeAsync(db, cfg, http);
