@@ -10,6 +10,14 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      // Silence harmless /*#__PURE__*/ position warnings from the third-party
+      // @microsoft/signalr bundle (a vendor file we can't change — the build
+      // succeeds regardless; at worst two tiny fns don't tree-shake). Real
+      // warnings from our own code still surface.
+      onwarn(warning, defaultHandler) {
+        if (warning.code === "INVALID_ANNOTATION" && /@microsoft[\\/]signalr/.test(String(warning.id ?? warning.message ?? ""))) return;
+        defaultHandler(warning);
+      },
       output: {
         // Split the big, rarely-changing vendor libraries into their own chunks
         // so they cache independently of app code and don't bloat the entry
