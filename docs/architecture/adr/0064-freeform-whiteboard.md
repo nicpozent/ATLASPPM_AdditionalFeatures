@@ -89,3 +89,43 @@ Designed against the platform's control baseline
   brainstorming; notify-and-refetch reuses the proven board path.
 - **First-class `Whiteboard` table now** — deferred until a migration can be
   generated; the `Setting`-backed blob is the migration-free interim.
+
+## Addendum — live co-editing (granular authorized ops)
+
+**Status:** Accepted — extends this ADR. Replaces the first cut's
+notify-and-refetch / last-write-wins whole-scene save.
+
+The first cut PUT the entire scene on a debounce and adopted the server copy on a
+peer's "refetch" ping — so two people editing the same board could clobber each
+other's whole scene. Co-editing replaces that with **granular, authorized ops**:
+
+- **Per-item endpoints** (`server/Whiteboards.cs`): `PUT …/node`, `DELETE
+  …/node/{id}`, `PUT …/edge`, `DELETE …/edge/{id}`. Each is cap-checked and
+  sanitised (the same `SanitizeNode`/`SanitizeEdge` used by the bulk path),
+  persists just its item into the scene, and broadcasts the exact delta.
+- **Server-only op broadcast** (`BoardHub.NotifyRoomOpAsync`): the REST handler
+  emits an `Op` message (`{t:"node",node}` / `{t:"delNode",id}` / `{t:"edge",edge}`
+  / `{t:"delEdge",id}`) to the room. **Crucially, clients cannot send ops** —
+  there is no hub method to do so — so a peer only ever receives a change the
+  server already authorized and persisted. This keeps the hub's "no
+  client-originated domain writes" property intact and closes the obvious
+  escalation (a view-only user cannot inject an op that an editor peer would
+  persist), because persistence only ever happens through the cap-checked REST
+  call of the acting editor.
+- **Client** (`src/whiteboard/*`): each local edit applies optimistically, then
+  fires its granular REST op; a peer's `Op` is merged via the pure, unit-tested
+  `applyRemoteOp` (`scene.ts`). Remote *upserts* to the node the local user is
+  actively dragging/editing are skipped so a peer can't fight an in-progress
+  interaction; deletes still apply. On error or reconnect the client refetches
+  the whole scene to reconcile.
+
+**Convergence, not CRDT.** Concurrent edits to *different* items are fully
+independent. Concurrent edits to the *same* item are last-write-wins and
+reconcile on the next reconnect/refetch. This is a large step up from whole-scene
+LWW without the weight of a CRDT/OT engine.
+
+**Residual race.** Persistence is still a read-modify-write of the `Setting`
+scene blob, so two writers to the *same* scene within the same instant can still
+lose an update at the storage layer. The typed-table promotion (per-row writes)
+is the real fix and is tracked as a **pending follow-up**
+(`docs/pi-board-followups.md` §3).

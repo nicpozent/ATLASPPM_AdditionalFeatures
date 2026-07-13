@@ -89,6 +89,23 @@ public class BoardHub : Hub
     public static Task NotifyGroupAsync(IHubContext<BoardHub> hub, int incrementId) =>
         NotifyRoomAsync(hub, $"pi:{incrementId}");
 
+    // Broadcast an authorized collaboration op to everyone in a room so peers can
+    // apply the delta live — richer than the contentless BoardChanged ping, used
+    // for whiteboard co-editing (a node moved/edited, a connector added, …). This
+    // is server-only: it is called from cap-checked REST mutations that have
+    // already validated, sanitised and persisted the change. Clients CANNOT send
+    // ops (there is no hub method to do so), so a peer only ever receives a change
+    // the server already authorised — the hub's authorization surface stays as
+    // small as before (no client-originated domain writes). Best-effort.
+    public static async Task NotifyRoomOpAsync(IHubContext<BoardHub> hub, string roomId, object op)
+    {
+        var room = Normalize(roomId);
+        if (room is null) return;
+        AtlasTelemetry.RecordBoardBroadcast();
+        try { await hub.Clients.Group(room).SendAsync("Op", op); }
+        catch { /* the REST write already succeeded; the op is advisory */ }
+    }
+
     // A stable, pleasant colour per connection (no identity leak — derived from
     // the opaque connection id, not from the user).
     static readonly string[] Palette =

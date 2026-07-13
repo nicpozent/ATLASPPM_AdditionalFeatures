@@ -338,4 +338,40 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.NotFound,
             (await Send(HttpMethod.Put, "/api/v1/whiteboards/banana/1", new { scene = new { nodes = new object[] { }, edges = new object[] { } } })).StatusCode);
     }
+
+    // ---- Whiteboard live co-editing: granular authorized ops ----------------
+    [Fact]
+    public async Task Whiteboard_granular_node_and_edge_ops_persist_and_validate()
+    {
+        var incId = (await Json(await Send(HttpMethod.Post, "/api/v1/increments", new { name = "WB PI 3" }))).GetProperty("id").GetInt32();
+        var wb = $"/api/v1/whiteboards/pi/{incId}";
+
+        // Upsert two nodes via the granular endpoint.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "a", kind = "note", x = 0.0, y = 0.0, w = 160.0, h = 150.0 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "b", kind = "rect", x = 300.0, y = 0.0, w = 120.0, h = 120.0 })).StatusCode);
+        // A bad kind is rejected.
+        Assert.Equal(HttpStatusCode.BadRequest, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "c", kind = "banana", x = 0.0, y = 0.0, w = 40.0, h = 40.0 })).StatusCode);
+
+        // Link them.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/edge", new { id = "e1", from = "a", to = "b" })).StatusCode);
+        // A dangling edge is rejected.
+        Assert.Equal(HttpStatusCode.BadRequest, (await Send(HttpMethod.Put, $"{wb}/edge", new { id = "e2", from = "a", to = "ghost" })).StatusCode);
+
+        var scene = (await Json(await Send(HttpMethod.Get, wb))).GetProperty("scene");
+        Assert.Equal(2, scene.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(1, scene.GetProperty("edges").GetArrayLength());
+
+        // Deleting node "a" removes it and its connector.
+        Assert.Equal(HttpStatusCode.NoContent, (await Send(HttpMethod.Delete, $"{wb}/node/a")).StatusCode);
+        var after = (await Json(await Send(HttpMethod.Get, wb))).GetProperty("scene");
+        Assert.Equal(1, after.GetProperty("nodes").GetArrayLength());
+        Assert.Equal(0, after.GetProperty("edges").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Whiteboard_granular_ops_reject_an_unknown_scope()
+    {
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Send(HttpMethod.Put, "/api/v1/whiteboards/banana/1/node", new { id = "a", kind = "note", x = 0.0, y = 0.0, w = 40.0, h = 40.0 })).StatusCode);
+    }
 }

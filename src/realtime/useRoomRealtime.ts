@@ -17,15 +17,17 @@ import { getToken } from "@/auth";
 export interface Peer { id: string; name: string; initials: string; color: string }
 export interface PeerCursor { id: string; x: number; y: number }
 
-export function useRoomRealtime(roomId: string | null, myName: string, onChanged: () => void) {
+export function useRoomRealtime(roomId: string | null, myName: string, onChanged: () => void, onOp?: (op: unknown) => void) {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [cursors, setCursors] = useState<Record<string, PeerCursor>>({});
   const [connected, setConnected] = useState(false);
   const connRef = useRef<HubConnection | null>(null);
   const lastCursor = useRef(0);
-  // Keep the latest onChanged without re-subscribing the socket each render.
+  // Keep the latest callbacks without re-subscribing the socket each render.
   const onChangedRef = useRef(onChanged);
   useLayoutEffect(() => { onChangedRef.current = onChanged; }, [onChanged]);
+  const onOpRef = useRef(onOp);
+  useLayoutEffect(() => { onOpRef.current = onOp; }, [onOp]);
 
   useEffect(() => {
     if (roomId == null) return;
@@ -49,9 +51,13 @@ export function useRoomRealtime(roomId: string | null, myName: string, onChanged
     });
     conn.on("Cursor", (id: string, x: number, y: number) => setCursors((cur) => ({ ...cur, [id]: { id, x, y } })));
     conn.on("BoardChanged", () => onChangedRef.current());
+    // Authorized live delta from a peer's server-side mutation (whiteboard).
+    conn.on("Op", (op: unknown) => onOpRef.current?.(op));
 
     conn.onreconnecting(() => setConnected(false));
-    conn.onreconnected(() => { setConnected(true); join(); });
+    // On reconnect, re-join and refetch authoritative state — we may have missed
+    // ops while offline, so a full resync reconciles.
+    conn.onreconnected(() => { setConnected(true); join(); onChangedRef.current(); });
     conn.onclose(() => setConnected(false));
 
     conn.start()

@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { toastError } from "@/components/Toast";
 import { useRole } from "@/components/RoleContext";
 import { useRoomRealtime } from "@/realtime/useRoomRealtime";
 import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
 import {
-  EMPTY_SCENE, PALETTE, SHAPE_TOOLS, ICONS, type Scene, type WbNode, type NodeKind,
+  EMPTY_SCENE, PALETTE, SHAPE_TOOLS, ICONS, type Scene, type WbNode, type WbEdge, type NodeKind,
 } from "./types";
-import { addNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints } from "./scene";
+import { createNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, applyRemoteOp, type RemoteOp } from "./scene";
 
 // ============================================================================
 //  Freeform Whiteboard (ADR-0064) — a per-entity brainstorming canvas: sticky
@@ -39,25 +38,25 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const [scene, setScene] = useState<Scene>(EMPTY_SCENE);
   const sceneRef = useRef(scene);
   useEffect(() => { sceneRef.current = scene; }, [scene]);
-  const lastSynced = useRef("");         // JSON we last accepted from / sent to the server
+  const lastSynced = useRef("");         // JSON we last adopted from the server
   const interacting = useRef(false);     // suppress remote adoption mid-drag / mid-edit
 
-  const save = useMutation({
-    mutationFn: (sc: Scene) => api<{ scene: Scene }>(`/whiteboards/${kind}/${id}`, { method: "PUT", body: JSON.stringify({ scene: sc }) }),
-    onSuccess: (res) => { if (res?.scene) lastSynced.current = JSON.stringify(res.scene); },
-    onError: toastError,
-  });
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
-  const scheduleSave = useCallback((sc: Scene) => {
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save.mutate(sc), 350);
-  }, [save]);
-  // A discrete edit: update state now, persist shortly after (debounced).
-  const commit = useCallback((next: Scene) => { setScene(next); scheduleSave(next); }, [scheduleSave]);
-  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  // Live co-editing: persist each change as an authorized granular op (per node /
+  // edge) rather than PUTting the whole scene. The server sanitises + persists it
+  // and broadcasts the exact delta to peers. This makes concurrent edits to
+  // *different* items independent (no whole-scene clobber). On any error we just
+  // refetch the authoritative scene to reconcile.
+  const reconcile = useCallback(() => { qc.invalidateQueries({ queryKey: ["whiteboard", kind, id] }); }, [qc, kind, id]);
+  const persist = useCallback((run: Promise<unknown>) => { run.catch(() => reconcile()); }, [reconcile]);
+  const base = `/whiteboards/${kind}/${id}`;
+  const pushNode = useCallback((node: WbNode) => persist(api(`${base}/node`, { method: "PUT", body: JSON.stringify(node) })), [persist, base]);
+  const pushDelNode = useCallback((nid: string) => persist(api(`${base}/node/${encodeURIComponent(nid)}`, { method: "DELETE" })), [persist, base]);
+  const pushEdge = useCallback((edge: WbEdge) => persist(api(`${base}/edge`, { method: "PUT", body: JSON.stringify(edge) })), [persist, base]);
+  const pushDelEdge = useCallback((eid: string) => persist(api(`${base}/edge/${encodeURIComponent(eid)}`, { method: "DELETE" })), [persist, base]);
 
-  // Adopt the server's scene on first load and when a peer changes it — but never
-  // while we're mid-interaction (last-write-wins, like the PI board).
+  // Adopt the server's scene on first load and on reconnect/error reconcile — but
+  // never while we're mid-interaction (a granular op we just sent may not be
+  // reflected in this fetch yet). Live peer changes arrive as ops, not here.
   const serverScene = q.data?.scene;
   useEffect(() => {
     if (!serverScene || interacting.current) return;
@@ -68,9 +67,16 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     }
   }, [serverScene]);
 
-  const onChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["whiteboard", kind, id] }), [qc, kind, id]);
+  // A peer's authorized op → apply the delta live. Skip upserts to the node the
+  // local user is actively dragging/editing so a peer can't fight the interaction.
+  const editingRef = useRef<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
+  const onOp = useCallback((op: unknown) => {
+    setScene((s) => applyRemoteOp(s, op as RemoteOp, dragIdRef.current ?? editingRef.current));
+  }, []);
+
   const roomKey = `wb:${kind}:${id}`.toLowerCase();
-  const { peers, cursors, connected, sendCursor } = useRoomRealtime(roomKey, identity.name, onChanged);
+  const { peers, cursors, connected, sendCursor } = useRoomRealtime(roomKey, identity.name, reconcile, onOp);
 
   // --- Selection & tool state ---
   const [sel, setSel] = useState<string | null>(null);
@@ -94,7 +100,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     if (!canEdit) { setSel(null); setSelEdge(null); return; }
     const p = toCanvas(e);
     if (pending) {
-      commit(addNode(sceneRef.current, pending.kind, p.x, p.y, pending.icon ? { icon: pending.icon, color: newColor } : { color: pending.kind === "text" ? color.ink : newColor }));
+      const node = createNode(pending.kind, p.x, p.y, pending.icon ? { icon: pending.icon, color: newColor } : { color: pending.kind === "text" ? color.ink : newColor });
+      setScene((s) => ({ ...s, nodes: [...s.nodes, node] }));
+      pushNode(node);
       setPending(null);
       return;
     }
@@ -120,10 +128,13 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   };
 
   const endDrag = () => {
-    if (!drag.current) return;
-    drag.current = null;
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null; dragIdRef.current = null;
     interacting.current = false;
-    scheduleSave(sceneRef.current);
+    // Persist the moved/resized node (one granular op).
+    const node = sceneRef.current.nodes.find((n) => n.id === d.id);
+    if (node) pushNode(node);
   };
 
   // --- Pointer: a node ---
@@ -131,7 +142,10 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     e.stopPropagation();
     if (!canEdit) { setSel(node.id); setSelEdge(null); return; }
     if (linkFrom) {
-      if (node.id !== linkFrom) commit(addEdge(sceneRef.current, linkFrom, node.id, color.faint2));
+      if (node.id !== linkFrom) {
+        const after = addEdge(sceneRef.current, linkFrom, node.id, color.faint2);
+        if (after !== sceneRef.current) { setScene(after); pushEdge(after.edges[after.edges.length - 1]); }
+      }
       setLinkFrom(null);
       return;
     }
@@ -139,26 +153,35 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     interacting.current = true;
     const p = toCanvas(e);
     drag.current = { id: node.id, mode, ox: p.x, oy: p.y, start: node };
+    dragIdRef.current = node.id;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
   // --- Node text editing ---
   const startEdit = (node: WbNode) => {
     if (!canEdit || node.kind === "icon") return;
-    setSel(node.id); interacting.current = true; setEditing(node.id);
+    setSel(node.id); interacting.current = true; editingRef.current = node.id; setEditing(node.id);
   };
   const changeText = (nodeId: string, text: string) => setScene((s) => updateNode(s, nodeId, { text }));
-  const endEdit = () => { setEditing(null); interacting.current = false; scheduleSave(sceneRef.current); };
+  const endEdit = () => {
+    const nid = editingRef.current;
+    setEditing(null); editingRef.current = null; interacting.current = false;
+    const node = nid ? sceneRef.current.nodes.find((n) => n.id === nid) : null;
+    if (node) pushNode(node);
+  };
 
   // --- Toolbar actions on the selection ---
   const recolor = (c: string) => {
     setNewColor(c);
-    if (sel) commit(updateNode(sceneRef.current, sel, { color: c }));
+    if (sel) {
+      const node = sceneRef.current.nodes.find((n) => n.id === sel);
+      if (node) { const upd = { ...node, color: c }; setScene((s) => updateNode(s, sel, { color: c })); pushNode(upd); }
+    }
   };
   const deleteSel = useCallback(() => {
-    if (sel) { commit(removeNode(sceneRef.current, sel)); setSel(null); }
-    else if (selEdge) { commit(removeEdge(sceneRef.current, selEdge)); setSelEdge(null); }
-  }, [sel, selEdge, commit]);
+    if (sel) { setScene((s) => removeNode(s, sel)); pushDelNode(sel); setSel(null); }
+    else if (selEdge) { setScene((s) => removeEdge(s, selEdge)); pushDelEdge(selEdge); setSelEdge(null); }
+  }, [sel, selEdge, pushDelNode, pushDelEdge]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return;

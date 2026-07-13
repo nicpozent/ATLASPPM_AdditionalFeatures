@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { addNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, uid } from "./scene";
-import { EMPTY_SCENE, type Scene } from "./types";
+import { addNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, uid, applyRemoteOp } from "./scene";
+import { EMPTY_SCENE, type Scene, type WbNode } from "./types";
 
 describe("whiteboard scene helpers", () => {
   it("adds a node centred on the drop point", () => {
@@ -66,5 +66,49 @@ describe("whiteboard scene helpers", () => {
 
   it("mints charset-safe ids", () => {
     for (let i = 0; i < 50; i++) expect(uid()).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+  });
+});
+
+describe("applyRemoteOp — live co-editing", () => {
+  const n = (id: string, x = 0): WbNode => ({ id, kind: "rect", x, y: 0, w: 100, h: 100 });
+
+  it("upserts a node from a peer (add then update)", () => {
+    let s: Scene = applyRemoteOp(EMPTY_SCENE, { t: "node", node: n("a") });
+    expect(s.nodes).toHaveLength(1);
+    s = applyRemoteOp(s, { t: "node", node: n("a", 250) });   // same id → update
+    expect(s.nodes).toHaveLength(1);
+    expect(s.nodes[0].x).toBe(250);
+  });
+
+  it("ignores a remote upsert to the node the local user is manipulating", () => {
+    const s0: Scene = applyRemoteOp(EMPTY_SCENE, { t: "node", node: n("a", 0) });
+    const s1 = applyRemoteOp(s0, { t: "node", node: n("a", 999) }, "a");   // skip
+    expect(s1.nodes[0].x).toBe(0);
+  });
+
+  it("applies a remote node delete and drops connected edges", () => {
+    let s: Scene = applyRemoteOp(EMPTY_SCENE, { t: "node", node: n("a") });
+    s = applyRemoteOp(s, { t: "node", node: n("b", 300) });
+    s = applyRemoteOp(s, { t: "edge", edge: { id: "e1", from: "a", to: "b" } });
+    expect(s.edges).toHaveLength(1);
+    s = applyRemoteOp(s, { t: "delNode", id: "a" });
+    expect(s.nodes).toHaveLength(1);
+    expect(s.edges).toHaveLength(0);
+  });
+
+  it("adds and removes a remote edge idempotently", () => {
+    let s: Scene = applyRemoteOp(EMPTY_SCENE, { t: "node", node: n("a") });
+    s = applyRemoteOp(s, { t: "node", node: n("b", 300) });
+    s = applyRemoteOp(s, { t: "edge", edge: { id: "e1", from: "a", to: "b" } });
+    s = applyRemoteOp(s, { t: "edge", edge: { id: "e1", from: "a", to: "b" } });   // dup id
+    expect(s.edges).toHaveLength(1);
+    s = applyRemoteOp(s, { t: "delEdge", id: "e1" });
+    expect(s.edges).toHaveLength(0);
+  });
+
+  it("is a no-op for malformed input", () => {
+    expect(applyRemoteOp(EMPTY_SCENE, null).nodes).toHaveLength(0);
+    // @ts-expect-error unknown op type
+    expect(applyRemoteOp(EMPTY_SCENE, { t: "nope" }).nodes).toHaveLength(0);
   });
 });
