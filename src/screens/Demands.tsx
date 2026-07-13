@@ -159,6 +159,19 @@ export default function Demands() {
                       onDragStart={(e) => { dragId.current = d.id; e.dataTransfer.effectAllowed = "move"; }}
                       onDragEnd={() => { dragId.current = null; setOverStage(null); }}
                       onClick={() => setDetailId(d.id)}
+                      role="button" tabIndex={0}
+                      aria-label={`Demand ${d.id}: ${d.title}. ${s.label}. ${mayScore ? "Enter to open; arrow left or right to move stage." : "Enter to open."}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailId(d.id); return; }
+                        if (!mayScore || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+                        e.preventDefault();
+                        const i = STAGES.findIndex((x) => x.key === d.stage);
+                        const j = e.key === "ArrowLeft" ? i - 1 : i + 1;
+                        if (i < 0 || j < 0 || j >= STAGES.length) return;
+                        const target = STAGES[j];
+                        if (target.key === "approved" && !mayApprove) { toast("Only a Platform Administrator or PMO can approve demands.", "error"); return; }
+                        advanceDemand.mutate({ id: d.id, stage: target.key });
+                      }}
                       style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: "13px 13px 11px", boxShadow: "0 1px 2px rgba(20,26,60,0.04)", cursor: "pointer" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
                         <span style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{d.id}</span>

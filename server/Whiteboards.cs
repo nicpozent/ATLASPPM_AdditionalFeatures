@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
@@ -19,13 +20,15 @@ public record SaveWhiteboardReq(WbScene? Scene);
 //  (ADR-0061). Built for PI Planning first and reused on projects / programs /
 //  releases / products.
 //
-//  Persistence (migration-free, like the PI board): the scene is a small JSON
-//  document stored in the existing Setting store under "whiteboard.{scope}",
-//  where {scope} is "{kind}:{id}" (e.g. "pi:5", "project:PRJ-1"). This
-//  environment can't generate an EF migration; promoting the scene to a typed
-//  table is a clean follow-up. The blob is content, not a global setting, so it
-//  is redacted from the broad GET /settings dump (see Backups.IsSecretSetting)
-//  and served only through the scoped endpoints below.
+//  Persistence: a scene is stored as typed rows — WhiteboardNode / WhiteboardEdge
+//  keyed by the canonical scope "{kind}:{id}" (e.g. "pi:5", "project:PRJ-1"). Each
+//  live co-editing op (upsert/delete one node or edge) is therefore an independent
+//  single-row write, so two people editing different items can't clobber each
+//  other (the earlier Setting-blob read-modify-write of the whole scene could lose
+//  updates — ADR-0064 addendum). Scenes that predate this table are migrated at
+//  startup by BackfillAsync (from the old "whiteboard.{scope}" Setting rows, which
+//  are then removed). The old GET /settings redaction of "whiteboard." keys stays
+//  as defence-in-depth for any not-yet-migrated row.
 //
 //  Security:
 //  - Authorization is server-authoritative and scope-aware: editing a whiteboard
@@ -65,7 +68,8 @@ public static class Whiteboards
     static readonly Regex ColorRe = new("^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
     static readonly Regex IconRe = new("^[a-z0-9-]{1,32}$", RegexOptions.Compiled);
 
-    static string SettingKey(string scope) => $"whiteboard.{scope}";
+    // Legacy Setting-blob key prefix — only used by the one-time startup backfill.
+    const string LegacyPrefix = "whiteboard.";
     static string Room(string scope) => $"wb:{scope}";
 
     // Validate {kind}/{id} and return the canonical scope string, or null if the
@@ -80,12 +84,38 @@ public static class Whiteboards
         return $"{kind}:{id.Trim()}";
     }
 
+    // Read a whole scene for a scope from its typed rows (used by GET).
     static async Task<WbScene> LoadAsync(AtlasDbContext db, string scope)
     {
-        var raw = (await db.Settings.FindAsync(SettingKey(scope)))?.Value;
-        if (string.IsNullOrWhiteSpace(raw)) return new(new(), new());
-        try { return JsonSerializer.Deserialize<WbScene>(raw) ?? new(new(), new()); }
-        catch { return new(new(), new()); }   // tolerate a hand-edited/corrupt blob
+        var nodes = await db.WhiteboardNodes.Where(n => n.Scope == scope).ToListAsync();
+        var edges = await db.WhiteboardEdges.Where(e => e.Scope == scope).ToListAsync();
+        return new WbScene(nodes.Select(ToWbNode).ToList(), edges.Select(ToWbEdge).ToList());
+    }
+
+    // ---- Row ⇄ wire mapping -------------------------------------------------
+    static WbNode ToWbNode(WhiteboardNode e) =>
+        new(e.NodeId, e.Kind, e.X, e.Y, e.W, e.H, e.Text, e.Color, e.Icon, PointsFromJson(e.PointsJson));
+
+    static WbEdge ToWbEdge(WhiteboardEdge e) => new(e.EdgeId, e.FromNode, e.ToNode, e.Color);
+
+    // A sanitised WbNode → a fresh row for `scope` (points serialised to JSON).
+    static WhiteboardNode ToRow(string scope, WbNode n) => new()
+    {
+        Scope = scope, NodeId = n.Id, Kind = n.Kind, X = n.X, Y = n.Y, W = n.W, H = n.H,
+        Text = n.Text, Color = n.Color, Icon = n.Icon,
+        PointsJson = n.Points is { Length: > 0 } ? JsonSerializer.Serialize(n.Points) : null,
+    };
+
+    static WhiteboardEdge ToRow(string scope, WbEdge e) => new()
+    {
+        Scope = scope, EdgeId = e.Id, FromNode = e.From, ToNode = e.To, Color = e.Color,
+    };
+
+    static double[]? PointsFromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<double[]>(json); }
+        catch { return null; }
     }
 
     static double Clamp(double v, double lo, double hi) =>
@@ -157,15 +187,16 @@ public static class Whiteboards
         return new WbScene(nodes, edges);
     }
 
-    // Persist a full scene blob under the scope key (read-modify-write; a typed
-    // table is a pending follow-up — see docs/pi-board-followups.md §3).
+    // Replace the whole scene for a scope (the bulk PUT). Clears the scope's rows
+    // and inserts the sanitised set — one transactional SaveChanges by the caller.
     static async Task SaveSceneAsync(AtlasDbContext db, string scope, WbScene scene)
     {
-        var key = SettingKey(scope);
-        var json = JsonSerializer.Serialize(scene);
-        var s = await db.Settings.FindAsync(key);
-        if (s is null) db.Settings.Add(new Setting { Key = key, Value = json });
-        else s.Value = json;
+        var oldNodes = await db.WhiteboardNodes.Where(n => n.Scope == scope).ToListAsync();
+        var oldEdges = await db.WhiteboardEdges.Where(e => e.Scope == scope).ToListAsync();
+        db.WhiteboardNodes.RemoveRange(oldNodes);
+        db.WhiteboardEdges.RemoveRange(oldEdges);
+        db.WhiteboardNodes.AddRange(scene.Nodes!.Select(n => ToRow(scope, n)));
+        db.WhiteboardEdges.AddRange(scene.Edges!.Select(e => ToRow(scope, e)));
     }
 
     public static void MapWhiteboardEndpoints(this RouteGroupBuilder api)
@@ -218,11 +249,20 @@ public static class Whiteboards
             var clean = SanitizeNode(node);
             if (clean is null) return Results.BadRequest(new { error = "Invalid node." });
 
-            var scene = await LoadAsync(db, scope!);
-            var nodes = scene.Nodes!.Where(n => n.Id != clean.Id).ToList();
-            if (nodes.Count >= MaxNodes) return Results.BadRequest(new { error = "This whiteboard is full." });
-            nodes.Add(clean);
-            await SaveSceneAsync(db, scope!, new WbScene(nodes, scene.Edges));
+            // Upsert just this node's row — no whole-scene read-modify-write.
+            var existing = await db.WhiteboardNodes.FirstOrDefaultAsync(n => n.Scope == scope && n.NodeId == clean.Id);
+            if (existing is null)
+            {
+                if (await db.WhiteboardNodes.CountAsync(n => n.Scope == scope) >= MaxNodes)
+                    return Results.BadRequest(new { error = "This whiteboard is full." });
+                db.WhiteboardNodes.Add(ToRow(scope!, clean));
+            }
+            else
+            {
+                var row = ToRow(scope!, clean);
+                existing.Kind = row.Kind; existing.X = row.X; existing.Y = row.Y; existing.W = row.W; existing.H = row.H;
+                existing.Text = row.Text; existing.Color = row.Color; existing.Icon = row.Icon; existing.PointsJson = row.PointsJson;
+            }
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Edited whiteboard node", $"{scope} · {clean.Id}"));
             await db.SaveChangesAsync();
             await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "node", node = clean });
@@ -235,10 +275,13 @@ public static class Whiteboards
             var (scope, denied) = await AuthScope(kind, id, http, db, cfg);
             if (denied is not null) return denied;
 
-            var scene = await LoadAsync(db, scope!);
-            var nodes = scene.Nodes!.Where(n => n.Id != nodeId).ToList();
-            var edges = scene.Edges!.Where(e => e.From != nodeId && e.To != nodeId).ToList();
-            await SaveSceneAsync(db, scope!, new WbScene(nodes, edges));
+            // Remove just this node and any connectors touching it (single scoped
+            // write; idempotent if the node is already gone).
+            var node = await db.WhiteboardNodes.FirstOrDefaultAsync(n => n.Scope == scope && n.NodeId == nodeId);
+            if (node is not null) db.WhiteboardNodes.Remove(node);
+            var touching = await db.WhiteboardEdges
+                .Where(e => e.Scope == scope && (e.FromNode == nodeId || e.ToNode == nodeId)).ToListAsync();
+            db.WhiteboardEdges.RemoveRange(touching);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Deleted whiteboard node", $"{scope} · {nodeId}"));
             await db.SaveChangesAsync();
             await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "delNode", id = nodeId });
@@ -251,17 +294,16 @@ public static class Whiteboards
             var (scope, denied) = await AuthScope(kind, id, http, db, cfg);
             if (denied is not null) return denied;
 
-            var scene = await LoadAsync(db, scope!);
-            var nodeIds = scene.Nodes!.Select(n => n.Id).ToHashSet();
+            var nodeIds = (await db.WhiteboardNodes.Where(n => n.Scope == scope).Select(n => n.NodeId).ToListAsync()).ToHashSet();
             var clean = SanitizeEdge(edge, nodeIds);
             if (clean is null) return Results.BadRequest(new { error = "Invalid connector." });
-            if (scene.Edges!.Count >= MaxEdges) return Results.BadRequest(new { error = "Too many connectors." });
+            if (await db.WhiteboardEdges.CountAsync(e => e.Scope == scope) >= MaxEdges)
+                return Results.BadRequest(new { error = "Too many connectors." });
             // No duplicate id, and no duplicate undirected pair.
-            if (scene.Edges!.Any(e => e.Id == clean.Id
-                    || (e.From == clean.From && e.To == clean.To) || (e.From == clean.To && e.To == clean.From)))
+            if (await db.WhiteboardEdges.AnyAsync(e => e.Scope == scope && (e.EdgeId == clean.Id
+                    || (e.FromNode == clean.From && e.ToNode == clean.To) || (e.FromNode == clean.To && e.ToNode == clean.From))))
                 return Results.Ok(clean);   // idempotent — already linked
-            var edges = scene.Edges!.Append(clean).ToList();
-            await SaveSceneAsync(db, scope!, new WbScene(scene.Nodes, edges));
+            db.WhiteboardEdges.Add(ToRow(scope!, clean));
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Linked whiteboard nodes", $"{scope} · {clean.Id}"));
             await db.SaveChangesAsync();
             await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "edge", edge = clean });
@@ -274,9 +316,8 @@ public static class Whiteboards
             var (scope, denied) = await AuthScope(kind, id, http, db, cfg);
             if (denied is not null) return denied;
 
-            var scene = await LoadAsync(db, scope!);
-            var edges = scene.Edges!.Where(e => e.Id != edgeId).ToList();
-            await SaveSceneAsync(db, scope!, new WbScene(scene.Nodes, edges));
+            var e = await db.WhiteboardEdges.FirstOrDefaultAsync(x => x.Scope == scope && x.EdgeId == edgeId);
+            if (e is not null) db.WhiteboardEdges.Remove(e);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Unlinked whiteboard nodes", $"{scope} · {edgeId}"));
             await db.SaveChangesAsync();
             await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "delEdge", id = edgeId });
@@ -294,5 +335,37 @@ public static class Whiteboards
         var cap = KindCap[kind.Trim().ToLowerInvariant()];
         if (await Permissions.Deny(http, db, cfg, cap, "E") is { } denied) return (null, denied);
         return (scope, null);
+    }
+
+    // ---- One-time migration of legacy blob scenes to typed rows -------------
+    // Runs at startup (after Migrate/EnsureCreated). For each old
+    // "whiteboard.{scope}" Setting row: if that scope has no typed rows yet, parse
+    // the blob, re-sanitise it and insert rows; then delete the Setting row either
+    // way. Idempotent — once every legacy row is gone this is a no-op, and it
+    // never overwrites a scope that already has typed rows.
+    public static async Task BackfillAsync(AtlasDbContext db)
+    {
+        var legacy = await db.Settings.Where(s => s.Key.StartsWith(LegacyPrefix)).ToListAsync();
+        if (legacy.Count == 0) return;
+
+        foreach (var s in legacy)
+        {
+            var scope = s.Key.Substring(LegacyPrefix.Length);
+            var alreadyTyped = await db.WhiteboardNodes.AnyAsync(n => n.Scope == scope)
+                            || await db.WhiteboardEdges.AnyAsync(e => e.Scope == scope);
+            if (!alreadyTyped && !string.IsNullOrWhiteSpace(s.Value))
+            {
+                WbScene? parsed = null;
+                try { parsed = JsonSerializer.Deserialize<WbScene>(s.Value); } catch { /* corrupt blob → drop */ }
+                if (parsed is not null)
+                {
+                    var scene = Sanitize(parsed);   // re-apply current bounds
+                    db.WhiteboardNodes.AddRange(scene.Nodes!.Select(n => ToRow(scope, n)));
+                    db.WhiteboardEdges.AddRange(scene.Edges!.Select(e => ToRow(scope, e)));
+                }
+            }
+            db.Settings.Remove(s);   // the blob's job is done regardless
+        }
+        await db.SaveChangesAsync();
     }
 }

@@ -9,14 +9,14 @@ quality dimensions. Ratings are evidence-based (code, tests, CI, ADRs). Scale:
 - **★★☆☆☆ Partial** — scaffolded / in progress.
 - **★☆☆☆☆ Absent** — not started.
 
-_Last reviewed: 2026-07-09 · main @ docs-catchup (dark mode, region rates + roles, Jira sprint discovery)._
+_Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration, freeform whiteboard, task-board collaboration, typed-table promotions, ISO 27001 SoA)._
 
 ## 1. Scorecard
 
 | # | Dimension | Rating | Evidence | Gaps / next |
 |---|-----------|--------|----------|-------------|
-| 1 | **Functional coverage** (screens vs prototype) | ★★★★★ | All Workspace + Configuration screens built and data-wired; 128 tracked features complete | Ongoing prototype-fidelity spot-checks |
-| 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 57 ADRs | — |
+| 1 | **Functional coverage** (screens vs prototype) | ★★★★★ | All Workspace + Configuration screens built and data-wired; 128 tracked features complete; **product-owner-approved extensions** (Teams notifications, real-time collaboration, freeform whiteboard, task-board collaboration, ISO 27001 SoA) built in the existing design language and recorded (CLAUDE.md §2, ADR-0060/0061/0064/0065/0066) | `design/` regeneration to fold the extensions back into the prototype |
+| 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 66 ADRs | — |
 | 3 | **Frontend engineering** | ★★★★★ | React 18 + TS strict + Vite 8; inline design tokens with **per-profile dark mode (CSS-variable palettes, ADR-0056)**; route code-splitting + vendor chunks; **lint clean (0 warnings)** | — |
 | 4 | **Identity & access** | ★★★★★ | Entra SSO (MSAL, PKCE) **verified end-to-end on a live tenant**; server-authoritative RBAC capability matrix; **15-min idle-logout** | — |
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
@@ -24,14 +24,14 @@ _Last reviewed: 2026-07-09 · main @ docs-catchup (dark mode, region rates + rol
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)** | Human pen-test engagement + automated secret rotation outstanding |
-| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics | Sweep covers 6 representative routes; extend as views grow |
+| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics; **keyboard/AT operation of the pointer-first surfaces** — whiteboard canvas (focusable labelled nodes, arrow-move/edit/delete) + Kanban/funnel drag boards (focus + arrow-move) | Axe sweep covers 6 representative routes; extend to the whiteboard/board views |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★★ | Backend 394 xUnit; frontend 64 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; smoke wired into CI (`perf-smoke.yml`, seeded API + k6 vs hot roll-ups) | Full load/stress runs operated against a seeded test env; NBomber not used |
+| 12 | **Testing** | ★★★★★ | Backend 442 xUnit; frontend 89 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; smoke wired into CI (`perf-smoke.yml`, seeded API + k6 vs hot roll-ups) | Deeper frontend logic tests for the new canvas/board interactions (in progress); full load/stress against a seeded env |
 | 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
 | 14 | **Delivery & runtime** | ★★★★★ | **On-prem single-node Docker (`docker compose`: web/worker/db/nginx edge) as the chosen, documented target (ADR-0054)**; images promoted from GHCR (ADR-0052); migrations on start; health-gated; secrets overlay; upgrade = pull-and-recreate | k8s parked (no scale/HA need at portfolio scale); HA is a single-node trade-off |
-| 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049) | — |
+| 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049); **ISO 27001:2022 Statement of Applicability — full 93-control Annex A coverage per project (ADR-0066)** | Per-control automated evidence linkage; SoAs for other frameworks |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 57 ADRs, in-app Help + **Security Posture** page, setup guides, this evaluation, user stories | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 66 ADRs, in-app Help + **Security Posture** page, setup guides, this evaluation, user stories & requirements (all refreshed for the post-prototype extensions) | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -79,10 +79,10 @@ _Last reviewed: 2026-07-09 · main @ docs-catchup (dark mode, region rates + rol
 ## 4. Overall
 
 **Verdict: production-ready.** The core PPM product is complete, data-wired,
-tested (468 automated tests across stacks — 394 backend xUnit, 64 frontend
+tested (541 automated tests across stacks — 442 backend xUnit, 89 frontend
 vitest, 10 Playwright e2e: 6 axe + 4 full-journey — plus a k6 load/perf suite),
 accessible (AA-gated), observable, and documented to a professional standard
-(ABB/SBB traceability, 47 ADRs, HLD/LLD). Entra SSO is verified end-to-end on a
+(ABB/SBB traceability, 66 ADRs, HLD/LLD). Entra SSO is verified end-to-end on a
 live tenant. Remaining items are enhancements, not blockers: broadening connector
 coverage beyond Jira/Azure DevOps, automated security scanning (SAST/DAST), and a
 release/k8s pipeline once a target host is chosen.
@@ -162,3 +162,22 @@ parked deliberately (no scale/HA need at portfolio scale), reframing the old
 "no k8s manifests" gap as a matched decision rather than a shortfall. Delivery &
 runtime → ★★★★★. **Overall 4.9/5 — 16 of 18 dimensions at ★★★★★** (the two
 non-max are Integrations ★★★★☆ and Security ★★★★☆)._
+
+_Update 2026-07-13: post-prototype collaboration & governance extensions folded
+in (ADR-0060–0066). **Microsoft Teams** channel notifications (webhook + Adaptive
+Card) as a third channel (ADR-0060). **Real-time collaboration** on a SignalR
+room hub — live presence, peer cursors and off-screen peer indicators across PI
+board, demand funnel, task board and the whiteboard, with a server-only op
+broadcast so peers render only authorized deltas (ADR-0061). **Freeform
+whiteboard** — a per-entity brainstorming canvas (shapes, connectors, freehand,
+templates, export) with live co-editing, now persisted as **typed rows**
+(`WhiteboardNode`/`WhiteboardEdge`, migration `WhiteboardTables`) so each op is a
+single-row write and the earlier blob write-race is closed (ADR-0064). PI board
+placement likewise promoted to a typed column (`PiObjective.IterationId`). **Task
+-board card move** scoped to the four planner roles via `cap-schedule` (ADR-0065).
+**ISO 27001:2022 Statement of Applicability** — full 93-control Annex A coverage
+per project with applicability/justification/status + coverage roll-up (ADR-0066).
+**Keyboard/AT pass** over the pointer-first canvas and drag boards. Tests grew to
+442 backend xUnit + 89 frontend vitest; ADRs to 66; user-stories, requirements
+and building-blocks (ABB/SBB) refreshed to match. No rating change (the affected
+dimensions were already ★★★★★); **Overall stays 4.9/5**._

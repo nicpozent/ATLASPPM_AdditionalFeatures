@@ -28,10 +28,15 @@ product, mounted as a tab on that entity's screen. Shipped first as a
 editor (`src/whiteboard/Whiteboard.tsx`) is pure inline-styled React using the
 existing theme tokens and `Icon` set — **no new UI framework, no redesign**.
 
-**Persistence (migration-free).** The scene is stored as JSON in the existing
-`Setting` store under `whiteboard.{kind}:{id}` (e.g. `whiteboard.pi:5`) — the
-same interim pattern as the PI board, because this environment can't generate an
-EF migration. Promoting it to a typed `Whiteboard` table is a clean follow-up.
+**Persistence.** A scene is stored as typed rows — `WhiteboardNode` /
+`WhiteboardEdge`, keyed by the canonical scope `{kind}:{id}` (migration
+`WhiteboardTables`). Each live co-editing op is a single-row upsert/delete, so
+edits to *different* items are independent (the residual write-race below is
+resolved). Scenes that predate the table are migrated at startup by
+`Whiteboards.BackfillAsync` from the old `whiteboard.{scope}` `Setting` blobs,
+which are then deleted. *(History: this first shipped as a migration-free JSON
+blob in the `Setting` store — the same interim pattern as the PI board — until a
+`.NET` SDK was available to generate the EF migration.)*
 
 **Real-time.** The whiteboard joins a room `wb:{kind}:{id}` on the shared hub
 (ADR-0061): presence, peer cursors, and a contentless "refetch" ping. Saves are
@@ -69,14 +74,12 @@ Designed against the platform's control baseline
   existing design language; no new dependency or framework.
 - **+** One reusable canvas component + one generic scoped endpoint ⇒ extending
   to projects/programs/releases/products is UI mounting only (Phase 3).
-- **+** Migration-free — ships where `dotnet ef` can't run.
-- **−** Last-write-wins (notify-and-refetch) can drop a concurrent edit made in
-  the same debounce window; acceptable at brainstorming cadence, a CRDT/OT
-  upgrade remains open.
-- **−** Scene lives in a key/value blob rather than a typed table (promotion is a
-  follow-up); it also rides along in the admin backup snapshot (intended).
-- **−** The .NET pieces were written to the codebase's patterns but **not
-  compiled here** (no SDK); the CI `dotnet build`/`test` gate is the confirmation.
+- **+** Scene persists as typed rows (`WhiteboardNode`/`WhiteboardEdge`); each
+  co-editing op is an independent single-row write — no whole-scene read-modify-
+  write, so the storage-layer race below is closed. It still rides along in the
+  admin backup snapshot (intended).
+- **−** Same-item concurrent edits are still last-write-wins (a CRDT/OT upgrade
+  remains open); this is convergence, not conflict-free merge.
 
 ## Alternatives considered
 - **Embed a third-party board (Miro/Mural) via iframe/SDK** — rejected: sends
@@ -87,8 +90,9 @@ Designed against the platform's control baseline
   authorization and is what planning/kick-off sessions actually need.
 - **Full CRDT co-editing** — deferred: heavier than needed for sticky-note
   brainstorming; notify-and-refetch reuses the proven board path.
-- **First-class `Whiteboard` table now** — deferred until a migration can be
-  generated; the `Setting`-backed blob is the migration-free interim.
+- **First-class whiteboard table** — **adopted** once a `.NET` SDK was available
+  to generate the migration (`WhiteboardTables`); the `Setting`-backed blob was
+  the migration-free interim and is now backfilled away at startup.
 
 ## Addendum — live co-editing (granular authorized ops)
 
@@ -124,11 +128,12 @@ independent. Concurrent edits to the *same* item are last-write-wins and
 reconcile on the next reconnect/refetch. This is a large step up from whole-scene
 LWW without the weight of a CRDT/OT engine.
 
-**Residual race.** Persistence is still a read-modify-write of the `Setting`
-scene blob, so two writers to the *same* scene within the same instant can still
-lose an update at the storage layer. The typed-table promotion (per-row writes)
-is the real fix and is tracked as a **pending follow-up**
-(`docs/pi-board-followups.md` §3).
+**Residual race — resolved.** The first cut persisted each op by rewriting the
+whole `Setting` scene blob, so two writers to the *same* scene within the same
+instant could still lose an update at the storage layer. Persistence is now typed
+rows and every op is a **single-row upsert/delete**, so writers to *different*
+items never touch the same row and can't clobber each other. Only edits to the
+*same* item remain last-write-wins (by design — see "Convergence, not CRDT").
 
 ## Addendum — richer toolset, freehand, export & the Roadmap surface
 

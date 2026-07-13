@@ -49,8 +49,8 @@ export function Tasks({ projectId }: { projectId: string | null }) {
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }> =>
-      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean; canMove?: boolean }> =>
+      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean; canMove?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
   });
   const move = useMutation({
     mutationFn: (v: { id: number; status: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
@@ -70,14 +70,15 @@ export function Tasks({ projectId }: { projectId: string | null }) {
 
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
-  // Moving a card between columns is open to every role (ADR-0065); other edits
+  // Moving a card between columns is a scheduling action — Platform Admin, PMO,
+  // Project Manager and PM Lead only (cap-schedule, ADR-0065). Other edits
   // (rename, re-plan, delete, detail fields) still require the project-edit right.
-  const canMove = true;
+  const canMove = data?.canMove ?? false;
   const canCreate = data?.canCreate ?? false;
 
   // Real-time collaboration — every role joins the project's task room for live
   // presence, peer cursors and instant board refresh when anyone moves a card.
-  // (Moving a card still needs the project-edit right; collaboration is for all.)
+  // (Moving a card needs the schedule right; collaboration is open to all.)
   const { identity } = useRole();
   const onChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["tasks", projectId] }), [qc, projectId]);
   const { peers, cursors, connected, sendCursor } = useRoomRealtime(projectId ? `tasks:${projectId}` : null, identity.name, onChanged);
@@ -157,6 +158,16 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                     return (
                       <div key={t.id} draggable={canMove} onDragStart={() => { dragId.current = t.id; }}
                         onClick={() => setOpenId(t.id)}
+                        role="button" tabIndex={0}
+                        aria-label={`${t.code} ${t.name}. ${t.status}. ${canMove ? "Enter to open; arrow left or right to move column." : "Enter to open."}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(t.id); return; }
+                          if (!canMove || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+                          e.preventDefault();
+                          const i = BOARD_COLS.findIndex((x) => x.label === t.status);
+                          const j = e.key === "ArrowLeft" ? i - 1 : i + 1;
+                          if (i >= 0 && j >= 0 && j < BOARD_COLS.length) move.mutate({ id: t.id, status: BOARD_COLS[j].label });
+                        }}
                         style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: "pointer", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                           <span style={{ fontFamily: font.mono, fontSize: 10, color: color.faint3 }}>{t.code}</span>

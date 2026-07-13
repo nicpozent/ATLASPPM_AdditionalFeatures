@@ -193,6 +193,9 @@ using (var scope = app.Services.CreateScope())
         await Help.SeedAsync(db);
         // Start the DB-password rotation clock at first deploy (idempotent).
         await SecretRotation.EnsureAnchorAsync(db);
+        // Migrate any legacy whiteboard blob scenes to typed rows (idempotent;
+        // no-op once done) — see ADR-0064 / Whiteboards.BackfillAsync.
+        await Whiteboards.BackfillAsync(db);
         if (cfg.GetValue("Seed:Enabled", false))
         {
             await Seed.RunAsync(db);

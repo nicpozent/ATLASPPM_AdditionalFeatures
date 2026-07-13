@@ -5,8 +5,11 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
 import { Overlay } from "./Demands";
+import {
+  type Win, MONTHS, nowAbs, monthOfIso, absOfIso, ymToAbs, absToYm,
+  monthAbbr, yearOf, anchored, makeWindow, segPct, barGeom, centerPct,
+} from "./gantt/model";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VIEW_TABS = [["schedule", "Schedule"], ["tasks", "Tasks"], ["resources", "Resource allocation"], ["sprints", "Sprints"]] as const;
 type ViewId = (typeof VIEW_TABS)[number][0];
 
@@ -28,53 +31,24 @@ const TASK_BAR: Record<string, { bg: string; border: string }> = {
   Done:          { bg: color.successTint,  border: color.success },
   Blocked:       { bg: color.dangerTint,   border: color.danger },
 };
-const monthOfIso = (s: string): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getMonth(); };
-
 const LABEL_W = 286;
 
 // ── Timeline window (absolute months) ───────────────────────────────────────
-// Absolute month = year*12 + monthIndex(0..11). The visible window is a calendar
-// range the user picks (From/To, capped at 5 years), so a project running e.g.
-// 2027→2030 lays out correctly across years. Items with real dates are placed by
-// them; a bare month-of-year (phases, derived sprints) is anchored to a base
-// year supplied by its context (its project's start year).
-interface Win { start: number; span: number }
-const nowAbs = () => { const d = new Date(); return d.getFullYear() * 12 + d.getMonth(); };
+// The pure month/geometry model lives in ./gantt/model (unit-tested). Here we
+// keep only the React-coupled pieces: the window context and the CSS builders.
 const WinCtx = createContext<Win>({ start: Math.floor(nowAbs() / 12) * 12, span: 12 });
 const useWin = () => useContext(WinCtx);
-const absOfIso = (s?: string | null): number | null => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d.getFullYear() * 12 + d.getMonth(); };
-const ymToAbs = (ym: string): number => { const [y, m] = ym.split("-").map(Number); return (y || 0) * 12 + ((m || 1) - 1); };
-const absToYm = (abs: number): string => `${Math.floor(abs / 12)}-${String((abs % 12) + 1).padStart(2, "0")}`;
-const monthAbbr = (abs: number) => MONTHS[((abs % 12) + 12) % 12];
-const yearOf = (abs: number) => Math.floor(abs / 12);
-const MAX_SPAN = 60; // 5 years
 
-// Window-relative bar geometry (absolute months). Bars fully outside the window
-// are hidden; bars crossing an edge are clipped to it.
+// Window-relative bar geometry as inline styles. Bars fully outside the window
+// are hidden; bars crossing an edge are clipped to it (see barGeom).
 function barAbs(a0: number, a1: number, win: Win): React.CSSProperties {
-  const lo = Math.min(a0, a1), hi = Math.max(a0, a1), winEnd = win.start + win.span - 1;
-  if (hi < win.start || lo > winEnd) return { display: "none" };
-  const s = Math.max(lo, win.start), e = Math.min(hi, winEnd);
-  const left = (s - win.start) / win.span * 100;
-  const width = Math.max(0.7, (e - s + 1) / win.span * 100);
-  return { position: "absolute", left: `${left}%`, width: `${width}%`, top: 9, height: 20 };
-}
-// Left/width (%) of a [a0,a1] span within the window, clipped to its edges, or
-// null when the span is fully outside. Like barAbs but geometry-only, so callers
-// can style their own height/top (used by the lifecycle bars' stacked segments).
-function segPct(a0: number, a1: number, win: Win): { left: number; width: number } | null {
-  const lo = Math.min(a0, a1), hi = Math.max(a0, a1), winEnd = win.start + win.span - 1;
-  if (hi < win.start || lo > winEnd) return null;
-  const s = Math.max(lo, win.start), e = Math.min(hi, winEnd);
-  return { left: (s - win.start) / win.span * 100, width: Math.max(0.6, (e - s + 1) / win.span * 100) };
+  const g = barGeom(a0, a1, win);
+  return g ? { position: "absolute", left: `${g.left}%`, width: `${g.width}%`, top: 9, height: 20 } : { display: "none" };
 }
 const gridBg = (win: Win): React.CSSProperties => ({
   backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`,
   backgroundSize: `${100 / win.span}% 100%`,
 });
-// Centre-of-month position (%) within the window, or null when outside it.
-const centerPct = (abs: number, win: Win): number | null =>
-  abs < win.start || abs > win.start + win.span - 1 ? null : (abs - win.start + 0.5) / win.span * 100;
 
 function useOpts(path: string, key: string) {
   return useQuery({
@@ -97,13 +71,7 @@ export default function Gantt() {
   const thisYear = new Date().getFullYear();
   const [fromYM, setFromYM] = useState(`${thisYear}-01`);
   const [toYM, setToYM] = useState(`${thisYear}-12`);
-  const win = useMemo<Win>(() => {
-    const start = ymToAbs(fromYM);
-    let span = ymToAbs(toYM) - start + 1;
-    if (span < 1) span = 1;
-    if (span > MAX_SPAN) span = MAX_SPAN;
-    return { start, span };
-  }, [fromYM, toYM]);
+  const win = useMemo<Win>(() => makeWindow(fromYM, toYM), [fromYM, toYM]);
   const qc = useQueryClient();
 
   const { data: projects = [] } = useOpts("/projects", "projects");
@@ -330,7 +298,6 @@ export default function Gantt() {
 // ---- Bar geometry ----------------------------------------------------------
 // Month-of-year (0-11) → absolute month, anchored to a base year (the item's
 // project start year). Used for phases/derived sprints that carry no year.
-const anchored = (base: number, m: number) => base + m;
 
 function PhaseBar({ phase, base, editable, onEdit }: { phase: Phase; base: number; editable?: boolean; onEdit?: () => void }) {
   const win = useWin();

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Atlas.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Atlas.Api.Migrations
 {
     [DbContext(typeof(AtlasDbContext))]
-    partial class AtlasDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713205305_WhiteboardTables")]
+    partial class WhiteboardTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3330,45 +3333,6 @@ namespace Atlas.Api.Migrations
                     b.HasIndex("SkillId", "Person");
 
                     b.ToTable("SkillRatings");
-                });
-
-            modelBuilder.Entity("Atlas.Api.SoaEntry", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("Applicable")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Justification")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Owner")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ProjectId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Ref")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId", "Ref")
-                        .IsUnique();
-
-                    b.ToTable("SoaEntries");
                 });
 
             modelBuilder.Entity("Atlas.Api.Sprint", b =>

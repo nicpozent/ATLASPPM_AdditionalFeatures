@@ -50,6 +50,11 @@ public record SecurityControlDto(int Id, string Code, string Control, string Fra
 public record SecurityReviewGateDto(int Id, string Name, string Type, string Reviewer, string Status, string Date, string Note);
 public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls, List<SecurityReviewGateDto> ReviewGates);
 
+// Statement of Applicability (ISO 27001:2022 Annex A).
+public record SoaControlDto(string Ref, string Title, string Theme, bool Applicable, string Justification, string Status, string Owner);
+public record SoaCoverageDto(int Total, int Applicable, int Excluded, int Implemented, int Reviewed, int ImplementedPct);
+public record SoaDto(bool CanEdit, SoaCoverageDto Coverage, List<SoaControlDto> Controls);
+
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,
     string Status, string Sprint, string Baseline, string Priority,
     string StartDate = "", string TargetDate = "", int Points = 0, string Size = "",
@@ -63,7 +68,7 @@ public record ProjectTaskDto(int Id, string Code, string Name, string Epic, stri
     // Lifecycle timestamps (Jira-synced): when work started (first status change)
     // and when it was resolved/closed. Empty for backlog / locally-created rows.
     string StartedAt = "", string ResolvedAt = "");
-public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
+public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false, bool CanMove = false);
 public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At, bool FromJira = false);
 public record TaskAttachmentDto(int Id, string FileName, string ContentType, long Size, string Author, string CreatedAt);
 public record SprintDto(int Id, string Name, string Goal, string StartDate, string EndDate, string Status,

@@ -307,10 +307,37 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const armIcon = (icon: string) => { setPending({ kind: "icon", icon }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
   const armTool = (t: "select" | "connector" | "pen") => { setTool(t); setPending(null); setLinkFrom(null); setIconMenu(false); };
 
+  // Keyboard move for the selected node — the pointer-free path to the drag
+  // interaction. Uses the same granular persist (pushNode) as a mouse drag, so
+  // the move is saved and broadcast to peers identically. Arrow = 10px, Shift =
+  // 1px fine nudge. Coordinates are clamped to the canvas.
+  const nudge = useCallback((id: string, dx: number, dy: number) => {
+    const node = sceneRef.current.nodes.find((n) => n.id === id);
+    if (!node) return;
+    const cx = Math.max(0, Math.min(CANVAS_W - node.w, node.x + dx));
+    const cy = Math.max(0, Math.min(CANVAS_H - node.h, node.y + dy));
+    const patch = translateNode(node, cx - node.x, cy - node.y);
+    setScene((s) => updateNode(s, id, patch));
+    pushNode({ ...node, ...patch });
+  }, [pushNode]);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return;
-    if ((e.key === "Delete" || e.key === "Backspace") && (sel || selEdge)) { e.preventDefault(); deleteSel(); }
-    if (e.key === "Escape") { setPending(null); setLinkFrom(null); setSel(null); setSelEdge(null); setTool("select"); }
+    if ((e.key === "Delete" || e.key === "Backspace") && (sel || selEdge)) { e.preventDefault(); deleteSel(); return; }
+    if (e.key === "Escape") { setPending(null); setLinkFrom(null); setSel(null); setSelEdge(null); setTool("select"); return; }
+    if (!canEdit || !sel) return;
+    // Enter / F2 edits the selected node's text (shapes/notes/text only).
+    if (e.key === "Enter" || e.key === "F2") {
+      const node = sceneRef.current.nodes.find((n) => n.id === sel);
+      if (node && node.kind !== "icon" && node.kind !== "draw") { e.preventDefault(); startEdit(node); }
+      return;
+    }
+    // Arrow keys move the selection (keyboard equivalent of dragging).
+    const step = e.shiftKey ? 1 : 10;
+    const delta: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+    };
+    if (delta[e.key]) { e.preventDefault(); const [dx, dy] = delta[e.key]; nudge(sel, dx, dy); }
   };
 
   return (
@@ -426,6 +453,10 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
         <div
           ref={canvasRef}
           tabIndex={0}
+          role="application"
+          aria-label={canEdit
+            ? "Whiteboard canvas. Tab to a shape to select it, then use the arrow keys to move it, Enter to edit its text, and Delete to remove it."
+            : "Whiteboard canvas (view only). Tab through the shapes to read them."}
           onKeyDown={onKeyDown}
           onPointerDown={onCanvasDown}
           onPointerMove={onCanvasMove}
@@ -483,6 +514,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
             <NodeView
               key={node.id} node={node} selected={sel === node.id} canEdit={canEdit}
               editing={editing === node.id} linkSource={linkFrom === node.id}
+              onSelect={() => { setSel(node.id); setSelEdge(null); }}
               onDown={(e, mode) => onNodeDown(e, node, mode)}
               onStartWire={(e) => startWire(e, node.id)}
               onDoubleClick={() => startEdit(node)}
@@ -511,8 +543,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 }
 
 // ---- Node rendering --------------------------------------------------------
-function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onStartWire, onDoubleClick, onText, onTextBlur }: {
+function NodeView({ node, selected, canEdit, editing, linkSource, onSelect, onDown, onStartWire, onDoubleClick, onText, onTextBlur }: {
   node: WbNode; selected: boolean; canEdit: boolean; editing: boolean; linkSource: boolean;
+  onSelect: () => void;
   onDown: (e: React.PointerEvent, mode: "move" | "resize") => void;
   onStartWire: (e: React.PointerEvent) => void;
   onDoubleClick: () => void; onText: (t: string) => void; onTextBlur: () => void;
@@ -522,6 +555,18 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onStar
     boxSizing: "border-box", cursor: canEdit ? "move" : "default",
     outline: selected ? `2px solid ${color.primary}` : linkSource ? `2px dashed ${color.primary}` : "none",
     outlineOffset: 2,
+  };
+  // Keyboard/AT: every node is focusable and announced with its kind + text;
+  // focusing it selects it, so the canvas arrow-key move/edit/delete apply.
+  const kindLabel = node.kind === "draw" ? "freehand drawing" : node.kind;
+  // While editing, the inner textarea is the interactive element — the wrapper
+  // steps out of the tab order and drops its button role to avoid nesting.
+  const a11y: React.HTMLAttributes<HTMLDivElement> = editing ? { tabIndex: -1 } : {
+    tabIndex: 0,
+    role: "button",
+    "aria-label": node.text ? `${kindLabel}: ${node.text}` : kindLabel,
+    "aria-pressed": selected,
+    onFocus: onSelect,
   };
   const textInk = node.kind === "note" ? color.ink : node.kind === "text" ? (node.color ?? color.ink) : color.text;
 
@@ -564,13 +609,13 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onStar
   // hit box so the stroke can be selected, moved and deleted like any node.
   if (node.kind === "draw") {
     return (
-      <div style={{ ...base, background: "transparent", cursor: canEdit ? "move" : "default" }}
+      <div {...a11y} style={{ ...base, background: "transparent", cursor: canEdit ? "move" : "default" }}
         onPointerDown={(e) => onDown(e, "move")} title="Freehand drawing" />
     );
   }
 
   return (
-    <div style={base} onPointerDown={(e) => onDown(e, "move")} onDoubleClick={onDoubleClick}>
+    <div {...a11y} style={base} onPointerDown={(e) => onDown(e, "move")} onDoubleClick={onDoubleClick}>
       {node.kind === "icon" ? (
         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name={node.icon ?? "rocket"} size={Math.max(16, Math.min(node.w, node.h) * 0.7)} color={node.color ?? color.primary} />
