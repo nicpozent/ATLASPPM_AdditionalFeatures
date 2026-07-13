@@ -450,6 +450,27 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Whiteboard_backfill_migrates_a_legacy_setting_blob_to_rows()
+    {
+        // A scene left behind as a "whiteboard.{scope}" Setting blob (the old,
+        // migration-free home) must be promoted to typed rows and the blob removed.
+        const string scope = "pi:987654";
+        const string json = """{"Nodes":[{"Id":"leg1","Kind":"note","X":5,"Y":6,"W":160,"H":150,"Text":"legacy","Color":"#FFE8A3","Icon":null,"Points":null}],"Edges":[]}""";
+        using var s = _factory.Services.CreateScope();
+        var db = s.ServiceProvider.GetRequiredService<AtlasDbContext>();
+        db.Settings.Add(new Setting { Key = "whiteboard." + scope, Value = json });
+        await db.SaveChangesAsync();
+
+        await Whiteboards.BackfillAsync(db);
+
+        Assert.Single(db.WhiteboardNodes.Where(n => n.Scope == scope && n.NodeId == "leg1").ToList());
+        Assert.Empty(db.Settings.Where(x => x.Key == "whiteboard." + scope).ToList());
+        // Re-running is a no-op (idempotent) and doesn't duplicate the row.
+        await Whiteboards.BackfillAsync(db);
+        Assert.Single(db.WhiteboardNodes.Where(n => n.Scope == scope).ToList());
+    }
+
+    [Fact]
     public async Task Whiteboard_supports_the_roadmap_scope()
     {
         // Roadmap is a single portfolio-wide whiteboard, gated on cap-roadmap.

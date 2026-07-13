@@ -134,6 +134,38 @@ public class Setting
     public string Value { get; set; } = "";
 }
 
+// A freeform-whiteboard node (ADR-0064). Persisted as a typed row rather than a
+// JSON blob so each live co-editing op is an independent single-row write (no
+// read-modify-write of the whole scene → no lost updates). Scope is the canonical
+// "{kind}:{id}" surface key; NodeId is the client-assigned id, unique within a
+// scope. PointsJson holds a freehand "draw" polyline ([x0,y0,x1,y1,…]) as JSON.
+public class WhiteboardNode
+{
+    public int Id { get; set; }
+    public string Scope { get; set; } = "";
+    public string NodeId { get; set; } = "";
+    public string Kind { get; set; } = "";
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double W { get; set; }
+    public double H { get; set; }
+    public string? Text { get; set; }
+    public string? Color { get; set; }
+    public string? Icon { get; set; }
+    public string? PointsJson { get; set; }
+}
+
+// A freeform-whiteboard connector (ADR-0064) between two nodes in the same scope.
+public class WhiteboardEdge
+{
+    public int Id { get; set; }
+    public string Scope { get; set; } = "";
+    public string EdgeId { get; set; } = "";
+    public string FromNode { get; set; } = "";
+    public string ToNode { get; set; } = "";
+    public string? Color { get; set; }
+}
+
 // A request to delete a project, routed to PMO/Admin for approval. Approving
 // archives the project (soft delete); rejecting drops the request. Lets roles
 // that can't archive directly still ask for a project to be removed.

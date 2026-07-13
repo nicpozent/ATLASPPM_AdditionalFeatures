@@ -92,9 +92,19 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<RoadmapMilestone> RoadmapMilestones => Set<RoadmapMilestone>();
     public DbSet<RoadmapDependency> RoadmapDependencies => Set<RoadmapDependency>();
     public DbSet<RoadmapLink> RoadmapLinks => Set<RoadmapLink>();
+    public DbSet<WhiteboardNode> WhiteboardNodes => Set<WhiteboardNode>();
+    public DbSet<WhiteboardEdge> WhiteboardEdges => Set<WhiteboardEdge>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        // Whiteboard scene rows (ADR-0064). Unique per (scope, client id) so an
+        // upsert is a delete-then-insert of a single row; the scope index keeps
+        // per-surface reads and deletes cheap.
+        b.Entity<WhiteboardNode>().HasKey(x => x.Id);
+        b.Entity<WhiteboardNode>().HasIndex(x => new { x.Scope, x.NodeId }).IsUnique();
+        b.Entity<WhiteboardEdge>().HasKey(x => x.Id);
+        b.Entity<WhiteboardEdge>().HasIndex(x => new { x.Scope, x.EdgeId }).IsUnique();
+        b.Entity<WhiteboardEdge>().HasIndex(x => x.Scope);
         b.Entity<Skill>().HasKey(x => x.Id);
         b.Entity<SkillRating>().HasKey(x => x.Id);
         b.Entity<SkillRating>().HasIndex(x => new { x.SkillId, x.Person });
