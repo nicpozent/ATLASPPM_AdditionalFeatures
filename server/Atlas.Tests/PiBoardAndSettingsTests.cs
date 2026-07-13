@@ -274,4 +274,68 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         var deleted = await Send(HttpMethod.Delete, $"/api/v1/demands/{id}");
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
     }
+
+    // ---- Whiteboard: roundtrip, sanitisation, scope guard, redaction --------
+    [Fact]
+    public async Task Whiteboard_roundtrips_and_sanitises_the_scene()
+    {
+        const string marker = "WB_NOTE_MARKER";
+        var incId = (await Json(await Send(HttpMethod.Post, "/api/v1/increments", new { name = "WB PI" }))).GetProperty("id").GetInt32();
+
+        var body = new
+        {
+            scene = new
+            {
+                nodes = new object[]
+                {
+                    new { id = "n1", kind = "note", x = 10.0, y = 20.0, w = 160.0, h = 150.0, text = marker, color = "#FFE8A3" },
+                    new { id = "far", kind = "rect", x = 1_000_000.0, y = 0.0, w = 100.0, h = 100.0, color = "#FFFFFF" },
+                    new { id = "bad id!", kind = "note", x = 0.0, y = 0.0, w = 40.0, h = 40.0 },   // bad id → dropped
+                    new { id = "n2", kind = "banana", x = 0.0, y = 0.0, w = 40.0, h = 40.0 },       // bad kind → dropped
+                },
+                edges = new object[]
+                {
+                    new { id = "e1", from = "n1", to = "n2" },        // n2 dropped → dangling → dropped
+                    new { id = "e2", from = "n1", to = "missing" },   // dangling → dropped
+                },
+            },
+        };
+
+        var put = await Send(HttpMethod.Put, $"/api/v1/whiteboards/pi/{incId}", body);
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+
+        var get = await Json(await Send(HttpMethod.Get, $"/api/v1/whiteboards/pi/{incId}"));
+        Assert.True(get.GetProperty("canEdit").GetBoolean());           // dev identity edits
+        var nodes = get.GetProperty("scene").GetProperty("nodes");
+        var edges = get.GetProperty("scene").GetProperty("edges");
+        Assert.Equal(2, nodes.GetArrayLength());                        // bad id + bad kind dropped
+        Assert.Equal(0, edges.GetArrayLength());                        // both connectors dangling → dropped
+        // Runaway coordinate clamped to the safety bound.
+        var far = nodes.EnumerateArray().First(n => n.GetProperty("id").GetString() == "far");
+        Assert.True(far.GetProperty("x").GetDouble() <= 20000);
+    }
+
+    [Fact]
+    public async Task Whiteboard_content_is_redacted_from_settings()
+    {
+        const string marker = "WB_SECRET_BRAINSTORM";
+        var incId = (await Json(await Send(HttpMethod.Post, "/api/v1/increments", new { name = "WB PI 2" }))).GetProperty("id").GetInt32();
+        await Send(HttpMethod.Put, $"/api/v1/whiteboards/pi/{incId}", new
+        {
+            scene = new { nodes = new object[] { new { id = "n1", kind = "note", x = 0.0, y = 0.0, w = 160.0, h = 150.0, text = marker } }, edges = new object[] { } },
+        });
+
+        var map = await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.NotNull(map);
+        Assert.DoesNotContain(map!.Keys, k => k.StartsWith("whiteboard."));
+        Assert.DoesNotContain(marker, await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Whiteboard_rejects_an_unknown_scope_kind()
+    {
+        Assert.Equal(HttpStatusCode.NotFound, (await Send(HttpMethod.Get, "/api/v1/whiteboards/banana/1")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Send(HttpMethod.Put, "/api/v1/whiteboards/banana/1", new { scene = new { nodes = new object[] { }, edges = new object[] { } } })).StatusCode);
+    }
 }

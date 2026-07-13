@@ -63,6 +63,12 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   on PI Planning, then generalised to a reusable room concept and extended to the
   **Demand Pipeline funnel** (`demands`) so intake can be worked together. Built
   from the existing theme/components. See ADR-0061 · `docs/pi-board-followups.md`.
+- **Freeform Whiteboard** — a bounded, per-entity brainstorming canvas (sticky
+  notes, shapes, connectors, icons, actors, colour palette) worked live via the
+  room hub. Persisted as a JSON scene per entity; server-sanitised and
+  scope-gated by the same capability as the entity. Shipped as a **Whiteboard
+  tab on PI Planning** first; reused on projects/programs/releases/products.
+  See ADR-0064.
 - **Team SWOT** — a per-team Strengths/Weaknesses/Opportunities/Threats note on
   *My Team*, manager-scoped. Team-level only (individual-member SWOT is out of
   scope: sensitive HR/GDPR data → HRIS).
