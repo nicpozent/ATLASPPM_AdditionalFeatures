@@ -4,6 +4,7 @@
 export interface SoaControl {
   ref: string; title: string; theme: string;
   applicable: boolean; justification: string; status: string; owner: string;
+  autoEvidence?: string;
 }
 
 export interface ThemeSummary {

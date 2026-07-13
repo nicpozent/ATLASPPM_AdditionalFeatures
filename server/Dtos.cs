@@ -51,8 +51,8 @@ public record SecurityReviewGateDto(int Id, string Name, string Type, string Rev
 public record SecurityDto(bool CanEdit, SecurityProfileDto Profile, List<SecurityControlDto> Controls, List<SecurityReviewGateDto> ReviewGates);
 
 // Statement of Applicability (ISO 27001:2022 Annex A).
-public record SoaControlDto(string Ref, string Title, string Theme, bool Applicable, string Justification, string Status, string Owner);
-public record SoaCoverageDto(int Total, int Applicable, int Excluded, int Implemented, int Reviewed, int ImplementedPct);
+public record SoaControlDto(string Ref, string Title, string Theme, bool Applicable, string Justification, string Status, string Owner, string AutoEvidence = "");
+public record SoaCoverageDto(int Total, int Applicable, int Excluded, int Implemented, int Reviewed, int AutoEvidenced, int ImplementedPct);
 public record SoaDto(bool CanEdit, SoaCoverageDto Coverage, List<SoaControlDto> Controls);
 
 public record ProjectTaskDto(int Id, string Code, string Name, string Epic, string Assignee,

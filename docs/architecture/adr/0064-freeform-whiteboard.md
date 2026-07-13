@@ -78,8 +78,10 @@ Designed against the platform's control baseline
   co-editing op is an independent single-row write — no whole-scene read-modify-
   write, so the storage-layer race below is closed. It still rides along in the
   admin backup snapshot (intended).
-- **−** Same-item concurrent edits are still last-write-wins (a CRDT/OT upgrade
-  remains open); this is convergence, not conflict-free merge.
+- **−** Only edits to the *exact same field* of one node remain last-write-wins
+  (cross-field edits now merge). A full CRDT/OT was evaluated and declined as
+  disproportionate — see the addendum. This is field-level convergence, not
+  conflict-free character-level merge.
 
 ## Alternatives considered
 - **Embed a third-party board (Miro/Mural) via iframe/SDK** — rejected: sends
@@ -124,9 +126,19 @@ other's whole scene. Co-editing replaces that with **granular, authorized ops**:
   the whole scene to reconcile.
 
 **Convergence, not CRDT.** Concurrent edits to *different* items are fully
-independent. Concurrent edits to the *same* item are last-write-wins and
-reconcile on the next reconnect/refetch. This is a large step up from whole-scene
-LWW without the weight of a CRDT/OT engine.
+independent. Edits to the *same* node are now **field-level**: a co-editing op
+carries only the properties that changed (a move sends geometry, a recolour sends
+the colour, a text edit sends the text), and the server merges per field — so two
+people editing different aspects of one node (A moves it, B recolours it) both
+survive. Only two edits to the *exact same field* remain last-write-wins,
+reconciling on the next refetch. A full CRDT/OT engine was **evaluated and
+declined**: it would mean a heavy dependency (Yjs/Automerge), replacing the typed
+rows with an opaque CRDT document and a binary update protocol, and conflict-free
+merge semantics for spatial data — disproportionate for a bounded brainstorming
+canvas whose realistic conflict (a sub-RTT race on the *same field* of the *same*
+node) is already rare and self-heals. Field-level merge is the proportionate step:
+it removes the cross-field clobber with no new dependency and keeps the typed-row
+model.
 
 **Residual race — resolved.** The first cut persisted each op by rewriting the
 whole `Setting` scene blob, so two writers to the *same* scene within the same
