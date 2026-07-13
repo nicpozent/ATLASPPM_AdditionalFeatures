@@ -91,6 +91,12 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   **gated off by default** behind a personnel-data processing flag (Integrations
   → Governance), enforced server-side, until DPIA + MBL §11 sign-off — see
   ADR-0063 · `docs/compliance-sweden.md`.
+- **Statement of Applicability** — a per-project **ISO 27001:2022 Annex A** SoA on
+  *Project → Security*: all 93 controls (Organizational / People / Physical /
+  Technological) with an applicability decision, justification, implementation
+  status and owner, plus a coverage roll-up. The Annex A catalogue is static
+  reference data; only the per-project decision is persisted (`SoaEntry`).
+  Governance-scoped (cap-approve), server-authoritative, audited. See ADR-0066.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs

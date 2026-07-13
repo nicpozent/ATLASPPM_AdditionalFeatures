@@ -1151,6 +1151,22 @@ public class SecurityControl
     public int Ord { get; set; }
 }
 
+// One project's applicability decision for a single ISO 27001:2022 Annex A
+// control (the Statement of Applicability). The control catalogue itself is
+// static reference data (Soa.Catalogue); only a project's per-control decision
+// — applicable? why? implementation status, owner — is persisted here. Absent
+// row ⇒ the SoA baseline (applicable, "Not started") for that control.
+public class SoaEntry
+{
+    public int Id { get; set; }
+    public string ProjectId { get; set; } = default!;
+    public string Ref { get; set; } = default!;          // "A.5.1"
+    public bool Applicable { get; set; } = true;
+    public string Justification { get; set; } = "";      // why included / excluded
+    public string Status { get; set; } = "Not started";  // Not started | Planned | Partial | Implemented
+    public string Owner { get; set; } = "";
+}
+
 // A scheduled security/architecture/privacy review checkpoint for a project.
 public class SecurityReviewGate
 {

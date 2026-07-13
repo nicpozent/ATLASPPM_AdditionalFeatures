@@ -9,6 +9,7 @@ import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { toastError } from "@/components/Toast";
 import { SectionTitle, DecLabel } from "./shared";
+import { SoaPanel } from "./SoaPanel";
 
 interface SecProfile {
   classification: string; residency: string; subjects: string; retention: string;
@@ -334,6 +335,9 @@ export function Security({ projectId }: { projectId: string | null }) {
           );
         })}
       </Card>
+
+      {/* Statement of Applicability — full Annex A coverage (ISO 27001) */}
+      <SoaPanel projectId={projectId} />
 
       {addOpen && <AddControlModal projectId={projectId} onClose={() => setAddOpen(false)} />}
       {openCtl && <EditControlModal projectId={projectId} ctl={openCtl} onClose={() => setOpenCtl(null)} />}

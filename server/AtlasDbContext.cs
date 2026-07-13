@@ -94,6 +94,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<RoadmapLink> RoadmapLinks => Set<RoadmapLink>();
     public DbSet<WhiteboardNode> WhiteboardNodes => Set<WhiteboardNode>();
     public DbSet<WhiteboardEdge> WhiteboardEdges => Set<WhiteboardEdge>();
+    public DbSet<SoaEntry> SoaEntries => Set<SoaEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -105,6 +106,9 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<WhiteboardEdge>().HasKey(x => x.Id);
         b.Entity<WhiteboardEdge>().HasIndex(x => new { x.Scope, x.EdgeId }).IsUnique();
         b.Entity<WhiteboardEdge>().HasIndex(x => x.Scope);
+        // Statement of Applicability: one decision per (project, Annex A control).
+        b.Entity<SoaEntry>().HasKey(x => x.Id);
+        b.Entity<SoaEntry>().HasIndex(x => new { x.ProjectId, x.Ref }).IsUnique();
         b.Entity<Skill>().HasKey(x => x.Id);
         b.Entity<SkillRating>().HasKey(x => x.Id);
         b.Entity<SkillRating>().HasIndex(x => new { x.SkillId, x.Person });

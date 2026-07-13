@@ -16,6 +16,7 @@ public static class Endpoints
         api.MapRoleEndpoints();
         api.MapGateEndpoints();
         api.MapSecurityEndpoints();
+        api.MapSoaEndpoints();
         api.MapTaskEndpoints();
         api.MapSprintEndpoints();
         api.MapArtifactEndpoints();
