@@ -58,8 +58,11 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
 
 - **Microsoft Teams notifications** — a third notification channel (webhook +
   Adaptive Card). See ADR-0060 · `docs/teams-setup.md`.
-- **Real-time PI Program Board** — a live swimlane board tab on PI Planning
-  (SignalR presence/cursors). See ADR-0061 · `docs/pi-board-followups.md`.
+- **Real-time collaboration** — live presence, shared cursors and change-sync
+  over a single SignalR "room" hub. First shipped as the **PI Program Board** tab
+  on PI Planning, then generalised to a reusable room concept and extended to the
+  **Demand Pipeline funnel** (`demands`) so intake can be worked together. Built
+  from the existing theme/components. See ADR-0061 · `docs/pi-board-followups.md`.
 - **Team SWOT** — a per-team Strengths/Weaknesses/Opportunities/Threats note on
   *My Team*, manager-scoped. Team-level only (individual-member SWOT is out of
   scope: sensitive HR/GDPR data → HRIS).

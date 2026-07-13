@@ -53,23 +53,26 @@ public static class AtlasTelemetry
     public static void RecordTeamsDelivery(bool ok) =>
         TeamsNotifications.Add(1, new KeyValuePair<string, object?>("outcome", ok ? "ok" : "error"));
 
-    // Real-time PI board (ADR-0061): count of change-pings broadcast to viewers.
+    // Real-time collaboration hub (ADR-0061): count of change-pings broadcast to
+    // viewers across all rooms (PI boards, the demand funnel, …). Metric name kept
+    // stable (atlas.board.*) for dashboard continuity as rooms were generalised.
     static readonly Counter<long> BoardBroadcasts =
-        Meter.CreateCounter<long>("atlas.board.broadcasts", unit: "{broadcast}", description: "PI board change-pings broadcast to viewers.");
+        Meter.CreateCounter<long>("atlas.board.broadcasts", unit: "{broadcast}", description: "Real-time room change-pings broadcast to viewers.");
 
     public static void RecordBoardBroadcast() => BoardBroadcasts.Add(1);
 
-    // Live PI board hub state — observable gauges registered once at startup with
-    // accessors into the hub's in-memory presence map (see BoardHub / Program.cs).
+    // Live collaboration-hub state — observable gauges registered once at startup
+    // with accessors into the hub's in-memory presence map (see BoardHub /
+    // Program.cs). Counts span every room (PI boards, the demand funnel, …).
     static bool _boardGaugesRegistered;
     public static void RegisterBoardGauges(Func<int> activeConnections, Func<int> activeBoards)
     {
         if (_boardGaugesRegistered) return;
         _boardGaugesRegistered = true;
         Meter.CreateObservableGauge("atlas.board.connections", activeConnections,
-            unit: "{connection}", description: "Live PI board hub connections.");
+            unit: "{connection}", description: "Live real-time hub connections across all rooms.");
         Meter.CreateObservableGauge("atlas.board.active", activeBoards,
-            unit: "{board}", description: "PI boards with at least one viewer.");
+            unit: "{board}", description: "Real-time rooms with at least one viewer.");
     }
 
     // DB command duration (seconds) — recorded by AtlasDbMetricsInterceptor so EF

@@ -4,23 +4,31 @@ using Microsoft.AspNetCore.SignalR;
 namespace Atlas.Api;
 
 // ============================================================================
-//  Real-time PI Program Board (ADR-0061). A SignalR hub that gives the board
-//  live presence, shared cursors and change-notifications so multiple planners
-//  can work the same increment together.
+//  Real-time collaboration hub (ADR-0061). A single SignalR hub that gives any
+//  shared surface — the PI Program Board, the Demand Pipeline funnel, and future
+//  canvases — live presence, shared cursors and change-notifications so multiple
+//  people can work the same thing together.
+//
+//  Rooms:
+//  - A "room" is an opaque scope string that names one collaborative surface,
+//    e.g. "pi:5" (PI increment #5) or "demands" (the portfolio demand funnel).
+//    Clients join a room, receive presence/cursors for that room only, and are
+//    pinged when its underlying data changes. Rooms are validated (§Normalize)
+//    so a client can never inject an arbitrary SignalR group name.
 //
 //  Design & security:
-//  - The board's data is owned by the REST API (PiBoard/Pip endpoints, which
-//    enforce cap-schedule). This hub carries NO domain writes — it only relays
-//    presence/cursors and a "something changed, refetch" ping. That keeps the
-//    authorization surface small: there is no way to mutate portfolio data
-//    through the hub, so a socket can't escalate past what REST already allows.
+//  - Each room's data is owned by the REST API (PiBoard/Pip enforce cap-schedule;
+//    the demand endpoints enforce cap-submit-demand / cap-demand-scoring). This
+//    hub carries NO domain writes — it only relays presence/cursors and a
+//    "something changed, refetch" ping. That keeps the authorization surface
+//    small: there is no way to mutate portfolio data through the hub, so a socket
+//    can't escalate past what REST already allows.
 //  - Access mirrors the API: the hub is mapped with RequireAuthorization when
-//    Auth:Enabled, so only authenticated principals can connect (Program.cs
-//    also teaches JwtBearer to read the access_token query string that browsers
-//    must use for the WebSocket handshake).
-//  - Traffic is scoped to a per-increment group ("pi:{id}"), so a client only
-//    ever receives events for the board it explicitly joined — no cross-board
-//    leakage.
+//    Auth:Enabled, so only authenticated principals can connect (Program.cs also
+//    teaches JwtBearer to read the access_token query string that browsers must
+//    use for the WebSocket handshake).
+//  - Traffic is scoped to a per-room group, so a client only ever receives events
+//    for the room it explicitly joined — no cross-room leakage.
 //  - Data minimisation (GDPR): presence is display-name + initials + a colour
 //    derived from the connection id. No email or stable user id is broadcast,
 //    and nothing here is persisted — presence/cursor state lives only in memory
@@ -28,39 +36,58 @@ namespace Atlas.Api;
 // ============================================================================
 public class BoardHub : Hub
 {
-    // Lightweight, non-PII presence broadcast to peers on a board.
+    // Lightweight, non-PII presence broadcast to peers in a room.
     public record Peer(string Id, string Name, string Initials, string Color);
 
-    // incrementId → (connectionId → peer). In-memory only; a process restart
-    // simply re-derives it as clients reconnect.
-    static readonly ConcurrentDictionary<int, ConcurrentDictionary<string, Peer>> Boards = new();
+    // room key → (connectionId → peer). In-memory only; a process restart simply
+    // re-derives it as clients reconnect.
+    static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, Peer>> Rooms = new();
 
     // Observability accessors (atlas.board.* gauges — see AtlasTelemetry).
-    public static int ActiveConnections => Boards.Values.Sum(b => b.Count);
-    public static int ActiveBoards => Boards.Count;
+    public static int ActiveConnections => Rooms.Values.Sum(b => b.Count);
+    public static int ActiveBoards => Rooms.Count;
 
-    // The connection's current board, so OnDisconnected can clean up without the
-    // client having to tell us which board it left.
-    int? CurrentBoard
+    // The connection's current room, so OnDisconnected can clean up without the
+    // client having to tell us which room it left.
+    string? CurrentRoom
     {
-        get => Context.Items.TryGetValue("pi", out var v) && v is int i ? i : null;
-        set { if (value is null) Context.Items.Remove("pi"); else Context.Items["pi"] = value; }
+        get => Context.Items.TryGetValue("room", out var v) && v is string s ? s : null;
+        set { if (value is null) Context.Items.Remove("room"); else Context.Items["room"] = value; }
     }
 
-    static string Group(int incrementId) => $"pi:{incrementId}";
+    // Room keys are opaque scope strings ("pi:5", "demands"). Normalise defensively
+    // so a client can't inject arbitrary group names or unbounded strings: trim,
+    // lowercase, allow only [a-z0-9:_-], cap the length. Returns null for anything
+    // invalid — callers then no-op rather than touching a group.
+    static string? Normalize(string? roomId)
+    {
+        if (string.IsNullOrWhiteSpace(roomId)) return null;
+        var r = roomId.Trim().ToLowerInvariant();
+        if (r.Length > 64) return null;
+        foreach (var c in r)
+            if (!(c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or ':' or '_' or '-')) return null;
+        return r;
+    }
 
-    // Broadcast a "board changed, refetch" ping to everyone viewing an increment,
-    // from OUTSIDE the hub (a REST mutation). This is how server-side changes —
-    // an objective edited on another tab, a dependency added via the API — reach
-    // open boards live, not just changes made on the board itself. Contentless,
+    // Broadcast a "room changed, refetch" ping to everyone in a room, from OUTSIDE
+    // the hub (a REST mutation). This is how server-side changes — a demand moved
+    // through the funnel on another tab, an objective edited via the API — reach
+    // open surfaces live, not just changes made in the room itself. Contentless,
     // like the in-hub ping; peers refetch the authoritative state. Best-effort:
     // a transport hiccup must never fail the originating write.
-    public static async Task NotifyGroupAsync(IHubContext<BoardHub> hub, int incrementId)
+    public static async Task NotifyRoomAsync(IHubContext<BoardHub> hub, string roomId)
     {
+        var room = Normalize(roomId);
+        if (room is null) return;
         AtlasTelemetry.RecordBoardBroadcast();
-        try { await hub.Clients.Group(Group(incrementId)).SendAsync("BoardChanged"); }
+        try { await hub.Clients.Group(room).SendAsync("BoardChanged"); }
         catch { /* the REST write already succeeded; the ping is advisory */ }
     }
+
+    // Convenience for PI increments — the increment board's room key is "pi:{id}".
+    // Keeps the many Pip/PiBoard callers reading naturally.
+    public static Task NotifyGroupAsync(IHubContext<BoardHub> hub, int incrementId) =>
+        NotifyRoomAsync(hub, $"pi:{incrementId}");
 
     // A stable, pleasant colour per connection (no identity leak — derived from
     // the opaque connection id, not from the user).
@@ -82,55 +109,61 @@ public class BoardHub : Hub
         return (first + last).ToUpperInvariant();
     }
 
-    // Join a board: register presence and hand the caller the current roster,
-    // then tell peers someone arrived. `name` is the caller's display name; it is
+    // Join a room: register presence and hand the caller the current roster, then
+    // tell peers someone arrived. `name` is the caller's display name; it is
     // cosmetic (identity is still enforced by the API), so we cap its length and
-    // never trust it for authorization.
-    public async Task JoinBoard(int incrementId, string? name)
+    // never trust it for authorization. An unrecognised room is a silent no-op.
+    public async Task JoinRoom(string roomId, string? name)
     {
-        var display = string.IsNullOrWhiteSpace(name) ? "Planner" : name.Trim();
+        var room = Normalize(roomId);
+        if (room is null) return;
+
+        var display = string.IsNullOrWhiteSpace(name) ? "Guest" : name.Trim();
         if (display.Length > 60) display = display[..60];
 
-        // Leave any previous board first (a client that switches increments).
-        if (CurrentBoard is { } prev && prev != incrementId) await LeaveBoard(prev);
+        // Leave any previous room first (a client that switches surfaces).
+        if (CurrentRoom is { } prev && prev != room) await LeaveRoom(prev);
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, Group(incrementId));
-        CurrentBoard = incrementId;
+        await Groups.AddToGroupAsync(Context.ConnectionId, room);
+        CurrentRoom = room;
 
         var peer = new Peer(Context.ConnectionId, display, InitialsOf(display), ColorFor(Context.ConnectionId));
-        var board = Boards.GetOrAdd(incrementId, _ => new());
-        board[Context.ConnectionId] = peer;
+        var members = Rooms.GetOrAdd(room, _ => new());
+        members[Context.ConnectionId] = peer;
 
         // Send the joiner the full roster; tell everyone else just the newcomer.
-        await Clients.Caller.SendAsync("Presence", board.Values.ToArray());
-        await Clients.OthersInGroup(Group(incrementId)).SendAsync("PeerJoined", peer);
+        await Clients.Caller.SendAsync("Presence", members.Values.ToArray());
+        await Clients.OthersInGroup(room).SendAsync("PeerJoined", peer);
     }
 
-    public async Task LeaveBoard(int incrementId)
+    public async Task LeaveRoom(string roomId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, Group(incrementId));
-        if (Boards.TryGetValue(incrementId, out var board) && board.TryRemove(Context.ConnectionId, out _))
+        var room = Normalize(roomId);
+        if (room is null) return;
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, room);
+        if (Rooms.TryGetValue(room, out var members) && members.TryRemove(Context.ConnectionId, out _))
         {
-            if (board.IsEmpty) Boards.TryRemove(incrementId, out _);
-            await Clients.OthersInGroup(Group(incrementId)).SendAsync("PeerLeft", Context.ConnectionId);
+            if (members.IsEmpty) Rooms.TryRemove(room, out _);
+            await Clients.OthersInGroup(room).SendAsync("PeerLeft", Context.ConnectionId);
         }
-        if (CurrentBoard == incrementId) CurrentBoard = null;
+        if (CurrentRoom == room) CurrentRoom = null;
     }
 
     // Relay a cursor position to peers. Coordinates are normalised [0,1] fractions
-    // of the board surface (resolution-independent); we clamp defensively and drop
-    // anything for a board the caller hasn't joined. Ephemeral — never stored.
-    public async Task Cursor(int incrementId, double x, double y)
+    // of the room surface (resolution-independent); we clamp defensively and drop
+    // anything for a room the caller hasn't joined. Ephemeral — never stored.
+    public async Task Cursor(string roomId, double x, double y)
     {
-        if (CurrentBoard != incrementId) return;
+        var room = Normalize(roomId);
+        if (room is null || CurrentRoom != room) return;
         static double Clamp(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
-        await Clients.OthersInGroup(Group(incrementId))
+        await Clients.OthersInGroup(room)
             .SendAsync("Cursor", Context.ConnectionId, Clamp(x), Clamp(y));
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (CurrentBoard is { } id) await LeaveBoard(id);
+        if (CurrentRoom is { } room) await LeaveRoom(room);
         await base.OnDisconnectedAsync(exception);
     }
 }

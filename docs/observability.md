@@ -209,9 +209,9 @@ metrics on the `Atlas.Api` meter (Prometheus names shown):
 | `atlas.sync.queue.depth` | `atlas_sync_queue_depth` | Pending background sync jobs, by `connector` |
 | `atlas.capacity.alerts` | `atlas_capacity_alerts_total` | Over-allocation alerts delivered |
 | `atlas.teams.notifications` | `atlas_teams_notifications_total` | Teams channel posts, by `outcome` (ok/error) — drives a delivery-failure alert |
-| `atlas.board.broadcasts` | `atlas_board_broadcasts_total` | PI board change-pings broadcast to viewers |
-| `atlas.board.connections` | `atlas_board_connections` | Live PI board hub connections (gauge) |
-| `atlas.board.active` | `atlas_board_active` | PI boards with at least one viewer (gauge) |
+| `atlas.board.broadcasts` | `atlas_board_broadcasts_total` | Real-time room change-pings broadcast to viewers (PI boards, demand funnel, …) |
+| `atlas.board.connections` | `atlas_board_connections` | Live real-time hub connections across all rooms (gauge) |
+| `atlas.board.active` | `atlas_board_active` | Real-time rooms with at least one viewer (gauge) |
 | `atlas.db.command.duration` | `atlas_db_command_duration_seconds_*` | EF Core command latency (via an interceptor) |
 
 **Dashboards** (`deploy/observability/grafana/dashboards/`, auto-provisioned):

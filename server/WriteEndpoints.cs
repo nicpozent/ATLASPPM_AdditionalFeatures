@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -32,6 +33,11 @@ public record UpdateKrReq(int? Progress, string? LinkType, string? LinkId);
 
 public static class WriteEndpoints
 {
+    // The Demand Pipeline funnel is one portfolio-wide collaborative surface, so
+    // it shares a single real-time room. Mutations below ping it (presence &
+    // cursors come from the hub; this is the "refetch, something moved" signal).
+    const string DemandRoom = "demands";
+
     static readonly string[] Stages = { "draft", "backlog", "approved", "progress", "hold" };
     // Leadership roles auto-notified on every demand create / status change
     // (role-addressed, in-app for anyone holding the role — no subscription needed).
@@ -54,7 +60,7 @@ public static class WriteEndpoints
     public static void MapAtlasWriteEndpoints(this RouteGroupBuilder api)
     {
         // ---- Demands -------------------------------------------------------
-        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/demands", async (CreateDemandReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-submit-demand", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
@@ -100,6 +106,7 @@ public static class WriteEndpoints
             await Notifications.EmitToRolesAsync(db, cfg, Notifications.Created, DemandWatchRoles,
                 $"New demand: {d.Title}", $"{d.Id} · {d.Title} ({d.Dept}) was submitted.", "demand", d.Id,
                 Permissions.CallerRoleKeys(http, cfg));
+            await BoardHub.NotifyRoomAsync(hub, DemandRoom);
             return Results.Created($"/api/v1/demands/{d.Id}",
                 new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
@@ -156,7 +163,7 @@ public static class WriteEndpoints
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });
 
-        api.MapPatch("/demands/{id}", async (string id, UpdateDemandStageReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/demands/{id}", async (string id, UpdateDemandStageReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-demand-scoring", "E") is { } denied) return denied;
             if (!Stages.Contains(req.Stage)) return Results.BadRequest(new { error = "Unknown stage." });
@@ -179,10 +186,11 @@ public static class WriteEndpoints
                     $"Demand {d.Title} {msg}", $"{d.Id} · {d.Title} {msg}.", "demand", d.Id,
                     Permissions.CallerRoleKeys(http, cfg));
             }
+            await BoardHub.NotifyRoomAsync(hub, DemandRoom);
             return Results.Ok(new DemandDto(d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date));
         });
 
-        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
+        api.MapDelete("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
@@ -191,6 +199,7 @@ public static class WriteEndpoints
             db.Demands.Remove(d);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Deleted demand", id));
             await db.SaveChangesAsync();
+            await BoardHub.NotifyRoomAsync(hub, DemandRoom);
             return Results.NoContent();
         });
 
