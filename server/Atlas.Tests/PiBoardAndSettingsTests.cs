@@ -450,6 +450,30 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Whiteboard_node_patches_merge_per_field_without_clobbering()
+    {
+        var incId = (await Json(await Send(HttpMethod.Post, "/api/v1/increments", new { name = "WB PI merge" }))).GetProperty("id").GetInt32();
+        var wb = $"/api/v1/whiteboards/pi/{incId}";
+
+        // Create a node.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node",
+            new { id = "m1", kind = "note", x = 10.0, y = 10.0, w = 160.0, h = 150.0, color = "#FFE8A3" })).StatusCode);
+
+        // Two independent field-level edits: one recolours, one moves.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "m1", color = "#BBDEFB" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "m1", x = 300.0, y = 220.0 })).StatusCode);
+
+        // Both survive — the move did not revert the colour, the recolour did not
+        // revert the position, and the untouched size is intact.
+        var node = (await Json(await Send(HttpMethod.Get, wb))).GetProperty("scene").GetProperty("nodes")
+            .EnumerateArray().First(n => n.GetProperty("id").GetString() == "m1");
+        Assert.Equal("#BBDEFB", node.GetProperty("color").GetString());
+        Assert.Equal(300.0, node.GetProperty("x").GetDouble());
+        Assert.Equal(220.0, node.GetProperty("y").GetDouble());
+        Assert.Equal(160.0, node.GetProperty("w").GetDouble());
+    }
+
+    [Fact]
     public async Task Whiteboard_backfill_migrates_a_legacy_setting_blob_to_rows()
     {
         // A scene left behind as a "whiteboard.{scope}" Setting blob (the old,

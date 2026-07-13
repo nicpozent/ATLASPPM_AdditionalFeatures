@@ -9,6 +9,9 @@ namespace Atlas.Api;
 // Points is only used by freehand "draw" nodes: a flat [x0,y0,x1,y1,…] polyline
 // in absolute canvas coordinates.
 public record WbNode(string Id, string Kind, double X, double Y, double W, double H, string? Text, string? Color, string? Icon, double[]? Points = null);
+// A partial node update — every field optional except the id, so a co-editing op
+// carries only what changed (field-level merge; see the node endpoint).
+public record WbNodePatch(string Id, string? Kind, double? X, double? Y, double? W, double? H, string? Text, string? Color, string? Icon, double[]? Points);
 public record WbEdge(string Id, string From, string To, string? Color);
 public record WbScene(List<WbNode>? Nodes, List<WbEdge>? Edges);
 public record SaveWhiteboardReq(WbScene? Scene);
@@ -238,35 +241,54 @@ public static class Whiteboards
         // Because the op originates from an authorized REST call, peers can trust
         // and render it without re-checking permissions (the hub never lets a
         // client send an op). Concurrent edits to *different* items are
-        // independent; same-item edits are last-write-wins and reconcile on the
-        // next reconnect/refetch.
+        // independent. For the *same* item, writes are FIELD-LEVEL: a patch only
+        // carries the properties that changed, so two people editing different
+        // aspects of one node (A moves it, B recolours it) both survive — no
+        // last-write-wins clobber across fields. Two edits to the *same* field are
+        // still last-write-wins and reconcile on the next refetch. (This is the
+        // proportionate step below a CRDT/OT engine, which would be disproportionate
+        // for a bounded brainstorming canvas — see ADR-0064.)
 
-        // Upsert a single node (add or replace by id).
-        api.MapPut("/whiteboards/{kind}/{id}/node", async (string kind, string id, WbNode node, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
+        // Upsert a single node. The body is a partial patch (all fields optional
+        // except the id): a brand-new node must carry kind + geometry; an existing
+        // node merges only the provided, sanitised fields (single-row write).
+        api.MapPut("/whiteboards/{kind}/{id}/node", async (string kind, string id, WbNodePatch patch, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             var (scope, denied) = await AuthScope(kind, id, http, db, cfg);
             if (denied is not null) return denied;
-            var clean = SanitizeNode(node);
-            if (clean is null) return Results.BadRequest(new { error = "Invalid node." });
+            if (patch.Id is null || !IdRe.IsMatch(patch.Id)) return Results.BadRequest(new { error = "Invalid node id." });
 
-            // Upsert just this node's row — no whole-scene read-modify-write.
-            var existing = await db.WhiteboardNodes.FirstOrDefaultAsync(n => n.Scope == scope && n.NodeId == clean.Id);
+            var existing = await db.WhiteboardNodes.FirstOrDefaultAsync(n => n.Scope == scope && n.NodeId == patch.Id);
+            WbNode result;
             if (existing is null)
             {
+                // Create — needs a kind and full geometry (a bare patch can't seed a node).
+                if (patch.Kind is null || patch.X is null || patch.Y is null || patch.W is null || patch.H is null)
+                    return Results.BadRequest(new { error = "A new node needs a kind and geometry." });
+                var clean = SanitizeNode(new WbNode(patch.Id, patch.Kind, patch.X.Value, patch.Y.Value, patch.W.Value, patch.H.Value, patch.Text, patch.Color, patch.Icon, patch.Points));
+                if (clean is null) return Results.BadRequest(new { error = "Invalid node." });
                 if (await db.WhiteboardNodes.CountAsync(n => n.Scope == scope) >= MaxNodes)
                     return Results.BadRequest(new { error = "This whiteboard is full." });
                 db.WhiteboardNodes.Add(ToRow(scope!, clean));
+                result = clean;
             }
             else
             {
-                var row = ToRow(scope!, clean);
-                existing.Kind = row.Kind; existing.X = row.X; existing.Y = row.Y; existing.W = row.W; existing.H = row.H;
-                existing.Text = row.Text; existing.Color = row.Color; existing.Icon = row.Icon; existing.PointsJson = row.PointsJson;
+                // Merge only the provided fields (kind is immutable once created).
+                if (patch.X is { } x) existing.X = Clamp(x, -MaxCoord, MaxCoord);
+                if (patch.Y is { } y) existing.Y = Clamp(y, -MaxCoord, MaxCoord);
+                if (patch.W is { } w) existing.W = Clamp(w, MinSize, MaxSize);
+                if (patch.H is { } h) existing.H = Clamp(h, MinSize, MaxSize);
+                if (patch.Text is not null) existing.Text = Trim(patch.Text, MaxText);
+                if (patch.Color is not null) existing.Color = Color(patch.Color);
+                if (patch.Icon is not null) existing.Icon = Icon(patch.Icon);
+                if (patch.Points is not null) { var p = Points(patch.Points); existing.PointsJson = p is null ? null : JsonSerializer.Serialize(p); }
+                result = ToWbNode(existing);
             }
-            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Edited whiteboard node", $"{scope} · {clean.Id}"));
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Whiteboard", "Edited whiteboard node", $"{scope} · {patch.Id}"));
             await db.SaveChangesAsync();
-            await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "node", node = clean });
-            return Results.Ok(clean);
+            await BoardHub.NotifyRoomOpAsync(hub, Room(scope!), new { t = "node", node = result });
+            return Results.Ok(result);
         });
 
         // Delete a node (and any connectors touching it).

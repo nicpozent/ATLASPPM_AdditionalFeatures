@@ -53,6 +53,11 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const persist = useCallback((run: Promise<unknown>) => { run.catch(() => reconcile()); }, [reconcile]);
   const base = `/whiteboards/${kind}/${id}`;
   const pushNode = useCallback((node: WbNode) => persist(api(`${base}/node`, { method: "PUT", body: JSON.stringify(node) })), [persist, base]);
+  // Field-level update: send only the changed properties (plus the id) so a
+  // concurrent edit to a different property of the same node isn't clobbered —
+  // the server merges per field (see Whiteboards.cs). Creation still uses pushNode.
+  const patchNode = useCallback((patch: Partial<WbNode> & { id: string }) =>
+    persist(api(`${base}/node`, { method: "PUT", body: JSON.stringify(patch) })), [persist, base]);
   const pushDelNode = useCallback((nid: string) => persist(api(`${base}/node/${encodeURIComponent(nid)}`, { method: "DELETE" })), [persist, base]);
   const pushEdge = useCallback((edge: WbEdge) => persist(api(`${base}/edge`, { method: "PUT", body: JSON.stringify(edge) })), [persist, base]);
   const pushDelEdge = useCallback((eid: string) => persist(api(`${base}/edge/${encodeURIComponent(eid)}`, { method: "DELETE" })), [persist, base]);
@@ -242,7 +247,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     drag.current = null; dragIdRef.current = null;
     interacting.current = false;
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
-    if (node) pushNode(node);   // persist the moved/resized node (one granular op)
+    // Persist only the geometry that a move/resize changes — a field-level patch,
+    // so a peer's concurrent recolour/text edit on the same node isn't lost.
+    if (node) patchNode({ id: node.id, x: node.x, y: node.y, w: node.w, h: node.h, points: node.points });
   };
 
   // Start a drag-to-connect wire from a node's connector handle.
@@ -286,7 +293,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     const nid = editingRef.current;
     setEditing(null); editingRef.current = null; interacting.current = false;
     const node = nid ? sceneRef.current.nodes.find((n) => n.id === nid) : null;
-    if (node) pushNode(node);
+    if (node) patchNode({ id: node.id, text: node.text ?? "" });
   };
 
   // --- Toolbar actions on the selection ---
@@ -294,7 +301,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     setNewColor(c); setInkColor(c);
     if (sel) {
       const node = sceneRef.current.nodes.find((n) => n.id === sel);
-      if (node) { const upd = { ...node, color: c }; setScene((s) => updateNode(s, sel, { color: c })); pushNode(upd); }
+      if (node) { setScene((s) => updateNode(s, sel, { color: c })); patchNode({ id: node.id, color: c }); }
     }
   };
   const deleteSel = useCallback(() => {
@@ -318,8 +325,8 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     const cy = Math.max(0, Math.min(CANVAS_H - node.h, node.y + dy));
     const patch = translateNode(node, cx - node.x, cy - node.y);
     setScene((s) => updateNode(s, id, patch));
-    pushNode({ ...node, ...patch });
-  }, [pushNode]);
+    patchNode({ id, ...patch });
+  }, [patchNode]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return;
