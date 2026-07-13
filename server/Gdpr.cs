@@ -77,8 +77,24 @@ public static class Gdpr
             var blockersOwned = (await db.Blockers.ToListAsync()).Where(b => Eq(b.Owner)).Select(b => new { b.Id, b.Title }).ToList();
             var demandsRaised = (await db.Demands.ToListAsync()).Where(d => Eq(d.Requester)).Select(d => new { d.Id, d.Title }).ToList();
 
+            // Manager's development plan for this subject (Setting-stored, keyed by
+            // display name — ADR-0062). Sensitive personal data, so it MUST appear
+            // in a subject-access export.
+            var developmentPlan = new List<object>();
+            var devPlanRaw = (await db.Settings.FindAsync($"devplan.{s}"))?.Value;
+            if (!string.IsNullOrWhiteSpace(devPlanRaw))
+            {
+                try
+                {
+                    if (System.Text.Json.JsonSerializer.Deserialize<DevPlan>(devPlanRaw) is { } p)
+                        developmentPlan.Add(new { p.Strengths, p.GrowthAreas, p.Goals, p.UpdatedAt, p.UpdatedBy });
+                }
+                catch { /* corrupt value — skip */ }
+            }
+
             var categories = new Dictionary<string, object>
             {
+                ["developmentPlan"] = developmentPlan,
                 ["resourceAllocation"] = resources,
                 ["directoryMembership"] = directory,
                 ["productAllocations"] = productAllocations,
@@ -97,7 +113,7 @@ public static class Gdpr
             var total = resources.Count + directory.Count + productAllocations.Count + productMemberships.Count
                 + subscriptions.Count + notificationPreferences.Count + notifications.Count + auditActivity.Count
                 + ownedProjects.Count + ownedPrograms.Count + ownedProducts.Count + ownedObjectives.Count
-                + blockersOwned.Count + demandsRaised.Count;
+                + blockersOwned.Count + demandsRaised.Count + developmentPlan.Count;
 
             // Accessing a subject's full record is itself auditable.
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "GDPR", "Exported data-subject record", $"{s} · {total} record(s)"));

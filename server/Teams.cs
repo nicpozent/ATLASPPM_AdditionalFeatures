@@ -233,6 +233,12 @@ public static class Teams
             var m = await db.TeamMembers.FindAsync(id);
             if (m is null) return Results.NotFound();
             db.TeamMembers.Remove(m);
+            // Explicit removal is a real leaver signal — clean up their development
+            // plan so it doesn't orphan (keyed by display name; ADR-0062/0063). The
+            // bulk directory re-sync deliberately does NOT do this, to avoid deleting
+            // a plan during no-Uid→Uid re-keying churn.
+            var devPlan = await db.Settings.FindAsync($"devplan.{m.DisplayName}");
+            if (devPlan is not null) db.Settings.Remove(devPlan);
             await db.SaveChangesAsync();
             return Results.NoContent();
         });

@@ -217,4 +217,38 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.False((await Json(await Send(HttpMethod.Get, "/api/v1/teams/swot"))).GetProperty("enabled").GetBoolean());
         Assert.False((await Json(await Send(HttpMethod.Get, "/api/v1/devplans"))).GetProperty("enabled").GetBoolean());
     }
+
+    // ---- Personnel data lifecycle: subject export + erasure ------------------
+    [Fact]
+    public async Task Gdpr_export_includes_the_development_plan()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            // PascalCase keys — matches how the app stores it (JsonSerializer.Serialize
+            // with default options), which the export then deserialises case-sensitively.
+            db.Settings.Add(new Setting { Key = "devplan.Erik Svensson", Value = "{\"Strengths\":\"EXPORT_MARK\",\"GrowthAreas\":\"\",\"Goals\":\"\",\"UpdatedAt\":\"\",\"UpdatedBy\":\"mgr\"}" });
+            await db.SaveChangesAsync();
+        }
+        var raw = await (await Send(HttpMethod.Get, "/api/v1/gdpr/export?subject=Erik%20Svensson")).Content.ReadAsStringAsync();
+        Assert.Contains("developmentPlan", raw);
+        Assert.Contains("EXPORT_MARK", raw);
+    }
+
+    [Fact]
+    public async Task Gdpr_erase_deletes_the_development_plan()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            db.Settings.Add(new Setting { Key = "devplan.Nina Berg", Value = "{\"strengths\":\"ERASE_MARK\"}" });
+            await db.SaveChangesAsync();
+        }
+        (await Send(HttpMethod.Post, "/api/v1/gdpr/erase?subject=Nina%20Berg")).EnsureSuccessStatusCode();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            Assert.Null(await db.Settings.FindAsync("devplan.Nina Berg"));
+        }
+    }
 }
