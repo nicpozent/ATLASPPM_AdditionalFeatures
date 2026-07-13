@@ -100,4 +100,22 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.DoesNotContain("workflows", raw);
         Assert.DoesNotContain("TOKEN", raw);
     }
+
+    // ---- Backup snapshot now captures every table's structured data ---------
+    [Fact]
+    public async Task Snapshot_includes_pi_planning_and_previously_missing_tables()
+    {
+        await Send(HttpMethod.Post, "/api/v1/increments", new { name = "Backup PI", key = "BKP" });
+
+        var res = await Send(HttpMethod.Get, "/api/v1/backups/snapshot.json");
+        res.EnsureSuccessStatusCode();
+        var json = await res.Content.ReadAsStringAsync();
+
+        // Tables that used to be absent from the snapshot are now present…
+        foreach (var key in new[] { "increments", "piObjectives", "piDependencies", "piIterations",
+                                    "skills", "skillRatings", "requirements", "roadmapItems", "subTeams", "notifications" })
+            Assert.Contains($"\"{key}\"", json);
+        // …and the row we just created is actually captured.
+        Assert.Contains("Backup PI", json);
+    }
 }
