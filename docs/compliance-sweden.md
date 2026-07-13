@@ -42,6 +42,22 @@
 | **Säkerhetsskyddslagen (2018:585)**, **kamerabevakningslagen (2018:1200)** | **Not applicable** — no security-sensitive activity, no cameras. | Listed to rule out. |
 | **Visselblåsarlagen (2021:890)** | Out of scope | Only if Atlas becomes a whistleblowing channel (it isn't). |
 
+## Implemented lifecycle controls
+- **Subject access (Art. 15)** — development plans are included in `GET /gdpr/export`.
+- **Erasure (Art. 17)** — `POST /gdpr/erase` deletes the subject's development plan.
+- **Leaver cleanup** — explicit member removal deletes that person's development
+  plan (the bulk directory re-sync deliberately does **not**, to avoid deleting a
+  plan during no-Uid→Uid re-keying churn).
+- **Off-by-default gate** — SWOT + development plans are disabled until
+  `personnel.assessmentsEnabled` is set (server-enforced; ADR-0063).
+- *Team SWOT is team-level, not a person's personal data, so it is not part of
+  subject export/erasure; set the retention/cleanup policy for it separately.*
+
+**Backup note**: the full snapshot (admin-only download) now contains the Teams
+webhook secret **and** personnel-assessment data. Treat backup files as
+sensitive — store them encrypted with restricted access; don't email/share them
+casually.
+
 ## Tracked to-dos (before enabling personnel features in production)
 1. **DPIA** for SWOT / development plans / skills + the board's presence/monitoring aspect — a pre-filled template is in [`docs/dpia-personnel-data.md`](./dpia-personnel-data.md).
 2. **MBL §11 negotiation** with the unions.

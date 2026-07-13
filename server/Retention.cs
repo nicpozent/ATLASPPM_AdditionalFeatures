@@ -128,6 +128,12 @@ public static class Retention
         foreach (var b in (await db.Blockers.ToListAsync()).Where(b => Eq(b.Owner))) { b.Owner = NameToken(b.Owner); changed++; }
         foreach (var d in (await db.Demands.ToListAsync()).Where(d => Eq(d.Requester))) { d.Requester = NameToken(d.Requester); changed++; }
 
+        // A development plan is entirely about the subject (manager's private note),
+        // so erase = delete the row rather than tokenise. Keyed by display name in
+        // the Setting store (ADR-0062/0063).
+        var devPlan = await db.Settings.FindAsync($"devplan.{s}");
+        if (devPlan is not null) { db.Settings.Remove(devPlan); changed++; }
+
         if (changed > 0) await db.SaveChangesAsync();
         return changed;
     }

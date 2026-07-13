@@ -40,6 +40,7 @@ trigger. A DPIA is therefore expected before go-live.
 | Processing before governance sign-off | **Off-by-default gate** (`personnel.assessmentsEnabled`), server-enforced: writes 403, reads return no data until enabled (ADR-0063). |
 | Lack of accountability | Every write audited (who edited whose record — not content) in the audit log. |
 | Function creep to adversarial assessment | Development framing by design; individual SWOT deliberately not built. |
+| No subject access / erasure of the note | Included in `GET /gdpr/export`; deleted by `POST /gdpr/erase` and on explicit member removal. |
 | Monitoring via the live board | Presence/cursors are ephemeral, non-PII-minimised (name/initials only), never persisted; **[DPO: cover in the privacy notice; assess proportionality; MBL].** |
 
 ## 5. Residual risk & open actions **[org to complete before enabling the gate]**
