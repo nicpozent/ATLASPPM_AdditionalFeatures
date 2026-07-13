@@ -158,6 +158,16 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                     return (
                       <div key={t.id} draggable={canMove} onDragStart={() => { dragId.current = t.id; }}
                         onClick={() => setOpenId(t.id)}
+                        role="button" tabIndex={0}
+                        aria-label={`${t.code} ${t.name}. ${t.status}. ${canMove ? "Enter to open; arrow left or right to move column." : "Enter to open."}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(t.id); return; }
+                          if (!canMove || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+                          e.preventDefault();
+                          const i = BOARD_COLS.findIndex((x) => x.label === t.status);
+                          const j = e.key === "ArrowLeft" ? i - 1 : i + 1;
+                          if (i >= 0 && j >= 0 && j < BOARD_COLS.length) move.mutate({ id: t.id, status: BOARD_COLS[j].label });
+                        }}
                         style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: "pointer", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
                           <span style={{ fontFamily: font.mono, fontSize: 10, color: color.faint3 }}>{t.code}</span>
