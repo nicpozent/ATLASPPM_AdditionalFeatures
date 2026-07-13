@@ -38,6 +38,10 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     static async Task<JsonElement> Json(HttpResponseMessage res) =>
         await res.Content.ReadFromJsonAsync<JsonElement>();
 
+    // Flip the compliance gate for the personnel-assessment features (off by default).
+    Task EnablePersonnel(bool on) =>
+        Send(HttpMethod.Patch, "/api/v1/settings/personnel.assessmentsEnabled", new { value = on ? "true" : "false" });
+
     // ---- GET /settings must not leak secret-valued keys ---------------------
     [Fact]
     public async Task Settings_redacts_secret_keys_but_returns_toggles()
@@ -136,6 +140,7 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     public async Task Team_swot_roundtrips_and_is_redacted_from_settings()
     {
         const string marker = "STRENGTH_MARKER_XYZ";
+        await EnablePersonnel(true);
         // No role header ⇒ dev acts as Platform Admin (all slots in scope).
         Assert.Equal(HttpStatusCode.NoContent,
             (await Send(HttpMethod.Put, "/api/v1/teams/teammgr/swot",
@@ -156,6 +161,7 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     [Fact]
     public async Task Team_swot_rejects_unknown_slot_and_out_of_scope_caller()
     {
+        await EnablePersonnel(true);
         // Unknown slot → 404 (even as admin).
         Assert.Equal(HttpStatusCode.NotFound,
             (await Send(HttpMethod.Put, "/api/v1/teams/not-a-slot/swot", new { strengths = "x" })).StatusCode);
@@ -169,6 +175,7 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     [Fact]
     public async Task Devplan_write_is_scoped_and_validated()
     {
+        await EnablePersonnel(true);
         // Missing person → 400.
         Assert.Equal(HttpStatusCode.BadRequest,
             (await Send(HttpMethod.Put, "/api/v1/devplans", new { strengths = "x" })).StatusCode);
@@ -194,5 +201,20 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         var raw = await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadAsStringAsync();
         Assert.DoesNotContain("devplan.", raw);
         Assert.DoesNotContain("DEVPLAN_MARKER", raw);
+    }
+
+    // ---- Compliance gate: personnel features off by default ------------------
+    [Fact]
+    public async Task Personnel_features_are_gated_off_by_default()
+    {
+        await EnablePersonnel(false); // explicit: gate closed
+        // Writes refused…
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Send(HttpMethod.Put, "/api/v1/teams/teammgr/swot", new { strengths = "x" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Send(HttpMethod.Put, "/api/v1/devplans", new { person = "X", strengths = "x" })).StatusCode);
+        // …and reads report disabled (no data served).
+        Assert.False((await Json(await Send(HttpMethod.Get, "/api/v1/teams/swot"))).GetProperty("enabled").GetBoolean());
+        Assert.False((await Json(await Send(HttpMethod.Get, "/api/v1/devplans"))).GetProperty("enabled").GetBoolean());
     }
 }
