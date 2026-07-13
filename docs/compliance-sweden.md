@@ -43,7 +43,7 @@
 | **Visselblåsarlagen (2021:890)** | Out of scope | Only if Atlas becomes a whistleblowing channel (it isn't). |
 
 ## Tracked to-dos (before enabling personnel features in production)
-1. **DPIA** for SWOT / development plans / skills + the board's presence/monitoring aspect.
+1. **DPIA** for SWOT / development plans / skills + the board's presence/monitoring aspect — a pre-filled template is in [`docs/dpia-personnel-data.md`](./dpia-personnel-data.md).
 2. **MBL §11 negotiation** with the unions.
 3. **Retention schedule** reconciling Bokföringslagen (7y) ⟷ GDPR minimisation ⟷ the anonymisation pass.
 4. **Processor DPAs + Ch. V transfer assessment** (Microsoft, Atlassian, observability).
