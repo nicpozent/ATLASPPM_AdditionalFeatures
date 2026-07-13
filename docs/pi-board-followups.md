@@ -7,7 +7,12 @@ precise checklist to finish them.
 
 ---
 
-## 1. Promote board placement to a typed column — *also fixes a concurrency race*
+## 1. Promote board placement to a typed column — *also fixes a concurrency race* — ✅ DONE
+
+> **Resolved** — `PiObjective.IterationId` shipped (migration `PiObjectiveIterationId`,
+> which backfills from and removes the old `pi.board.%` Setting rows). `PiBoard.cs`
+> now reads/writes the column (per-row, concurrency-safe). The original plan is
+> kept below for history.
 
 **Why.** Board placement currently lives as a JSON blob in the `Setting` row
 `pi.board.{incrementId}`, written read-modify-write in `server/PiBoard.cs`

@@ -1214,6 +1214,7 @@ public class PiObjective
     public int Confidence { get; set; }                  // team vote, 1–5 (0 ⇒ not voted)
     public string Status { get; set; } = "Planned";      // Planned | In Progress | Done | Missed
     public int Ord { get; set; }
+    public int? IterationId { get; set; }                // Program Board column; null ⇒ Unscheduled
 }
 
 // A cross-team dependency for the increment, linking two deliverables (or free
