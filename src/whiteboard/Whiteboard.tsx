@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { createNode, createStroke, translateNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, applyRemoteOp, type RemoteOp } from "./scene";
 import { downloadPng, downloadSvg, downloadJson, jsonToScene } from "./exportScene";
+import { TEMPLATES } from "./templates";
 import { toast, toastError } from "@/components/Toast";
 
 // ============================================================================
@@ -93,10 +94,27 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const [exportMenu, setExportMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const [templateMenu, setTemplateMenu] = useState(false);
+
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: string; mode: "move" | "resize"; ox: number; oy: number; start: WbNode } | null>(null);
   const pen = useRef<number[] | null>(null);                 // in-progress freehand points
   const [penLive, setPenLive] = useState<number[] | null>(null);
+  // Drag-to-create: press-drag on the canvas with a shape tool armed rubber-bands
+  // the new shape to size (a plain click still drops a default-sized one).
+  const create = useRef<{ kind: NodeKind; icon?: string; x0: number; y0: number } | null>(null);
+  const [createLive, setCreateLive] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Drag-to-connect: drag from a node's connector handle to another node.
+  const wire = useRef<{ from: string } | null>(null);
+  const [wireLive, setWireLive] = useState<{ from: string; x: number; y: number } | null>(null);
+
+  // Drop a template's nodes+edges onto the board (bulk save → peers refetch).
+  const insertTemplate = (def: { build: (ox: number, oy: number) => { nodes: WbNode[]; edges: WbEdge[] } }) => {
+    setTemplateMenu(false);
+    const frag = def.build(120, 120);
+    const next: Scene = { nodes: [...sceneRef.current.nodes, ...frag.nodes], edges: [...sceneRef.current.edges, ...frag.edges] };
+    setScene(next); putWholeScene(next);
+  };
 
   // Whole-scene persist (bulk PUT) — used by Clear and Import. Broadcasts a
   // refetch ping so peers converge; on error we reconcile.
@@ -137,10 +155,11 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       return;
     }
     if (pending) {
-      const node = createNode(pending.kind, p.x, p.y, pending.icon ? { icon: pending.icon, color: inkColor } : { color: pending.kind === "text" ? color.ink : newColor });
-      setScene((s) => ({ ...s, nodes: [...s.nodes, node] }));
-      pushNode(node);
-      setPending(null);
+      // Begin a rubber-band create; endInteraction finalizes (click = default size).
+      create.current = { kind: pending.kind, icon: pending.icon, x0: p.x, y0: p.y };
+      setCreateLive({ x: p.x, y: p.y, w: 0, h: 0 });
+      interacting.current = true;
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
       return;
     }
     setSel(null); setSelEdge(null); setLinkFrom(null);
@@ -150,6 +169,12 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     const p = toCanvas(e);
     sendCursor(p.x / CANVAS_W, p.y / CANVAS_H);
     if (pen.current) { pen.current.push(p.x, p.y); setPenLive(pen.current.slice()); return; }
+    if (create.current) {
+      const c = create.current;
+      setCreateLive({ x: Math.min(c.x0, p.x), y: Math.min(c.y0, p.y), w: Math.abs(p.x - c.x0), h: Math.abs(p.y - c.y0) });
+      return;
+    }
+    if (wire.current) { setWireLive({ from: wire.current.from, x: p.x, y: p.y }); return; }
     const d = drag.current;
     if (!d) return;
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
@@ -166,7 +191,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     }
   };
 
-  const endInteraction = () => {
+  const endInteraction = (e?: React.PointerEvent) => {
     // Finish a freehand stroke → commit it as one node.
     if (pen.current) {
       const pts = pen.current; pen.current = null; setPenLive(null); interacting.current = false;
@@ -177,12 +202,48 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       }
       return;
     }
+    // Finish a rubber-band create → node sized to the drag (or default on a click).
+    if (create.current) {
+      const c = create.current; const live = createLive;
+      create.current = null; setCreateLive(null); interacting.current = false; setPending(null);
+      const extra = c.icon ? { icon: c.icon, color: inkColor } : { color: c.kind === "text" ? color.ink : newColor };
+      const cx = c.x0, cy = c.y0;
+      let node = createNode(c.kind, cx, cy, extra);
+      if (live && live.w > 12 && live.h > 12) {
+        node = { ...node, x: Math.round(live.x), y: Math.round(live.y), w: Math.round(Math.max(24, live.w)), h: Math.round(Math.max(20, live.h)) };
+      }
+      setScene((s) => ({ ...s, nodes: [...s.nodes, node] }));
+      pushNode(node);
+      return;
+    }
+    // Finish a drag-to-connect → link to whatever node is under the pointer.
+    if (wire.current) {
+      const from = wire.current.from; wire.current = null; setWireLive(null); interacting.current = false;
+      if (e) {
+        const p = toCanvas(e);
+        const target = [...sceneRef.current.nodes].reverse().find((n) => p.x >= n.x && p.x <= n.x + n.w && p.y >= n.y && p.y <= n.y + n.h);
+        if (target && target.id !== from) {
+          const after = addEdge(sceneRef.current, from, target.id, color.faint2);
+          if (after !== sceneRef.current) { setScene(after); pushEdge(after.edges[after.edges.length - 1]); }
+        }
+      }
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     drag.current = null; dragIdRef.current = null;
     interacting.current = false;
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
     if (node) pushNode(node);   // persist the moved/resized node (one granular op)
+  };
+
+  // Start a drag-to-connect wire from a node's connector handle.
+  const startWire = (e: React.PointerEvent, nodeId: string) => {
+    e.stopPropagation();
+    if (!canEdit) return;
+    wire.current = { from: nodeId }; interacting.current = true;
+    const p = toCanvas(e); setWireLive({ from: nodeId, x: p.x, y: p.y });
+    (canvasRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
   };
 
   // --- Pointer: a node ---
@@ -289,6 +350,28 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
               ))}
             </div>
 
+            {/* Templates dropdown */}
+            <div style={{ position: "relative" }}>
+              <button type="button" onClick={() => setTemplateMenu((v) => !v)} title="Insert a template" style={actionBtn(true)}>
+                <Icon name="template" size={15} /> Templates ▾
+              </button>
+              {templateMenu && (
+                <div style={{ position: "absolute", top: 40, left: 0, zIndex: 20, minWidth: 210, maxHeight: 360, overflowY: "auto", background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, padding: 6, boxShadow: "0 6px 20px rgba(20,26,60,0.14)" }}>
+                  {["Brainstorm", "SDLC", "Agile", "Governance"].map((group) => (
+                    <div key={group}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: color.faint3, padding: "8px 9px 3px" }}>{group}</div>
+                      {TEMPLATES.filter((t) => t.group === group).map((t) => (
+                        <button key={t.key} type="button" onClick={() => insertTemplate(t)}
+                          style={{ display: "block", width: "100%", textAlign: "left", fontSize: 12.5, fontFamily: "inherit", color: color.text, background: "transparent", border: "none", borderRadius: 7, padding: "7px 9px", cursor: "pointer" }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button type="button" onClick={deleteSel} disabled={!sel && !selEdge} title="Delete selection (Del)"
               style={{ ...actionBtn(!!(sel || selEdge)), color: (sel || selEdge) ? color.danger : color.faint3 }}>
               <Icon name="trash" size={15} /> Delete
@@ -324,7 +407,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       </div>
 
       {/* Hints */}
-      {pending && <Banner>Click on the canvas to drop a <b>{pending.icon ? pending.icon : pending.kind}</b>. <Esc /></Banner>}
+      {pending && <Banner>Click to drop a <b>{pending.icon ? pending.icon : pending.kind}</b>, or drag to size it. <Esc /></Banner>}
       {tool === "connector" && !linkFrom && <Banner>Connector: click the first shape, then the second, to link them with an arrow. <Esc /></Banner>}
       {linkFrom && <Banner>Now click the shape to connect to. <Esc /></Banner>}
       {tool === "pen" && <Banner>Pen: click and drag on the canvas to draw freehand. <Esc /></Banner>}
@@ -378,6 +461,12 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
             {penLive && penLive.length >= 2 && (
               <polyline points={pointsAttr(penLive)} fill="none" stroke={inkColor} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
             )}
+            {/* Live drag-to-connect wire */}
+            {wireLive && (() => {
+              const src = scene.nodes.find((n) => n.id === wireLive.from);
+              if (!src) return null;
+              return <line x1={src.x + src.w / 2} y1={src.y + src.h / 2} x2={wireLive.x} y2={wireLive.y} stroke={color.primary} strokeWidth={2} strokeDasharray="5 4" markerEnd="url(#wb-arrow)" />;
+            })()}
           </svg>
 
           {/* Nodes */}
@@ -386,11 +475,17 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
               key={node.id} node={node} selected={sel === node.id} canEdit={canEdit}
               editing={editing === node.id} linkSource={linkFrom === node.id}
               onDown={(e, mode) => onNodeDown(e, node, mode)}
+              onStartWire={(e) => startWire(e, node.id)}
               onDoubleClick={() => startEdit(node)}
               onText={(t) => changeText(node.id, t)}
               onTextBlur={endEdit}
             />
           ))}
+
+          {/* Rubber-band create preview */}
+          {createLive && (createLive.w > 2 || createLive.h > 2) && (
+            <div style={{ position: "absolute", left: createLive.x, top: createLive.y, width: createLive.w, height: createLive.h, border: `1.5px dashed ${color.primary}`, background: color.primaryTint, opacity: 0.5, borderRadius: 8, pointerEvents: "none" }} />
+          )}
 
           {/* Peer cursors */}
           <CursorLayer cursors={cursors} peers={peers} w={CANVAS_W} h={CANVAS_H} />
@@ -401,9 +496,10 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 }
 
 // ---- Node rendering --------------------------------------------------------
-function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoubleClick, onText, onTextBlur }: {
+function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onStartWire, onDoubleClick, onText, onTextBlur }: {
   node: WbNode; selected: boolean; canEdit: boolean; editing: boolean; linkSource: boolean;
   onDown: (e: React.PointerEvent, mode: "move" | "resize") => void;
+  onStartWire: (e: React.PointerEvent) => void;
   onDoubleClick: () => void; onText: (t: string) => void; onTextBlur: () => void;
 }) {
   const base: React.CSSProperties = {
@@ -482,6 +578,11 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoub
       {selected && canEdit && node.kind !== "text" && (
         <div onPointerDown={(e) => { e.stopPropagation(); onDown(e, "resize"); }}
           style={{ position: "absolute", right: -6, bottom: -6, width: 14, height: 14, borderRadius: 4, background: color.surface, border: `2px solid ${color.primary}`, cursor: "nwse-resize" }} />
+      )}
+      {/* Connector handle — drag from here onto another shape to link them */}
+      {selected && canEdit && (
+        <div title="Drag to another shape to connect" onPointerDown={onStartWire}
+          style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: color.primary, border: `2px solid ${color.surface}`, cursor: "crosshair", boxShadow: "0 1px 3px rgba(20,26,60,0.3)" }} />
       )}
     </div>
   );

@@ -161,3 +161,26 @@ is the real fix and is tracked as a **pending follow-up**
 All additions reuse the existing granular-op + sanitisation + capability model:
 new kinds are whitelisted server-side, freehand points are clamped/capped, and
 `roadmap` joins the scope→capability map. No new dependency, no redesign.
+
+## Addendum — fluid authoring & templates (xmind-style)
+
+**Status:** Accepted — extends this ADR. Frontend-only (reuses the existing
+kinds, granular ops and bulk save; no server change).
+
+- **Drag-to-create with live resize.** With a shape tool armed, press-drag on the
+  canvas rubber-bands the new shape to size (a live dashed preview follows the
+  pointer); a plain click still drops a default-sized shape. Persisted as the
+  usual single node op.
+- **Drag-to-connect (flexible arrows).** A selected shape shows a connector
+  handle; dragging from it draws a live arrow to wherever the pointer goes and
+  links to whatever shape it's dropped on (point-in-box hit test). The
+  click-source→click-target connector tool remains for keyboard/precision use.
+- **Templates dropdown.** A **Templates** menu drops a ready-made scene
+  (nodes + connectors) onto the board, grouped: **Brainstorm** (Mind map,
+  Fishbone/Ishikawa), **SDLC** (Iterative/Incremental, Spiral, Waterfall,
+  V-Model, RAD, DevOps), **Agile** (Scrum, Kanban, Scrumban, SAFe) and
+  **Governance** (Stage-Gate G0–G5) — one per methodology the tool supports
+  (CLAUDE.md §5) plus the named brainstorming/SDLC models. Templates are pure
+  builders (`src/whiteboard/templates.ts`, unit-tested for self-consistent
+  edges) and insert through the cap-checked bulk `PUT`, so they co-edit and
+  persist like anything else.
