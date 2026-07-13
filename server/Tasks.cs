@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
@@ -16,6 +17,10 @@ public record UpdateEpicReq(string? Name, int? Stories, int? Done, string? Statu
 // ============================================================================
 public static class Tasks
 {
+    // A project's task board is one real-time room; mutations ping it so open
+    // boards refetch and stay in sync (presence/cursors come from the hub).
+    static string Room(string projectId) => $"tasks:{projectId}";
+
     static readonly string[] Statuses = { "To Do", "In Progress", "In Review", "Done", "Blocked" };
     static readonly string[] Priorities = { "Critical", "High", "Medium", "Low" };
     static readonly string[] Sizes = { "XS", "S", "M", "L", "XL", "XXL" };
@@ -47,7 +52,7 @@ public static class Tasks
             return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known, attCounts, comCounts)).ToList(), canCreate));
         });
 
-        api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-schedule", "E") is { } denied) return denied;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
@@ -70,10 +75,11 @@ public static class Tasks
             db.ProjectTasks.Add(task);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Tasks", "Created task", $"{id} · {task.Code} {task.Name}"));
             await db.SaveChangesAsync();
+            await BoardHub.NotifyRoomAsync(hub, Room(id));
             return Results.Created($"/api/v1/projects/{id}/tasks/{task.Id}", ToDto(task, null));
         });
 
-        api.MapPatch("/tasks/{taskId:int}", async (int taskId, UpdateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapPatch("/tasks/{taskId:int}", async (int taskId, UpdateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var task = await db.ProjectTasks.FindAsync(taskId);
@@ -112,11 +118,12 @@ public static class Tasks
             // Spillover may have changed → keep the auto RAID risk in sync.
             if (req.Sprint is not null)
                 await Spillover.ReconcileRaidAsync(db, task.ProjectId, http, cfg);
+            await BoardHub.NotifyRoomAsync(hub, Room(task.ProjectId));
             var absences = await db.Absences.Where(a => a.ProjectId == task.ProjectId).ToListAsync();
             return Results.Ok(ToDto(task, absences));
         });
 
-        api.MapDelete("/tasks/{taskId:int}", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        api.MapDelete("/tasks/{taskId:int}", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var task = await db.ProjectTasks.FindAsync(taskId);
@@ -126,6 +133,7 @@ public static class Tasks
             db.ProjectTasks.Remove(task);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Tasks", "Deleted task", $"{task.ProjectId} · {task.Code} {task.Name}"));
             await db.SaveChangesAsync();
+            await BoardHub.NotifyRoomAsync(hub, Room(task.ProjectId));
             return Results.NoContent();
         });
 
