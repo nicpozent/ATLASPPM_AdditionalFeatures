@@ -14,6 +14,7 @@ import {
 
 // Lazy so the SignalR client only loads when the live board is opened (ADR-0027).
 const ProgramBoard = lazy(() => import("./pip/ProgramBoard"));
+const Whiteboard = lazy(() => import("@/whiteboard/Whiteboard"));
 
 // ============================================================================
 //  Program Increment Planning (PIP) — quarterly PI planning across the whole
@@ -49,7 +50,7 @@ export default function Pip() {
   const { can } = usePermissions();
   const canEdit = can("cap-schedule", "E");
   const [selected, setSelected] = useState<number | null>(null);
-  const [tab, setTab] = useState<"board" | "objectives" | "calendar" | "capacity" | "dependencies">("objectives");
+  const [tab, setTab] = useState<"board" | "objectives" | "calendar" | "capacity" | "dependencies" | "whiteboard">("objectives");
   const [showNew, setShowNew] = useState(false);
   const [quickCreate, setQuickCreate] = useState<null | "project" | "program">(null);
   const canCreatePortfolio = can("cap-projects", "F");
@@ -120,6 +121,7 @@ export default function Pip() {
               ["calendar", "Calendar", inc.iterationList.length],
               ["capacity", "Capacity & Load", inc.iterationList.length],
               ["dependencies", "Dependencies", inc.dependencyList.length],
+              ["whiteboard", "Whiteboard", 0],
             ] as const).map(([key, label, n]) => (
               <button key={key} onClick={() => setTab(key)} style={{ padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", background: tab === key ? color.surface : "transparent", color: tab === key ? color.primary : color.subtle, boxShadow: tab === key ? "0 1px 3px rgba(20,26,60,0.12)" : "none" }}>
                 {label}{n ? ` · ${n}` : ""}
@@ -136,6 +138,11 @@ export default function Pip() {
           {tab === "calendar" && <CalendarView inc={inc} />}
           {tab === "capacity" && <CapacityView inc={inc} />}
           {tab === "dependencies" && <DependenciesView inc={inc} />}
+          {tab === "whiteboard" && (
+            <Suspense fallback={<Card><EmptyBlock message="Loading whiteboard…" /></Card>}>
+              <Whiteboard scope={{ kind: "pi", id: String(inc.id) }} />
+            </Suspense>
+          )}
         </>
       )}
 
