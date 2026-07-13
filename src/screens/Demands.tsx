@@ -1,11 +1,14 @@
-import { useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api, apiUpload, apiDownload } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Textarea, Modal as Overlay } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { useRole } from "@/components/RoleContext";
 import { toast } from "@/components/Toast";
+import { useRoomRealtime } from "@/realtime/useRoomRealtime";
+import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
 
 export { Overlay };
 
@@ -58,6 +61,7 @@ interface NewDemand {
 export default function Demands() {
   const { data: demands = [] } = useDemands();
   const qc = useQueryClient();
+  const { identity } = useRole();
   const { can } = usePermissions();
   const maySubmit = can("cap-submit-demand", "E");
   const mayScore = can("cap-demand-scoring", "E");   // move demands through the funnel
@@ -84,16 +88,42 @@ export default function Demands() {
   const dragId = useRef<string | null>(null);
   const [overStage, setOverStage] = useState<string | null>(null);
 
+  // Real-time: the whole funnel is one shared room. A peer's create/move/delete
+  // pings us to refetch; presence + cursors show who else is working the intake.
+  const onChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["demands"] }), [qc]);
+  const { peers, cursors, connected, sendCursor } = useRoomRealtime("demands", identity.name, onChanged);
+
+  // Measure the funnel surface so peer cursors (normalised [0,1]) map to pixels.
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const surf = surfaceRef.current;
+    if (!surf) return;
+    const measure = () => setSize({ w: surf.offsetWidth, h: surf.offsetHeight });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [demands.length]);
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const surf = surfaceRef.current;
+    if (!surf) return;
+    const r = surf.getBoundingClientRect();
+    if (r.width && r.height) sendCursor((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }, [sendCursor]);
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13.5, color: color.subtle }}>Intake scored on <b style={{ color: color.primary }}>value</b> vs <b style={{ color: "#C98A00" }}>effort</b> · drag to advance through the funnel</div>
+        <LiveDot connected={connected} />
+        <PresenceRow peers={peers} />
         <div style={{ flex: 1 }} />
         <Button variant="secondary"><Icon name="search" size={16} /> Filter</Button>
         <Button onClick={() => setModal(true)} disabled={!maySubmit} title={maySubmit ? undefined : "Your role can't submit demands"}><Icon name="plus" size={16} /> New demand</Button>
       </div>
 
-      <div style={{ display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
+      <div ref={surfaceRef} onMouseMove={onMouseMove} style={{ position: "relative", display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
+        <CursorLayer cursors={cursors} peers={peers} w={size.w} h={size.h} />
         {STAGES.map((s) => {
           const items = demands.filter((d) => d.stage === s.key);
           const over = overStage === s.key;

@@ -251,4 +251,27 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
             Assert.Null(await db.Settings.FindAsync("devplan.Nina Berg"));
         }
     }
+
+    // ---- Demand funnel lifecycle drives the real-time room broadcast --------
+    // Create → move (stage) → delete each ping the "demands" room via the shared
+    // BoardHub. This asserts the endpoints still behave once IHubContext<BoardHub>
+    // is injected — i.e. the hub dependency resolves and the broadcast is a
+    // best-effort no-op (no connected clients) rather than failing the write.
+    [Fact]
+    public async Task Demand_funnel_create_move_delete_succeeds_with_realtime_wired()
+    {
+        var created = await Send(HttpMethod.Post, "/api/v1/demands", new { title = "Realtime funnel demand" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = (await Json(created)).GetProperty("id").GetString();
+        Assert.False(string.IsNullOrEmpty(id));
+
+        // Move it through the funnel (a stage that doesn't require cap-approve).
+        var moved = await Send(HttpMethod.Patch, $"/api/v1/demands/{id}", new { stage = "backlog" });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.Equal("backlog", (await Json(moved)).GetProperty("stage").GetString());
+
+        // Delete it (dev identity is the creator / Platform Admin).
+        var deleted = await Send(HttpMethod.Delete, $"/api/v1/demands/{id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
 }

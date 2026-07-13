@@ -12,6 +12,7 @@ import {
   type Lane, columns, deriveLanes, cardsFor, dependencyLaneLinks, arrowPath,
 } from "./board";
 import { useBoardRealtime } from "./useBoardRealtime";
+import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
 
 interface BoardData { canEdit: boolean; placements: Record<string, number> }
 
@@ -108,10 +109,7 @@ export default function ProgramBoard({ inc }: { inc: IncrementDetail }) {
     <div>
       {/* Toolbar: live status + presence + legend */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: connected ? color.successInk : color.faint }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? color.success : color.border2, boxShadow: connected ? `0 0 0 3px ${color.successTint}` : "none" }} />
-          {connected ? "Live" : "Offline"}
-        </div>
+        <LiveDot connected={connected} />
         <PresenceRow peers={peers} />
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -180,16 +178,7 @@ export default function ProgramBoard({ inc }: { inc: IncrementDetail }) {
           </svg>
 
           {/* Peer cursors (overlay, non-interactive) */}
-          {cursors.map((cur) => {
-            const peer = peers.find((p) => p.id === cur.id);
-            if (!peer) return null;
-            return (
-              <div key={cur.id} style={{ position: "absolute", left: cur.x * size.w, top: cur.y * size.h, pointerEvents: "none", transform: "translate(-2px,-2px)", transition: "left .08s linear, top .08s linear", zIndex: 5 }}>
-                <Icon name="mousePointer" size={16} color={peer.color} />
-                <span style={{ marginLeft: 2, fontSize: 10.5, fontWeight: 700, color: "#fff", background: peer.color, padding: "1px 6px", borderRadius: 6, whiteSpace: "nowrap" }}>{peer.name}</span>
-              </div>
-            );
-          })}
+          <CursorLayer cursors={cursors} peers={peers} w={size.w} h={size.h} />
         </div>
       </div>
 
@@ -209,21 +198,6 @@ const headCell: React.CSSProperties = {
   borderBottom: `1px solid ${color.border}`, borderLeft: `1px solid ${color.border}`,
   position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap",
 };
-
-function PresenceRow({ peers }: { peers: { id: string; name: string; initials: string; color: string }[] }) {
-  if (peers.length === 0) return null;
-  return (
-    <div style={{ display: "flex", alignItems: "center" }} aria-label={`${peers.length} on this board`}>
-      {peers.slice(0, 6).map((p, i) => (
-        <span key={p.id} title={p.name}
-          style={{ width: 26, height: 26, borderRadius: "50%", background: p.color, color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid " + color.surface, marginLeft: i ? -8 : 0 }}>
-          {p.initials}
-        </span>
-      ))}
-      {peers.length > 6 && <span style={{ marginLeft: 6, fontSize: 11.5, color: color.faint }}>+{peers.length - 6}</span>}
-    </div>
-  );
-}
 
 function LaneRow({
   lane, cols, objectives, placements, iterationIds, canEdit, linking, isLinkSource, onLink, onDropCard, railWidth, anchorRef,

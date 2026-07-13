@@ -88,3 +88,36 @@ Designed against the platform's control baseline
   and dependency links at planning cadence.
 - **First-class `IterationId` column now** — deferred until a migration can be
   generated; the `Setting`-backed map is the migration-free interim.
+
+## Addendum — generalised to a "room" hub; Demand funnel added
+
+**Status:** Accepted — extends this ADR.
+
+The live layer proved useful beyond PI planning, so `BoardHub` was generalised
+from a PI-only hub to a reusable **room** concept without changing its security
+model:
+
+- A **room** is an opaque scope string naming one collaborative surface —
+  `pi:{id}` for a PI increment, `demands` for the portfolio Demand Pipeline
+  funnel. The hub's client methods are now `JoinRoom(roomId, name)` /
+  `LeaveRoom(roomId)` / `Cursor(roomId, x, y)`, and the out-of-band ping is
+  `NotifyRoomAsync(hub, roomId)`. `NotifyGroupAsync(hub, int)` is kept as a thin
+  `pi:{id}` convenience so the many Pip/PiBoard callers are unchanged.
+- Room keys are **validated server-side** (`Normalize`: trim, lowercase, allow
+  only `[a-z0-9:_-]`, ≤64 chars) so a client can never inject an arbitrary
+  SignalR group name — tightening the segregation control above.
+- The client transport moved to a surface-agnostic `useRoomRealtime(roomId, …)`
+  hook; `useBoardRealtime` is now a one-line wrapper (`pi:${id}`). The presence
+  chrome (live dot, avatar stack, cursor layer) was extracted to
+  `src/realtime/Presence.tsx` and is shared by every surface.
+
+**First application — Demand Pipeline funnel.** The `demands` screen joins room
+`demands`; the demand **create / stage-move / delete** REST endpoints call
+`NotifyRoomAsync(hub, "demands")` after committing, so a card dragged across the
+funnel by one person refetches for everyone. Presence + cursors show who else is
+triaging intake. Same contract as the board: no domain data over the socket,
+writes stay behind `cap-submit-demand` / `cap-demand-scoring`, presence is
+minimal (name/initials/colour), nothing persisted.
+
+The observability metrics keep their stable `atlas.board.*` names but now count
+across all rooms (see `docs/observability.md`).
