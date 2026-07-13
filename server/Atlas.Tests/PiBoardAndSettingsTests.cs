@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Atlas.Api;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Atlas.Tests;
@@ -161,5 +163,36 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         // A stakeholder has no manager scope → 403 on a real slot.
         Assert.Equal(HttpStatusCode.Forbidden,
             (await SendAs("stakeholder", HttpMethod.Put, "/api/v1/teams/teammgr/swot", new { strengths = "x" })).StatusCode);
+    }
+
+    // ---- Individual development plans: scoped, and never leaked via settings --
+    [Fact]
+    public async Task Devplan_write_is_scoped_and_validated()
+    {
+        // Missing person → 400.
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Send(HttpMethod.Put, "/api/v1/devplans", new { strengths = "x" })).StatusCode);
+        // No members are mapped in this host, so nobody is in scope — even the
+        // admin default can't write a plan for an unknown person → 403.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Send(HttpMethod.Put, "/api/v1/devplans", new { person = "Nobody At All", strengths = "x" })).StatusCode);
+        // A stakeholder (no manager scope) is likewise forbidden.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await SendAs("stakeholder", HttpMethod.Put, "/api/v1/devplans", new { person = "Nobody", strengths = "x" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Devplan_setting_is_redacted_from_settings()
+    {
+        // Seed a plan directly (the write path is scope-gated, tested above).
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            db.Settings.Add(new Setting { Key = "devplan.Jane Doe", Value = "{\"strengths\":\"DEVPLAN_MARKER\"}" });
+            await db.SaveChangesAsync();
+        }
+        var raw = await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("devplan.", raw);
+        Assert.DoesNotContain("DEVPLAN_MARKER", raw);
     }
 }

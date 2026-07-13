@@ -63,6 +63,10 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
 - **Team SWOT** — a per-team Strengths/Weaknesses/Opportunities/Threats note on
   *My Team*, manager-scoped. Team-level only (individual-member SWOT is out of
   scope: sensitive HR/GDPR data → HRIS).
+- **Individual development plans** — a per-person Strengths / Growth areas /
+  Goals note on *My Team*, manager-scoped and **manager-visible only** (never
+  shown to the person). Development-framed (not SWOT); sensitive personal data,
+  redacted + audited. See ADR-0062.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs

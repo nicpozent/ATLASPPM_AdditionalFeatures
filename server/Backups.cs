@@ -297,7 +297,7 @@ public static class Backups
     // redacted by default); confidential per-scope blobs (e.g. team SWOT) are
     // matched by prefix and served only through their own scoped endpoints.
     static readonly string[] SecretSettingSuffixes = { "webhookurl", "secret", "token", "password" };
-    static readonly string[] ConfidentialSettingPrefixes = { "team.swot." };
+    static readonly string[] ConfidentialSettingPrefixes = { "team.swot.", "devplan." };
     static bool IsSecretSetting(string key)
     {
         var k = key.ToLowerInvariant();
