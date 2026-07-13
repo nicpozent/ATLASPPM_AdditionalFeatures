@@ -38,10 +38,10 @@ requirement → capability → implementation → decision.
 | SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments; **board auto-discovery by project key when no board id is mapped, so sprints import regardless**; **changelog import (`expand=changelog`) → task lifecycle timestamps: `StartedAt` from the earliest status transition, `ResolvedAt` from `resolutiondate`**) | ABB-05 | ADR-0006, ADR-0018, ADR-0059 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
 | SBB-11 | Hosted services (`JiraSyncService`, `RetentionHostedService`, `CapacityAlertService`, `JiraSyncWorker`+`JiraSyncQueue`, `AdoSyncWorker`+`AdoSyncQueue`); **process-role split (`Atlas__Role` web/worker/all) — recurring timer jobs run in a separate worker container off the request path** | ABB-06, ABB-10, ABB-12 | ADR-0007, ADR-0028, ADR-0030, ADR-0039, ADR-0048 |
-| SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts; role-addressed demand alerts (PMO/Architect/CTO/CIO/PM Lead) with per-role email via the in-app group→role mapping + per-person opt-out | ABB-07 | ADR-0028, ADR-0043, ADR-0045 |
+| SBB-12 | Notifications service + subscriptions + comments + over-allocation alerts; role-addressed demand alerts (PMO/Architect/CTO/CIO/PM Lead) with per-role email via the in-app group→role mapping + per-person opt-out; **Microsoft Teams channel notifications** (Incoming-webhook + Adaptive Card, masked-secret status) as a third channel | ABB-07 | ADR-0028, ADR-0043, ADR-0045, ADR-0060 |
 | SBB-13 | OpenTelemetry (OTLP) + health/readiness + correlation IDs + reference Grafana/Tempo/Prometheus/Loki stack; domain metrics (sync duration, queue depth, capacity alerts, DB command duration) with tuned dashboards (overview + operations) & Prometheus alert rules | ABB-08 | ADR-0010, ADR-0032, ADR-0040 |
 | SBB-14 | Security headers/CSP, rate limiter, upload limits, least-privilege DB role, non-root API image; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy) in CI (triaged baseline) + on-demand DAST (OWASP ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture** | ABB-09, ABB-12 | ADR-0008, ADR-0051, ADR-0053, security-hardening.md |
-| SBB-15 | Governance modules (Gates, RAID, Architecture ADM/ARB, Security controls, Decisions, Quality) + GDPR/retention; **deterministic risk engine** (`Risks.cs`, no LLM) mapping findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK with a generic per-framework coverage rule; **EU AI Act risk-tiering + ISO 42001 AI-management** (tier→obligation rules: Art 5/6/9/10/14/50); **Zero-Trust posture** mapping | ABB-10, ABB-09 | ADR-0049, ADR-0050 |
+| SBB-15 | Governance modules (Gates, RAID, Architecture ADM/ARB, Security controls, Decisions, Quality) + GDPR/retention; **deterministic risk engine** (`Risks.cs`, no LLM) mapping findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK with a generic per-framework coverage rule; **EU AI Act risk-tiering + ISO 42001 AI-management** (tier→obligation rules: Art 5/6/9/10/14/50); **Zero-Trust posture** mapping; **ISO 27001:2022 Statement of Applicability** (full 93-control Annex A catalogue + per-project applicability/status + coverage roll-up) | ABB-10, ABB-09 | ADR-0049, ADR-0050, ADR-0066 |
 | SBB-16 | `IConfiguration` env + Docker secrets tooling | ABB-11 | ADR-0009 |
 | SBB-17 | **On-prem single-node Docker** (`docker compose`: api=web + worker + db + nginx edge, one image/role) as the supported delivery target (k8s parked); GitHub Actions CI (+ on-demand perf-smoke gate); **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + Trivy image scan)** — hosts pull & recreate, config via env/Docker secrets | ABB-12 | ADR-0008, ADR-0048, ADR-0052, ADR-0054 |
 | SBB-18 | Time-phased allocation (`TeamAssignmentMember` segments, `AllocMath`) + availability finder (`/resources/availability`) | ABB-06 | ADR-0013 |
@@ -53,6 +53,8 @@ requirement → capability → implementation → decision.
 | SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity) | ABB-06 | ADR-0020 |
 | SBB-25 | Azure DevOps connector (`AzureDevOps.cs`: PAT auth, status/test, discovery + import/map `Project.AdoProject`, **work-item sync** — WIQL work items → epics/tasks, iterations → sprints, idempotent by `AdoId`; **background queue/worker**; **delta/changed-since pulls** via `LastAdoSync` + WIQL `[System.ChangedDate]`) | ABB-05, ABB-06 | ADR-0035, ADR-0036, ADR-0039, ADR-0044 |
 | SBB-26 | k6 performance/load suite (`perf/`: smoke·load·stress + public-API volume seeder; env-driven URL/auth; hot roll-up endpoints; Prometheus remote-write into the reference stack) | ABB-08, ABB-12 | ADR-0047 |
+| SBB-27 | **Real-time collaboration hub** (`BoardHub`, SignalR over `/hubs/board`): opaque scope "rooms" (pi · demands · wb · tasks) carry live presence, peer cursors, off-screen peer indicators and change/op pings; server-only op broadcast (clients can't send ops) so peers render only server-authorized deltas; open to all roles (writes stay capability-gated) | ABB-07, ABB-01 | ADR-0061, ADR-0065 |
+| SBB-28 | **Freeform whiteboard** (`Whiteboards.cs` + `src/whiteboard/*`): per-entity brainstorming canvas — sticky notes, rich shape set, arrow connectors, icons, actors, freehand pen, templates (mind map/fishbone/methodologies); typed-row persistence (`WhiteboardNode`/`WhiteboardEdge`, per-row co-editing ops); scope→capability gate + server sanitisation; PNG/SVG/JSON export/import; keyboard-operable canvas | ABB-07, ABB-01, ABB-04 | ADR-0064 |
 
 ## 3. Traceability (ABB → SBB)
 
@@ -64,7 +66,7 @@ flowchart LR
   ABB04["ABB-04 Data"] --> SBB07 & SBB08
   ABB05["ABB-05 Integration"] --> SBB09 & SBB10
   ABB06["ABB-06 Async"] --> SBB11
-  ABB07["ABB-07 Notify"] --> SBB12 & SBB10
+  ABB07["ABB-07 Notify"] --> SBB12 & SBB10 & SBB27 & SBB28
   ABB08["ABB-08 Observability"] --> SBB13
   ABB09["ABB-09 Security"] --> SBB14
   ABB10["ABB-10 Governance"] --> SBB15 & SBB11
@@ -77,7 +79,7 @@ flowchart LR
 | ABB | Gap | Planned SBB |
 |-----|-----|-------------|
 | ABB-05 Integration | Jira + Graph + **Azure DevOps** (discovery · import · work-item sync, ADR-0035/0036) implemented | ServiceNow / ManageEngine SDP / GitHub / Confluence / Teams / Slack / Power BI (each mirrors the Jira/ADO pattern) |
-| ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep + full user-journey e2e** (Playwright: navigation, role-nav, dashboard layouts, mocked demand drill-in) & extracted per-screen logic tests (ADR-0033); token greys lifted to WCAG AA and **colour-contrast now gated** alongside structural rules (ADR-0037) | Extend swept routes & journeys as new high-traffic views land; load/perf tests |
+| ABB-01 UX | a11y baseline (ADR-0025) + jsdom axe over primitives + mobile drawer (ADR-0026) + **browser-based full-page axe sweep + full user-journey e2e** (Playwright: navigation, role-nav, dashboard layouts, mocked demand drill-in) & extracted per-screen logic tests (ADR-0033); token greys lifted to WCAG AA and **colour-contrast now gated** alongside structural rules (ADR-0037); **keyboard/AT operation of the pointer-first surfaces** — whiteboard canvas (focusable labelled nodes, arrow-move/edit/delete) and the Kanban/funnel drag boards (focus + arrow-move) | Extend swept routes & journeys as new high-traffic views land; add axe coverage of the whiteboard/board views |
 
 These map to the roadmap tracked with the product team; each will get an ADR when
 a concrete technology is chosen.

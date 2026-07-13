@@ -123,6 +123,12 @@ differ only in labour-rate visibility (ADR-0057).
 - **FR-PROJ-7** [Implemented] Editing project details (dates, owner, methodology,
   Jira/ADO mapping) SHALL be possible from the detail screen and reflected in the
   Gantt; edits SHALL be capability-gated. *Trace: ABB-03.*
+- **FR-PROJ-8** [Implemented] The task board SHALL be a real-time collaboration
+  room (live presence, peer cursors, instant refresh, open to all roles). Moving a
+  card between columns is a status-only change gated on `cap-schedule` (Platform
+  Admin, PMO, Project Manager, PM Lead) and audited; every other task edit stays
+  behind `cap-projects`. The board SHALL be keyboard-operable (focus a card;
+  Arrow Left/Right moves columns). *Trace: SBB-27, ADR-0061/0065.*
 
 ### 3.5 Demands (intake)
 - **FR-DEM-1** [Implemented] The system SHALL provide a value-vs-effort scored
@@ -227,6 +233,10 @@ differ only in labour-rate visibility (ADR-0057).
   idempotent by `AdoId`. *Trace: SBB-25, ADR-0035/0036/0044.*
 - **FR-INT-5** [Implemented] Large syncs SHALL run in the background (202 + jobId
   poll) so a portfolio-wide pull cannot time out. *Trace: SBB-11, ADR-0030/0039.*
+- **FR-INT-6** [Implemented] The system SHALL post notifications to a configured
+  Microsoft Teams channel (Incoming-webhook + Adaptive Card) as a third channel;
+  the webhook secret SHALL NOT be returned by any read endpoint (only a masked
+  host via the connector status); gated on `cap-integrations`. *Trace: SBB-12, ADR-0060.*
 - **FR-REP-1** [Implemented] The system SHALL produce branded portfolio / demand /
   blocker / audit reports with export formats. *Trace: ABB-01.*
 
@@ -242,6 +252,18 @@ differ only in labour-rate visibility (ADR-0057).
   milestones/links/dependencies, gated on `cap-roadmap`. *Trace: SBB-23, ADR-0019.*
 - **FR-PIP-1** [Implemented] The system SHALL provide PI Planning showing team
   free-time for the PI period against real capacity. *Trace: SBB-18.*
+- **FR-RT-1** [Implemented] The system SHALL provide real-time collaboration on a
+  SignalR room hub — live presence, peer cursors and off-screen peer indicators —
+  across the PI Program Board, demand funnel, task board and whiteboard.
+  Collaboration is open to all roles; domain writes stay capability-gated, and
+  peers render only server-authorised operation broadcasts (clients cannot send
+  ops). *Trace: SBB-27, ADR-0061.*
+- **FR-WB-1** [Implemented] The system SHALL provide a per-entity freeform
+  whiteboard (PI, project, program, release, product, roadmap) with shapes,
+  connectors, freehand, icons, methodology templates and PNG/SVG/JSON
+  export/import. Scenes SHALL persist as typed rows with per-row co-editing ops
+  (single-row writes), be server-sanitised, and be gated by the same capability as
+  the entity. *Trace: SBB-28, ADR-0064.*
 
 ### 3.12 Governance & compliance
 - **FR-GOV-1** [Implemented] The system SHALL enforce stage gates (G0–G5) with
@@ -256,6 +278,12 @@ differ only in labour-rate visibility (ADR-0057).
   (Art 5/6/9/10/14/50). *Trace: SBB-15, ADR-0050.*
 - **FR-GOV-4** [Implemented] The system SHALL provide a Quality module (plan →
   stages → tests + defects, tasks/test cases per plan). *Trace: SBB-15.*
+- **FR-GOV-5** [Implemented] The system SHALL provide a per-project ISO 27001:2022
+  Statement of Applicability covering all 93 Annex A controls (four themes), each
+  with an applicability decision, justification, implementation status and owner,
+  plus a coverage roll-up. The catalogue SHALL be fixed reference data (complete
+  coverage by construction); editing a decision SHALL require `cap-approve` and be
+  audited. *Trace: SBB-15, ADR-0066.*
 
 ### 3.13 Administration & privacy
 - **FR-ADM-1** [Implemented] The system SHALL provide a roles & permissions matrix,
@@ -328,6 +356,10 @@ differ only in labour-rate visibility (ADR-0057).
 - **NFR-A11Y-1** [Implemented] Shared primitives SHALL meet an accessibility
   baseline (focus management, dialogs, menus, ≥44px targets); CI SHALL run a
   browser-based full-page axe sweep with **gated colour-contrast** (WCAG AA). *Trace: ADR-0025/0026/0033/0037.*
+- **NFR-A11Y-2** [Implemented] The pointer-first surfaces SHALL be keyboard/AT
+  operable: the whiteboard canvas is a labelled application region with focusable,
+  labelled nodes (arrow-move, Enter/F2 edit, Delete), and the Kanban/funnel drag
+  boards support focus + Arrow-key moves. *Trace: SBB-27/SBB-28.*
 - **NFR-I18N-1** [Implemented] The UI SHALL be driven by a message catalogue with
   6 locales and a completeness test. *Trace: SBB-02.*
 - **NFR-UX-1** [Implemented] Every data view SHALL have loading / empty / error

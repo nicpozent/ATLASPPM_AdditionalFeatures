@@ -310,6 +310,12 @@ full (F) levels. Authorization is always server-side.
   import._
   **Acceptance:** epics import as items tagged Epic; children link by epic/parent
   key; comments/attachments idempotent by Jira id.
+- **US-INT-7** — _As a **PlatformAdmin**, I want to connect a Microsoft Teams
+  channel so that Atlas notifications also post there._
+  **Acceptance:** an Incoming-webhook URL is configured, tested ("Send test") and
+  saved; notifications post as an Adaptive Card; the raw webhook URL is a secret —
+  it is never returned by any read endpoint, only a masked host via the connector
+  status; gated on `cap-integrations` (ADR-0060, `docs/teams-setup.md`).
 
 ## 18. Reports
 
@@ -375,6 +381,16 @@ full (F) levels. Authorization is always server-side.
   (Art 14) + risk-management & data-governance (Art 9/10, ISO 42001); limited →
   transparency (Art 50); in-scope-but-unclassified is flagged to triage (Art 6).
   The Security tab shows an AI-classification card when AI is in scope (ADR-0050).
+- **US-GOV-7** — _As a **compliance officer**, I want a Statement of Applicability
+  covering every ISO 27001:2022 Annex A control, so that I can record — and
+  evidence to an auditor — which controls apply, why, and their implementation
+  status._
+  **Acceptance:** the Security tab shows all 93 Annex A controls grouped by the
+  four themes (Organizational/People/Physical/Technological); each has an
+  applicability toggle, justification, status and owner, with a coverage roll-up
+  (applicable / excluded / reviewed / implemented %); the catalogue is fixed
+  reference data so coverage is complete by construction; editing needs
+  `cap-approve` and is audited (ADR-0066).
 
 ## 22. Ops (run-the-business)
 
@@ -421,6 +437,12 @@ full (F) levels. Authorization is always server-side.
   email to those role members too, resolved via the in-app group→role mapping
   (`EntraGroup.ManagerKey` → member email), default-on with per-person opt-out;
   the actor isn't self-notified._
+- **US-NOTIF-4** — _As a **team**, I want Atlas notifications to also land in our
+  Microsoft Teams channel, so that we see portfolio activity where we already
+  work._
+  **Acceptance:** when a Teams webhook is configured and enabled, notifications
+  post as an Adaptive Card to the channel in addition to in-app + email; the
+  webhook secret is never exposed by a read endpoint (ADR-0060).
 
 ## 26. Stakeholder Experience
 
@@ -473,6 +495,41 @@ full (F) levels. Authorization is always server-side.
   is on-prem single-node Docker (`docker compose`: web/worker/db/nginx edge), off
   the public internet, upgraded by pull-and-recreate — Kubernetes is parked, not
   required, at portfolio scale (ADR-0054).
+
+## 28. Real-time Collaboration & Whiteboard
+
+- **US-RT-1** — _As **any user**, I want to see who else is on a board with me and
+  where their cursor is, so that we can plan together in real time._
+  **Acceptance:** presence avatars, live peer cursors and off-screen peer
+  indicators appear on the PI Program Board, the demand funnel, the project task
+  board and the whiteboard; a live indicator shows the connection; collaboration
+  (presence/cursors/refresh) is open to every role — only the writes are
+  capability-gated (ADR-0061).
+- **US-RT-2** — _As **Platform Admin / PMO / Project Manager / PM Lead**, I want to
+  move task cards on the project board and have everyone see the move instantly,
+  so that the board stays current for the team._
+  **Acceptance:** a status-only card move needs Edit on `cap-schedule` (those four
+  roles); the move is audited and broadcast to peers within ~1s; every other task
+  edit still needs `cap-projects`; keyboard: focus a card, Arrow Left/Right moves
+  it between columns (ADR-0065).
+- **US-WB-1** — _As a **planner**, I want a freeform whiteboard on an entity (PI,
+  project, program, release, product, roadmap), so that I can brainstorm with
+  shapes, connectors, freehand, icons and methodology templates._
+  **Acceptance:** drag-to-create-and-resize shapes, drag-from-a-handle to connect,
+  a Templates dropdown (mind map / fishbone / one per methodology), colour
+  palette, and Save menu export/import (PNG/SVG/JSON) + clear; the scene persists
+  as typed rows and is scope-gated by the same capability as the entity (ADR-0064).
+- **US-WB-2** — _As a **planner**, I want to co-edit the whiteboard live with
+  colleagues without our changes clobbering each other, so that a workshop works._
+  **Acceptance:** each node/edge op is an authorized, sanitised single-row write
+  broadcast to peers (server-only op broadcast — clients can't inject ops); edits
+  to different items are independent; same-item edits reconcile on refetch
+  (ADR-0064).
+- **US-WB-3** — _As a **keyboard / assistive-tech user**, I want to operate the
+  whiteboard without a mouse, so that the canvas is accessible._
+  **Acceptance:** the canvas is a labelled application region; each node is a
+  focusable, labelled button; focusing selects it; arrow keys move it (Shift =
+  fine nudge), Enter/F2 edits text, Delete removes it.
 
 ---
 
