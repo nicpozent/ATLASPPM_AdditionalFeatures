@@ -62,6 +62,23 @@ public class SoaTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Soa_surfaces_platform_evidence_for_controls_atlas_implements()
+    {
+        var id = await NewProject("SoA evidence");
+        var soa = await Json(await Send(HttpMethod.Get, $"/api/v1/projects/{id}/soa"));
+
+        // The platform evidences a set of controls by construction (audit log, RBAC…).
+        Assert.True(soa.GetProperty("coverage").GetProperty("autoEvidenced").GetInt32() >= 15);
+
+        var logging = soa.GetProperty("controls").EnumerateArray().First(c => c.GetProperty("ref").GetString() == "A.8.15");
+        Assert.Contains("audit log", logging.GetProperty("autoEvidence").GetString(), StringComparison.OrdinalIgnoreCase);
+
+        // A control with no platform mechanism carries no auto-evidence.
+        var physical = soa.GetProperty("controls").EnumerateArray().First(c => c.GetProperty("ref").GetString() == "A.7.1");
+        Assert.Equal("", physical.GetProperty("autoEvidence").GetString());
+    }
+
+    [Fact]
     public async Task Soa_rejects_unknown_control_and_bad_status()
     {
         var id = await NewProject("SoA validation");

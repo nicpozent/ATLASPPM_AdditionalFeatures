@@ -58,9 +58,18 @@ the four themes (Organizational 37, People 8, Physical 14, Technological 34).
 - **−** The catalogue is ISO 27001:2022-specific; other frameworks (SOC 2, NIST
   CSF) would each need their own catalogue if the org wants their SoAs too — a
   clean follow-up (the coverage roll-up and row model generalise).
-- **−** Coverage is a *roll-up of stated status*, not automated evidence
-  collection; linking a control to concrete system evidence (e.g. "A.8.13 backup"
-  → the backup-run record) remains a future enhancement.
+- **+** **Automated platform-evidence linkage:** ~20 Annex A controls the Atlas
+  platform satisfies by construction (RBAC → A.5.15/A.5.18/A.8.3; append-only
+  audit log → A.8.15; backups → A.8.13; OTel → A.8.16; CI SAST/SCA/DAST →
+  A.8.8/A.8.25/A.8.28/A.8.29; secret redaction → A.8.11; TLS/CSP →
+  A.8.20/A.8.24; Entra SSO → A.5.16/A.5.17/A.8.5) carry a standing evidence note
+  (`Soa.PlatformEvidence`) and a "platform-evidenced" coverage count, so a SoA
+  review starts from what the product already provides instead of a blank sheet.
+- **−** Per-control evidence beyond the platform set is still owner-entered;
+  linking to *project-specific* artefacts (a specific backup schedule, a DPA) is a
+  future enhancement. SoAs for other frameworks (SOC 2, NIST CSF) would each need
+  their own catalogue — the row model and coverage roll-up generalise, so it is a
+  data-addition, not a redesign.
 
 ## Alternatives considered
 - **Keep only the free-form control-evidence register** — rejected: it can't be a

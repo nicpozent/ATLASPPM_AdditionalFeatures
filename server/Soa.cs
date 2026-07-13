@@ -145,6 +145,35 @@ public static class Soa
     static readonly Dictionary<string, string> CatalogueRefs =
         Catalogue.ToDictionary(c => c.Ref, c => c.Title);
 
+    // Controls the Atlas *platform* evidences by construction — mapped to the
+    // concrete mechanism that satisfies them. This is the "automated control
+    // coverage": rather than every control starting blank, the ones the product
+    // itself already implements carry a standing evidence note, so a project's SoA
+    // review starts from what the platform provides and the owner fills the rest.
+    // Deliberately conservative — only defensible, platform-level mechanisms.
+    static readonly Dictionary<string, string> PlatformEvidence = new()
+    {
+        ["A.5.15"] = "Server-authoritative RBAC capability matrix (Permissions.cs)",
+        ["A.5.16"] = "Microsoft Entra ID identities (MSAL / OIDC)",
+        ["A.5.17"] = "Entra SSO — no local credentials stored",
+        ["A.5.18"] = "Capability matrix + role assignments (per-endpoint gates)",
+        ["A.5.34"] = "GDPR DSAR export + erasure/retention; secret redaction",
+        ["A.8.2"]  = "Privileged actions gated by PlatformAdmin / cap-* capabilities",
+        ["A.8.3"]  = "Every write endpoint is capability-checked server-side",
+        ["A.8.5"]  = "Entra SSO (OIDC/PKCE) + client idle-logout",
+        ["A.8.8"]  = "CI SCA/secrets/IaC scan (Trivy) + dependency audit gate",
+        ["A.8.11"] = "Secret redaction on GET /settings (Backups.IsSecretSetting)",
+        ["A.8.12"] = "Secret redaction + upload allow-list + bounded inputs",
+        ["A.8.13"] = "Admin backup snapshots (all tables) + restore",
+        ["A.8.15"] = "Append-only audit log (AuditEvents) on every significant action",
+        ["A.8.16"] = "OpenTelemetry traces/metrics/logs + Prometheus alert rules",
+        ["A.8.20"] = "nginx edge + CSP/security headers + rate limiting",
+        ["A.8.24"] = "TLS at the nginx edge; DB-hop TLS available (PGSSL)",
+        ["A.8.25"] = "CI gates: lint · test · build + SAST/SCA/DAST",
+        ["A.8.28"] = "SAST (Semgrep OWASP Top 10) + review discipline in CI",
+        ["A.8.29"] = "CI test suite (API + web) + axe a11y + on-demand ZAP DAST",
+    };
+
     public static void MapSoaEndpoints(this RouteGroupBuilder api)
     {
         // Full Statement of Applicability for a project: every Annex A control,
@@ -164,15 +193,17 @@ public static class Soa
                     e?.Applicable ?? true,
                     e?.Justification ?? "",
                     e?.Status ?? "Not started",
-                    e?.Owner ?? "");
+                    e?.Owner ?? "",
+                    PlatformEvidence.GetValueOrDefault(c.Ref, ""));
             }).ToList();
 
             var applicable = rows.Count(r => r.Applicable);
             var implemented = rows.Count(r => r.Applicable && r.Status == "Implemented");
             var reviewed = rows.Count(r => entries.ContainsKey(r.Ref));
+            var autoEvidenced = rows.Count(r => r.Applicable && r.AutoEvidence != "");
             var coverage = new SoaCoverageDto(
                 Catalogue.Length, applicable, Catalogue.Length - applicable,
-                implemented, reviewed,
+                implemented, reviewed, autoEvidenced,
                 applicable == 0 ? 100 : (int)Math.Round(100.0 * implemented / applicable));
 
             return Results.Ok(new SoaDto(canEdit, coverage, rows));
@@ -203,7 +234,8 @@ public static class Soa
                 $"{id} · {CatalogueRefs[ctlRef]} → {e.Status}"));
             await db.SaveChangesAsync();
             return Results.Ok(new SoaControlDto(e.Ref, CatalogueRefs[e.Ref],
-                Catalogue.First(c => c.Ref == e.Ref).Theme, e.Applicable, e.Justification, e.Status, e.Owner));
+                Catalogue.First(c => c.Ref == e.Ref).Theme, e.Applicable, e.Justification, e.Status, e.Owner,
+                PlatformEvidence.GetValueOrDefault(e.Ref, "")));
         });
     }
 }

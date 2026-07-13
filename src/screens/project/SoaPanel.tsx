@@ -9,10 +9,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Card, EmptyBlock, Select } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import { toastError } from "@/components/Toast";
 import { type SoaControl, summariseThemes } from "./soa";
 
-interface SoaCoverage { total: number; applicable: number; excluded: number; implemented: number; reviewed: number; implementedPct: number; }
+interface SoaCoverage { total: number; applicable: number; excluded: number; implemented: number; reviewed: number; autoEvidenced: number; implementedPct: number; }
 interface SoaData { canEdit: boolean; coverage: SoaCoverage; controls: SoaControl[]; }
 
 const THEMES = ["Organizational", "People", "Physical", "Technological"] as const;
@@ -51,6 +52,7 @@ export function SoaPanel({ projectId }: { projectId: string }) {
         </span>
         <Kpi label="Applicable" value={`${coverage.applicable}/${coverage.total}`} />
         <Kpi label="Excluded" value={coverage.excluded} />
+        <Kpi label="Platform-evidenced" value={coverage.autoEvidenced} tint={color.primaryTint} ink={color.primary} />
         <Kpi label="Reviewed" value={`${coverage.reviewed}/${coverage.total}`} />
         <Kpi label="Implemented" value={`${coverage.implementedPct}%`} tint={color.successTint} ink={color.successInk} />
       </div>
@@ -99,6 +101,12 @@ function SoaRow({ c, canEdit, saving, onSave }: {
       <div style={{ fontFamily: font.mono, fontSize: 11, color: color.faint3 }}>{c.ref}</div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 12.5, color: color.text, fontWeight: 500 }}>{c.title}</div>
+        {c.autoEvidence ? (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 3, fontSize: 10.5, fontWeight: 600, color: color.primary, background: color.primaryTint, borderRadius: 5, padding: "2px 7px" }}
+            title="Evidenced by the Atlas platform">
+            <Icon name="shield" size={11} /> {c.autoEvidence}
+          </div>
+        ) : null}
         {canEdit ? (
           <input
             key={c.justification} defaultValue={c.justification}
