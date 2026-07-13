@@ -61,8 +61,11 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
 - **Real-time collaboration** — live presence, shared cursors and change-sync
   over a single SignalR "room" hub. First shipped as the **PI Program Board** tab
   on PI Planning, then generalised to a reusable room concept and extended to the
-  **Demand Pipeline funnel** (`demands`) so intake can be worked together. Built
-  from the existing theme/components. See ADR-0061 · `docs/pi-board-followups.md`.
+  **Demand Pipeline funnel** (`demands`) and the **project Tasks (Kanban) board**
+  (`tasks:{projectId}`) so cards move live for everyone. Collaboration (presence/
+  cursors/live refresh) is open to all roles; the underlying edit (moving a card)
+  stays behind the entity's capability. Built from the existing theme/components.
+  See ADR-0061 · `docs/pi-board-followups.md`.
 - **Freeform Whiteboard** — a bounded, per-entity brainstorming canvas (sticky
   notes, a rich shape set incl. triangle/hexagon/parallelogram/star/pill/
   cylinder, arrow connectors, icons, actors, freehand pen, colour palette) with

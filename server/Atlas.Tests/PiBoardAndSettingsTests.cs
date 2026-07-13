@@ -392,6 +392,24 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(6, draw.GetProperty("points").GetArrayLength());
     }
 
+    // ---- Project task board mutations drive the real-time room --------------
+    [Fact]
+    public async Task Task_board_create_move_delete_succeeds_with_realtime_wired()
+    {
+        var projId = (await Json(await Send(HttpMethod.Post, "/api/v1/projects", new { name = "Realtime board project" }))).GetProperty("id").GetString();
+        Assert.False(string.IsNullOrEmpty(projId));
+
+        var created = await Send(HttpMethod.Post, $"/api/v1/projects/{projId}/tasks", new { name = "Do the thing" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var taskId = (await Json(created)).GetProperty("id").GetInt32();
+
+        var moved = await Send(HttpMethod.Patch, $"/api/v1/tasks/{taskId}", new { status = "In Progress" });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.Equal("In Progress", (await Json(moved)).GetProperty("status").GetString());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await Send(HttpMethod.Delete, $"/api/v1/tasks/{taskId}")).StatusCode);
+    }
+
     [Fact]
     public async Task Whiteboard_supports_the_roadmap_scope()
     {

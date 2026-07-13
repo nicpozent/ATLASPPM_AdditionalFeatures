@@ -1,6 +1,6 @@
 // Tasks tab — board + table views, drag-to-move, assignee filter, Jira pull-sync.
 // Extracted from Project.tsx unchanged (ADR-0041).
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useLayoutEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
@@ -8,6 +8,9 @@ import { syncJira, syncToast } from "@/lib/jiraSync";
 import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, Button, Select } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
+import { useRole } from "@/components/RoleContext";
+import { useRoomRealtime } from "@/realtime/useRoomRealtime";
+import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
 import { toast } from "@/components/Toast";
 import { useProject } from "./useProject";
 import { type Task, BOARD_COLS, TASK_PRIORITY, useAssigneeOptions, useEpicOptions, useSprintOptions } from "./taskModel";
@@ -68,6 +71,29 @@ export function Tasks({ projectId }: { projectId: string | null }) {
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
   const canCreate = data?.canCreate ?? false;
+
+  // Real-time collaboration — every role joins the project's task room for live
+  // presence, peer cursors and instant board refresh when anyone moves a card.
+  // (Moving a card still needs the project-edit right; collaboration is for all.)
+  const { identity } = useRole();
+  const onChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["tasks", projectId] }), [qc, projectId]);
+  const { peers, cursors, connected, sendCursor } = useRoomRealtime(projectId ? `tasks:${projectId}` : null, identity.name, onChanged);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const surf = surfaceRef.current;
+    if (!surf) return;
+    const measure = () => setSize({ w: surf.offsetWidth, h: surf.offsetHeight });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [view, tasks.length]);
+  const onSurfaceMove = useCallback((e: React.MouseEvent) => {
+    const surf = surfaceRef.current;
+    if (!surf) return;
+    const r = surf.getBoundingClientRect();
+    if (r.width && r.height) sendCursor((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }, [sendCursor]);
   const isSpilled = (t: Task) => !!t.sprint && !!t.baseline && t.sprint !== t.baseline;
   // Assignee filter: options are the assignees actually present on the board.
   const assignees = Array.from(new Set(tasks.map((t) => t.assignee).filter(Boolean))).sort();
@@ -89,6 +115,8 @@ export function Tasks({ projectId }: { projectId: string | null }) {
             {assignees.map((a) => <option key={a} value={a}>{a}</option>)}
           </Select>
         )}
+        <LiveDot connected={connected} />
+        <PresenceRow peers={peers} />
         <div style={{ flex: 1 }} />
         {jiraMapped && (
           <Button variant="secondary" onClick={() => syncProject.mutate()} disabled={syncProject.isPending || !canSyncJira} title={canSyncJira ? `Pull ${project?.jiraProjectKey} / board ${project?.jiraBoardId} from Jira` : "Needs Edit on Integrations & connectors"}>
@@ -99,7 +127,8 @@ export function Tasks({ projectId }: { projectId: string | null }) {
       </div>
 
       {view === "board" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, alignItems: "start" }}>
+        <div ref={surfaceRef} onMouseMove={onSurfaceMove} style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, alignItems: "start" }}>
+          <CursorLayer cursors={cursors} peers={peers} w={size.w} h={size.h} />
           {BOARD_COLS.map((c) => {
             const cards = shown.filter((t) => t.status === c.label);
             const over = overCol === c.label;
