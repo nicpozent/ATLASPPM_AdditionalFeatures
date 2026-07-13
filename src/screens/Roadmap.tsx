@@ -7,6 +7,7 @@ import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
 import { yearOf, yearColumns } from "@/lib/roadmap";
+import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
 
 // ============================================================================
 //  Roadmap — strategic initiatives on the Now / Next / Later horizons, with a
@@ -67,7 +68,7 @@ export default function Roadmap() {
   const qc = useQueryClient();
   const { can } = usePermissions();
   const mayEdit = can("cap-roadmap", "E");
-  const [view, setView] = useState<"board" | "year" | "timeline">("board");
+  const [view, setView] = useState<"board" | "year" | "timeline" | "whiteboard">("board");
   const [theme, setTheme] = useState("all");
   const [status, setStatus] = useState("all");
   const [newItem, setNewItem] = useState(false);
@@ -124,14 +125,14 @@ export default function Roadmap() {
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ display: "inline-flex", background: color.surface, border: `1px solid ${color.border2}`, borderRadius: radius.md, padding: 3 }}>
-          {(["board", "year", "timeline"] as const).map((v) => (
+          {(["board", "year", "timeline", "whiteboard"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
                 border: "none", borderRadius: radius.sm, padding: "6px 12px", cursor: "pointer",
                 background: view === v ? color.primary : "transparent", color: view === v ? "#fff" : color.textMuted,
               }}>
-              <Icon name={v === "board" ? "grid" : v === "year" ? "calendar" : "gantt"} size={14} /> {v === "board" ? "Now / Next / Later" : v === "year" ? "By year" : "Timeline"}
+              <Icon name={v === "board" ? "grid" : v === "year" ? "calendar" : v === "timeline" ? "gantt" : "edit"} size={14} /> {v === "board" ? "Now / Next / Later" : v === "year" ? "By year" : v === "timeline" ? "Timeline" : "Whiteboard"}
             </button>
           ))}
         </div>
@@ -149,7 +150,9 @@ export default function Roadmap() {
         </Button>
       </div>
 
-      {items.length === 0 ? (
+      {view === "whiteboard" ? (
+        <WhiteboardPanel scope={{ kind: "roadmap", id: "portfolio" }} />
+      ) : items.length === 0 ? (
         <Card><EmptyBlock message="No roadmap initiatives yet. Add one to plan strategic work across the Now / Next / Later horizons — set dates to see it on the timeline, and link it to OKRs, projects, programs, products or releases." minHeight={150} /></Card>
       ) : filtered.length === 0 ? (
         <Card><EmptyBlock message="No initiatives match these filters." minHeight={120} /></Card>

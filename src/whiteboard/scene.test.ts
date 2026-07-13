@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, uid, applyRemoteOp } from "./scene";
+import { addNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, uid, applyRemoteOp, createStroke, translateNode } from "./scene";
 import { EMPTY_SCENE, type Scene, type WbNode } from "./types";
 
 describe("whiteboard scene helpers", () => {
@@ -110,5 +110,28 @@ describe("applyRemoteOp — live co-editing", () => {
     expect(applyRemoteOp(EMPTY_SCENE, null).nodes).toHaveLength(0);
     // @ts-expect-error unknown op type
     expect(applyRemoteOp(EMPTY_SCENE, { t: "nope" }).nodes).toHaveLength(0);
+  });
+});
+
+describe("freehand strokes", () => {
+  it("createStroke computes a bounding box from the polyline", () => {
+    const stroke = createStroke([10, 20, 60, 20, 60, 90], "#5B7CFA");
+    expect(stroke.kind).toBe("draw");
+    expect(stroke.x).toBe(10); expect(stroke.y).toBe(20);
+    expect(stroke.w).toBe(50); expect(stroke.h).toBe(70);
+    expect(stroke.points).toEqual([10, 20, 60, 20, 60, 90]);
+  });
+
+  it("translateNode shifts a stroke's box and every point", () => {
+    const stroke = createStroke([10, 20, 60, 90], "#000000");
+    const patch = translateNode(stroke, 5, -3);
+    expect(patch.x).toBe(15); expect(patch.y).toBe(17);
+    expect(patch.points).toEqual([15, 17, 65, 87]);
+  });
+
+  it("translateNode moves only the box for non-draw nodes", () => {
+    const rect: WbNode = { id: "r", kind: "rect", x: 0, y: 0, w: 100, h: 100 };
+    const patch = translateNode(rect, 10, 10);
+    expect(patch).toEqual({ x: 10, y: 10 });
   });
 });

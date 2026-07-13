@@ -7,9 +7,11 @@ import { useRole } from "@/components/RoleContext";
 import { useRoomRealtime } from "@/realtime/useRoomRealtime";
 import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
 import {
-  EMPTY_SCENE, PALETTE, SHAPE_TOOLS, ICONS, type Scene, type WbNode, type WbEdge, type NodeKind,
+  EMPTY_SCENE, PALETTE, SHAPE_TOOLS, ICONS, CLIP, type Scene, type WbNode, type WbEdge, type NodeKind,
 } from "./types";
-import { createNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, applyRemoteOp, type RemoteOp } from "./scene";
+import { createNode, createStroke, translateNode, updateNode, removeNode, addEdge, removeEdge, edgeEndpoints, applyRemoteOp, type RemoteOp } from "./scene";
+import { downloadPng, downloadSvg, downloadJson, jsonToScene } from "./exportScene";
+import { toast, toastError } from "@/components/Toast";
 
 // ============================================================================
 //  Freeform Whiteboard (ADR-0064) — a per-entity brainstorming canvas: sticky
@@ -82,25 +84,60 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const [sel, setSel] = useState<string | null>(null);
   const [selEdge, setSelEdge] = useState<string | null>(null);
   const [pending, setPending] = useState<{ kind: NodeKind; icon?: string } | null>(null);
+  const [tool, setTool] = useState<"select" | "connector" | "pen">("select");   // pointer mode
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [newColor, setNewColor] = useState<string>(PALETTE[0]);
+  const [inkColor, setInkColor] = useState<string>(color.primary);   // stroke colour for the pen / new icons
   const [iconMenu, setIconMenu] = useState(false);
+  const [exportMenu, setExportMenu] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: string; mode: "move" | "resize"; ox: number; oy: number; start: WbNode } | null>(null);
+  const pen = useRef<number[] | null>(null);                 // in-progress freehand points
+  const [penLive, setPenLive] = useState<number[] | null>(null);
+
+  // Whole-scene persist (bulk PUT) — used by Clear and Import. Broadcasts a
+  // refetch ping so peers converge; on error we reconcile.
+  const putWholeScene = useCallback((sc: Scene) =>
+    persist(api(`${base}`, { method: "PUT", body: JSON.stringify({ scene: sc }) })), [persist, base]);
+
+  const clearBoard = () => {
+    if (sceneRef.current.nodes.length === 0 && sceneRef.current.edges.length === 0) return;
+    if (!window.confirm("Clear the whole whiteboard? This removes every note, shape and connector for everyone.")) return;
+    setScene(EMPTY_SCENE); putWholeScene(EMPTY_SCENE); setSel(null); setSelEdge(null);
+  };
+  const doExport = (fmt: "png" | "svg" | "json") => {
+    setExportMenu(false);
+    const name = `whiteboard-${kind}-${id}`;
+    if (fmt === "json") downloadJson(sceneRef.current, name);
+    else if (fmt === "svg") downloadSvg(sceneRef.current, name);
+    else downloadPng(sceneRef.current, name).catch(() => toastError(new Error("Couldn't render the image.")));
+  };
+  const onImportFile = (file: File) => {
+    file.text().then((t) => {
+      const sc = jsonToScene(t);
+      setScene(sc); putWholeScene(sc); toast("Whiteboard imported.", "info");
+    }).catch(() => toastError(new Error("That file isn't a valid whiteboard JSON.")));
+  };
 
   const toCanvas = (e: { clientX: number; clientY: number }) => {
     const r = canvasRef.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  // --- Pointer: background (add tool / deselect) ---
+  // --- Pointer: background (pen / add tool / deselect) ---
   const onCanvasDown = (e: React.PointerEvent) => {
     if (!canEdit) { setSel(null); setSelEdge(null); return; }
     const p = toCanvas(e);
+    if (tool === "pen") {
+      pen.current = [p.x, p.y]; setPenLive([p.x, p.y]); interacting.current = true;
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
     if (pending) {
-      const node = createNode(pending.kind, p.x, p.y, pending.icon ? { icon: pending.icon, color: newColor } : { color: pending.kind === "text" ? color.ink : newColor });
+      const node = createNode(pending.kind, p.x, p.y, pending.icon ? { icon: pending.icon, color: inkColor } : { color: pending.kind === "text" ? color.ink : newColor });
       setScene((s) => ({ ...s, nodes: [...s.nodes, node] }));
       pushNode(node);
       setPending(null);
@@ -112,6 +149,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const onCanvasMove = (e: React.PointerEvent) => {
     const p = toCanvas(e);
     sendCursor(p.x / CANVAS_W, p.y / CANVAS_H);
+    if (pen.current) { pen.current.push(p.x, p.y); setPenLive(pen.current.slice()); return; }
     const d = drag.current;
     if (!d) return;
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
@@ -119,7 +157,8 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     if (d.mode === "move") {
       const nx = clamp(d.start.x + (p.x - d.ox), 0, CANVAS_W - node.w);
       const ny = clamp(d.start.y + (p.y - d.oy), 0, CANVAS_H - node.h);
-      setScene((s) => updateNode(s, d.id, { x: nx, y: ny }));
+      const patch = d.start.kind === "draw" ? translateNode(d.start, nx - d.start.x, ny - d.start.y) : { x: nx, y: ny };
+      setScene((s) => updateNode(s, d.id, patch));
     } else {
       const nw = clamp(d.start.w + (p.x - d.ox), 44, CANVAS_W - node.x);
       const nh = clamp(d.start.h + (p.y - d.oy), 32, CANVAS_H - node.y);
@@ -127,20 +166,30 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     }
   };
 
-  const endDrag = () => {
+  const endInteraction = () => {
+    // Finish a freehand stroke → commit it as one node.
+    if (pen.current) {
+      const pts = pen.current; pen.current = null; setPenLive(null); interacting.current = false;
+      if (pts.length >= 4) {
+        const stroke = createStroke(pts, inkColor);
+        setScene((s) => ({ ...s, nodes: [...s.nodes, stroke] }));
+        pushNode(stroke);
+      }
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     drag.current = null; dragIdRef.current = null;
     interacting.current = false;
-    // Persist the moved/resized node (one granular op).
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
-    if (node) pushNode(node);
+    if (node) pushNode(node);   // persist the moved/resized node (one granular op)
   };
 
   // --- Pointer: a node ---
   const onNodeDown = (e: React.PointerEvent, node: WbNode, mode: "move" | "resize") => {
     e.stopPropagation();
     if (!canEdit) { setSel(node.id); setSelEdge(null); return; }
+    // Completing a connector (from the connector tool or the Connect button).
     if (linkFrom) {
       if (node.id !== linkFrom) {
         const after = addEdge(sceneRef.current, linkFrom, node.id, color.faint2);
@@ -149,6 +198,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       setLinkFrom(null);
       return;
     }
+    if (tool === "connector") { setSel(node.id); setLinkFrom(node.id); return; }
     setSel(node.id); setSelEdge(null);
     interacting.current = true;
     const p = toCanvas(e);
@@ -159,7 +209,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 
   // --- Node text editing ---
   const startEdit = (node: WbNode) => {
-    if (!canEdit || node.kind === "icon") return;
+    if (!canEdit || node.kind === "icon" || node.kind === "draw") return;
     setSel(node.id); interacting.current = true; editingRef.current = node.id; setEditing(node.id);
   };
   const changeText = (nodeId: string, text: string) => setScene((s) => updateNode(s, nodeId, { text }));
@@ -172,7 +222,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 
   // --- Toolbar actions on the selection ---
   const recolor = (c: string) => {
-    setNewColor(c);
+    setNewColor(c); setInkColor(c);
     if (sel) {
       const node = sceneRef.current.nodes.find((n) => n.id === sel);
       if (node) { const upd = { ...node, color: c }; setScene((s) => updateNode(s, sel, { color: c })); pushNode(upd); }
@@ -183,13 +233,16 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     else if (selEdge) { setScene((s) => removeEdge(s, selEdge)); pushDelEdge(selEdge); setSelEdge(null); }
   }, [sel, selEdge, pushDelNode, pushDelEdge]);
 
+  // Pick a shape/pen/connector tool (clears the others).
+  const armShape = (k: NodeKind) => { setPending({ kind: k }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
+  const armIcon = (icon: string) => { setPending({ kind: "icon", icon }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
+  const armTool = (t: "select" | "connector" | "pen") => { setTool(t); setPending(null); setLinkFrom(null); setIconMenu(false); };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return;
     if ((e.key === "Delete" || e.key === "Backspace") && (sel || selEdge)) { e.preventDefault(); deleteSel(); }
-    if (e.key === "Escape") { setPending(null); setLinkFrom(null); setSel(null); setSelEdge(null); }
+    if (e.key === "Escape") { setPending(null); setLinkFrom(null); setSel(null); setSelEdge(null); setTool("select"); }
   };
-
-  const selNode = scene.nodes.find((n) => n.id === sel) ?? null;
 
   return (
     <div>
@@ -197,9 +250,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         {canEdit ? (
           <>
-            <div style={{ display: "flex", gap: 4, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 10, padding: 4 }}>
+            <div style={{ display: "flex", gap: 4, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 10, padding: 4, flexWrap: "wrap" }}>
               {SHAPE_TOOLS.map((t) => (
-                <ToolBtn key={t.kind} title={t.label} active={pending?.kind === t.kind && !pending.icon} onClick={() => { setPending({ kind: t.kind }); setIconMenu(false); }}>
+                <ToolBtn key={t.kind} title={t.label} active={pending?.kind === t.kind && !pending.icon} onClick={() => armShape(t.kind)}>
                   <ShapeGlyph kind={t.kind} />
                 </ToolBtn>
               ))}
@@ -211,7 +264,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
                 {iconMenu && (
                   <div style={{ position: "absolute", top: 40, left: 0, zIndex: 20, display: "grid", gridTemplateColumns: "repeat(4, 34px)", gap: 4, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, padding: 6, boxShadow: "0 6px 20px rgba(20,26,60,0.14)" }}>
                     {ICONS.map((ic) => (
-                      <button key={ic} type="button" title={ic} onClick={() => { setPending({ kind: "icon", icon: ic }); setIconMenu(false); }}
+                      <button key={ic} type="button" title={ic} onClick={() => armIcon(ic)}
                         style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${color.border2}`, borderRadius: 8, background: color.surface, cursor: "pointer", color: color.text }}>
                         <Icon name={ic} size={17} />
                       </button>
@@ -219,9 +272,16 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
                   </div>
                 )}
               </div>
+              {/* Connector (arrow) + freehand pen tools */}
+              <ToolBtn title="Connector — click two shapes to link them with an arrow" active={tool === "connector"} onClick={() => armTool(tool === "connector" ? "select" : "connector")}>
+                <Icon name="gitBranch" size={17} />
+              </ToolBtn>
+              <ToolBtn title="Pen — draw freehand" active={tool === "pen"} onClick={() => armTool(tool === "pen" ? "select" : "pen")}>
+                <Icon name="edit" size={16} />
+              </ToolBtn>
             </div>
 
-            {/* Colour palette (recolours the selection, sets the default for new) */}
+            {/* Colour palette (recolours the selection; sets the default for new shapes & the pen) */}
             <div style={{ display: "flex", gap: 4, background: color.surfaceAlt, border: `1px solid ${color.border}`, borderRadius: 10, padding: 4 }}>
               {PALETTE.map((c) => (
                 <button key={c} type="button" aria-label={`Colour ${c}`} onClick={() => recolor(c)}
@@ -229,16 +289,29 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
               ))}
             </div>
 
-            {/* Selection actions */}
-            <button type="button" onClick={() => selNode && setLinkFrom(selNode.id)} disabled={!selNode || selNode.kind === "text" || selNode.kind === "icon"}
-              title={selNode ? "Draw a connector from this node" : "Select a node to connect"}
-              style={actionBtn(!!selNode && selNode.kind !== "text" && selNode.kind !== "icon")}>
-              <Icon name="gitBranch" size={15} /> Connect
-            </button>
             <button type="button" onClick={deleteSel} disabled={!sel && !selEdge} title="Delete selection (Del)"
               style={{ ...actionBtn(!!(sel || selEdge)), color: (sel || selEdge) ? color.danger : color.faint3 }}>
               <Icon name="trash" size={15} /> Delete
             </button>
+
+            {/* Export / import / clear */}
+            <div style={{ position: "relative" }}>
+              <button type="button" onClick={() => setExportMenu((v) => !v)} title="Save / export this whiteboard" style={actionBtn(true)}>
+                <Icon name="download" size={15} /> Save ▾
+              </button>
+              {exportMenu && (
+                <div style={{ position: "absolute", top: 40, right: 0, zIndex: 20, minWidth: 180, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 10, padding: 6, boxShadow: "0 6px 20px rgba(20,26,60,0.14)" }}>
+                  <MenuRow icon="download" label="Export as PNG (image)" onClick={() => doExport("png")} />
+                  <MenuRow icon="download" label="Export as SVG (vector)" onClick={() => doExport("svg")} />
+                  <MenuRow icon="download" label="Export as JSON (backup)" onClick={() => doExport("json")} />
+                  <div style={{ height: 1, background: color.border, margin: "5px 0" }} />
+                  <MenuRow icon="sheet" label="Import JSON…" onClick={() => { setExportMenu(false); fileRef.current?.click(); }} />
+                  <MenuRow icon="trash" label="Clear board" danger onClick={() => { setExportMenu(false); clearBoard(); }} />
+                </div>
+              )}
+              <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImportFile(f); e.currentTarget.value = ""; }} />
+            </div>
           </>
         ) : (
           <div style={{ fontSize: 12.5, color: color.faint2, display: "flex", alignItems: "center", gap: 6 }}>
@@ -252,7 +325,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 
       {/* Hints */}
       {pending && <Banner>Click on the canvas to drop a <b>{pending.icon ? pending.icon : pending.kind}</b>. <Esc /></Banner>}
-      {linkFrom && <Banner>Click another node to connect. <Esc /></Banner>}
+      {tool === "connector" && !linkFrom && <Banner>Connector: click the first shape, then the second, to link them with an arrow. <Esc /></Banner>}
+      {linkFrom && <Banner>Now click the shape to connect to. <Esc /></Banner>}
+      {tool === "pen" && <Banner>Pen: click and drag on the canvas to draw freehand. <Esc /></Banner>}
 
       {/* Canvas */}
       <div style={{ overflow: "auto", height: 580, border: `1px solid ${color.border}`, borderRadius: 12, background: color.surface }}>
@@ -262,13 +337,14 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
           onKeyDown={onKeyDown}
           onPointerDown={onCanvasDown}
           onPointerMove={onCanvasMove}
-          onPointerUp={endDrag}
-          onPointerLeave={endDrag}
+          onPointerUp={endInteraction}
+          onPointerLeave={endInteraction}
           style={{
             position: "relative", width: CANVAS_W, height: CANVAS_H, outline: "none",
-            cursor: pending ? "copy" : linkFrom ? "crosshair" : "default",
+            cursor: pending ? "copy" : (linkFrom || tool === "connector") ? "crosshair" : tool === "pen" ? "crosshair" : "default",
             backgroundImage: `radial-gradient(${color.border2} 1px, transparent 1px)`,
             backgroundSize: "22px 22px",
+            touchAction: "none",
           }}
         >
           {/* Connectors (under nodes) */}
@@ -293,6 +369,15 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
                 </g>
               );
             })}
+            {/* Freehand strokes */}
+            {scene.nodes.filter((n) => n.kind === "draw" && n.points && n.points.length >= 2).map((n) => (
+              <polyline key={n.id} points={pointsAttr(n.points!)} fill="none" stroke={n.color ?? color.primary}
+                strokeWidth={sel === n.id ? 3.5 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
+            ))}
+            {/* Live pen preview */}
+            {penLive && penLive.length >= 2 && (
+              <polyline points={pointsAttr(penLive)} fill="none" stroke={inkColor} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+            )}
           </svg>
 
           {/* Nodes */}
@@ -329,16 +414,20 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoub
   };
   const textInk = node.kind === "note" ? color.ink : node.kind === "text" ? (node.color ?? color.ink) : color.text;
 
-  const shape = () => {
+  const shape = (): React.CSSProperties => {
+    const fill = node.color ?? "#fff";
+    const bordered = { background: fill, border: `1.5px solid ${color.border2}` };
+    const centered = { display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" as const };
+    if (CLIP[node.kind]) return { ...bordered, clipPath: CLIP[node.kind], ...centered, padding: 16 };
     switch (node.kind) {
       case "note":
         return { background: node.color ?? "#FFE8A3", borderRadius: 6, boxShadow: "0 2px 6px rgba(20,26,60,0.12)", padding: 10 };
       case "rect":
-        return { background: node.color ?? "#fff", border: `1.5px solid ${color.border2}`, borderRadius: 10, padding: 10 };
+        return { ...bordered, borderRadius: 10, padding: 10 };
+      case "pill":
+        return { ...bordered, borderRadius: node.h / 2, padding: "8px 14px", ...centered };
       case "ellipse":
-        return { background: node.color ?? "#fff", border: `1.5px solid ${color.border2}`, borderRadius: "50%", padding: 12, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" as const };
-      case "diamond":
-        return { background: node.color ?? "#fff", border: `1.5px solid ${color.border2}`, clipPath: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" as const, padding: 18 };
+        return { ...bordered, borderRadius: "50%", padding: 12, ...centered };
       case "text":
         return { background: "transparent", padding: 4, display: "flex", alignItems: "center" };
       default:
@@ -360,6 +449,15 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoub
       </div>
     );
 
+  // Freehand strokes render in the SVG layer; here we only need a transparent
+  // hit box so the stroke can be selected, moved and deleted like any node.
+  if (node.kind === "draw") {
+    return (
+      <div style={{ ...base, background: "transparent", cursor: canEdit ? "move" : "default" }}
+        onPointerDown={(e) => onDown(e, "move")} title="Freehand drawing" />
+    );
+  }
+
   return (
     <div style={base} onPointerDown={(e) => onDown(e, "move")} onDoubleClick={onDoubleClick}>
       {node.kind === "icon" ? (
@@ -371,6 +469,11 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoub
           <ActorGlyph color={node.color && node.color !== "#FFFFFF" ? "#5B6472" : color.subtle} />
           <div style={{ fontSize: 11.5, fontWeight: 600, color: color.text, textAlign: "center", maxWidth: "100%", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{node.text || "Actor"}</div>
         </div>
+      ) : node.kind === "cylinder" ? (
+        <div style={{ width: "100%", height: "100%", position: "relative" }}>
+          <CylinderGlyph color={node.color ?? "#fff"} />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>{label()}</div>
+        </div>
       ) : (
         <div style={{ width: "100%", height: "100%", ...shape() }}>{label()}</div>
       )}
@@ -381,6 +484,23 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onDown, onDoub
           style={{ position: "absolute", right: -6, bottom: -6, width: 14, height: 14, borderRadius: 4, background: color.surface, border: `2px solid ${color.primary}`, cursor: "nwse-resize" }} />
       )}
     </div>
+  );
+}
+
+// Flatten [x0,y0,x1,y1,…] into an SVG points attribute.
+function pointsAttr(pts: number[]): string {
+  let s = "";
+  for (let i = 0; i + 1 < pts.length; i += 2) s += `${pts[i]},${pts[i + 1]} `;
+  return s.trim();
+}
+
+// A database/cylinder shape drawn as scalable SVG.
+function CylinderGlyph({ color: c }: { color: string }) {
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ display: "block" }}>
+      <path d="M4 14 A46 12 0 0 1 96 14 L96 86 A46 12 0 0 1 4 86 Z" fill={c} stroke="#c7ccd6" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      <path d="M4 14 A46 12 0 0 0 96 14" fill="none" stroke="#c7ccd6" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }
 
@@ -397,12 +517,30 @@ function ActorGlyph({ color: c }: { color: string }) {
 // Tiny glyph shown on each shape tool button.
 function ShapeGlyph({ kind }: { kind: NodeKind }) {
   const s = 16;
+  const outline = `2px solid ${color.text}`;
+  const clip = (poly: string) => <div style={{ width: s, height: s, background: color.text, clipPath: poly }} />;
   if (kind === "note") return <div style={{ width: s, height: s, background: "#FFE8A3", borderRadius: 3, border: `1px solid rgba(20,26,60,0.15)` }} />;
-  if (kind === "rect") return <div style={{ width: s, height: s - 3, border: `2px solid ${color.text}`, borderRadius: 3 }} />;
-  if (kind === "ellipse") return <div style={{ width: s, height: s - 2, border: `2px solid ${color.text}`, borderRadius: "50%" }} />;
-  if (kind === "diamond") return <div style={{ width: s - 3, height: s - 3, border: `2px solid ${color.text}`, transform: "rotate(45deg)" }} />;
+  if (kind === "rect") return <div style={{ width: s, height: s - 3, border: outline, borderRadius: 3 }} />;
+  if (kind === "pill") return <div style={{ width: s, height: s - 5, border: outline, borderRadius: 999 }} />;
+  if (kind === "ellipse") return <div style={{ width: s, height: s - 2, border: outline, borderRadius: "50%" }} />;
+  if (kind === "diamond") return <div style={{ width: s - 3, height: s - 3, border: outline, transform: "rotate(45deg)" }} />;
+  if (kind === "triangle") return clip("polygon(50% 0, 100% 100%, 0 100%)");
+  if (kind === "hexagon") return clip("polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)");
+  if (kind === "parallelogram") return clip("polygon(22% 0, 100% 0, 78% 100%, 0 100%)");
+  if (kind === "star") return clip("polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)");
+  if (kind === "cylinder") return <Icon name="box" size={17} />;
   if (kind === "actor") return <Icon name="users" size={17} />;
   return <span style={{ fontFamily: font.head, fontWeight: 700, fontSize: 15, color: color.text }}>T</span>;
+}
+
+// A row in the Save/export dropdown.
+function MenuRow({ icon, label, onClick, danger }: { icon: string; label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", color: danger ? color.danger : color.text, background: "transparent", border: "none", borderRadius: 7, padding: "8px 9px", cursor: "pointer" }}>
+      <Icon name={icon} size={14} /> {label}
+    </button>
+  );
 }
 
 function ToolBtn({ children, active, title, onClick }: { children: React.ReactNode; active: boolean; title: string; onClick: () => void }) {

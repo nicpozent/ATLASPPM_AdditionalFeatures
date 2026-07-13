@@ -374,4 +374,32 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.NotFound,
             (await Send(HttpMethod.Put, "/api/v1/whiteboards/banana/1/node", new { id = "a", kind = "note", x = 0.0, y = 0.0, w = 40.0, h = 40.0 })).StatusCode);
     }
+
+    [Fact]
+    public async Task Whiteboard_accepts_new_shapes_and_freehand_strokes()
+    {
+        var incId = (await Json(await Send(HttpMethod.Post, "/api/v1/increments", new { name = "WB PI shapes" }))).GetProperty("id").GetInt32();
+        var wb = $"/api/v1/whiteboards/pi/{incId}";
+
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "s1", kind = "triangle", x = 0.0, y = 0.0, w = 120.0, h = 100.0 })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "s2", kind = "star", x = 200.0, y = 0.0, w = 120.0, h = 120.0 })).StatusCode);
+        // A freehand stroke carries a points polyline.
+        Assert.Equal(HttpStatusCode.OK, (await Send(HttpMethod.Put, $"{wb}/node", new { id = "d1", kind = "draw", x = 0.0, y = 0.0, w = 60.0, h = 40.0, points = new[] { 10.0, 10.0, 40.0, 30.0, 70.0, 10.0 } })).StatusCode);
+
+        var scene = (await Json(await Send(HttpMethod.Get, wb))).GetProperty("scene");
+        Assert.Equal(3, scene.GetProperty("nodes").GetArrayLength());
+        var draw = scene.GetProperty("nodes").EnumerateArray().First(n => n.GetProperty("id").GetString() == "d1");
+        Assert.Equal(6, draw.GetProperty("points").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Whiteboard_supports_the_roadmap_scope()
+    {
+        // Roadmap is a single portfolio-wide whiteboard, gated on cap-roadmap.
+        var put = await Send(HttpMethod.Put, "/api/v1/whiteboards/roadmap/portfolio/node",
+            new { id = "r1", kind = "note", x = 0.0, y = 0.0, w = 160.0, h = 150.0, text = "Strategy" });
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+        var scene = (await Json(await Send(HttpMethod.Get, "/api/v1/whiteboards/roadmap/portfolio"))).GetProperty("scene");
+        Assert.Equal(1, scene.GetProperty("nodes").GetArrayLength());
+    }
 }

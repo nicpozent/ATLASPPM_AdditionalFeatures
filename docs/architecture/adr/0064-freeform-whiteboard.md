@@ -129,3 +129,35 @@ scene blob, so two writers to the *same* scene within the same instant can still
 lose an update at the storage layer. The typed-table promotion (per-row writes)
 is the real fix and is tracked as a **pending follow-up**
 (`docs/pi-board-followups.md` §3).
+
+## Addendum — richer toolset, freehand, export & the Roadmap surface
+
+**Status:** Accepted — extends this ADR.
+
+- **More shapes.** Added `triangle`, `hexagon`, `parallelogram`, `star`, `pill`
+  (rounded) and `cylinder` (database) to the node kinds, alongside the original
+  note / rect / ellipse / diamond / actor / text / icon. Polygon shapes render
+  via CSS `clip-path` (shared `CLIP` map); cylinder via inline SVG.
+- **Connector tool.** Connectors (arrows) are now a first-class toolbar tool —
+  pick it, click the source shape, click the target — in addition to the
+  select-then-Connect path. Available on every surface (the component is shared),
+  so e.g. the Programs whiteboard has arrows too.
+- **Freehand pen (handwriting).** A `draw` node stores a `points` polyline
+  (absolute coords, server-bounded to `MaxPoints`). The pen tool captures pointer
+  strokes; strokes render in the SVG layer and are selectable/movable/deletable
+  like any node (moving translates every point). Persisted and broadcast as a
+  normal node op, so freehand co-edits live too.
+- **Save / export & clear.** A **Save** menu exports the board — **PNG** and
+  **SVG** (built from our own model via a dependency-free SVG serialiser +
+  canvas rasterisation — nothing leaves the browser) and **JSON** (re-importable
+  backup). **Import JSON** and **Clear board** (confirmed) round out lifecycle
+  management; per-item **Delete** and Del-key deletion already existed. Clear and
+  Import use the bulk-scene `PUT` (cap-checked) and ping peers to refetch.
+- **Roadmap surface.** Added a `roadmap` scope kind (single portfolio-wide board,
+  id `portfolio`, gated on `cap-roadmap`) and a **Whiteboard** view on the Roadmap
+  screen. The whiteboard now spans PI Planning, projects, programs, releases,
+  products and the roadmap.
+
+All additions reuse the existing granular-op + sanitisation + capability model:
+new kinds are whitelisted server-side, freehand points are clamped/capped, and
+`roadmap` joins the scope→capability map. No new dependency, no redesign.
