@@ -6,16 +6,28 @@
 // ============================================================================
 import { color } from "@/theme";
 
-export type NodeKind = "note" | "rect" | "ellipse" | "diamond" | "actor" | "text" | "icon";
+export type NodeKind =
+  | "note" | "rect" | "ellipse" | "diamond" | "actor" | "text" | "icon"
+  | "triangle" | "hexagon" | "parallelogram" | "star" | "cylinder" | "pill" | "draw";
 
 export interface WbNode {
   id: string;
   kind: NodeKind;
   x: number; y: number; w: number; h: number;
   text?: string;
-  color?: string;   // #RRGGBB — fill for shapes/notes, ink for text/icon
-  icon?: string;    // icon name (kind === "icon")
+  color?: string;    // #RRGGBB — fill for shapes/notes, ink for text/icon/draw
+  icon?: string;     // icon name (kind === "icon")
+  points?: number[]; // freehand polyline [x0,y0,x1,y1,…] in absolute coords (kind === "draw")
 }
+
+// Shapes rendered via a CSS clip-path polygon (the value is the polygon()).
+export const CLIP: Partial<Record<NodeKind, string>> = {
+  diamond: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)",
+  triangle: "polygon(50% 2%, 100% 100%, 0 100%)",
+  hexagon: "polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)",
+  parallelogram: "polygon(22% 0, 100% 0, 78% 100%, 0 100%)",
+  star: "polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+};
 export interface WbEdge { id: string; from: string; to: string; color?: string }
 export interface Scene { nodes: WbNode[]; edges: WbEdge[] }
 
@@ -34,12 +46,18 @@ export const PALETTE = [
   "#FFFFFF", // white
 ] as const;
 
-// Starter shape/tool set shown in the palette (order = toolbar order).
+// Shape/tool set shown in the palette (order = toolbar order).
 export const SHAPE_TOOLS: { kind: NodeKind; label: string }[] = [
   { kind: "note", label: "Sticky note" },
   { kind: "rect", label: "Rectangle" },
+  { kind: "pill", label: "Rounded" },
   { kind: "ellipse", label: "Ellipse" },
   { kind: "diamond", label: "Diamond" },
+  { kind: "triangle", label: "Triangle" },
+  { kind: "hexagon", label: "Hexagon" },
+  { kind: "parallelogram", label: "Parallelogram" },
+  { kind: "star", label: "Star" },
+  { kind: "cylinder", label: "Cylinder / DB" },
   { kind: "actor", label: "Actor" },
   { kind: "text", label: "Text" },
 ];
@@ -58,7 +76,10 @@ export function defaultSize(kind: NodeKind): { w: number; h: number } {
     case "icon": return { w: 64, h: 64 };
     case "actor": return { w: 96, h: 120 };
     case "ellipse": return { w: 150, h: 110 };
-    case "diamond": return { w: 150, h: 120 };
+    case "diamond": case "triangle": case "hexagon": case "star": return { w: 140, h: 120 };
+    case "cylinder": return { w: 130, h: 130 };
+    case "pill": return { w: 170, h: 70 };
+    case "draw": return { w: 2, h: 2 };
     default: return { w: 170, h: 110 };
   }
 }
@@ -66,6 +87,6 @@ export function defaultSize(kind: NodeKind): { w: number; h: number } {
 export function defaultColor(kind: NodeKind): string {
   if (kind === "note") return PALETTE[0];
   if (kind === "text") return color.ink;
-  if (kind === "icon") return color.primary;
+  if (kind === "icon" || kind === "draw") return color.primary;
   return "#FFFFFF";
 }

@@ -31,6 +31,30 @@ export function addNode(scene: Scene, kind: NodeKind, x: number, y: number, extr
   return { ...scene, nodes: [...scene.nodes, createNode(kind, x, y, extra)] };
 }
 
+// Build a freehand "draw" node from a flat [x0,y0,x1,y1,…] polyline (absolute
+// canvas coords). The node's box is the stroke's bounding box (for selection);
+// points stay absolute so the polyline renders directly.
+export function createStroke(points: number[], color: string): WbNode {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i + 1 < points.length; i += 2) {
+    minX = Math.min(minX, points[i]); maxX = Math.max(maxX, points[i]);
+    minY = Math.min(minY, points[i + 1]); maxY = Math.max(maxY, points[i + 1]);
+  }
+  if (!isFinite(minX)) { minX = minY = 0; maxX = maxY = 1; }
+  return {
+    id: uid("d"), kind: "draw", color, points,
+    x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY),
+  };
+}
+
+// Translate a node by (dx,dy); for freehand nodes the polyline points move too.
+export function translateNode(node: WbNode, dx: number, dy: number): Partial<WbNode> {
+  if (node.kind === "draw" && node.points) {
+    return { x: node.x + dx, y: node.y + dy, points: node.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) };
+  }
+  return { x: node.x + dx, y: node.y + dy };
+}
+
 export function updateNode(scene: Scene, id: string, patch: Partial<WbNode>): Scene {
   return { ...scene, nodes: scene.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
 }

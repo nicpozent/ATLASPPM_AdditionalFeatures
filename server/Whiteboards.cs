@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.SignalR;
 namespace Atlas.Api;
 
 // ---- Wire model (a scene = free-form nodes + connectors) -------------------
-public record WbNode(string Id, string Kind, double X, double Y, double W, double H, string? Text, string? Color, string? Icon);
+// Points is only used by freehand "draw" nodes: a flat [x0,y0,x1,y1,…] polyline
+// in absolute canvas coordinates.
+public record WbNode(string Id, string Kind, double X, double Y, double W, double H, string? Text, string? Color, string? Icon, double[]? Points = null);
 public record WbEdge(string Id, string From, string To, string? Color);
 public record WbScene(List<WbNode>? Nodes, List<WbEdge>? Edges);
 public record SaveWhiteboardReq(WbScene? Scene);
@@ -47,13 +49,16 @@ public static class Whiteboards
         ["program"] = "cap-projects",
         ["release"] = "cap-projects",
         ["product"] = "cap-products",
+        ["roadmap"] = "cap-roadmap",
     };
 
     // Node kinds the editor understands; anything else is rejected on write.
-    static readonly HashSet<string> Kinds = new() { "note", "rect", "ellipse", "diamond", "actor", "text", "icon" };
+    static readonly HashSet<string> Kinds = new()
+        { "note", "rect", "ellipse", "diamond", "actor", "text", "icon",
+          "triangle", "hexagon", "parallelogram", "star", "cylinder", "pill", "draw" };
 
     // Sanitisation bounds — generous for real brainstorming, finite for safety.
-    const int MaxNodes = 500, MaxEdges = 800, MaxText = 4000, MaxIdLen = 64;
+    const int MaxNodes = 500, MaxEdges = 800, MaxText = 4000, MaxIdLen = 64, MaxPoints = 4000;
     const double MaxCoord = 20000, MinSize = 8, MaxSize = 8000;
 
     static readonly Regex IdRe = new("^[A-Za-z0-9_-]{1,64}$", RegexOptions.Compiled);
@@ -102,7 +107,18 @@ public static class Whiteboards
             n.Id, n.Kind,
             Clamp(n.X, -MaxCoord, MaxCoord), Clamp(n.Y, -MaxCoord, MaxCoord),
             Clamp(n.W, MinSize, MaxSize), Clamp(n.H, MinSize, MaxSize),
-            Trim(n.Text, MaxText), Color(n.Color), Icon(n.Icon));
+            Trim(n.Text, MaxText), Color(n.Color), Icon(n.Icon), Points(n.Points));
+    }
+
+    // Freehand polyline points: cap the count and clamp each coordinate; drop the
+    // array entirely if empty/absent.
+    static double[]? Points(double[]? pts)
+    {
+        if (pts is null || pts.Length == 0) return null;
+        var take = pts.Length > MaxPoints ? MaxPoints : pts.Length;
+        var outp = new double[take];
+        for (int i = 0; i < take; i++) outp[i] = Clamp(pts[i], -MaxCoord, MaxCoord);
+        return outp;
     }
 
     // Coerce one connector — or null if unusable / dangling (both endpoints must
