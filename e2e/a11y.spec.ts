@@ -6,7 +6,9 @@ import AxeBuilder from "@axe-core/playwright";
 // token contrast pass (ADR-0037) the design greys meet WCAG AA, so ALL WCAG 2
 // A/AA violations — structural (roles, names, labels, aria) AND colour-contrast
 // — now GATE the build.
-const ROUTES = ["/", "/portfolio", "/gantt", "/roadmap", "/resources", "/admin"];
+// `/demands` sweeps the drag funnel board (empty columns) so the collaborative
+// board chrome is covered alongside the static screens.
+const ROUTES = ["/", "/portfolio", "/gantt", "/roadmap", "/resources", "/admin", "/demands"];
 
 for (const route of ROUTES) {
   test(`a11y: ${route}`, async ({ page }) => {
