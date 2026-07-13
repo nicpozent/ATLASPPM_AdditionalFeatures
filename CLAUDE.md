@@ -63,9 +63,10 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   on PI Planning, then generalised to a reusable room concept and extended to the
   **Demand Pipeline funnel** (`demands`) and the **project Tasks (Kanban) board**
   (`tasks:{projectId}`) so cards move live for everyone. Collaboration (presence/
-  cursors/live refresh) is open to all roles, as is **moving a task card between
-  columns** (a status-only change; every other task edit stays behind
-  cap-projects — ADR-0065). Large canvases show **off-screen peer indicators**
+  cursors/live refresh) is open to all roles. **Moving a task card between
+  columns** is a status-only change scoped to the planner roles (Platform Admin,
+  PMO, Project Manager, PM Lead — cap-schedule); every other task edit stays
+  behind cap-projects (ADR-0065). Large canvases show **off-screen peer indicators**
   (edge markers pointing to collaborators scrolled out of view). Built from the
   existing theme/components. See ADR-0061 · ADR-0065 · `docs/pi-board-followups.md`.
 - **Freeform Whiteboard** — a bounded, per-entity brainstorming canvas (sticky

@@ -34,7 +34,12 @@ public static class Tasks
             var tasks = await db.ProjectTasks.Where(t => t.ProjectId == id).OrderBy(t => t.Ord).ToListAsync();
             var absences = await db.Absences.Where(a => a.ProjectId == id).ToListAsync();
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
+            // Creating and moving cards are both scheduling actions — gated by Edit
+            // on "Project schedule" (cap-schedule), held only by Platform Admin, PMO,
+            // Project Manager and PM Lead (ADR-0065). Collaboration (presence/cursors/
+            // live refresh) stays open to every role; only the writes are scoped.
             var canCreate = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
+            var canMove = canCreate;
             var taskIds = tasks.Select(t => t.Id).ToList();
             var attCounts = (await db.TaskAttachments.Where(a => taskIds.Contains(a.TaskId))
                 .GroupBy(a => a.TaskId).Select(g => new { g.Key, N = g.Count() }).ToListAsync())
@@ -49,7 +54,7 @@ public static class Tasks
             foreach (var r in await db.Resources.Select(x => x.Name).ToListAsync()) if (!string.IsNullOrWhiteSpace(r)) known.Add(r.Trim());
             foreach (var m in await db.TeamMembers.Select(x => new { x.DisplayName, x.Email }).ToListAsync())
             { if (!string.IsNullOrWhiteSpace(m.DisplayName)) known.Add(m.DisplayName.Trim()); if (!string.IsNullOrWhiteSpace(m.Email)) known.Add(m.Email.Trim()); }
-            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known, attCounts, comCounts)).ToList(), canCreate));
+            return Results.Ok(new ProjectTasksDto(canEdit, tasks.Select(t => ToDto(t, absences, known, attCounts, comCounts)).ToList(), canCreate, canMove));
         });
 
         api.MapPost("/projects/{id}/tasks", async (string id, CreateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
@@ -81,14 +86,17 @@ public static class Tasks
 
         api.MapPatch("/tasks/{taskId:int}", async (int taskId, UpdateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
-            // Moving a card between board columns (a status-only change) is open to
-            // any authenticated user — collaboration on the board is for everyone
-            // (product decision, ADR-0065). Every OTHER field change (rename,
-            // re-plan, assignee, estimate…) still requires Edit on cap-projects.
+            // Moving a card between board columns (a status-only change) is a
+            // scheduling action — Edit on "Project schedule" (cap-schedule), i.e.
+            // Platform Admin, PMO, Project Manager and PM Lead only (ADR-0065).
+            // Every OTHER field change (rename, assignee, estimate…) requires Edit
+            // on cap-projects. Live collaboration (presence/cursors/refresh) is open
+            // to all roles via the hub; only the write itself is scoped.
             var statusOnly = req.Status is not null && req.Name is null && req.Epic is null && req.Assignee is null
                 && req.Sprint is null && req.Baseline is null && req.Priority is null && req.StartDate is null
                 && req.TargetDate is null && req.Points is null && req.Size is null && req.EstimateHours is null;
-            if (!statusOnly && await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var moveCap = statusOnly ? "cap-schedule" : "cap-projects";
+            if (await Permissions.Deny(http, db, cfg, moveCap, "E") is { } denied) return denied;
             var task = await db.ProjectTasks.FindAsync(taskId);
             if (task is null) return Results.NotFound();
             if (req.Name is not null)

@@ -49,8 +49,8 @@ export function Tasks({ projectId }: { projectId: string | null }) {
 
   const { data } = useQuery({
     queryKey: ["tasks", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }> =>
-      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
+    queryFn: async (): Promise<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean; canMove?: boolean }> =>
+      (await api<{ canEdit: boolean; tasks: Task[]; canCreate?: boolean; canMove?: boolean }>(`/projects/${projectId}/tasks`)) ?? { canEdit: false, tasks: [] },
   });
   const move = useMutation({
     mutationFn: (v: { id: number; status: string }) => api(`/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
@@ -70,14 +70,15 @@ export function Tasks({ projectId }: { projectId: string | null }) {
 
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
-  // Moving a card between columns is open to every role (ADR-0065); other edits
+  // Moving a card between columns is a scheduling action — Platform Admin, PMO,
+  // Project Manager and PM Lead only (cap-schedule, ADR-0065). Other edits
   // (rename, re-plan, delete, detail fields) still require the project-edit right.
-  const canMove = true;
+  const canMove = data?.canMove ?? false;
   const canCreate = data?.canCreate ?? false;
 
   // Real-time collaboration — every role joins the project's task room for live
   // presence, peer cursors and instant board refresh when anyone moves a card.
-  // (Moving a card still needs the project-edit right; collaboration is for all.)
+  // (Moving a card needs the schedule right; collaboration is open to all.)
   const { identity } = useRole();
   const onChanged = useCallback(() => qc.invalidateQueries({ queryKey: ["tasks", projectId] }), [qc, projectId]);
   const { peers, cursors, connected, sendCursor } = useRoomRealtime(projectId ? `tasks:${projectId}` : null, identity.name, onChanged);

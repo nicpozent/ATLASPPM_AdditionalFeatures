@@ -63,7 +63,7 @@ public record ProjectTaskDto(int Id, string Code, string Name, string Epic, stri
     // Lifecycle timestamps (Jira-synced): when work started (first status change)
     // and when it was resolved/closed. Empty for backlog / locally-created rows.
     string StartedAt = "", string ResolvedAt = "");
-public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false);
+public record ProjectTasksDto(bool CanEdit, List<ProjectTaskDto> Tasks, bool CanCreate = false, bool CanMove = false);
 public record TaskCommentDto(int Id, string Author, string Initials, string Body, string At, bool FromJira = false);
 public record TaskAttachmentDto(int Id, string FileName, string ContentType, long Size, string Author, string CreatedAt);
 public record SprintDto(int Id, string Name, string Goal, string StartDate, string EndDate, string Status,
