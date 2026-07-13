@@ -125,3 +125,34 @@ service (HTTPS on its mapped port).
   works, just not live).
 - Dependency-arrow geometry with many lanes/dependencies (potential visual
   overlap on the rail).
+
+---
+
+## 3. PENDING — promote key/value blobs to typed tables (whiteboard + board)
+
+**Status: pending** — blocked on a **.NET SDK environment** (`dotnet ef`), which
+the authoring sessions didn't have.
+
+Two collaborative surfaces persist their state as JSON in the `Setting`
+key/value table because a migration couldn't be generated here:
+
+- **PI board placement** — `Setting["pi.board.{incrementId}"]` (the typed-column
+  fix + concurrency rationale is item **1** above).
+- **Whiteboard scenes** — `Setting["whiteboard.{kind}:{id}"]` (nodes + connectors),
+  see `server/Whiteboards.cs` and ADR-0064.
+
+Both are the *migration-free interim*. Promoting them to first-class tables is a
+clean follow-up that also removes the residual **blob read-modify-write race**
+(two writers to the same scene/board can still lose an update — the live
+co-editing layer narrows the window and reconciles, but per-row typed writes are
+the real fix). Whiteboard shape:
+
+1. Add typed entities — e.g. `WhiteboardNode` / `WhiteboardEdge` (or a
+   `Whiteboard` row with owned collections) keyed by `(scopeKind, scopeId)`.
+2. `dotnet ef migrations add Whiteboards` → `Database.Migrate()` applies on boot.
+3. Rewrite `server/Whiteboards.cs` to read/write rows (keep the same routes, DTOs,
+   scope→capability gate, sanitisation and the real-time op broadcast so the
+   frontend is unchanged), then drop the `Setting`-blob load/save helpers.
+4. Backfill any existing `Setting` rows `LIKE 'whiteboard.%'`, then delete them.
+5. Update ADR-0064: scenes are a typed table; the "migration-free `Setting` blob"
+   note and `whiteboard.` `GET /settings` redaction line can be revisited.

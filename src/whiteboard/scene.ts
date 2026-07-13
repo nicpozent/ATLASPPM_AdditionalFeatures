@@ -12,12 +12,12 @@ export function uid(prefix = "n"): string {
   return `${prefix}-${t}-${rand}`;
 }
 
-export function addNode(scene: Scene, kind: NodeKind, x: number, y: number, extra?: Partial<WbNode>): Scene {
+// Build a new node centred on a drop point (no scene mutation).
+export function createNode(kind: NodeKind, x: number, y: number, extra?: Partial<WbNode>): WbNode {
   const { w, h } = defaultSize(kind);
-  const node: WbNode = {
+  return {
     id: uid(),
     kind,
-    // Drop centred on the requested point.
     x: Math.round(x - w / 2),
     y: Math.round(y - h / 2),
     w, h,
@@ -25,7 +25,10 @@ export function addNode(scene: Scene, kind: NodeKind, x: number, y: number, extr
     ...(kind === "text" ? { text: "Text" } : {}),
     ...extra,
   };
-  return { ...scene, nodes: [...scene.nodes, node] };
+}
+
+export function addNode(scene: Scene, kind: NodeKind, x: number, y: number, extra?: Partial<WbNode>): Scene {
+  return { ...scene, nodes: [...scene.nodes, createNode(kind, x, y, extra)] };
 }
 
 export function updateNode(scene: Scene, id: string, patch: Partial<WbNode>): Scene {
@@ -51,6 +54,41 @@ export function addEdge(scene: Scene, from: string, to: string, color?: string):
 
 export function removeEdge(scene: Scene, id: string): Scene {
   return { ...scene, edges: scene.edges.filter((e) => e.id !== id) };
+}
+
+// ---- Live co-editing ops (ADR-0064 addendum) -------------------------------
+// The server broadcasts these authorized deltas over the hub so peers apply a
+// change instantly instead of refetching the whole scene. Discriminated on `t`.
+export type RemoteOp =
+  | { t: "node"; node: WbNode }
+  | { t: "delNode"; id: string }
+  | { t: "edge"; edge: WbEdge }
+  | { t: "delEdge"; id: string };
+
+// Apply a peer's op to the local scene. `skipNodeId` is the node the local user
+// is actively dragging/editing — remote *upserts* to it are ignored so a peer
+// can't yank it out from under an in-progress interaction (deletes still apply).
+export function applyRemoteOp(scene: Scene, op: RemoteOp | null | undefined, skipNodeId?: string | null): Scene {
+  if (!op || typeof op !== "object") return scene;
+  switch (op.t) {
+    case "node": {
+      if (!op.node?.id || op.node.id === skipNodeId) return scene;
+      return scene.nodes.some((n) => n.id === op.node.id)
+        ? { ...scene, nodes: scene.nodes.map((n) => (n.id === op.node.id ? op.node : n)) }
+        : { ...scene, nodes: [...scene.nodes, op.node] };
+    }
+    case "delNode":
+      return op.id ? removeNode(scene, op.id) : scene;
+    case "edge": {
+      if (!op.edge?.id) return scene;
+      if (scene.edges.some((e) => e.id === op.edge.id)) return scene;
+      return { ...scene, edges: [...scene.edges, op.edge] };
+    }
+    case "delEdge":
+      return op.id ? removeEdge(scene, op.id) : scene;
+    default:
+      return scene;
+  }
 }
 
 export interface Point { x: number; y: number }
