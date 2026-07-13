@@ -14,41 +14,138 @@ public record SettingReq(string Value);
 // ============================================================================
 public static class Backups
 {
-    // Build the snapshot object from live data. Returns (json bytes, record count).
+    // Snapshot serialisation. EF fixes up navigation properties within the
+    // tracked context, so ignore cycles. Attachment file bytes are omitted (see
+    // OmitBytesConverter) — the data snapshot stays a data backup; file contents
+    // are the separate "Artifacts & files" backup stream.
+    static readonly JsonSerializerOptions SnapshotJson = new()
+    {
+        WriteIndented = true,
+        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
+        Converters = { new OmitBytesConverter() },
+    };
+
+    // A complete JSON snapshot of every table's structured data. Attachment rows
+    // are included (so the catalogue is complete) but their raw `byte[]` payloads
+    // are omitted to keep the JSON a data backup, not a multi-GB blob dump.
+    // Returns (json bytes, record count).
     static async Task<(byte[] Bytes, int Records)> SnapshotAsync(AtlasDbContext db)
     {
         var data = new Dictionary<string, object>
         {
+            // Portfolio & delivery
             ["projects"] = await db.Projects.ToListAsync(),
             ["blockers"] = await db.Blockers.ToListAsync(),
+            ["projectComments"] = await db.ProjectComments.ToListAsync(),
+            ["stakeholderEntries"] = await db.StakeholderEntries.ToListAsync(),
             ["demands"] = await db.Demands.ToListAsync(),
+            ["demandAttachments"] = await db.DemandAttachments.ToListAsync(),
+            ["demandComments"] = await db.DemandComments.ToListAsync(),
             ["programs"] = await db.Programs.ToListAsync(),
             ["products"] = await db.Products.ToListAsync(),
+            ["productTasks"] = await db.ProductTasks.ToListAsync(),
+            ["productMembers"] = await db.ProductMembers.ToListAsync(),
+            ["productAllocations"] = await db.ProductAllocations.ToListAsync(),
             ["objectives"] = await db.Objectives.ToListAsync(),
+            ["keyResults"] = await db.KeyResults.ToListAsync(),
             ["releases"] = await db.Releases.ToListAsync(),
+            ["deliveryReports"] = await db.DeliveryReports.ToListAsync(),
+            ["dashboardKpis"] = await db.DashboardKpis.ToListAsync(),
+            ["activityEvents"] = await db.ActivityEvents.ToListAsync(),
+            ["myTasks"] = await db.MyTasks.ToListAsync(),
+            ["budgetSnapshots"] = await db.BudgetSnapshots.ToListAsync(),
+            ["newsBlocks"] = await db.NewsBlocks.ToListAsync(),
+            // Schedule / phases / PI planning
+            ["phases"] = await db.Phases.ToListAsync(),
+            ["milestones"] = await db.Milestones.ToListAsync(),
+            ["increments"] = await db.ProgramIncrements.ToListAsync(),
+            ["piIterations"] = await db.PiIterations.ToListAsync(),
+            ["piObjectives"] = await db.PiObjectives.ToListAsync(),
+            ["piDependencies"] = await db.PiDependencies.ToListAsync(),
+            ["roadmapItems"] = await db.RoadmapItems.ToListAsync(),
+            ["roadmapMilestones"] = await db.RoadmapMilestones.ToListAsync(),
+            ["roadmapDependencies"] = await db.RoadmapDependencies.ToListAsync(),
+            ["roadmapLinks"] = await db.RoadmapLinks.ToListAsync(),
+            // People, teams & skills
             ["resources"] = await db.Resources.ToListAsync(),
+            ["entraGroups"] = await db.EntraGroups.ToListAsync(),
+            ["teamMembers"] = await db.TeamMembers.ToListAsync(),
+            ["managerNodes"] = await db.ManagerNodes.ToListAsync(),
+            ["subTeams"] = await db.SubTeams.ToListAsync(),
+            ["subTeamMembers"] = await db.SubTeamMembers.ToListAsync(),
+            ["teamAssignments"] = await db.TeamAssignments.ToListAsync(),
+            ["teamAssignmentMembers"] = await db.TeamAssignmentMembers.ToListAsync(),
+            ["skills"] = await db.Skills.ToListAsync(),
+            ["skillRatings"] = await db.SkillRatings.ToListAsync(),
+            ["absences"] = await db.Absences.ToListAsync(),
+            ["wowOverrides"] = await db.WowOverrides.ToListAsync(),
+            // Work items, ops & quality
             ["tasks"] = await db.ProjectTasks.ToListAsync(),
+            ["taskComments"] = await db.TaskComments.ToListAsync(),
+            ["taskAttachments"] = await db.TaskAttachments.ToListAsync(),
             ["epics"] = await db.Epics.ToListAsync(),
+            ["sprints"] = await db.Sprints.ToListAsync(),
+            ["opsServices"] = await db.OpsServices.ToListAsync(),
+            ["opsItems"] = await db.OpsItems.ToListAsync(),
+            ["opsItemComments"] = await db.OpsItemComments.ToListAsync(),
+            ["opsItemAttachments"] = await db.OpsItemAttachments.ToListAsync(),
+            ["opsTaskLinks"] = await db.OpsTaskLinks.ToListAsync(),
+            ["testPlans"] = await db.TestPlans.ToListAsync(),
+            ["testPlanTasks"] = await db.TestPlanTasks.ToListAsync(),
+            ["defects"] = await db.Defects.ToListAsync(),
+            ["projectDependencies"] = await db.ProjectDependencies.ToListAsync(),
+            // Governance & architecture
             ["gates"] = await db.Gates.ToListAsync(),
+            ["gateCriteria"] = await db.GateCriteria.ToListAsync(),
+            ["decisions"] = await db.Decisions.ToListAsync(),
             ["raid"] = await db.RaidItems.ToListAsync(),
+            ["securityProfiles"] = await db.SecurityProfiles.ToListAsync(),
+            ["securityControls"] = await db.SecurityControls.ToListAsync(),
+            ["securityReviewGates"] = await db.SecurityReviewGates.ToListAsync(),
+            ["archProfiles"] = await db.ArchProfiles.ToListAsync(),
+            ["admPhases"] = await db.AdmPhases.ToListAsync(),
+            ["archApprovals"] = await db.ArchApprovals.ToListAsync(),
+            ["changeRequests"] = await db.ChangeRequests.ToListAsync(),
+            ["requirements"] = await db.Requirements.ToListAsync(),
+            ["requirementAttachments"] = await db.RequirementAttachments.ToListAsync(),
+            // Financials
             ["costLines"] = await db.CostLines.ToListAsync(),
-            ["operational"] = await db.OperationalItems.ToListAsync(),
-            ["assignments"] = await db.RoleAssignments.ToListAsync(),
+            // Artifacts (metadata; file bytes omitted — see OmitBytesConverter)
+            ["artifacts"] = await db.Artifacts.ToListAsync(),
+            ["artifactVersions"] = await db.ArtifactVersions.ToListAsync(),
+            // Communications & notifications
+            ["communicationEntries"] = await db.CommunicationEntries.ToListAsync(),
+            ["subscriptions"] = await db.Subscriptions.ToListAsync(),
+            ["notificationPrefs"] = await db.NotificationPrefs.ToListAsync(),
+            ["notifications"] = await db.Notifications.ToListAsync(),
+            ["helpArticles"] = await db.HelpArticles.ToListAsync(),
+            // Config, RBAC, dashboards & platform
             ["roles"] = await db.RoleDefs.ToListAsync(),
+            ["capabilities"] = await db.Capabilities.ToListAsync(),
             ["permissions"] = await db.RolePermissions.ToListAsync(),
+            ["assignments"] = await db.RoleAssignments.ToListAsync(),
+            ["operational"] = await db.OperationalItems.ToListAsync(),
+            ["dashboardLayouts"] = await db.DashboardLayouts.ToListAsync(),
+            ["deletionRequests"] = await db.DeletionRequests.ToListAsync(),
+            ["backupRuns"] = await db.BackupRuns.ToListAsync(),
             ["settings"] = await db.Settings.ToListAsync(),
             ["audit"] = await db.AuditEvents.ToListAsync(),
         };
         var records = data.Values.Sum(v => ((System.Collections.ICollection)v).Count);
         var envelope = new { generatedAt = DateTime.UtcNow.ToString("o"), records, data };
-        // EF fixes up navigation properties (e.g. Project.Blockers ↔ Blocker.Project)
-        // within the tracked context, so ignore cycles when serialising the snapshot.
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
-        });
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, SnapshotJson);
         return (bytes, records);
+    }
+
+    // Keeps attachment metadata in the snapshot while omitting the raw file bytes
+    // (those live in the separate artifact backup stream). Reads are tolerant so
+    // an older blob-inclusive backup can still be parsed.
+    sealed class OmitBytesConverter : System.Text.Json.Serialization.JsonConverter<byte[]>
+    {
+        public override byte[] Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.String ? reader.GetBytesFromBase64() : Array.Empty<byte>();
+        public override void Write(Utf8JsonWriter writer, byte[] value, JsonSerializerOptions options) =>
+            writer.WriteNullValue();
     }
 
     static string HumanSize(long bytes) => bytes switch
@@ -115,9 +212,12 @@ public static class Backups
 
         // Restore from an uploaded snapshot — a MERGE (upsert by id), never a wipe:
         // it re-creates missing rows and updates existing ones for the string-keyed
-        // portfolio entities and settings, and can't delete anything. Child/identity
-        // rows and attachments are NOT restored here (use a PostgreSQL dump/PITR for
-        // a full recovery — see docs). Confirm-gated in the UI; Platform-Admin only.
+        // portfolio entities and settings, and can't delete anything. NOTE: the
+        // snapshot now captures every table's structured data (for archival /
+        // portability / off-box retention), but this JSON merge only re-applies the
+        // string-keyed roots below — identity-keyed / composite-key / FK-ordered
+        // rows and file attachments are NOT safely mergeable this way, so a full
+        // recovery uses a PostgreSQL dump/PITR (see docs). Platform-Admin only.
         api.MapPost("/backups/restore", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-backups", "F") is { } denied) return denied;
