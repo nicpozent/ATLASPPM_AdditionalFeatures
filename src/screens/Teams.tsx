@@ -6,6 +6,7 @@ import { Card, EmptyBlock, Button, Input } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
 import { SubTeamManager } from "@/components/TeamPanel";
+import { TeamSwotPanel, type TeamSwot } from "@/components/TeamSwot";
 import { useRole } from "@/components/RoleContext";
 import { laborHours, laborCost, HOURS_PER_DAY, DAYS_PER_MONTH } from "@/lib/labor";
 
@@ -31,6 +32,13 @@ export default function Teams() {
   });
   const teams = data?.teams ?? [];
   const totalMembers = teams.reduce((s, t) => s + t.memberCount, 0);
+
+  const qc = useQueryClient();
+  const { data: swot } = useQuery({
+    queryKey: ["teamswot"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; items: Record<string, TeamSwot> }> =>
+      (await api<{ canEdit: boolean; items: Record<string, TeamSwot> }>("/teams/swot")) ?? { canEdit: false, items: {} },
+  });
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -84,6 +92,12 @@ export default function Teams() {
                   ))}
                 </div>
               )}
+              <TeamSwotPanel
+                teamKey={t.key}
+                canEdit={!!swot?.canEdit}
+                swot={swot?.items[t.key]}
+                onSaved={() => qc.invalidateQueries({ queryKey: ["teamswot"] })}
+              />
             </Card>
           ))}
         </div>
