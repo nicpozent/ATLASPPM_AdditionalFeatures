@@ -35,6 +35,10 @@ public class BoardHub : Hub
     // simply re-derives it as clients reconnect.
     static readonly ConcurrentDictionary<int, ConcurrentDictionary<string, Peer>> Boards = new();
 
+    // Observability accessors (atlas.board.* gauges — see AtlasTelemetry).
+    public static int ActiveConnections => Boards.Values.Sum(b => b.Count);
+    public static int ActiveBoards => Boards.Count;
+
     // The connection's current board, so OnDisconnected can clean up without the
     // client having to tell us which board it left.
     int? CurrentBoard
@@ -53,6 +57,7 @@ public class BoardHub : Hub
     // a transport hiccup must never fail the originating write.
     public static async Task NotifyGroupAsync(IHubContext<BoardHub> hub, int incrementId)
     {
+        AtlasTelemetry.RecordBoardBroadcast();
         try { await hub.Clients.Group(Group(incrementId)).SendAsync("BoardChanged"); }
         catch { /* the REST write already succeeded; the ping is advisory */ }
     }
