@@ -68,4 +68,5 @@ notifications](./docs/teams-setup.md)). The **architecture reference**
 is in [`docs/architecture/`](./docs/architecture/). Open engineering follow-ups
 are tracked in [`docs/pi-board-followups.md`](./docs/pi-board-followups.md). The
 Sweden legal/regulatory map for the personnel-data features is in
-[`docs/compliance-sweden.md`](./docs/compliance-sweden.md).
+[`docs/compliance-sweden.md`](./docs/compliance-sweden.md), with a pre-filled
+DPIA template in [`docs/dpia-personnel-data.md`](./docs/dpia-personnel-data.md).
