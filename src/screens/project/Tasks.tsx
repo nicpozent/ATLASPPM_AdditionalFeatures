@@ -70,6 +70,9 @@ export function Tasks({ projectId }: { projectId: string | null }) {
 
   const tasks = data?.tasks ?? [];
   const canEdit = data?.canEdit ?? false;
+  // Moving a card between columns is open to every role (ADR-0065); other edits
+  // (rename, re-plan, delete, detail fields) still require the project-edit right.
+  const canMove = true;
   const canCreate = data?.canCreate ?? false;
 
   // Real-time collaboration — every role joins the project's task room for live
@@ -134,7 +137,7 @@ export function Tasks({ projectId }: { projectId: string | null }) {
             const over = overCol === c.label;
             return (
               <div key={c.label}
-                onDragOver={(e) => { if (canEdit) { e.preventDefault(); if (overCol !== c.label) setOverCol(c.label); } }}
+                onDragOver={(e) => { if (canMove) { e.preventDefault(); if (overCol !== c.label) setOverCol(c.label); } }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -152,7 +155,7 @@ export function Tasks({ projectId }: { projectId: string | null }) {
                   {cards.map((t) => {
                     const pr = TASK_PRIORITY[t.priority] ?? TASK_PRIORITY.Medium;
                     return (
-                      <div key={t.id} draggable={canEdit} onDragStart={() => { dragId.current = t.id; }}
+                      <div key={t.id} draggable={canMove} onDragStart={() => { dragId.current = t.id; }}
                         onClick={() => setOpenId(t.id)}
                         style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 11, padding: 12, cursor: "pointer", boxShadow: "0 1px 2px rgba(20,26,60,0.04)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>

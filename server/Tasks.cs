@@ -81,7 +81,14 @@ public static class Tasks
 
         api.MapPatch("/tasks/{taskId:int}", async (int taskId, UpdateTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http, IHubContext<BoardHub> hub) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            // Moving a card between board columns (a status-only change) is open to
+            // any authenticated user — collaboration on the board is for everyone
+            // (product decision, ADR-0065). Every OTHER field change (rename,
+            // re-plan, assignee, estimate…) still requires Edit on cap-projects.
+            var statusOnly = req.Status is not null && req.Name is null && req.Epic is null && req.Assignee is null
+                && req.Sprint is null && req.Baseline is null && req.Priority is null && req.StartDate is null
+                && req.TargetDate is null && req.Points is null && req.Size is null && req.EstimateHours is null;
+            if (!statusOnly && await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var task = await db.ProjectTasks.FindAsync(taskId);
             if (task is null) return Results.NotFound();
             if (req.Name is not null)
@@ -94,6 +101,8 @@ public static class Tasks
             if (req.Status is not null)
             {
                 if (!Statuses.Contains(req.Status)) return Results.BadRequest(new { error = "Unknown status." });
+                if (task.Status != req.Status)
+                    db.AuditEvents.Add(Permissions.Audit(http, cfg, "Tasks", "Moved task", $"{task.ProjectId} · {task.Code} {task.Status} → {req.Status}"));
                 task.Status = req.Status;
             }
             if (req.Priority is not null)

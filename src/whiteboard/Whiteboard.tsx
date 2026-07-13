@@ -5,7 +5,7 @@ import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { useRole } from "@/components/RoleContext";
 import { useRoomRealtime } from "@/realtime/useRoomRealtime";
-import { LiveDot, PresenceRow, CursorLayer } from "@/realtime/Presence";
+import { LiveDot, PresenceRow, CursorLayer, OffscreenPeers } from "@/realtime/Presence";
 import {
   EMPTY_SCENE, PALETTE, SHAPE_TOOLS, ICONS, CLIP, type Scene, type WbNode, type WbEdge, type NodeKind,
 } from "./types";
@@ -97,6 +97,14 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const [templateMenu, setTemplateMenu] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  // Scroll viewport of the canvas container, for off-screen peer indicators.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [view, setView] = useState({ left: 0, top: 0, w: 0, h: 0 });
+  const syncView = useCallback(() => {
+    const s = scrollRef.current;
+    if (s) setView({ left: s.scrollLeft, top: s.scrollTop, w: s.clientWidth, h: s.clientHeight });
+  }, []);
+  useEffect(() => { syncView(); window.addEventListener("resize", syncView); return () => window.removeEventListener("resize", syncView); }, [syncView]);
   const drag = useRef<{ id: string; mode: "move" | "resize"; ox: number; oy: number; start: WbNode } | null>(null);
   const pen = useRef<number[] | null>(null);                 // in-progress freehand points
   const [penLive, setPenLive] = useState<number[] | null>(null);
@@ -413,7 +421,8 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       {tool === "pen" && <Banner>Pen: click and drag on the canvas to draw freehand. <Esc /></Banner>}
 
       {/* Canvas */}
-      <div style={{ overflow: "auto", height: 580, border: `1px solid ${color.border}`, borderRadius: 12, background: color.surface }}>
+      <div style={{ position: "relative" }}>
+      <div ref={scrollRef} onScroll={syncView} style={{ overflow: "auto", height: 580, border: `1px solid ${color.border}`, borderRadius: 12, background: color.surface }}>
         <div
           ref={canvasRef}
           tabIndex={0}
@@ -489,6 +498,12 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 
           {/* Peer cursors */}
           <CursorLayer cursors={cursors} peers={peers} w={CANVAS_W} h={CANVAS_H} />
+        </div>
+      </div>
+        {/* Off-screen peer indicators — pinned to the viewport, point to peers
+            scrolled out of view on the large canvas. */}
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 12 }}>
+          <OffscreenPeers cursors={cursors} peers={peers} canvasW={CANVAS_W} canvasH={CANVAS_H} view={view} />
         </div>
       </div>
     </div>
