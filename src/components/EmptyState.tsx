@@ -2,8 +2,8 @@ import { color, font, radius } from "@/theme";
 import { Icon } from "./Icon";
 
 // Placeholder shown on every not-yet-built screen. No demo data by design —
-// Claude Code replaces each screen's body with the exact layout from the
-// prototype (see CLAUDE.md). Empty states are intentional.
+// each screen's body is replaced with the exact layout from the approved
+// prototype (see the project guide). Empty states are intentional.
 export function EmptyState({ title, subtitle, icon = "layers" }: {
   title: string; subtitle: string; icon?: string;
 }) {

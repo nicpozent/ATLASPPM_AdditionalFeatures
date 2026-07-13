@@ -1,7 +1,7 @@
 // ============================================================================
 //  Typed API client. Same-origin in prod (nginx proxies /api → API); dev uses
 //  the Vite proxy. Attaches the Entra bearer token when auth is enabled.
-//  Add typed endpoint helpers here as Claude Code wires each screen to the API.
+//  Add typed endpoint helpers here as each screen is wired to the API.
 // ============================================================================
 import { getToken } from "./auth";
 

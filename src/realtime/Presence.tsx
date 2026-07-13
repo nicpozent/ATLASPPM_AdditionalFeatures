@@ -35,6 +35,40 @@ export function PresenceRow({ peers }: { peers: Peer[] }) {
   );
 }
 
+// Edge markers for peers whose cursor is outside the current scroll viewport of a
+// large canvas — a little avatar pinned to the nearest edge, with an arrow that
+// points toward where the peer actually is. Render inside a non-scrolling overlay
+// sized to the viewport (position it over the scroll container). `view` is the
+// scroll position + client size of the scroll container; canvasW/H are the full
+// canvas size the cursors are normalised against.
+export function OffscreenPeers({ cursors, peers, canvasW, canvasH, view }: {
+  cursors: PeerCursor[]; peers: Peer[]; canvasW: number; canvasH: number;
+  view: { left: number; top: number; w: number; h: number };
+}) {
+  if (!view.w || !view.h) return null;
+  const M = 16;
+  return (
+    <>
+      {cursors.map((cur) => {
+        const peer = peers.find((p) => p.id === cur.id);
+        if (!peer) return null;
+        const vx = cur.x * canvasW - view.left, vy = cur.y * canvasH - view.top;
+        if (vx >= 0 && vx <= view.w && vy >= 0 && vy <= view.h) return null;   // on-screen already
+        const cx = Math.max(M, Math.min(view.w - M, vx));
+        const cy = Math.max(M, Math.min(view.h - M, vy));
+        const ang = (Math.atan2(vy - cy, vx - cx) * 180) / Math.PI;
+        return (
+          <div key={cur.id} title={`${peer.name} is working over here`}
+            style={{ position: "absolute", left: cx, top: cy, transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 6, display: "flex", alignItems: "center", gap: 2 }}>
+            <span style={{ width: 22, height: 22, borderRadius: "50%", background: peer.color, color: "#fff", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #fff", boxShadow: "0 1px 4px rgba(20,26,60,0.35)" }}>{peer.initials}</span>
+            <span style={{ transform: `rotate(${ang}deg)`, color: peer.color, display: "flex" }}><Icon name="arrowRight" size={13} /></span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 // Floating peer cursors, positioned by normalised [0,1] fractions of a surface of
 // the given pixel size. Render inside a position:relative container that matches
 // (w, h); the layer itself is non-interactive.

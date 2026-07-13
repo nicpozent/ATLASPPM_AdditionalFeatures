@@ -411,6 +411,23 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Task_status_move_is_open_to_all_roles_but_other_edits_stay_gated()
+    {
+        // Set up a project + task as the dev/admin identity.
+        var projId = (await Json(await Send(HttpMethod.Post, "/api/v1/projects", new { name = "Move-for-all project" }))).GetProperty("id").GetString();
+        var taskId = (await Json(await Send(HttpMethod.Post, $"/api/v1/projects/{projId}/tasks", new { name = "Card" }))).GetProperty("id").GetInt32();
+
+        // A Stakeholder (most-restricted role; no cap-projects edit) CAN move the card…
+        var moved = await SendAs("stkhldr", HttpMethod.Patch, $"/api/v1/tasks/{taskId}", new { status = "In Progress" });
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.Equal("In Progress", (await Json(moved)).GetProperty("status").GetString());
+
+        // …but may NOT rename it (a non-status edit still needs cap-projects Edit).
+        var renamed = await SendAs("stkhldr", HttpMethod.Patch, $"/api/v1/tasks/{taskId}", new { name = "Hacked name" });
+        Assert.Equal(HttpStatusCode.Forbidden, renamed.StatusCode);
+    }
+
+    [Fact]
     public async Task Whiteboard_supports_the_roadmap_scope()
     {
         // Roadmap is a single portfolio-wide whiteboard, gated on cap-roadmap.
