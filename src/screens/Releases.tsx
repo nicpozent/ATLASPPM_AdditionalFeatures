@@ -7,6 +7,7 @@ import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { TeamPanel } from "@/components/TeamPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
 
 // ---- data ----------------------------------------------------------------
 type ReleaseStatus = "Planned" | "In progress" | "Deployed" | "Rolled back" | "Completed" | "Cancelled";
@@ -88,6 +89,7 @@ export default function Releases() {
   const [confirmDel, setConfirmDel] = useState<Release | null>(null);
   const [editing, setEditing] = useState<Release | null>(null);
   const [teamFor, setTeamFor] = useState<Release | null>(null);
+  const [wbFor, setWbFor] = useState<Release | null>(null);
   const { data: releases = [] } = useReleases();
   const qc = useQueryClient();
   const { can } = usePermissions();
@@ -251,6 +253,7 @@ export default function Releases() {
                         <>
                           {mayEdit && <MenuItem label="Edit details" icon={<Icon name="edit" size={15} />} onClick={() => { setEditing(r); close(); }} />}
                           <MenuItem label="Team" icon={<Icon name="users" size={15} />} onClick={() => { setTeamFor(r); close(); }} />
+                          <MenuItem label="Whiteboard" icon={<Icon name="grid" size={15} />} onClick={() => { setWbFor(r); close(); }} />
                           <MenuDivider />
                           {mayEdit && (r.archived
                             ? <MenuItem label="Restore" icon={<Icon name="refresh" size={15} />} onClick={() => { archive.mutate({ id: r.id, on: false }); close(); }} />
@@ -277,6 +280,13 @@ export default function Releases() {
         <Overlay onClose={() => setTeamFor(null)} width={520} label={`Team · ${teamFor.name}`}>
           <TeamPanel entityType="release" entityId={teamFor.id} />
           <div style={{ marginTop: 14 }}><SkillsPanel entityType="release" entityId={teamFor.id} /></div>
+        </Overlay>
+      )}
+
+      {wbFor && (
+        <Overlay onClose={() => setWbFor(null)} width={1040} label={`Whiteboard · ${wbFor.name}`}>
+          <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 12 }}>Whiteboard · {wbFor.name}</div>
+          <WhiteboardPanel scope={{ kind: "release", id: wbFor.id }} />
         </Overlay>
       )}
 

@@ -28,6 +28,7 @@ import { Epics } from "./project/Epics";
 import { useProject, type ProjectDetail } from "./project/useProject";
 import { isAgileWithSprints } from "./project/taskModel";
 import { type CommentItem, fmtCommentTime } from "./project/util";
+import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
 
 // ---- data (empty until API exists) -----------------------------------------
 
@@ -35,7 +36,7 @@ const TABS = [
   ["overview", "Overview"], ["tasks", "Tasks"], ["backlog", "Backlog"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
   ["quality", "Quality"], ["governance", "Governance"], ["architecture", "Architecture"],
   ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["blockers", "Blockers"], ["vacations", "Vacations"],
-  ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"],
+  ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"], ["whiteboard", "Whiteboard"],
 ] as const;
 type TabId = (typeof TABS)[number][0];
 
@@ -117,6 +118,7 @@ export default function Project() {
       {tab === "blockers" && <ProjectBlockers projectId={id} />}
       {tab === "vacations" && <Vacations projectId={id} />}
       {tab === "comments" && <Comments projectId={id} />}
+      {tab === "whiteboard" && id && <WhiteboardPanel scope={{ kind: "project", id }} />}
 
       {editing && p && <EditProjectDetailModal project={p} onClose={() => setEditing(false)} />}
     </div>
