@@ -114,7 +114,7 @@ export default function Demands() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13.5, color: color.subtle }}>Intake scored on <b style={{ color: color.primary }}>value</b> vs <b style={{ color: "#C98A00" }}>effort</b> · drag to advance through the funnel</div>
+        <div style={{ fontSize: 13.5, color: color.subtle }}>Intake scored on <b style={{ color: color.primary }}>value</b> vs <b style={{ color: color.warningInk }}>effort</b> · drag to advance through the funnel</div>
         <LiveDot connected={connected} />
         <PresenceRow peers={peers} />
         <div style={{ flex: 1 }} />
@@ -122,7 +122,7 @@ export default function Demands() {
         <Button onClick={() => setModal(true)} disabled={!maySubmit} title={maySubmit ? undefined : "Your role can't submit demands"}><Icon name="plus" size={16} /> New demand</Button>
       </div>
 
-      <div ref={surfaceRef} onMouseMove={onMouseMove} style={{ position: "relative", display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
+      <div ref={surfaceRef} onMouseMove={onMouseMove} tabIndex={0} role="group" aria-label="Demand funnel — scroll horizontally to see all stages" style={{ position: "relative", display: "flex", gap: 15, alignItems: "flex-start", overflowX: "auto", paddingBottom: 12 }}>
         <CursorLayer cursors={cursors} peers={peers} w={size.w} h={size.h} />
         {STAGES.map((s) => {
           const items = demands.filter((d) => d.stage === s.key);

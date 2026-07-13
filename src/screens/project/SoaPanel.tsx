@@ -10,8 +10,8 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Card, EmptyBlock, Select } from "@/components/ui";
 import { toastError } from "@/components/Toast";
+import { type SoaControl, summariseThemes } from "./soa";
 
-interface SoaControl { ref: string; title: string; theme: string; applicable: boolean; justification: string; status: string; owner: string; }
 interface SoaCoverage { total: number; applicable: number; excluded: number; implemented: number; reviewed: number; implementedPct: number; }
 interface SoaData { canEdit: boolean; coverage: SoaCoverage; controls: SoaControl[]; }
 
@@ -57,12 +57,8 @@ export function SoaPanel({ projectId }: { projectId: string }) {
 
       {controls.length === 0 ? (
         <EmptyBlock message="No Annex A catalogue loaded." minHeight={120} />
-      ) : THEMES.map((theme) => {
-        const rows = controls.filter((c) => c.theme === theme);
-        if (rows.length === 0) return null;
+      ) : summariseThemes(controls, THEMES).map(({ theme, controls: rows, applicable: appl, implemented: impl }) => {
         const isOpen = open[theme] ?? false;
-        const impl = rows.filter((r) => r.applicable && r.status === "Implemented").length;
-        const appl = rows.filter((r) => r.applicable).length;
         return (
           <div key={theme}>
             <button type="button" onClick={() => setOpen((s) => ({ ...s, [theme]: !isOpen }))}
