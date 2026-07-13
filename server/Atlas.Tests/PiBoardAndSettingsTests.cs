@@ -23,6 +23,16 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         return await client.SendAsync(req);
     }
 
+    // Send as a specific switcher identity (drives the effective role with auth off).
+    async Task<HttpResponseMessage> SendAs(string role, HttpMethod method, string path, object? body = null)
+    {
+        var client = _factory.CreateClient();
+        var req = new HttpRequestMessage(method, path);
+        req.Headers.Add("X-Atlas-Role", role);
+        if (body is not null) req.Content = JsonContent.Create(body);
+        return await client.SendAsync(req);
+    }
+
     static async Task<JsonElement> Json(HttpResponseMessage res) =>
         await res.Content.ReadFromJsonAsync<JsonElement>();
 
@@ -117,5 +127,39 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
             Assert.Contains($"\"{key}\"", json);
         // …and the row we just created is actually captured.
         Assert.Contains("Backup PI", json);
+    }
+
+    // ---- Team SWOT: scoped write/read, and never leaked via GET /settings ---
+    [Fact]
+    public async Task Team_swot_roundtrips_and_is_redacted_from_settings()
+    {
+        const string marker = "STRENGTH_MARKER_XYZ";
+        // No role header ⇒ dev acts as Platform Admin (all slots in scope).
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Send(HttpMethod.Put, "/api/v1/teams/teammgr/swot",
+                new { strengths = marker, weaknesses = "W", opportunities = "O", threats = "T" })).StatusCode);
+
+        var swot = (await Json(await Send(HttpMethod.Get, "/api/v1/teams/swot")))
+            .GetProperty("items").GetProperty("teammgr");
+        Assert.Equal(marker, swot.GetProperty("strengths").GetString());
+
+        // The SWOT must NOT appear in the broadly-readable settings dump.
+        var settings = await Send(HttpMethod.Get, "/api/v1/settings");
+        var map = await settings.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.NotNull(map);
+        Assert.DoesNotContain(map!.Keys, k => k.StartsWith("team.swot."));
+        Assert.DoesNotContain(marker, await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Team_swot_rejects_unknown_slot_and_out_of_scope_caller()
+    {
+        // Unknown slot → 404 (even as admin).
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Send(HttpMethod.Put, "/api/v1/teams/not-a-slot/swot", new { strengths = "x" })).StatusCode);
+
+        // A stakeholder has no manager scope → 403 on a real slot.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await SendAs("stakeholder", HttpMethod.Put, "/api/v1/teams/teammgr/swot", new { strengths = "x" })).StatusCode);
     }
 }

@@ -292,12 +292,16 @@ public static class Backups
         });
     }
 
-    // A setting whose value is a secret and must not be returned by GET /settings.
-    // Suffix-based so future secret keys are redacted by default.
+    // A setting whose value must not be returned by the broadly-readable
+    // GET /settings. Secrets are matched by suffix (so a new secret key is
+    // redacted by default); confidential per-scope blobs (e.g. team SWOT) are
+    // matched by prefix and served only through their own scoped endpoints.
     static readonly string[] SecretSettingSuffixes = { "webhookurl", "secret", "token", "password" };
+    static readonly string[] ConfidentialSettingPrefixes = { "team.swot." };
     static bool IsSecretSetting(string key)
     {
         var k = key.ToLowerInvariant();
-        return SecretSettingSuffixes.Any(suffix => k.EndsWith(suffix));
+        return SecretSettingSuffixes.Any(suffix => k.EndsWith(suffix))
+            || ConfidentialSettingPrefixes.Any(prefix => k.StartsWith(prefix));
     }
 }

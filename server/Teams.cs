@@ -8,6 +8,10 @@ public record MapGroupReq(string? ManagerKey);
 public record AddGroupReq(string DisplayName);
 public record AddMemberReq(string DisplayName, string? Email, string? JobTitle);
 public record SetParentReq(string? ParentKey);
+public record SetSwotReq(string? Strengths, string? Weaknesses, string? Opportunities, string? Threats);
+// The stored/returned team SWOT (persisted as JSON in the Setting store).
+public record TeamSwot(string Strengths, string Weaknesses, string Opportunities, string Threats,
+    string UpdatedAt, string UpdatedBy);
 
 // ============================================================================
 //  Teams. Entra groups are synced from the directory (Microsoft Graph) — or
@@ -252,6 +256,47 @@ public static class Teams
             }).Where(t => t.Groups.Count > 0 || t.Key == mgr).ToList();
 
             return Results.Ok(new MyTeamDto(isAdmin, mgr ?? "", mgr is null ? "" : Label(mgr), teams));
+        });
+
+        // ---- Team SWOT (manager self-service, scoped to the roll-up tree) -----
+        // A qualitative strengths/weaknesses/opportunities/threats note per team
+        // slot, owned by its manager and anyone above them (Platform Admin sees
+        // all). Authorization IS the scope: only slots in the caller's roll-up are
+        // readable/editable. Stored as JSON in the Setting store
+        // ("team.swot.{slot}") and redacted from the broad GET /settings, so it's
+        // only ever read back through this scoped endpoint.
+        api.MapGet("/teams/swot", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var scope = await ScopeAsync(db, cfg, http);
+            var items = new Dictionary<string, TeamSwot>();
+            foreach (var key in scope)
+            {
+                var raw = (await db.Settings.FindAsync($"team.swot.{key}"))?.Value;
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                try { if (JsonSerializer.Deserialize<TeamSwot>(raw) is { } s) items[key] = s; }
+                catch { /* tolerate a hand-edited/corrupt value */ }
+            }
+            return Results.Ok(new { canEdit = scope.Count > 0, items });
+        });
+
+        api.MapPut("/teams/{key}/swot", async (string key, SetSwotReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (!IsValidSlot(key)) return Results.NotFound();
+            var scope = await ScopeAsync(db, cfg, http);
+            if (!scope.Contains(key))
+                return Results.Json(new { error = "That team isn't in your scope." }, statusCode: StatusCodes.Status403Forbidden);
+
+            static string Clip(string? s) { var t = (s ?? "").Trim(); return t.Length > 4000 ? t[..4000] : t; }
+            var swot = new TeamSwot(Clip(req.Strengths), Clip(req.Weaknesses), Clip(req.Opportunities), Clip(req.Threats),
+                DateTime.UtcNow.ToString("o"), Permissions.ActorName(http, cfg));
+            var settingKey = $"team.swot.{key}";
+            var json = JsonSerializer.Serialize(swot);
+            var existing = await db.Settings.FindAsync(settingKey);
+            if (existing is null) db.Settings.Add(new Setting { Key = settingKey, Value = json });
+            else existing.Value = json;
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", "Updated team SWOT", Label(key)));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         // The team-manager slots as pickable options (for the create-product form).
