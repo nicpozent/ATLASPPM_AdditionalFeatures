@@ -45,6 +45,33 @@ public static class AtlasTelemetry
     public static readonly Counter<long> CapacityAlerts =
         Meter.CreateCounter<long>("atlas.capacity.alerts", unit: "{alert}", description: "Over-allocation alerts delivered.");
 
+    // Microsoft Teams notification delivery, tagged by outcome (ADR-0060) —
+    // powers a delivery-failure alert; the in-app copy is unaffected either way.
+    static readonly Counter<long> TeamsNotifications =
+        Meter.CreateCounter<long>("atlas.teams.notifications", unit: "{message}", description: "Teams channel notifications posted, by outcome.");
+
+    public static void RecordTeamsDelivery(bool ok) =>
+        TeamsNotifications.Add(1, new KeyValuePair<string, object?>("outcome", ok ? "ok" : "error"));
+
+    // Real-time PI board (ADR-0061): count of change-pings broadcast to viewers.
+    static readonly Counter<long> BoardBroadcasts =
+        Meter.CreateCounter<long>("atlas.board.broadcasts", unit: "{broadcast}", description: "PI board change-pings broadcast to viewers.");
+
+    public static void RecordBoardBroadcast() => BoardBroadcasts.Add(1);
+
+    // Live PI board hub state — observable gauges registered once at startup with
+    // accessors into the hub's in-memory presence map (see BoardHub / Program.cs).
+    static bool _boardGaugesRegistered;
+    public static void RegisterBoardGauges(Func<int> activeConnections, Func<int> activeBoards)
+    {
+        if (_boardGaugesRegistered) return;
+        _boardGaugesRegistered = true;
+        Meter.CreateObservableGauge("atlas.board.connections", activeConnections,
+            unit: "{connection}", description: "Live PI board hub connections.");
+        Meter.CreateObservableGauge("atlas.board.active", activeBoards,
+            unit: "{board}", description: "PI boards with at least one viewer.");
+    }
+
     // DB command duration (seconds) — recorded by AtlasDbMetricsInterceptor so EF
     // query timings show up as a Prometheus histogram (traces live in Tempo).
     static readonly Histogram<double> DbSeconds =

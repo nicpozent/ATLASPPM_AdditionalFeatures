@@ -83,9 +83,11 @@ public static class TeamsNotify
             var res = await http.PostAsJsonAsync(webhookUrl, payload);
             if (res.IsSuccessStatusCode)
             {
+                AtlasTelemetry.RecordTeamsDelivery(ok: true);
                 _log.LogInformation("Teams notification posted for “{Title}”.", title);
                 return (true, null);
             }
+            AtlasTelemetry.RecordTeamsDelivery(ok: false);
             var detail = await res.Content.ReadAsStringAsync();
             _log.LogWarning("Teams notification for “{Title}” failed: webhook returned {Status}. {Detail}",
                 title, (int)res.StatusCode, Trim(detail));
@@ -93,6 +95,7 @@ public static class TeamsNotify
         }
         catch (Exception ex)
         {
+            AtlasTelemetry.RecordTeamsDelivery(ok: false);
             _log.LogWarning(ex, "Teams notification for “{Title}” failed: {Message}", title, ex.Message);
             return (false, ex.Message);
         }

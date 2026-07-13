@@ -153,6 +153,8 @@ Notifications.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 AtlasTelemetry.RegisterQueueGauges(
     () => app.Services.GetRequiredService<JiraSyncQueue>().Pending,
     () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
+// Live PI board hub gauges (connections + active boards) — see BoardHub.
+AtlasTelemetry.RegisterBoardGauges(() => BoardHub.ActiveConnections, () => BoardHub.ActiveBoards);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 TeamsNotify.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 
