@@ -68,5 +68,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0059](./0059-task-lifecycle-timeline.md) | Task lifecycle timeline + Jira changelog-derived started/resolved timestamps | Accepted |
 | [0060](./0060-teams-notification-channel.md) | Microsoft Teams as a third notification channel (channel webhook + Adaptive Card) | Accepted |
 | [0061](./0061-realtime-pi-program-board.md) | Real-time PI Program Board (SignalR presence/cursors + notify-and-refetch) | Accepted |
+| [0062](./0062-individual-development-plans.md) | Individual development plans (manager-scoped, development-framed, redacted) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

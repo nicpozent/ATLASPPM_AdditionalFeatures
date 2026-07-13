@@ -12,6 +12,11 @@ public record SetSwotReq(string? Strengths, string? Weaknesses, string? Opportun
 // The stored/returned team SWOT (persisted as JSON in the Setting store).
 public record TeamSwot(string Strengths, string Weaknesses, string Opportunities, string Threats,
     string UpdatedAt, string UpdatedBy);
+// A manager's development note for one team member (development-focused framing:
+// strengths, growth areas, goals — no "weaknesses/threats"). Person-keyed by
+// display name, consistent with the skills matrix.
+public record SetDevPlanReq(string? Person, string? Strengths, string? GrowthAreas, string? Goals);
+public record DevPlan(string Strengths, string GrowthAreas, string Goals, string UpdatedAt, string UpdatedBy);
 
 // ============================================================================
 //  Teams. Entra groups are synced from the directory (Microsoft Graph) — or
@@ -53,6 +58,18 @@ public static class Teams
         var mgr = Permissions.ManagerKey(http, cfg);
         if (mgr is null) return new HashSet<string>();
         return DescendantsOf(mgr, await ParentMapAsync(db));
+    }
+
+    // The distinct member display names the caller manages (members of any team
+    // in their scope). The authorization set for individual development plans.
+    public static async Task<HashSet<string>> MembersInScopeAsync(AtlasDbContext db, IConfiguration cfg, HttpContext http)
+    {
+        var scope = await ScopeAsync(db, cfg, http);
+        if (scope.Count == 0) return new HashSet<string>();
+        var groups = await db.EntraGroups.Include(g => g.Members)
+            .Where(g => g.ManagerKey != "" && scope.Contains(g.ManagerKey)).ToListAsync();
+        return groups.SelectMany(g => g.Members).Select(m => m.DisplayName)
+            .Where(n => !string.IsNullOrWhiteSpace(n)).ToHashSet();
     }
 
     static bool GraphConfigured(IConfiguration cfg) =>
@@ -295,6 +312,50 @@ public static class Teams
             if (existing is null) db.Settings.Add(new Setting { Key = settingKey, Value = json });
             else existing.Value = json;
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", "Updated team SWOT", Label(key)));
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // ---- Individual development plans (manager self-service, scoped) ------
+        // A per-person Strengths / Growth areas / Goals note a manager keeps for
+        // the people they manage (teams in their roll-up scope; Platform Admin
+        // all). This is sensitive personnel data (ADR-0062): it is manager-and-up
+        // only — NEVER shown to the person or peers — every write is audited, and
+        // it is stored as JSON in the Setting store ("devplan.{person}") and
+        // redacted from the broad GET /settings, so it's only read back here.
+        // Development-focused framing on purpose (no weaknesses/threats).
+        api.MapGet("/devplans", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var names = await MembersInScopeAsync(db, cfg, http);
+            var items = new Dictionary<string, DevPlan>();
+            foreach (var name in names)
+            {
+                var raw = (await db.Settings.FindAsync($"devplan.{name}"))?.Value;
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                try { if (JsonSerializer.Deserialize<DevPlan>(raw) is { } p) items[name] = p; }
+                catch { /* tolerate a hand-edited/corrupt value */ }
+            }
+            return Results.Ok(new { canEdit = names.Count > 0, items });
+        });
+
+        api.MapPut("/devplans", async (SetDevPlanReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var person = (req.Person ?? "").Trim();
+            if (person.Length == 0) return Results.BadRequest(new { error = "A person is required." });
+            var names = await MembersInScopeAsync(db, cfg, http);
+            if (!names.Contains(person))
+                return Results.Json(new { error = "That person isn't in a team you manage." }, statusCode: StatusCodes.Status403Forbidden);
+
+            static string Clip(string? s) { var t = (s ?? "").Trim(); return t.Length > 4000 ? t[..4000] : t; }
+            var plan = new DevPlan(Clip(req.Strengths), Clip(req.GrowthAreas), Clip(req.Goals),
+                DateTime.UtcNow.ToString("o"), Permissions.ActorName(http, cfg));
+            var settingKey = $"devplan.{person}";
+            var json = JsonSerializer.Serialize(plan);
+            var existing = await db.Settings.FindAsync(settingKey);
+            if (existing is null) db.Settings.Add(new Setting { Key = settingKey, Value = json });
+            else existing.Value = json;
+            // Audit the fact (not the content) — records who edited whose plan.
+            db.AuditEvents.Add(Permissions.Audit(http, cfg, "Teams", "Updated development plan", person));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });

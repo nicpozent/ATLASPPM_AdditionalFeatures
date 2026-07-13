@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { toast, toastError } from "@/components/Toast";
 import { SubTeamManager } from "@/components/TeamPanel";
 import { TeamSwotPanel, type TeamSwot } from "@/components/TeamSwot";
+import { DevPlanModal, type DevPlan } from "@/components/DevPlan";
 import { useRole } from "@/components/RoleContext";
 import { laborHours, laborCost, HOURS_PER_DAY, DAYS_PER_MONTH } from "@/lib/labor";
 
@@ -39,6 +40,12 @@ export default function Teams() {
     queryFn: async (): Promise<{ canEdit: boolean; items: Record<string, TeamSwot> }> =>
       (await api<{ canEdit: boolean; items: Record<string, TeamSwot> }>("/teams/swot")) ?? { canEdit: false, items: {} },
   });
+  const { data: dev } = useQuery({
+    queryKey: ["devplans"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; items: Record<string, DevPlan> }> =>
+      (await api<{ canEdit: boolean; items: Record<string, DevPlan> }>("/devplans")) ?? { canEdit: false, items: {} },
+  });
+  const [devPlanFor, setDevPlanFor] = useState<string | null>(null);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -81,10 +88,16 @@ export default function Teams() {
                         {g.members.map((m) => (
                           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 11, border: `1px solid ${color.border}`, borderRadius: 12, padding: "10px 12px" }}>
                             <span style={{ width: 34, height: 34, borderRadius: "50%", background: avatarColor(m.displayName), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flex: "none" }}>{initials(m.displayName)}</span>
-                            <div style={{ minWidth: 0 }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.displayName}</div>
                               <div style={{ fontSize: 11.5, color: color.faint3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.jobTitle || m.email || "—"}</div>
                             </div>
+                            {dev?.canEdit && (
+                              <button onClick={() => setDevPlanFor(m.displayName)} title="Development plan (managers only)" aria-label={`Development plan for ${m.displayName}`}
+                                style={{ border: "none", background: "transparent", color: dev.items[m.displayName] ? color.primary : color.faint2, cursor: "pointer", padding: 5, borderRadius: 7, lineHeight: 0, flex: "none" }}>
+                                <Icon name="userCheck" size={15} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -108,6 +121,15 @@ export default function Teams() {
       <div style={{ marginTop: 18 }}><SkillsMatrix /></div>
 
       <SubTeamManager />
+
+      {devPlanFor && (
+        <DevPlanModal
+          person={devPlanFor}
+          plan={dev?.items[devPlanFor]}
+          onClose={() => setDevPlanFor(null)}
+          onSaved={() => { setDevPlanFor(null); qc.invalidateQueries({ queryKey: ["devplans"] }); }}
+        />
+      )}
     </div>
   );
 }
