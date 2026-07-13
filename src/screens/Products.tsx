@@ -10,6 +10,7 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { JiraSyncButton } from "@/components/JiraSyncButton";
 import { TeamPanel } from "@/components/TeamPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { WhiteboardPanel, WhiteboardSwitch } from "@/whiteboard/WhiteboardPanel";
 import { DEPARTMENTS } from "@/departments";
 
 type Source = "jira" | "ado" | "manual";
@@ -241,6 +242,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
   const mayManage = product.canManage ?? can("cap-products", "E");
   const { data: ownerPool = [] } = useOwnerPool();
   const [costsOpen, setCostsOpen] = useState(false);
+  const [view, setView] = useState<"overview" | "whiteboard">("overview");
   const setStatus = useMutation({
     mutationFn: (status: string) => api(`/products/${product.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
@@ -316,6 +318,8 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         )}
       </div>
 
+      <WhiteboardSwitch value={view} onChange={setView} />
+      {view === "whiteboard" ? <WhiteboardPanel scope={{ kind: "product", id: product.id }} /> : (<>
       {/* linked projects */}
       <div style={sectionCard}>
         <div style={sectionTitle}>Linked projects</div>
@@ -398,6 +402,7 @@ function ProductDetail({ product, onClose }: { product: Product; onClose: () => 
         <div style={{ fontSize: 11.5, color: color.faint2, marginBottom: 14 }}>Absences for resources on this product</div>
         <div style={{ minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center", color: color.faint3, fontSize: 13 }}>No absences recorded.</div>
       </div>
+      </>)}
       {costsOpen && <CostsModal scope="products" id={product.id} name={product.name} onClose={() => setCostsOpen(false)} />}
     </div>
   );

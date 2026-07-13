@@ -10,6 +10,7 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { JiraSyncButton } from "@/components/JiraSyncButton";
 import { StakeholderMatrixCard } from "@/components/StakeholderMatrixCard";
 import { TeamPanel } from "@/components/TeamPanel";
+import { WhiteboardPanel, WhiteboardSwitch } from "@/whiteboard/WhiteboardPanel";
 import { SkillsPanel } from "@/components/SkillsPanel";
 import { DEPARTMENTS } from "@/departments";
 import { Overlay } from "./Demands";
@@ -226,6 +227,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
     onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
   });
   const [costsOpen, setCostsOpen] = useState(false);
+  const [view, setView] = useState<"overview" | "whiteboard">("overview");
   const projectRows = projectOpts.filter((p) => program.projects.includes(p.id));
 
   const kpi = (label: string, node: React.ReactNode) => (
@@ -283,6 +285,8 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
         </div>
       </div>
 
+      <WhiteboardSwitch value={view} onChange={setView} />
+      {view === "whiteboard" ? <WhiteboardPanel scope={{ kind: "program", id: program.id }} /> : (<>
       {/* aggregated cost */}
       <div style={{ background: color.surface, border: `1px solid ${color.border}`, borderRadius: 16, padding: "20px 22px", marginBottom: 18 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 4 }}>Aggregated cost · all program projects</div>
@@ -362,6 +366,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
       <div style={{ marginTop: 18 }}>
         <StakeholderMatrixCard scopeType="program" scopeId={program.id} />
       </div>
+      </>)}
       {costsOpen && <CostsModal scope="programs" id={program.id} name={program.name} onClose={() => setCostsOpen(false)} />}
     </>
   );
