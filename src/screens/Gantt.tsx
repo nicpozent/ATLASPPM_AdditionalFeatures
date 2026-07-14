@@ -298,6 +298,7 @@ export default function Gantt() {
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
             : <ProjectSchedule
                 phases={gantt?.phases ?? []} milestones={milestones} canEdit={canEdit} hasProject={!!activeProjectId}
+                projectId={activeProjectId}
                 projectStart={effProjectStart} projectEnd={effProjectEnd}
                 startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""} sprints={sprintBars}
                 onAddPhase={() => setAddPhase(true)} onEditPhase={setEditPhase} onRemovePhase={(id) => removePhase.mutate(id)}
@@ -393,8 +394,8 @@ const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Active:    { bg: color.successTint,  border: color.success },
   Closed:    { bg: color.primaryTint2, border: color.primary },
 };
-function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
-  phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
+function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
+  phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean; projectId: string;
   projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string; sprints?: SprintBar[];
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
@@ -410,11 +411,21 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
   const hasWindow = projectStart != null && projectEnd != null;
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set());
   const toggleSprint = (id: number) => setOpenSprints((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // Sprint-level dependency arrows: only edges whose BOTH ends are sprints of this
+  // project (their ids are among the bars we render). Drawn over the right grid.
+  const { edges, canEdit: canLink, add: addDep, remove: removeDep } = usePortfolioDeps();
+  const [linking, setLinking] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const sprintIds = new Set(sprints.map((s) => String(s.id)));
+  const sprintEdges = edges.filter((e) => e.fromType === "sprint" && e.toType === "sprint" && sprintIds.has(e.fromId) && sprintIds.has(e.toId));
+  const sprintName = (id: string) => sprints.find((s) => String(s.id) === id)?.name ?? `sprint ${id}`;
+  const manualSprintEdges = sprintEdges.filter((e) => e.source === "manual");
   // Project window bar in absolute months: prefer the real project dates (span
   // years), else anchor the derived month window to the base year.
   const winA = absOfIso(startDate) ?? base + Math.min(projectStart ?? 0, projectEnd ?? 0);
   const winB = absOfIso(endDate) ?? base + Math.max(projectStart ?? 0, projectEnd ?? 0);
   return (
+    <>
     <div style={{ display: "flex" }}>
       {/* left labels */}
       <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
@@ -478,7 +489,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         </div>
       </div>
       {/* right grid */}
-      <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
+      <div ref={gridRef} style={{ position: "relative", flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
         {hasWindow && (
           <div style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt, ...gb }}>
@@ -500,7 +511,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               return (
                 <div key={s.id}>
                   <div style={{ position: "relative", height: 34, ...gb }}>
-                    <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
+                    <div data-dep-key={s.id >= 0 ? `sprint-${s.id}` : undefined} title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
                       style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
@@ -532,8 +543,67 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             );
           })}
         </div>
+        {sprints.length > 0 && <MeasuredArrows containerRef={gridRef} edges={sprintEdges} remeasure={`${win.start}:${win.span}:${sprints.length}:${[...openSprints].join(",")}:${sprintEdges.length}`} />}
       </div>
     </div>
+    {/* Sprint dependency legend + manual linking (project timeline) */}
+    {sprints.length > 0 && (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 22px", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt, flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.subtle }}>
+          <svg width={26} height={8} aria-hidden="true"><line x1={0} y1={4} x2={20} y2={4} stroke={color.faint} strokeWidth={1.5} /><path d="M20,1 L25,4 L20,7 Z" fill={color.faint} /></svg>
+          sprint depends on
+        </span>
+        <span style={{ fontSize: 11, color: color.faint3 }}>{sprintEdges.length} shown</span>
+        <div style={{ flex: 1 }} />
+        {canLink && sprints.filter((s) => s.id >= 0).length >= 2 && <Button variant="secondary" onClick={() => setLinking(true)}><Icon name="plus" size={14} /> Link sprint dependency</Button>}
+      </div>
+    )}
+    {manualSprintEdges.length > 0 && (
+      <div style={{ display: "flex", gap: 8, padding: "0 22px 12px", flexWrap: "wrap" }}>
+        {manualSprintEdges.map((e) => (
+          <span key={e.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.text, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 20, padding: "4px 6px 4px 11px" }}>
+            {sprintName(e.fromId)} <Icon name="arrowRight" size={12} color={color.faint2} /> {sprintName(e.toId)}
+            {canLink && <button onClick={() => removeDep.mutate(e.id)} aria-label="Remove dependency" title="Remove dependency" style={{ border: "none", background: "none", cursor: "pointer", color: color.faint3, padding: 2, lineHeight: 0 }}><Icon name="x" size={13} /></button>}
+          </span>
+        ))}
+      </div>
+    )}
+    {linking && (
+      <LinkSprintModal projectId={projectId} sprints={sprints.filter((s) => s.id >= 0)} onClose={() => setLinking(false)}
+        onAdd={(b) => { addDep.mutate(b); setLinking(false); }} pending={addDep.isPending} />
+    )}
+    </>
+  );
+}
+
+// Modal to hand-draw a sprint→sprint dependency within one project's timeline.
+function LinkSprintModal({ projectId, sprints, onClose, onAdd, pending }: {
+  projectId: string; sprints: SprintBar[]; onClose: () => void;
+  onAdd: (b: { fromType: string; fromId: string; toType: string; toId: string }) => void; pending?: boolean;
+}) {
+  void projectId;
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const submit = () => { if (from && to && from !== to) onAdd({ fromType: "sprint", fromId: from, toType: "sprint", toId: to }); };
+  return (
+    <Overlay onClose={onClose} width={440}>
+      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 700, color: color.ink, marginBottom: 4 }}>Link a sprint dependency</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Draw an arrow from the sprint that <b>depends on</b> an earlier one.</div>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>This sprint…</label>
+      <Select value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", marginBottom: 14 }}>
+        <option value="">Select a sprint…</option>
+        {sprints.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+      </Select>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>…depends on</label>
+      <Select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", marginBottom: 18 }}>
+        <option value="">Select an upstream sprint…</option>
+        {sprints.map((s) => <option key={s.id} value={String(s.id)} disabled={String(s.id) === from}>{s.name}</option>)}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={!from || !to || from === to || pending}>Link</Button>
+      </div>
+    </Overlay>
   );
 }
 
@@ -584,6 +654,81 @@ function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos
   );
 }
 
+// Measured dependency overlay — reads the on-screen rect of every bar tagged
+// with data-dep-key inside `containerRef` and draws arrows between them. Used on
+// the Project/Program timelines whose rows are non-uniform and expandable, so
+// positions come from the real DOM (correct by construction) rather than
+// hand-computed row math. `remeasure` is any value that changes when layout does
+// (window, expand state, edge list) to re-run the measurement.
+function MeasuredArrows({ containerRef, edges, remeasure }: {
+  containerRef: React.RefObject<HTMLDivElement | null>; edges: TimelineDep[]; remeasure: unknown;
+}) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [rects, setRects] = useState<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const base = el.getBoundingClientRect();
+      const m = new Map<string, { x: number; y: number; w: number; h: number }>();
+      el.querySelectorAll<HTMLElement>("[data-dep-key]").forEach((n) => {
+        const k = n.getAttribute("data-dep-key");
+        if (!k) return;
+        const r = n.getBoundingClientRect();
+        m.set(k, { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height });
+      });
+      setRects(m);
+      setBox({ w: el.clientWidth, h: el.scrollHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef, remeasure]);
+  return (
+    <svg width={box.w} height={box.h} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", overflow: "visible", zIndex: 4 }} aria-hidden="true">
+      <defs>
+        <marker id="dep-arrowhead-m" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+        </marker>
+      </defs>
+      {edges.map((e) => {
+        const up = rects.get(`${e.toType}-${e.toId}`), down = rects.get(`${e.fromType}-${e.fromId}`);
+        if (!up || !down) return null;
+        const x1 = up.x + up.w, y1 = up.y + up.h / 2, x2 = down.x, y2 = down.y + down.h / 2;
+        const midX = Math.max(x1 + 12, x2 - 12);
+        return (
+          <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
+            d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
+            stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
+            markerEnd="url(#dep-arrowhead-m)" opacity={0.85} />
+        );
+      })}
+    </svg>
+  );
+}
+
+// Shared portfolio/timeline dependency edges + link mutations (one row per
+// dependency; source manual|jira|project). Used by every timeline scope.
+function usePortfolioDeps() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["portfolio-deps"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; edges: TimelineDep[] }> =>
+      (await api<{ canEdit: boolean; edges: TimelineDep[] }>("/portfolio/dependencies")) ?? { canEdit: false, edges: [] },
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["portfolio-deps"] });
+  const add = useMutation({
+    mutationFn: (b: { fromType: string; fromId: string; toType: string; toId: string }) => api("/portfolio/dependencies", { method: "POST", body: JSON.stringify(b) }),
+    onSuccess: () => { toast("Dependency linked", "info"); invalidate(); }, onError: toastError,
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/portfolio/dependencies/${id}`, { method: "DELETE" }),
+    onSuccess: () => { toast("Dependency removed", "info"); invalidate(); }, onError: toastError,
+  });
+  return { edges: data?.edges ?? [], canEdit: data?.canEdit ?? false, add, remove };
+}
+
 // ---- Portfolio schedule (all entity types on one grid) --------------------
 const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: string }> = {
   project: { ink: "#7A3FB0", tint: color.accentTint, bar: "#7A3FB0", label: "Project" },
@@ -594,24 +739,8 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   const win = useWin();
   const gb = gridBg(win);
-  const qc = useQueryClient();
   const [linking, setLinking] = useState(false);
-  const { data: depData } = useQuery({
-    queryKey: ["portfolio-deps"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<{ canEdit: boolean; edges: TimelineDep[] }> =>
-      (await api<{ canEdit: boolean; edges: TimelineDep[] }>("/portfolio/dependencies")) ?? { canEdit: false, edges: [] },
-  });
-  const edges = depData?.edges ?? [];
-  const canEdit = depData?.canEdit ?? false;
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["portfolio-deps"] });
-  const addDep = useMutation({
-    mutationFn: (b: { fromType: string; fromId: string; toType: string; toId: string }) => api("/portfolio/dependencies", { method: "POST", body: JSON.stringify(b) }),
-    onSuccess: () => { toast("Dependency linked", "info"); setLinking(false); invalidate(); }, onError: toastError,
-  });
-  const removeDep = useMutation({
-    mutationFn: (id: number) => api(`/portfolio/dependencies/${id}`, { method: "DELETE" }),
-    onSuccess: () => { toast("Dependency removed", "info"); invalidate(); }, onError: toastError,
-  });
+  const { edges, canEdit, add: addDep, remove: removeDep } = usePortfolioDeps();
   // Dated items (startLabel/endLabel are ISO/display dates) place across years;
   // items with only a derived month window anchor to the window's start year.
   const itemAbs = (label: string, month: number) => absOfIso(label) ?? yearOf(win.start) * 12 + month;
@@ -683,7 +812,7 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
         ))}
       </div>
     )}
-    {linking && <LinkDependencyModal items={items} onClose={() => setLinking(false)} onAdd={(b) => addDep.mutate(b)} pending={addDep.isPending} />}
+    {linking && <LinkDependencyModal items={items} onClose={() => setLinking(false)} onAdd={(b) => { addDep.mutate(b); setLinking(false); }} pending={addDep.isPending} />}
     </>
   );
 }
@@ -729,6 +858,12 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
   const win = useWin();
   const gb = gridBg(win);
   const msBase = yearOf(win.start) * 12;
+  // Read-only dependency arrows across the program's projects & sprints.
+  const { edges } = usePortfolioDeps();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const keys = new Set<string>();
+  rows.forEach((r) => { keys.add(`project-${r.projectId}`); (r.sprints ?? []).forEach((s) => keys.add(`sprint-${s.id}`)); });
+  const progEdges = edges.filter((e) => keys.has(`${e.fromType}-${e.fromId}`) && keys.has(`${e.toType}-${e.toId}`));
   if (rows.length === 0) return <Note text="No projects in this program, or no program selected." />;
   return (
     <div style={{ display: "flex" }}>
@@ -768,7 +903,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
       {/* right grid */}
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", ...gb }}>
+        <div ref={gridRef} style={{ position: "relative", ...gb }}>
           <NowLine />
           {rows.map((r) => {
             const hasWindow = r.startMonth != null && r.endMonth != null;
@@ -779,7 +914,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
                 <div style={{ height: 30, borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
                 {hasWindow && (
                   <div style={{ position: "relative", height: 30, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
-                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barAbs(absOfIso(r.startDate) ?? base + Math.min(r.startMonth!, r.endMonth!), absOfIso(r.endDate) ?? base + Math.max(r.startMonth!, r.endMonth!), win), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
+                    <div data-dep-key={`project-${r.projectId}`} title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barAbs(absOfIso(r.startDate) ?? base + Math.min(r.startMonth!, r.endMonth!), absOfIso(r.endDate) ?? base + Math.max(r.startMonth!, r.endMonth!), win), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
                   </div>
                 )}
                 {r.phases.map((p) => <PhaseBar key={p.id} phase={p} base={base} />)}
@@ -787,7 +922,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
                   const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
                   return (
                     <div key={s.id} style={{ position: "relative", height: 34, ...gb }}>
-                      <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
+                      <div data-dep-key={s.id >= 0 ? `sprint-${s.id}` : undefined} title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
                         style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                     </div>
                   );
@@ -796,6 +931,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
               </div>
             );
           })}
+          <MeasuredArrows containerRef={gridRef} edges={progEdges} remeasure={`${win.start}:${win.span}:${rows.length}:${progEdges.length}`} />
         </div>
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
           {milestones.map((ms) => {
