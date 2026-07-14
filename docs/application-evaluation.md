@@ -24,7 +24,7 @@ _Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)** | Human pen-test engagement + automated secret rotation outstanding |
-| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics; **keyboard/AT operation of the pointer-first surfaces** — whiteboard canvas (focusable labelled nodes, arrow-move/edit/delete) + Kanban/funnel drag boards (focus + arrow-move) | Axe sweep covers 6 representative routes; extend to the whiteboard/board views |
+| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast** across 7 routes, the whiteboard canvas AND the **Tasks Kanban + PI Program boards** (seeded via mocked API); **keyboard/AT operation of every pointer-first surface**; **documented screen-reader test procedure** (`docs/accessibility.md`); mobile drawer; focus/dialog/menu semantics | No third-party assistive-tech audit yet (internal SR procedure documented; external audit recommended pre-GA) |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
 | 12 | **Testing** | ★★★★★ | Backend 444 xUnit; frontend 111 vitest + per-screen logic (incl. Gantt-geometry, whiteboard field-merge/backfill, SoA roll-up/evidence); Playwright e2e — axe sweep **now covering the whiteboard canvas + demand funnel** + full user-journey specs; **k6 load/perf suite (ADR-0047)**; smoke wired into CI | Migrations/backfill exercised in-memory in tests, not yet against a live Postgres; task/PI-board drag e2e still thin |
 | 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
@@ -80,7 +80,7 @@ _Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration
 
 **Verdict: production-ready.** The core PPM product is complete, data-wired,
 tested (555 automated tests across stacks — 444 backend xUnit, 111 frontend
-vitest, 11 Playwright e2e: 7 axe + 4 full-journey — plus a k6 load/perf suite),
+vitest, 14 Playwright e2e: 10 axe + 4 full-journey — plus a k6 load/perf suite),
 accessible (AA-gated), observable, and documented to a professional standard
 (ABB/SBB traceability, 66 ADRs, HLD/LLD). Entra SSO is verified end-to-end on a
 live tenant. Remaining items are enhancements, not blockers: broadening connector
@@ -202,3 +202,15 @@ were both re-scored. Remaining items are operator/organizational (auth-on,
 at-rest encryption, DPIA sign-off, the Azure move) plus one caveat — the new
 migrations + backfill are proven in-memory, not yet against a live Postgres. No
 rating change here (the dimensions were already ★★★★★)._
+
+_Update 2026-07-13 (rev 3): closed the accessibility follow-up. The gated axe
+sweep now also covers the **Tasks Kanban board** and the **PI Program Board** —
+both seeded via mocked `/api/v1/*` (`e2e/journeys/board-a11y.spec.ts`), which
+surfaced and fixed a real bug: the PI increment picker had no accessible name.
+Project tabs are now **deep-linkable** (`?tab=`) so a board is reachable directly.
+A **screen-reader test procedure** is documented (`docs/accessibility.md`),
+consolidating the automated coverage + a per-surface manual NVDA/VoiceOver
+checklist. Playwright grew to 14 specs (10 axe + 4 journey). The one remaining
+a11y item is an **external assistive-tech audit** (pre-GA) — analogous to the
+outstanding human pen-test on Security. In the broader 18-dimension evaluation
+artifact this lifts Accessibility to ★★★★★ (14/18 at the top band; overall 4.7)._

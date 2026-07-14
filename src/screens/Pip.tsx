@@ -86,7 +86,7 @@ export default function Pip() {
           Quarterly Program Increment planning across projects, programs, products &amp; releases — objectives with business value &amp; confidence, an iteration calendar, capacity vs load, and a cross-team dependency board.
         </div>
         {increments.length > 0 && (
-          <Select value={String(activeId ?? "")} onChange={(e) => setSelected(Number(e.target.value))} style={{ width: 260 }}>
+          <Select value={String(activeId ?? "")} onChange={(e) => setSelected(Number(e.target.value))} aria-label="Select program increment" style={{ width: 260 }}>
             {increments.map((i) => <option key={i.id} value={i.id}>{i.key ? `${i.key} · ` : ""}{i.name}</option>)}
           </Select>
         )}
