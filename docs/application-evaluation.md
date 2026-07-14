@@ -16,22 +16,22 @@ _Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration
 | # | Dimension | Rating | Evidence | Gaps / next |
 |---|-----------|--------|----------|-------------|
 | 1 | **Functional coverage** (screens vs prototype) | ★★★★★ | All Workspace + Configuration screens built and data-wired; 128 tracked features complete; **product-owner-approved extensions** (Teams notifications, real-time collaboration, freeform whiteboard, task-board collaboration, ISO 27001 SoA) built in the existing design language and recorded (CLAUDE.md §2, ADR-0060/0061/0064/0065/0066) | `design/` regeneration to fold the extensions back into the prototype |
-| 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 66 ADRs | — |
+| 2 | **Architecture & modularity** | ★★★★★ | Modular monolith, minimal API grouped `/api/v1`; one C# file per domain; HLD + LLD + 69 ADRs | — |
 | 3 | **Frontend engineering** | ★★★★★ | React 18 + TS strict + Vite 8; inline design tokens with **per-profile dark mode (CSS-variable palettes, ADR-0056)**; route code-splitting + vendor chunks; **lint clean (0 warnings)** | — |
 | 4 | **Identity & access** | ★★★★★ | Entra SSO (MSAL, PKCE) **verified end-to-end on a live tenant**; server-authoritative RBAC capability matrix; **15-min idle-logout** | — |
 | 5 | **Authorization model** | ★★★★★ | 6 canonical server roles; UI checks cosmetic; capability matrix; authz integration tests | — |
 | 6 | **Data & persistence** | ★★★★★ | PostgreSQL 16 + EF Core 9; migrations auto-applied; empty-by-default, derive-on-read roll-ups | — |
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
-| 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)** | Human pen-test engagement + automated secret rotation outstanding |
+| 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)**; **secret-management depth: OpenBao/Vault KV provider (ADR-0067), AES-GCM field encryption for the DPIA-gated personnel notes (ADR-0068), and passwordless Postgres via TLS client-cert auth — removing the DB password entirely, verified against real Postgres (ADR-0069)** | Human pen-test engagement outstanding (secret rotation now has a path via OpenBao dynamic creds / cert rotation) |
 | 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast** across 7 routes, the whiteboard canvas AND the **Tasks Kanban + PI Program boards** (seeded via mocked API); **keyboard/AT operation of every pointer-first surface**; **documented screen-reader test procedure** (`docs/accessibility.md`); mobile drawer; focus/dialog/menu semantics | No third-party assistive-tech audit yet (internal SR procedure documented; external audit recommended pre-GA) |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★★ | Backend 444 xUnit; frontend 111 vitest + per-screen logic (incl. Gantt-geometry, whiteboard field-merge/backfill, SoA roll-up/evidence); Playwright e2e — axe sweep **now covering the whiteboard canvas + demand funnel** + full user-journey specs; **k6 load/perf suite (ADR-0047)**; smoke wired into CI | Migrations/backfill exercised in-memory in tests, not yet against a live Postgres; task/PI-board drag e2e still thin |
+| 12 | **Testing** | ★★★★★ | Backend 463 xUnit; frontend 117 vitest + per-screen logic (incl. Gantt-geometry/window-fit, whiteboard field-merge/backfill, SoA roll-up/evidence, OpenBao/personnel-crypto); Playwright e2e — axe sweep over 7 routes + whiteboard + Kanban/PI boards, **deterministic native-DnD drag specs for both boards**, dependency-arrow render + full user-journey specs; **k6 load/perf suite (ADR-0047)**; smoke wired into CI. **Full migration chain verified against a live Postgres 16** (not only the in-memory provider) | — |
 | 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
 | 14 | **Delivery & runtime** | ★★★★★ | **On-prem single-node Docker (`docker compose`: web/worker/db/nginx edge) as the chosen, documented target (ADR-0054)**; images promoted from GHCR (ADR-0052); migrations on start; health-gated; secrets overlay; upgrade = pull-and-recreate | k8s parked (no scale/HA need at portfolio scale); HA is a single-node trade-off |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049); **ISO 27001:2022 Statement of Applicability — full 93-control Annex A coverage per project (ADR-0066)** | Per-control automated evidence linkage; SoAs for other frameworks |
 | 16 | **i18n** | ★★★★★ | 6 locales; completeness test gates missing keys | — |
-| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 66 ADRs, in-app Help + **Security Posture** page, setup guides, this evaluation, user stories & requirements (all refreshed for the post-prototype extensions) | — |
+| 17 | **Documentation** | ★★★★★ | HLD, LLD, building-blocks (ABB/SBB), 69 ADRs, in-app Help + **Security Posture** page, setup guides (incl. `secrets.md`, `postgres-cert-auth.md`), this evaluation, user stories & requirements (all refreshed for the post-prototype extensions) | — |
 | 18 | **Maintainability / DX** | ★★★★★ | Consistent patterns, typed models, dependabot; **large screens decomposed into per-tab modules** (`project/`, `resources/`, ADR-0041) | — |
 
 ## 2. Dimension notes
@@ -214,3 +214,27 @@ checklist. Playwright grew to 14 specs (10 axe + 4 journey). The one remaining
 a11y item is an **external assistive-tech audit** (pre-GA) — analogous to the
 outstanding human pen-test on Security. In the broader 18-dimension evaluation
 artifact this lifts Accessibility to ★★★★★ (14/18 at the top band; overall 4.7)._
+
+_Update 2026-07-14: screenshot-driven feature batch + hardening (ADR-0067–0069).
+**Timeline** — a project's sprints now render on the Schedule (the window
+auto-fits the project's real span; sprints carry their true Jira dates), and
+**cross-entity dependency arrows** were added across the Portfolio, Project
+(sprint-level) and Program timelines from a generic `TimelineDependency`
+(manual links + a Jira issue-link ingest deriving sprint→sprint edges).
+**Quality** — test tasks gained a full window (details, start/due dates,
+assignee, time-to-spend) and a linkable Jira board with issue ingest reusing the
+project sync client. **Governance** review checkpoints, **Releases** calendar and
+**compliance** multi-requirement descriptions fixed; **My Team skills matrix**
+made manager-only + per-team scoped. Hardening: **deterministic native-DnD e2e**
+for the Tasks + PI boards (closing the last Testing gap), **OpenBao/Vault KV
+secrets provider** (ADR-0067), **AES-GCM field encryption** for the DPIA-gated
+personnel notes (ADR-0068), and **passwordless Postgres via TLS client-cert auth**
+(ADR-0069) — plus the **full migration chain verified against a live Postgres 16**,
+closing the other Testing caveat. Tests 463 backend + 117 frontend; ADRs to 69.
+Testing's two open items are now closed; **Security's remaining gap narrows to the
+human pen-test** (secret rotation has a path via OpenBao dynamic creds / cert
+rotation). No band change: **overall stays 4.9/5 — 16 of 18 dimensions at ★★★★★**,
+the two non-max being **Integrations ★★★★☆** (ServiceNow/GitHub/Confluence/Slack/
+Power BI still cosmetic — the clearest next build) and **Security ★★★★☆** (human
+pen-test). Live-Jira verification of the two ingests, and `design/` regeneration
+for the approved extensions, remain operator/organizational follow-ups._
