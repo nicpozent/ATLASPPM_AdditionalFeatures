@@ -9,6 +9,8 @@ import { Icon } from "@/components/Icon";
 import { Card, EmptyBlock, Button, Modal, Input, Select, Textarea } from "@/components/ui";
 import { toastError } from "@/components/Toast";
 import { DecLabel } from "./shared";
+import { SecReviewGateModal } from "./Security";
+import { SRG_STATUS, type SecReviewGate } from "./reviewGates";
 
 interface GateCriterion { id: number; label: string; met: boolean; }
 interface Gate { id: number; code: string; name: string; approver: string; status: string; date: string; pct: number; metLabel: string; criteria: GateCriterion[]; }
@@ -109,18 +111,55 @@ export function Governance({ projectId }: { projectId: string | null }) {
         })}
       </div>
 
-      {/* review checkpoints (structural; populated from architecture/security reviews) */}
-      <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
-        <div style={{ padding: "16px 22px 13px", fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.ink }}>Architecture &amp; security review checkpoints</div>
-        <div style={{ display: "grid", gridTemplateColumns: "0.7fr 1fr 1.2fr 0.9fr 0.8fr 2.2fr", padding: "0 22px 9px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
-          <div>Gate</div><div>Type</div><div>Reviewer</div><div>Status</div><div>Date</div><div>Note</div>
-        </div>
-        <EmptyBlock message="No review checkpoints scheduled yet." minHeight={120} />
-      </Card>
+      {/* architecture & security review checkpoints (shared with the Security tab) */}
+      <ReviewCheckpoints projectId={projectId} />
 
       {/* decision log (ADR) */}
       <DecisionLog projectId={projectId} canGovern={canGovern} />
     </div>
+  );
+}
+
+// Architecture & security review checkpoints — the SecurityReviewGate records
+// (shared with the Security tab). Governance surfaces them for sign-off and lets
+// a governance lead add/schedule one; editing needs the same cap-approve right.
+function ReviewCheckpoints({ projectId }: { projectId: string | null }) {
+  const [add, setAdd] = useState(false);
+  const [open, setOpen] = useState<SecReviewGate | null>(null);
+  const { data } = useQuery({
+    queryKey: ["security", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; reviewGates: SecReviewGate[] }> =>
+      (await api<{ canEdit: boolean; reviewGates: SecReviewGate[] }>(`/projects/${projectId}/security`)) ?? { canEdit: false, reviewGates: [] },
+  });
+  const gates = data?.reviewGates ?? [];
+  const canEdit = data?.canEdit ?? false;
+  const COLS = "1.6fr 1fr 1.1fr 0.9fr 0.9fr";
+  return (
+    <Card padding={0} style={{ overflow: "hidden", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", padding: "15px 22px", borderBottom: `1px solid ${color.bg}` }}>
+        <span style={{ flex: 1, fontFamily: font.head, fontSize: 14.5, fontWeight: 600, color: color.ink }}>Architecture &amp; security review checkpoints</span>
+        {canEdit && projectId && <button onClick={() => setAdd(true)} style={{ fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.primaryTint, border: "none", padding: "8px 13px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>+ Add checkpoint</button>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: COLS, padding: "11px 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
+        <div>Gate</div><div>Type</div><div>Reviewer</div><div>Date</div><div>Status</div>
+      </div>
+      {gates.length === 0 ? (
+        <EmptyBlock message="No review checkpoints scheduled yet." minHeight={120} />
+      ) : gates.map((g) => {
+        const gs = SRG_STATUS[g.status] ?? SRG_STATUS.Scheduled;
+        return (
+          <div key={g.id} onClick={() => canEdit && setOpen(g)} style={{ display: "grid", gridTemplateColumns: COLS, alignItems: "center", padding: "12px 22px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: canEdit ? "pointer" : "default" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: canEdit ? color.primary : color.text }}>{g.name}{g.note && <div style={{ fontSize: 11, color: color.faint3, fontWeight: 400, marginTop: 2 }}>{g.note}</div>}</div>
+            <div style={{ fontSize: 11.5, color: color.subtle }}>{g.type}</div>
+            <div style={{ fontSize: 11.5, color: color.subtle }}>{g.reviewer || "—"}</div>
+            <div style={{ fontSize: 11.5, color: color.faint, fontFamily: font.mono }}>{g.date || "—"}</div>
+            <div><span style={{ fontSize: 11, fontWeight: 700, color: gs.ink, background: gs.tint, padding: "3px 9px", borderRadius: 6 }}>{g.status}</span></div>
+          </div>
+        );
+      })}
+      {add && projectId && <SecReviewGateModal projectId={projectId} onClose={() => setAdd(false)} />}
+      {open && projectId && <SecReviewGateModal projectId={projectId} gate={open} onClose={() => setOpen(null)} />}
+    </Card>
   );
 }
 

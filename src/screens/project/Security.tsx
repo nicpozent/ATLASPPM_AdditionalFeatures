@@ -10,6 +10,7 @@ import { Card, EmptyBlock, Button, Modal, Input, Select, Textarea } from "@/comp
 import { toastError } from "@/components/Toast";
 import { SectionTitle, DecLabel } from "./shared";
 import { SoaPanel } from "./SoaPanel";
+import { type SecReviewGate, SRG_TYPES, SRG_STATUSES, SRG_STATUS } from "./reviewGates";
 
 interface SecProfile {
   classification: string; residency: string; subjects: string; retention: string;
@@ -33,17 +34,7 @@ const AI_TIER_COLOR: Record<string, { ink: string; tint: string }> = {
   prohibited: { ink: color.dangerInk, tint: color.dangerTint },
 };
 interface SecControl { id: number; code: string; control: string; framework: string; evidence: string; owner: string; status: string; description: string; reason: string; }
-interface SecReviewGate { id: number; name: string; type: string; reviewer: string; status: string; date: string; note: string; }
 interface SecData { canEdit: boolean; profile: SecProfile; controls: SecControl[]; reviewGates: SecReviewGate[]; }
-const SRG_TYPES = ["Security", "Architecture", "Privacy", "Threat model", "Data protection"];
-const SRG_STATUSES = ["Scheduled", "Passed", "Failed", "Waived", "Not required"];
-const SRG_STATUS: Record<string, { ink: string; tint: string }> = {
-  Passed:         { ink: color.successInk, tint: color.successTint },
-  Scheduled:      { ink: color.primaryDark, tint: color.primaryTint2 },
-  Failed:         { ink: color.dangerInk, tint: color.dangerTint },
-  Waived:         { ink: color.warningInk, tint: color.warningTint },
-  "Not required": { ink: color.subtle, tint: color.bg },
-};
 
 const CLASS_OPTS = ["Public", "Internal", "Confidential", "Restricted"];
 const RESIDENCY_OPTS = ["EU / EEA", "Global", "On-prem only"];
@@ -93,12 +84,21 @@ const DPIA_COLOR: Record<string, { ink: string; tint: string }> = {
   Recommended:   { ink: color.warningInk, tint: color.warningTint },
   "Not required":{ ink: color.successInk, tint: color.successTint },
 };
-function dpiaVerdict(p: SecProfile): { level: string; reason: string } {
-  if (p.specialCategory || p.automatedDecisions || p.classification === "Restricted")
-    return { level: "Required", reason: "Special-category data, automated decision-making, or restricted classification triggers a mandatory DPIA under GDPR Art. 35." };
-  if (p.personalData || p.cardholderData)
-    return { level: "Recommended", reason: "Personal or cardholder data is processed — a screening DPIA is recommended to confirm residual risk." };
-  return { level: "Not required", reason: "No personal, special-category or cardholder data identified in scope." };
+// Each in-scope factor contributes its own obligation, so when several toggles
+// are on the banner lists them all (not just the single highest-precedence one).
+// The overall level is still the strongest trigger present.
+function dpiaVerdict(p: SecProfile): { level: string; reasons: string[] } {
+  const reasons: string[] = [];
+  if (p.specialCategory) reasons.push("Special-category data (GDPR Art. 9) — an explicit Art. 9(2) condition is required and a DPIA is mandatory (Art. 35).");
+  if (p.automatedDecisions) reasons.push("Automated decision-making / profiling (Art. 22) — needs a lawful basis, safeguards and meaningful human oversight; a DPIA is mandatory.");
+  if (p.classification === "Restricted") reasons.push("Restricted classification — a DPIA plus heightened access, encryption and logging controls are mandatory for this initiative.");
+  if (p.personalData) reasons.push("Personal data is processed — GDPR applies: a lawful basis, data-subject rights, and an entry in the Records of Processing (Art. 30).");
+  if (p.cardholderData) reasons.push("Cardholder data is in scope — PCI-DSS applies: SAQ/ROC scoping, network segmentation and key management.");
+  const level = p.specialCategory || p.automatedDecisions || p.classification === "Restricted"
+    ? "Required"
+    : p.personalData || p.cardholderData ? "Recommended" : "Not required";
+  if (reasons.length === 0) reasons.push("No personal, special-category or cardholder data identified in scope.");
+  return { level, reasons };
 }
 const SEC_COLS = "0.6fr 1.9fr 0.9fr 1.9fr 1.1fr 0.9fr";
 
@@ -169,10 +169,18 @@ export function Security({ projectId }: { projectId: string | null }) {
         </div>
       </Card>
 
-      {/* DPIA banner */}
+      {/* DPIA banner — lists every in-scope obligation when several toggles are on */}
       <div style={{ border: `1px solid ${dc.ink}`, background: dc.tint, borderRadius: 16, padding: "18px 22px", marginBottom: 16 }}>
         <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 700, color: dc.ink }}>DPIA / PIA — {dpia.level}</div>
-        <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.55, marginTop: 8 }}>{dpia.reason}</div>
+        {dpia.reasons.length === 1 ? (
+          <div style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.55, marginTop: 8 }}>{dpia.reasons[0]}</div>
+        ) : (
+          <ul style={{ margin: "8px 0 0", paddingLeft: 20, listStyle: "disc" }}>
+            {dpia.reasons.map((r, i) => (
+              <li key={i} style={{ fontSize: 13, color: color.textMuted, lineHeight: 1.55, marginTop: i ? 5 : 0 }}>{r}</li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* compliance flags */}
@@ -347,7 +355,7 @@ export function Security({ projectId }: { projectId: string | null }) {
   );
 }
 
-function SecReviewGateModal({ projectId, gate, onClose }: { projectId: string; gate?: SecReviewGate; onClose: () => void }) {
+export function SecReviewGateModal({ projectId, gate, onClose }: { projectId: string; gate?: SecReviewGate; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState(gate?.name ?? "");
   const [type, setType] = useState(gate?.type ?? "Security");
