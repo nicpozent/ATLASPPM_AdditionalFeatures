@@ -75,5 +75,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0066](./0066-statement-of-applicability.md) | ISO 27001 Annex A Statement of Applicability (per-project) | Accepted |
 | [0067](./0067-openbao-secrets-provider.md) | OpenBao / Vault secrets provider (on-prem, KV v2, opt-in) | Accepted |
 | [0068](./0068-personnel-notes-field-encryption.md) | Field encryption (AES-GCM) for DPIA-gated personnel notes | Accepted |
+| [0069](./0069-passwordless-postgres-cert-auth.md) | Passwordless Postgres via TLS client-certificate auth (opt-in) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.
