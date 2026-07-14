@@ -109,6 +109,30 @@ public static class Dependencies
                 new TimelineDepDto(dep.Id, dep.FromType, dep.FromId, dep.ToType, dep.ToId, dep.Source));
         });
 
+        // Derive sprint→sprint dependencies from a project's cross-sprint Jira
+        // issue links (reuses the project Jira sync client). Config- + key-guarded,
+        // idempotent, audited; failures return a clean 502.
+        api.MapPost("/projects/{id}/dependencies/jira-ingest", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
+            var proj = await db.Projects.FindAsync(id);
+            if (proj is null) return Results.NotFound();
+            if (!Jira.JiraConfigured(cfg)) return Results.BadRequest(new { error = "Jira isn't configured — set it up in Integrations first." });
+            if (string.IsNullOrWhiteSpace(proj.JiraProjectKey)) return Results.BadRequest(new { error = "This project isn't linked to a Jira project." });
+            try
+            {
+                using var c = Jira.Client(cfg);
+                var res = await Jira.IngestSprintDependenciesAsync(db, cfg, c, proj);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Dependencies", "Ingested Jira sprint dependencies", $"{id} · +{res.Added}/-{res.Removed}"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { res.Added, res.Removed, res.Truncated });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { error = $"Jira dependency ingest failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
         api.MapDelete("/portfolio/dependencies/{id:int}", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;

@@ -904,6 +904,67 @@ public static class Jira
         return new TestIngestResult(added, updated, removed.Count, truncated);
     }
 
+    public record DepIngestResult(int Added, int Removed, bool Truncated);
+
+    // Ingest cross-sprint Jira issue links as sprint→sprint timeline dependencies.
+    // A task-level "blocks"/"depends" link whose two issues sit in DIFFERENT
+    // sprints of this project implies a sprint dependency (from = the sprint that
+    // depends, to = the upstream sprint). Idempotent: replaces this project's
+    // Jira-sourced sprint edges with the current Jira state. Reuses the sync
+    // client/paging/parsing. Caller owns SaveChanges.
+    public static async Task<DepIngestResult> IngestSprintDependenciesAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, Project p)
+    {
+        var key = p.JiraProjectKey.Trim();
+        if (key.Length == 0) throw new InvalidOperationException("This project has no Jira project key.");
+        var sprintField = string.IsNullOrWhiteSpace(cfg["Jira:SprintField"]) ? "customfield_10020" : cfg["Jira:SprintField"]!.Trim();
+        var truncated = false;
+        var issues = await FetchJqlAsync(c, $"project = \"{key}\" ORDER BY created ASC",
+            $"issuelinks,sprint,closedSprints,{sprintField}", () => truncated = true);
+
+        // Jira sprint id → Atlas sprint id, then each issue key → its Atlas sprint.
+        var sprintByJiraKey = (await db.Sprints.Where(s => s.ProjectId == p.Id && s.JiraKey != "").ToListAsync())
+            .GroupBy(s => s.JiraKey).ToDictionary(g => g.Key, g => g.First().Id);
+        var issueSprint = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var withLinks = new List<(string issue, JsonElement links)>();
+        foreach (var ji in issues)
+        {
+            var ik = Str(ji, "key");
+            if (ik.Length == 0) continue;
+            var f = Prop(ji, "fields") ?? default;
+            var sids = SprintsFromIssue(f, sprintField).Select(js => NumOrStr(js, "id")).Where(x => x.Length > 0).ToList();
+            if (sids.Count > 0 && sprintByJiraKey.TryGetValue(sids[^1], out var sid)) issueSprint[ik] = sid;   // most-recent sprint
+            if (Prop(f, "issuelinks") is { ValueKind: JsonValueKind.Array } links) withLinks.Add((ik, links));
+        }
+
+        var edges = new HashSet<(int from, int to)>();
+        foreach (var (issue, links) in withLinks)
+        {
+            if (!issueSprint.TryGetValue(issue, out var mine)) continue;
+            foreach (var lk in links.EnumerateArray())
+            {
+                var tn = StrPath(lk, "type", "name").ToLowerInvariant();
+                if (!tn.Contains("block") && !tn.Contains("depend")) continue;
+                // outwardIssue: this issue blocks it ⇒ it depends on this (from = other, to = mine)
+                if (Prop(lk, "outwardIssue") is { } outw && Str(outw, "key") is { Length: > 0 } ok
+                    && issueSprint.TryGetValue(ok, out var os) && os != mine) edges.Add((os, mine));
+                // inwardIssue: it blocks this ⇒ this depends on it (from = mine, to = other)
+                if (Prop(lk, "inwardIssue") is { } inw && Str(inw, "key") is { Length: > 0 } ik2
+                    && issueSprint.TryGetValue(ik2, out var isid) && isid != mine) edges.Add((mine, isid));
+            }
+        }
+
+        // Idempotent replace of this project's Jira-sourced sprint edges.
+        var mine2 = sprintByJiraKey.Values.Select(x => x.ToString()).ToHashSet();
+        var stale = (await db.TimelineDependencies
+                .Where(d => d.Source == "jira" && d.FromType == "sprint" && d.ToType == "sprint").ToListAsync())
+            .Where(d => mine2.Contains(d.FromId) || mine2.Contains(d.ToId)).ToList();
+        db.TimelineDependencies.RemoveRange(stale);
+        var ord = await db.TimelineDependencies.Select(d => (int?)d.Ord).MaxAsync() ?? 0;
+        foreach (var (from, to) in edges)
+            db.TimelineDependencies.Add(new TimelineDependency { FromType = "sprint", FromId = from.ToString(), ToType = "sprint", ToId = to.ToString(), Source = "jira", Ord = ++ord });
+        return new DepIngestResult(edges.Count, stale.Count, truncated);
+    }
+
     // Jira priority name → Atlas task Priority (Critical|High|Medium|Low).
     public static string MapPriority(string? name) => (name ?? "").ToLowerInvariant() switch
     {

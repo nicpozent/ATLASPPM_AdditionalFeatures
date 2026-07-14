@@ -157,4 +157,18 @@ public class RaidDependencyTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
             new { fromType = "project", fromId = "PRJ-1", toType = "project", toId = "PRJ-2" })).StatusCode);
     }
+
+    // Jira sprint-dependency ingest is guarded on Jira config + a linked Jira key
+    // (tests run with Jira unconfigured → a clean 400, not a crash), and gated.
+    [Fact]
+    public async Task Jira_dependency_ingest_is_guarded_and_gated()
+    {
+        var c = Admin();
+        var p = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Dep ingest project" }));
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync($"/api/v1/projects/{p}/dependencies/jira-ingest", null)).StatusCode);
+
+        var stk = _factory.CreateClient();
+        stk.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await stk.PostAsync($"/api/v1/projects/{p}/dependencies/jira-ingest", null)).StatusCode);
+    }
 }

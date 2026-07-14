@@ -106,9 +106,12 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   project). The **Portfolio timeline** now renders each dependency as a
   finish-to-start arrow (upstream → downstream) and lets planners hand-draw /
   remove links (cap-projects); the existing project links are folded in
-  automatically. Built from the existing timeline geometry + theme. Jira
-  issue-link ingestion and per-project (sprint-level) arrows are the next
-  increments. Prototype needs the arrow visuals added.
+  automatically. **Sprint-level arrows** also render on the Project timeline
+  (hand-drawn per project) and read-only on the Program timeline, via a DOM-
+  measurement overlay. **Jira issue-link ingest** derives sprint→sprint links
+  from a project's cross-sprint "blocks"/"depends" issue links (separate guarded
+  endpoint reusing the Jira sync client, idempotent, `source` = jira). Built from
+  the existing timeline geometry + theme. Prototype needs the arrow visuals added.
 - **Quality test tasks — full details + Jira board ingest** — a test plan's tasks
   now carry description/steps, start & due dates, assignee and a planned
   time-to-spend, editable in a proper task window (was title + status only). A

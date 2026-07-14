@@ -414,7 +414,13 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
   // Sprint-level dependency arrows: only edges whose BOTH ends are sprints of this
   // project (their ids are among the bars we render). Drawn over the right grid.
   const { edges, canEdit: canLink, add: addDep, remove: removeDep } = usePortfolioDeps();
+  const qc = useQueryClient();
   const [linking, setLinking] = useState(false);
+  const ingestDeps = useMutation({
+    mutationFn: () => api<{ added: number; removed: number }>(`/projects/${projectId}/dependencies/jira-ingest`, { method: "POST" }),
+    onSuccess: (r) => { toast(`Jira dependencies: +${r?.added ?? 0} · -${r?.removed ?? 0}`, "info"); qc.invalidateQueries({ queryKey: ["portfolio-deps"] }); },
+    onError: toastError,
+  });
   const gridRef = useRef<HTMLDivElement>(null);
   const sprintIds = new Set(sprints.map((s) => String(s.id)));
   const sprintEdges = edges.filter((e) => e.fromType === "sprint" && e.toType === "sprint" && sprintIds.has(e.fromId) && sprintIds.has(e.toId));
@@ -555,6 +561,11 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
         </span>
         <span style={{ fontSize: 11, color: color.faint3 }}>{sprintEdges.length} shown</span>
         <div style={{ flex: 1 }} />
+        {canLink && (
+          <Button variant="secondary" onClick={() => ingestDeps.mutate()} disabled={ingestDeps.isPending} title="Derive sprint dependencies from the project's Jira issue links">
+            <Icon name="refresh" size={14} /> {ingestDeps.isPending ? "Ingesting…" : "Ingest from Jira"}
+          </Button>
+        )}
         {canLink && sprints.filter((s) => s.id >= 0).length >= 2 && <Button variant="secondary" onClick={() => setLinking(true)}><Icon name="plus" size={14} /> Link sprint dependency</Button>}
       </div>
     )}
