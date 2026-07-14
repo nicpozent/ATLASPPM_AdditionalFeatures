@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Atlas.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Atlas.Api.Migrations
 {
     [DbContext(typeof(AtlasDbContext))]
-    partial class AtlasDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260714175753_TimelineDependencies")]
+    partial class TimelineDependencies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3780,9 +3783,6 @@ namespace Atlas.Api.Migrations
                     b.Property<int>("Failed")
                         .HasColumnType("integer");
 
-                    b.Property<int>("JiraBoardId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -3820,27 +3820,8 @@ namespace Atlas.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DueDate")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<double>("EstimateHours")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("JiraKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<int>("Ord")
                         .HasColumnType("integer");
-
-                    b.Property<string>("StartDate")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()

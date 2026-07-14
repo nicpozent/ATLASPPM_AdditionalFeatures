@@ -52,6 +52,11 @@ public class GanttTimelineTests : IClassFixture<AtlasApiFactory>
         // Undated sprints are kept (flagged) via the window fallback, so past/
         // current/future sprints all show rather than being dropped.
         Assert.Contains(sprints, s => s.GetProperty("name").GetString() == "Sprint 2 (undated)" && s.GetProperty("undated").GetBoolean());
+        // The dated sprint carries its real ISO dates so the client can place the
+        // bar in its true calendar year (not just anchored month-of-year).
+        var dated = sprints.Single(s => s.GetProperty("name").GetString() == "Sprint 1");
+        Assert.Equal("2026-03-10", dated.GetProperty("startDate").GetString());
+        Assert.Equal("2026-03-24", dated.GetProperty("endDate").GetString());
     }
 
     [Fact]

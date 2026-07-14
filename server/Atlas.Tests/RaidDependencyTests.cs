@@ -94,4 +94,81 @@ public class RaidDependencyTests : IClassFixture<AtlasApiFactory>
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
         Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/projects/PRJ-1/dependencies/PRJ-2")).StatusCode);
     }
+
+    // The portfolio-timeline edge list surfaces the existing project→project links
+    // (source "project") so they render as arrows without a separate migration.
+    [Fact]
+    public async Task Portfolio_dependencies_include_project_links_as_arrows()
+    {
+        var c = Admin();
+        var a = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "PF Consumer" }));
+        var b = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "PF Provider" }));
+        await c.PostAsJsonAsync($"/api/v1/projects/{a}/dependencies", new { dependsOnId = b });
+
+        var edges = (await c.GetFromJsonAsync<JsonElement>("/api/v1/portfolio/dependencies")).GetProperty("edges").EnumerateArray();
+        Assert.Contains(edges, e =>
+            e.GetProperty("fromType").GetString() == "project" && e.GetProperty("fromId").GetString() == a &&
+            e.GetProperty("toType").GetString() == "project" && e.GetProperty("toId").GetString() == b &&
+            e.GetProperty("source").GetString() == "project");
+    }
+
+    // A hand-drawn cross-type link (project → release) round-trips and is removable.
+    [Fact]
+    public async Task Manual_cross_type_dependency_links_and_unlinks()
+    {
+        var c = Admin();
+        var proj = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Ship it" }));
+        var rel = await ProjId(await c.PostAsJsonAsync("/api/v1/releases", new { name = "2026.Q3", target = "2026-09-30" }));
+
+        var created = await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "project", fromId = proj, toType = "release", toId = rel });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = await IntId(created);
+
+        // Duplicate is rejected; self-link is rejected.
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "project", fromId = proj, toType = "release", toId = rel })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "project", fromId = proj, toType = "project", toId = proj })).StatusCode);
+
+        var edges = (await c.GetFromJsonAsync<JsonElement>("/api/v1/portfolio/dependencies")).GetProperty("edges").EnumerateArray();
+        Assert.Contains(edges, e => e.GetProperty("id").GetInt32() == id && e.GetProperty("source").GetString() == "manual"
+            && e.GetProperty("toType").GetString() == "release");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/v1/portfolio/dependencies/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Manual_dependency_rejects_unknown_type_and_missing_item()
+    {
+        var c = Admin();
+        var proj = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Anchor" }));
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "widget", fromId = proj, toType = "project", toId = proj })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "project", fromId = proj, toType = "project", toId = "PRJ-does-not-exist" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Linking_a_portfolio_dependency_needs_edit_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsJsonAsync("/api/v1/portfolio/dependencies",
+            new { fromType = "project", fromId = "PRJ-1", toType = "project", toId = "PRJ-2" })).StatusCode);
+    }
+
+    // Jira sprint-dependency ingest is guarded on Jira config + a linked Jira key
+    // (tests run with Jira unconfigured → a clean 400, not a crash), and gated.
+    [Fact]
+    public async Task Jira_dependency_ingest_is_guarded_and_gated()
+    {
+        var c = Admin();
+        var p = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Dep ingest project" }));
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync($"/api/v1/projects/{p}/dependencies/jira-ingest", null)).StatusCode);
+
+        var stk = _factory.CreateClient();
+        stk.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await stk.PostAsync($"/api/v1/projects/{p}/dependencies/jira-ingest", null)).StatusCode);
+    }
 }

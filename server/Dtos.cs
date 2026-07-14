@@ -100,9 +100,10 @@ public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto>
     List<ArchApprovalDto> Approvals, string ArbStatus);
 public record SetArbDecisionReq(string Decision, string? Note);
 
-public record TestPlanTaskDto(int Id, string Title, string Status, string Assignee);
+public record TestPlanTaskDto(int Id, string Title, string Status, string Assignee,
+    string Description, string StartDate, string DueDate, double EstimateHours, string JiraKey);
 public record TestPlanDto(int Id, string Name, string Stage, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct,
-    List<TestPlanTaskDto> Tasks);
+    int JiraBoardId, List<TestPlanTaskDto> Tasks);
 public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);
 public record QualityTotalsDto(int Cases, int Coverage, int PassRate, int Failed, int OpenDefects);
 public record QualityDto(bool CanEdit, QualityTotalsDto Totals, List<TestPlanDto> Plans, List<DefectDto> Defects);
@@ -150,8 +151,12 @@ public record MilestoneDto(int Id, string Label, int Month, string Date);
 public record GanttDto(bool CanEdit, List<PhaseDto> Phases, List<MilestoneDto> Milestones,
     int? ProjectStart = null, int? ProjectEnd = null, string StartDate = "", string EndDate = "",
     List<GanttSprintDto>? Sprints = null);
-// A sprint bar on a timeline (months on the year grid; Undated ⇒ dates TBD in Jira).
-public record GanttSprintDto(int Id, string Name, string Status, int StartMonth, int EndMonth, bool Undated);
+// A sprint bar on a timeline. StartMonth/EndMonth are the month-of-year fallback
+// (Undated ⇒ dates TBD in Jira, anchored to the project year); StartDate/EndDate
+// carry the real ISO dates so the client can place the bar in its true calendar
+// year rather than collapsing every year onto the project's base year.
+public record GanttSprintDto(int Id, string Name, string Status, int StartMonth, int EndMonth, bool Undated,
+    string StartDate = "", string EndDate = "");
 // A program row now carries the project's own window + sprint bars (not just
 // phases) so the program timeline shows a schedule derived from projects, tasks
 // and sprints — see ADR-0029.
@@ -163,6 +168,14 @@ public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> 
 // Portfolio-wide timeline: one bar per entity on the 12-month grid.
 public record PortfolioGanttItemDto(string Type, string Id, string Name, string Status, int StartMonth, int EndMonth, int? Progress, string StartLabel, string EndLabel);
 public record PortfolioGanttDto(List<PortfolioGanttItemDto> Items);
+
+// A dependency edge drawn as a timeline arrow: (FromType,FromId) depends on
+// (ToType,ToId) — arrow points To → From. Source = manual | jira | project
+// (derived from the existing project→project links). Id is 0 for derived edges
+// that can't be deleted from here.
+public record TimelineDepDto(int Id, string FromType, string FromId, string ToType, string ToId, string Source);
+public record TimelineDepsDto(bool CanEdit, List<TimelineDepDto> Edges);
+public record CreateTimelineDepReq(string? FromType, string? FromId, string? ToType, string? ToId);
 
 // ---- Ways of working (methodology-specific ceremonies & artifacts) ---------
 public record WowItemDto(string Label, string Detail);
@@ -385,4 +398,4 @@ public record UnonboardedDto(string Name, List<string> Projects);
 // ---- Skills matrix ---------------------------------------------------------
 public record SkillDto(int Id, string Name);
 public record SkillRatingDto(int SkillId, string Person, int Level);
-public record SkillsMatrixDto(bool CanEdit, List<SkillDto> Skills, List<string> People, List<SkillRatingDto> Ratings);
+public record SkillsMatrixDto(bool CanEdit, bool CanView, List<SkillDto> Skills, List<string> People, List<SkillRatingDto> Ratings);

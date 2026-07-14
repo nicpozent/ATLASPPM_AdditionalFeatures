@@ -921,6 +921,23 @@ public class ProjectDependency
     public int Ord { get; set; }
 }
 
+// ---- Timeline dependencies (generic cross-entity links) -------------------
+// A directed dependency drawn as an arrow on the portfolio/timeline views:
+// (FromType,FromId) depends on (ToType,ToId) — To is upstream/predecessor, so the
+// arrow points To → From. Types are project | program | product | release |
+// sprint. Source distinguishes hand-drawn links from ones ingested from Jira
+// issue links, so the sync can own its rows without clobbering manual ones.
+public class TimelineDependency
+{
+    public int Id { get; set; }
+    public string FromType { get; set; } = "project";
+    public string FromId { get; set; } = default!;
+    public string ToType { get; set; } = "project";
+    public string ToId { get; set; } = default!;
+    public string Source { get; set; } = "manual";   // manual | jira
+    public int Ord { get; set; }
+}
+
 // ---- Quality (test plans & defects) ---------------------------------------
 public class TestPlan
 {
@@ -933,6 +950,7 @@ public class TestPlan
     public int Failed { get; set; }
     public int Blocked { get; set; }
     public int Ord { get; set; }
+    public int JiraBoardId { get; set; }                 // linked Jira agile board; 0 ⇒ none. Ingested issues land as tasks.
     public List<TestPlanTask> Tasks { get; set; } = new();
 }
 
@@ -944,6 +962,11 @@ public class TestPlanTask
     public string Title { get; set; } = default!;
     public string Status { get; set; } = "Not run";      // Not run | In test | Passed | Failed | Blocked
     public string Assignee { get; set; } = "";
+    public string Description { get; set; } = "";         // steps / expected result / notes
+    public string StartDate { get; set; } = "";           // ISO date the test work starts
+    public string DueDate { get; set; } = "";             // ISO date it's due
+    public double EstimateHours { get; set; }             // planned time to spend (hours)
+    public string JiraKey { get; set; } = "";             // source Jira issue key when ingested; "" = local
     public int Ord { get; set; }
 }
 
@@ -1291,6 +1314,7 @@ public class Skill
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public int Ord { get; set; }
+    public string Team { get; set; } = "";              // owning manager slot (teammgr/svcmgr/…); "" = shared/legacy, visible to every manager
 }
 public class SkillRating
 {

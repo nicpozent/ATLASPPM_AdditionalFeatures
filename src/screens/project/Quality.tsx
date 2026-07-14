@@ -5,13 +5,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
-import { Card, EmptyBlock, Button, Modal, Input, Select } from "@/components/ui";
-import { toastError } from "@/components/Toast";
+import { Card, EmptyBlock, Button, Modal, Input, Select, Textarea } from "@/components/ui";
+import { toast, toastError } from "@/components/Toast";
 import { DecLabel } from "./shared";
 import { sectionTitleS } from "./util";
 
-interface PlanTask { id: number; title: string; status: string; assignee: string; }
-interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; tasks: PlanTask[]; }
+interface PlanTask { id: number; title: string; status: string; assignee: string; description: string; startDate: string; dueDate: string; estimateHours: number; jiraKey: string; }
+interface TestPlan { id: number; name: string; stage: string; cases: number; passed: number; failed: number; blocked: number; notRun: number; execPct: number; jiraBoardId: number; tasks: PlanTask[]; }
 const PLAN_TASK_STATUSES = ["Not run", "In test", "Passed", "Failed", "Blocked"];
 const PLAN_TASK_COLOR: Record<string, { ink: string; tint: string }> = {
   Passed: { ink: color.successInk, tint: color.successTint }, "In test": { ink: color.primaryDark, tint: color.primaryTint2 },
@@ -142,56 +142,133 @@ export function Quality({ projectId }: { projectId: string | null }) {
   );
 }
 
+// A short date like "12 Mar" from an ISO date, or "" — for the compact task row.
+function shortDate(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
 function PlanTasks({ projectId, plan, canEdit }: { projectId: string; plan: TestPlan; canEdit: boolean }) {
   const qc = useQueryClient();
-  const [title, setTitle] = useState("");
+  const [modal, setModal] = useState(false);
+  const [openTask, setOpenTask] = useState<PlanTask | null>(null);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
-  const add = useMutation({
-    mutationFn: () => api(`/test-plans/${plan.id}/tasks`, { method: "POST", body: JSON.stringify({ title: title.trim() }) }),
-    onSuccess: () => { setTitle(""); invalidate(); },
-    onError: (e) => toastError(e),
-  });
+  // Quick inline status change without opening the full window.
   const setStatus = useMutation({
     mutationFn: (v: { id: number; status: string }) => api(`/test-plan-tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
     onSuccess: invalidate, onError: (e) => toastError(e),
   });
-  const del = useMutation({
-    mutationFn: (id: number) => api(`/test-plan-tasks/${id}`, { method: "DELETE" }),
-    onSuccess: invalidate, onError: (e) => toastError(e),
+  const ingest = useMutation({
+    mutationFn: () => api<{ added: number; updated: number; removed: number }>(`/test-plans/${plan.id}/jira-ingest`, { method: "POST" }),
+    onSuccess: (r) => { toast(`Jira ingest: +${r?.added ?? 0} new · ${r?.updated ?? 0} updated · ${r?.removed ?? 0} removed`, "info"); invalidate(); },
+    onError: (e) => toastError(e),
   });
 
   return (
     <div style={{ marginTop: 11, paddingTop: 11, borderTop: `1px dashed ${color.border3}` }}>
       {plan.tasks.length === 0 ? (
-        <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: canEdit ? 9 : 0 }}>No test cases on this plan yet.</div>
+        <div style={{ fontSize: 11.5, color: color.faint3, marginBottom: canEdit ? 9 : 0 }}>No test tasks on this plan yet.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: canEdit ? 10 : 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: canEdit ? 10 : 0 }}>
           {plan.tasks.map((t) => {
             const sc = PLAN_TASK_COLOR[t.status] ?? PLAN_TASK_COLOR["Not run"];
+            const meta = [t.assignee, shortDate(t.dueDate) && `due ${shortDate(t.dueDate)}`, t.estimateHours > 0 && `${t.estimateHours}h`].filter(Boolean).join(" · ");
             return (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12.5 }}>
-                <span style={{ flex: 1, color: color.text }}>{t.title}{t.assignee && <span style={{ color: color.faint3 }}> · {t.assignee}</span>}</span>
+              <div key={t.id} onClick={() => canEdit && setOpenTask(t)} title={canEdit ? "Open test task" : undefined}
+                style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, padding: "5px 8px", borderRadius: 8, cursor: canEdit ? "pointer" : "default" }}>
+                {t.jiraKey && <span style={{ fontFamily: font.mono, fontSize: 10, fontWeight: 700, color: color.primaryDark, background: color.primaryTint2, padding: "1px 6px", borderRadius: 5, flex: "none" }}>{t.jiraKey}</span>}
+                <span style={{ flex: 1, minWidth: 0, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {t.title}{meta && <span style={{ color: color.faint3 }}> · {meta}</span>}
+                </span>
                 {canEdit ? (
-                  <select value={t.status} onChange={(e) => setStatus.mutate({ id: t.id, status: e.target.value })}
-                    style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, border: "none", borderRadius: 20, padding: "3px 8px", fontFamily: "inherit", cursor: "pointer" }}>
+                  <select value={t.status} onClick={(e) => e.stopPropagation()} onChange={(e) => setStatus.mutate({ id: t.id, status: e.target.value })}
+                    style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, border: "none", borderRadius: 20, padding: "3px 8px", fontFamily: "inherit", cursor: "pointer", flex: "none" }}>
                     {PLAN_TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 ) : (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 8px", borderRadius: 20 }}>{t.status}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: sc.ink, background: sc.tint, padding: "3px 8px", borderRadius: 20, flex: "none" }}>{t.status}</span>
                 )}
-                {canEdit && <button onClick={() => del.mutate(t.id)} title="Remove" style={{ background: "none", border: "none", cursor: "pointer", color: color.dangerInk, display: "inline-flex" }}><Icon name="trash" size={13} /></button>}
               </div>
             );
           })}
         </div>
       )}
       {canEdit && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a test case…" onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) add.mutate(); }} style={{ flex: 1, fontSize: 12.5, padding: "6px 10px" }} />
-          <Button variant="secondary" onClick={() => title.trim() && add.mutate()} disabled={add.isPending || !title.trim()}>Add</Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Button variant="secondary" onClick={() => setModal(true)}><Icon name="plus" size={14} /> Add test task</Button>
+          {plan.jiraBoardId > 0 && (
+            <Button variant="secondary" onClick={() => ingest.mutate()} disabled={ingest.isPending} title={`Pull issues from Jira board ${plan.jiraBoardId}`}>
+              <Icon name="refresh" size={14} /> {ingest.isPending ? "Ingesting…" : `Ingest from Jira (board ${plan.jiraBoardId})`}
+            </Button>
+          )}
         </div>
       )}
+      {modal && <PlanTaskModal projectId={projectId} planId={plan.id} onClose={() => setModal(false)} />}
+      {openTask && <PlanTaskModal projectId={projectId} planId={plan.id} task={openTask} onClose={() => setOpenTask(null)} />}
     </div>
+  );
+}
+
+// Full test-task window: title, description/steps, status, assignee, start & due
+// dates and the planned time to spend.
+function PlanTaskModal({ projectId, planId, task, onClose }: { projectId: string; planId: number; task?: PlanTask; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({
+    title: task?.title ?? "", status: task?.status ?? "Not run", assignee: task?.assignee ?? "",
+    description: task?.description ?? "", startDate: task?.startDate ?? "", dueDate: task?.dueDate ?? "",
+    estimateHours: task?.estimateHours ? String(task.estimateHours) : "",
+  });
+  const [confirmDel, setConfirmDel] = useState(false);
+  const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
+  const body = () => JSON.stringify({
+    title: f.title.trim(), status: f.status, assignee: f.assignee.trim(),
+    description: f.description.trim(), startDate: f.startDate, dueDate: f.dueDate,
+    estimateHours: Number(f.estimateHours) || 0,
+  });
+  const save = useMutation({
+    mutationFn: () => task
+      ? api(`/test-plan-tasks/${task.id}`, { method: "PATCH", body: body() })
+      : api(`/test-plans/${planId}/tasks`, { method: "POST", body: body() }),
+    onSuccess: () => { invalidate(); onClose(); }, onError: (e) => toastError(e),
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/test-plan-tasks/${task!.id}`, { method: "DELETE" }),
+    onSuccess: () => { invalidate(); onClose(); }, onError: (e) => toastError(e),
+  });
+  const dateWrong = !!f.startDate && !!f.dueDate && f.dueDate < f.startDate;
+  return (
+    <Modal onClose={onClose} width={520} label={task ? (task.jiraKey ? `${task.jiraKey} · Test task` : "Test task") : "New test task"}>
+      <DecLabel>Title</DecLabel>
+      <Input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Verify checkout with expired card" style={{ marginBottom: 14 }} />
+      <DecLabel>Details / steps</DecLabel>
+      <Textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Preconditions, steps and expected result…" style={{ marginBottom: 14, width: "100%", resize: "vertical" }} />
+      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+        <div style={{ flex: 1 }}><DecLabel>Status</DecLabel><Select value={f.status} onChange={(e) => set("status", e.target.value)}>{PLAN_TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+        <div style={{ flex: 1 }}><DecLabel>Assignee</DecLabel><Input value={f.assignee} onChange={(e) => set("assignee", e.target.value)} placeholder="Who runs it?" /></div>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}><DecLabel>Start date</DecLabel><Input type="date" value={f.startDate} onChange={(e) => set("startDate", e.target.value)} /></div>
+        <div style={{ flex: 1 }}><DecLabel>Due date</DecLabel><Input type="date" value={f.dueDate} min={f.startDate || undefined} onChange={(e) => set("dueDate", e.target.value)} /></div>
+        <div style={{ flex: 1 }}><DecLabel>Time to spend (h)</DecLabel><Input type="number" min={0} step={0.5} value={f.estimateHours} onChange={(e) => set("estimateHours", e.target.value)} placeholder="0" /></div>
+      </div>
+      {dateWrong && <div style={{ fontSize: 11.5, color: color.dangerInk, marginTop: 8 }}>Due date is before the start date.</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
+        {task && (confirmDel ? (
+          <>
+            <span style={{ fontSize: 12, color: color.dangerInk, fontWeight: 600 }}>Delete this task?</span>
+            <Button onClick={() => del.mutate()} disabled={del.isPending} style={{ background: "#D13438", borderColor: color.danger }}>{del.isPending ? "Deleting…" : "Confirm"}</Button>
+            <Button variant="secondary" onClick={() => setConfirmDel(false)}>Keep</Button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.dangerInk, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px" }}><Icon name="trash" size={15} /> Delete</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => f.title.trim() && !dateWrong && save.mutate()} disabled={save.isPending || !f.title.trim() || dateWrong}>{save.isPending ? "Saving…" : task ? "Save changes" : "Add task"}</Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -200,11 +277,12 @@ function PlanModal({ projectId, plan, onClose }: { projectId: string; plan?: Tes
   const [f, setF] = useState({
     name: plan?.name ?? "", stage: plan?.stage ?? "System",
     cases: String(plan?.cases ?? ""), passed: String(plan?.passed ?? ""), failed: String(plan?.failed ?? ""), blocked: String(plan?.blocked ?? ""),
+    jiraBoardId: plan?.jiraBoardId ? String(plan.jiraBoardId) : "",
   });
   const [confirmDel, setConfirmDel] = useState(false);
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }));
   const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
-  const body = () => JSON.stringify({ name: f.name.trim(), stage: f.stage, cases: Number(f.cases) || 0, passed: Number(f.passed) || 0, failed: Number(f.failed) || 0, blocked: Number(f.blocked) || 0 });
+  const body = () => JSON.stringify({ name: f.name.trim(), stage: f.stage, cases: Number(f.cases) || 0, passed: Number(f.passed) || 0, failed: Number(f.failed) || 0, blocked: Number(f.blocked) || 0, jiraBoardId: Number(f.jiraBoardId) || 0 });
   const save = useMutation({
     mutationFn: () => plan ? api(`/test-plans/${plan.id}`, { method: "PATCH", body: body() }) : api(`/projects/${projectId}/test-plans`, { method: "POST", body: body() }),
     onSuccess: () => { invalidate(); onClose(); },
@@ -226,6 +304,11 @@ function PlanModal({ projectId, plan, onClose }: { projectId: string; plan?: Tes
         <div style={{ flex: 1 }}><DecLabel>Passed</DecLabel><Input type="number" min={0} value={f.passed} onChange={(e) => set("passed", e.target.value)} placeholder="0" /></div>
         <div style={{ flex: 1 }}><DecLabel>Failed</DecLabel><Input type="number" min={0} value={f.failed} onChange={(e) => set("failed", e.target.value)} placeholder="0" /></div>
         <div style={{ flex: 1 }}><DecLabel>Blocked</DecLabel><Input type="number" min={0} value={f.blocked} onChange={(e) => set("blocked", e.target.value)} placeholder="0" /></div>
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <DecLabel>Linked Jira board id</DecLabel>
+        <Input type="number" min={0} value={f.jiraBoardId} onChange={(e) => set("jiraBoardId", e.target.value)} placeholder="e.g. 42 — leave blank for none" />
+        <div style={{ fontSize: 11, color: color.faint3, marginTop: 4 }}>Link an agile board to pull its issues into this plan's tasks (Integrations → Jira must be configured). Ingest from the plan's task list.</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 20 }}>
         {plan && (confirmDel ? (

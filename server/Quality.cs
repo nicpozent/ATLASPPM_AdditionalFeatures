@@ -2,12 +2,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Atlas.Api;
 
-public record CreateTestPlanReq(string Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked);
-public record UpdateTestPlanReq(string? Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked);
+public record CreateTestPlanReq(string Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked, int? JiraBoardId);
+public record UpdateTestPlanReq(string? Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked, int? JiraBoardId);
 public record CreateDefectReq(string Title, string? Severity, string? Owner, string? Status, string? Test);
 public record UpdateDefectReq(string? Title, string? Severity, string? Owner, string? Status, string? Test);
-public record CreatePlanTaskReq(string Title, string? Status, string? Assignee);
-public record UpdatePlanTaskReq(string? Title, string? Status, string? Assignee);
+public record CreatePlanTaskReq(string Title, string? Status, string? Assignee,
+    string? Description, string? StartDate, string? DueDate, double? EstimateHours);
+public record UpdatePlanTaskReq(string? Title, string? Status, string? Assignee,
+    string? Description, string? StartDate, string? DueDate, double? EstimateHours);
 
 // ============================================================================
 //  Quality — test plans (execution breakdown) and defects for a project.
@@ -58,7 +60,8 @@ public static class Quality
             var ord = (await db.TestPlans.Where(p => p.ProjectId == id).Select(p => (int?)p.Ord).MaxAsync() ?? 0) + 1;
             var plan = new TestPlan { ProjectId = id, Ord = ord, Name = req.Name.Trim(),
                 Stage = Stages.Contains(req.Stage) ? req.Stage! : "System",
-                Cases = cases, Passed = passed, Failed = failed, Blocked = blocked };
+                Cases = cases, Passed = passed, Failed = failed, Blocked = blocked,
+                JiraBoardId = Math.Max(0, req.JiraBoardId ?? 0) };
             db.TestPlans.Add(plan);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Added test plan", $"{id} · {plan.Name}"));
             await db.SaveChangesAsync();
@@ -105,6 +108,7 @@ public static class Quality
             if (req.Passed is not null) plan.Passed = Math.Max(0, req.Passed.Value);
             if (req.Failed is not null) plan.Failed = Math.Max(0, req.Failed.Value);
             if (req.Blocked is not null) plan.Blocked = Math.Max(0, req.Blocked.Value);
+            if (req.JiraBoardId is not null) plan.JiraBoardId = Math.Max(0, req.JiraBoardId.Value);
             if (plan.Passed + plan.Failed + plan.Blocked > plan.Cases)
                 return Results.BadRequest(new { error = "Passed + failed + blocked cannot exceed total cases." });
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Updated test plan", $"{plan.ProjectId} · {plan.Name}"));
@@ -173,11 +177,15 @@ public static class Quality
                 TestPlanId = planId, Ord = ord, Title = req.Title.Trim(),
                 Status = PlanTaskStatuses.Contains(req.Status) ? req.Status! : "Not run",
                 Assignee = req.Assignee?.Trim() ?? "",
+                Description = req.Description?.Trim() ?? "",
+                StartDate = req.StartDate?.Trim() ?? "",
+                DueDate = req.DueDate?.Trim() ?? "",
+                EstimateHours = Math.Max(0, req.EstimateHours ?? 0),
             };
             db.TestPlanTasks.Add(t);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Added test-plan task", $"plan {planId} · {t.Title}"));
             await db.SaveChangesAsync();
-            return Results.Ok(new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee));
+            return Results.Ok(ToTaskDto(t));
         });
 
         api.MapPatch("/test-plan-tasks/{taskId:int}", async (int taskId, UpdatePlanTaskReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -196,8 +204,12 @@ public static class Quality
                 t.Status = req.Status;
             }
             if (req.Assignee is not null) t.Assignee = req.Assignee.Trim();
+            if (req.Description is not null) t.Description = req.Description.Trim();
+            if (req.StartDate is not null) t.StartDate = req.StartDate.Trim();
+            if (req.DueDate is not null) t.DueDate = req.DueDate.Trim();
+            if (req.EstimateHours is not null) t.EstimateHours = Math.Max(0, req.EstimateHours.Value);
             await db.SaveChangesAsync();
-            return Results.Ok(new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee));
+            return Results.Ok(ToTaskDto(t));
         });
 
         api.MapDelete("/test-plan-tasks/{taskId:int}", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
@@ -209,6 +221,31 @@ public static class Quality
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+
+        // Pull the plan's linked Jira board into its tasks — reuses the project
+        // Jira sync's client/paging/parsing (idempotent by issue key). Requires
+        // Jira configured and a board linked on the plan.
+        api.MapPost("/test-plans/{planId:int}/jira-ingest", async (int planId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            if (await Permissions.Deny(http, db, cfg, "cap-quality", "E") is { } denied) return denied;
+            var plan = await db.TestPlans.FindAsync(planId);
+            if (plan is null) return Results.NotFound();
+            if (!Jira.JiraConfigured(cfg)) return Results.BadRequest(new { error = "Jira isn't configured — set it up in Integrations first." });
+            if (plan.JiraBoardId <= 0) return Results.BadRequest(new { error = "Link a Jira board to this plan first." });
+            try
+            {
+                using var c = Jira.Client(cfg);
+                var res = await Jira.IngestTestTasksAsync(db, cfg, c, plan);
+                db.AuditEvents.Add(Permissions.Audit(http, cfg, "Quality", "Ingested Jira test tasks",
+                    $"plan {planId} · board {plan.JiraBoardId} · +{res.Added}/~{res.Updated}/-{res.Removed}"));
+                await db.SaveChangesAsync();
+                return Results.Ok(new { res.Added, res.Updated, res.Removed, res.Truncated });
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { error = $"Jira ingest failed: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
     }
 
     static TestPlanDto ToPlanDto(TestPlan p)
@@ -216,6 +253,9 @@ public static class Quality
         var notRun = Math.Max(0, p.Cases - p.Passed - p.Failed - p.Blocked);
         var execPct = p.Cases == 0 ? 0 : (int)Math.Round(100.0 * (p.Passed + p.Failed + p.Blocked) / p.Cases);
         return new TestPlanDto(p.Id, p.Name, p.Stage, p.Cases, p.Passed, p.Failed, p.Blocked, notRun, execPct,
-            p.Tasks.OrderBy(t => t.Ord).Select(t => new TestPlanTaskDto(t.Id, t.Title, t.Status, t.Assignee)).ToList());
+            p.JiraBoardId, p.Tasks.OrderBy(t => t.Ord).Select(ToTaskDto).ToList());
     }
+
+    static TestPlanTaskDto ToTaskDto(TestPlanTask t) =>
+        new(t.Id, t.Title, t.Status, t.Assignee, t.Description, t.StartDate, t.DueDate, t.EstimateHours, t.JiraKey);
 }

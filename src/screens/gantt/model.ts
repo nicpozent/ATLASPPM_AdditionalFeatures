@@ -75,3 +75,17 @@ export const segPct = (a0: number, a1: number, win: Win) => spanPct(a0, a1, win,
 // Centre-of-month position (%) within the window, or null when outside it.
 export const centerPct = (abs: number, win: Win): number | null =>
   abs < win.start || abs > win.start + win.span - 1 ? null : (abs - win.start + 0.5) / win.span * 100;
+
+// Fit a From/To window (as "YYYY-MM") around a set of absolute-month positions —
+// the span of a project's content (window, phases, sprints, milestones) — with a
+// month of padding each side, a 12-month minimum so a short project still fills
+// the grid, and the MAX_SPAN cap. Null when there's nothing to fit. Used to open
+// the timeline on the selected project's own years instead of the current one.
+export function fitWindowYM(abs: number[]): { from: string; to: string } | null {
+  if (abs.length === 0) return null;
+  let lo = Math.min(...abs) - 1, hi = Math.max(...abs) + 1;
+  const span = hi - lo + 1;
+  if (span < 12) { const pad = 12 - span; lo -= Math.floor(pad / 2); hi += Math.ceil(pad / 2); }
+  if (span > MAX_SPAN) hi = lo + MAX_SPAN - 1;
+  return { from: absToYm(lo), to: absToYm(hi) };
+}

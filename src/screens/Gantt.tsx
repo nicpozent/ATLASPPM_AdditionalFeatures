@@ -1,13 +1,14 @@
-import { useState, useMemo, useRef, createContext, useContext } from "react";
+import { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
+import { toast, toastError } from "@/components/Toast";
 import { Overlay } from "./Demands";
 import {
   type Win, MONTHS, nowAbs, monthOfIso, absOfIso, ymToAbs, absToYm,
-  monthAbbr, yearOf, anchored, makeWindow, segPct, barGeom, centerPct,
+  monthAbbr, yearOf, anchored, makeWindow, fitWindowYM, segPct, barGeom, centerPct,
 } from "./gantt/model";
 
 const VIEW_TABS = [["schedule", "Schedule"], ["tasks", "Tasks"], ["resources", "Resource allocation"], ["sprints", "Sprints"]] as const;
@@ -16,12 +17,17 @@ type ViewId = (typeof VIEW_TABS)[number][0];
 interface Phase { id: number; name: string; startMonth: number; endMonth: number; progress: number; }
 interface Milestone { id: number; label: string; month: number; date: string; }
 interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; projectStart?: number | null; projectEnd?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
-interface ProgramSprint { id: number; name: string; status: string; startMonth: number; endMonth: number; undated: boolean; }
+interface ProgramSprint { id: number; name: string; status: string; startMonth: number; endMonth: number; undated: boolean; startDate?: string; endDate?: string; }
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; startMonth?: number | null; endMonth?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
 interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
 type PortfolioCat = "all" | "project" | "program" | "product" | "release";
+// A dependency edge on the timeline: (fromType,fromId) depends on (toType,toId),
+// so the arrow points to → from. `source` is manual | jira | project.
+interface TimelineDep { id: number; fromType: string; fromId: string; toType: string; toId: string; source: string; }
+// A laid-out bar's position for arrow routing: 0-based row + left/width in %.
+interface BarPos { row: number; left: number; width: number; }
 interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
 interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; jiraCreated?: string; startedAt?: string; resolvedAt?: string; assignee?: string; }
 const TASK_BAR: Record<string, { bg: string; border: string }> = {
@@ -110,7 +116,7 @@ export default function Gantt() {
       allTasks.filter((t) => t.sprint === name).map((t) => {
         const ta = monthOfIso(t.startDate), tb = monthOfIso(t.targetDate);
         const ts = ta ?? tb ?? start, te = tb ?? ta ?? end;
-        return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te) };
+        return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te), startDate: t.startDate, endDate: t.targetDate };
       });
 
     // Prefer the server-computed sprint bars from the gantt endpoint — the same
@@ -122,6 +128,7 @@ export default function Gantt() {
       return serverBars.map((s) => ({
         id: s.id, name: s.name, status: s.status, startMonth: s.startMonth, endMonth: s.endMonth,
         tasks: taskBars(s.name, s.startMonth, s.endMonth), undated: s.undated,
+        startDate: s.startDate, endDate: s.endDate,
       }));
     }
 
@@ -134,7 +141,7 @@ export default function Gantt() {
         const undated = a === null && b === null;
         if (undated) { a = gantt?.projectStart ?? nowM; b = gantt?.projectEnd ?? nowM; }
         const start = Math.min(a ?? b!, b ?? a!), end = Math.max(a ?? b!, b ?? a!);
-        return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks: taskBars(s.name, start, end), undated };
+        return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks: taskBars(s.name, start, end), undated, startDate: s.startDate, endDate: s.endDate };
       });
     }
 
@@ -151,6 +158,32 @@ export default function Gantt() {
       return { id: -1 - i, name, status: "Planned", startMonth: start, endMonth: end, tasks: taskBars(name, start, end), undated };
     });
   }, [sprintData, taskData, gantt]);
+
+  // Auto-fit the visible window to the selected project's actual span. Without
+  // this the window stays on the current calendar year, so a project whose
+  // phases/sprints live in another year shows an empty schedule ("sprints don't
+  // show"). We fit once per project (tracked by id) so manual window edits stick.
+  const fitYM = useMemo<{ from: string; to: string } | null>(() => {
+    if (scope !== "project" || !activeProjectId || !gantt) return null;
+    const base = yearOf(absOfIso(gantt.startDate) ?? nowAbs()) * 12;
+    const abs: number[] = [];
+    const add = (v: number | null | undefined) => { if (v != null) abs.push(v); };
+    add(absOfIso(gantt.startDate)); add(absOfIso(gantt.endDate));
+    (gantt.phases ?? []).forEach((p) => { abs.push(anchored(base, p.startMonth), anchored(base, p.endMonth)); });
+    sprintBars.forEach((s) => {
+      abs.push(absOfIso(s.startDate) ?? anchored(base, s.startMonth));
+      abs.push(absOfIso(s.endDate) ?? anchored(base, s.endMonth));
+    });
+    (gantt.milestones ?? []).forEach((m) => add(absOfIso(m.date) ?? base + m.month));
+    return fitWindowYM(abs);
+  }, [scope, activeProjectId, gantt, sprintBars]);
+
+  const fitRef = useRef<string>("");
+  useEffect(() => {
+    if (fitYM && activeProjectId && fitRef.current !== activeProjectId) {
+      setFromYM(fitYM.from); setToYM(fitYM.to); fitRef.current = activeProjectId;
+    }
+  }, [fitYM, activeProjectId]);
 
   const canEdit = scope === "project" && (gantt?.canEdit ?? false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gantt"] });
@@ -265,6 +298,7 @@ export default function Gantt() {
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
             : <ProjectSchedule
                 phases={gantt?.phases ?? []} milestones={milestones} canEdit={canEdit} hasProject={!!activeProjectId}
+                projectId={activeProjectId}
                 projectStart={effProjectStart} projectEnd={effProjectEnd}
                 startDate={gantt?.startDate ?? ""} endDate={gantt?.endDate ?? ""} sprints={sprintBars}
                 onAddPhase={() => setAddPhase(true)} onEditPhase={setEditPhase} onRemovePhase={(id) => removePhase.mutate(id)}
@@ -348,8 +382,8 @@ function NowLine() {
 }
 
 // ---- Project schedule ------------------------------------------------------
-interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
-interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; }
+interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; startDate?: string; endDate?: string; }
+interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; startDate?: string; endDate?: string; }
 const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Started:   { bg: color.successTint,  border: color.success },
   Completed: { bg: color.primaryTint2, border: color.primary },
@@ -360,8 +394,8 @@ const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Active:    { bg: color.successTint,  border: color.success },
   Closed:    { bg: color.primaryTint2, border: color.primary },
 };
-function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
-  phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean;
+function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
+  phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean; projectId: string;
   projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string; sprints?: SprintBar[];
   onAddPhase: () => void; onEditPhase: (p: Phase) => void; onRemovePhase: (id: number) => void;
   onAddMilestone: () => void; onRemoveMilestone: (id: number) => void;
@@ -377,11 +411,27 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
   const hasWindow = projectStart != null && projectEnd != null;
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set());
   const toggleSprint = (id: number) => setOpenSprints((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // Sprint-level dependency arrows: only edges whose BOTH ends are sprints of this
+  // project (their ids are among the bars we render). Drawn over the right grid.
+  const { edges, canEdit: canLink, add: addDep, remove: removeDep } = usePortfolioDeps();
+  const qc = useQueryClient();
+  const [linking, setLinking] = useState(false);
+  const ingestDeps = useMutation({
+    mutationFn: () => api<{ added: number; removed: number }>(`/projects/${projectId}/dependencies/jira-ingest`, { method: "POST" }),
+    onSuccess: (r) => { toast(`Jira dependencies: +${r?.added ?? 0} · -${r?.removed ?? 0}`, "info"); qc.invalidateQueries({ queryKey: ["portfolio-deps"] }); },
+    onError: toastError,
+  });
+  const gridRef = useRef<HTMLDivElement>(null);
+  const sprintIds = new Set(sprints.map((s) => String(s.id)));
+  const sprintEdges = edges.filter((e) => e.fromType === "sprint" && e.toType === "sprint" && sprintIds.has(e.fromId) && sprintIds.has(e.toId));
+  const sprintName = (id: string) => sprints.find((s) => String(s.id) === id)?.name ?? `sprint ${id}`;
+  const manualSprintEdges = sprintEdges.filter((e) => e.source === "manual");
   // Project window bar in absolute months: prefer the real project dates (span
   // years), else anchor the derived month window to the base year.
   const winA = absOfIso(startDate) ?? base + Math.min(projectStart ?? 0, projectEnd ?? 0);
   const winB = absOfIso(endDate) ?? base + Math.max(projectStart ?? 0, projectEnd ?? 0);
   return (
+    <>
     <div style={{ display: "flex" }}>
       {/* left labels */}
       <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
@@ -445,7 +495,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
         </div>
       </div>
       {/* right grid */}
-      <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
+      <div ref={gridRef} style={{ position: "relative", flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
         {hasWindow && (
           <div style={{ position: "relative", height: 34, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt, ...gb }}>
@@ -467,8 +517,8 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
               return (
                 <div key={s.id}>
                   <div style={{ position: "relative", height: 34, ...gb }}>
-                    <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                      style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                    <div data-dep-key={s.id >= 0 ? `sprint-${s.id}` : undefined} title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
+                      style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
                     ? <div style={{ height: 28, ...gb }} />
@@ -476,7 +526,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
                       const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
                       return (
                         <div key={t.id} style={{ position: "relative", height: 28, ...gb }}>
-                          <div title={`${t.name} · ${t.status}`} style={{ ...barAbs(anchored(base, t.startMonth), anchored(base, t.endMonth), win), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
+                          <div title={`${t.name} · ${t.status}`} style={{ ...barAbs(absOfIso(t.startDate) ?? anchored(base, t.startMonth), absOfIso(t.endDate) ?? anchored(base, t.endMonth), win), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
                         </div>
                       );
                     }))}
@@ -499,9 +549,195 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
             );
           })}
         </div>
+        {sprints.length > 0 && <MeasuredArrows containerRef={gridRef} edges={sprintEdges} remeasure={`${win.start}:${win.span}:${sprints.length}:${[...openSprints].join(",")}:${sprintEdges.length}`} />}
       </div>
     </div>
+    {/* Sprint dependency legend + manual linking (project timeline) */}
+    {sprints.length > 0 && (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 22px", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt, flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.subtle }}>
+          <svg width={26} height={8} aria-hidden="true"><line x1={0} y1={4} x2={20} y2={4} stroke={color.faint} strokeWidth={1.5} /><path d="M20,1 L25,4 L20,7 Z" fill={color.faint} /></svg>
+          sprint depends on
+        </span>
+        <span style={{ fontSize: 11, color: color.faint3 }}>{sprintEdges.length} shown</span>
+        <div style={{ flex: 1 }} />
+        {canLink && (
+          <Button variant="secondary" onClick={() => ingestDeps.mutate()} disabled={ingestDeps.isPending} title="Derive sprint dependencies from the project's Jira issue links">
+            <Icon name="refresh" size={14} /> {ingestDeps.isPending ? "Ingesting…" : "Ingest from Jira"}
+          </Button>
+        )}
+        {canLink && sprints.filter((s) => s.id >= 0).length >= 2 && <Button variant="secondary" onClick={() => setLinking(true)}><Icon name="plus" size={14} /> Link sprint dependency</Button>}
+      </div>
+    )}
+    {manualSprintEdges.length > 0 && (
+      <div style={{ display: "flex", gap: 8, padding: "0 22px 12px", flexWrap: "wrap" }}>
+        {manualSprintEdges.map((e) => (
+          <span key={e.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.text, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 20, padding: "4px 6px 4px 11px" }}>
+            {sprintName(e.fromId)} <Icon name="arrowRight" size={12} color={color.faint2} /> {sprintName(e.toId)}
+            {canLink && <button onClick={() => removeDep.mutate(e.id)} aria-label="Remove dependency" title="Remove dependency" style={{ border: "none", background: "none", cursor: "pointer", color: color.faint3, padding: 2, lineHeight: 0 }}><Icon name="x" size={13} /></button>}
+          </span>
+        ))}
+      </div>
+    )}
+    {linking && (
+      <LinkSprintModal projectId={projectId} sprints={sprints.filter((s) => s.id >= 0)} onClose={() => setLinking(false)}
+        onAdd={(b) => { addDep.mutate(b); setLinking(false); }} pending={addDep.isPending} />
+    )}
+    </>
   );
+}
+
+// Modal to hand-draw a sprint→sprint dependency within one project's timeline.
+function LinkSprintModal({ projectId, sprints, onClose, onAdd, pending }: {
+  projectId: string; sprints: SprintBar[]; onClose: () => void;
+  onAdd: (b: { fromType: string; fromId: string; toType: string; toId: string }) => void; pending?: boolean;
+}) {
+  void projectId;
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const submit = () => { if (from && to && from !== to) onAdd({ fromType: "sprint", fromId: from, toType: "sprint", toId: to }); };
+  return (
+    <Overlay onClose={onClose} width={440}>
+      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 700, color: color.ink, marginBottom: 4 }}>Link a sprint dependency</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Draw an arrow from the sprint that <b>depends on</b> an earlier one.</div>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>This sprint…</label>
+      <Select value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", marginBottom: 14 }}>
+        <option value="">Select a sprint…</option>
+        {sprints.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+      </Select>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>…depends on</label>
+      <Select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", marginBottom: 18 }}>
+        <option value="">Select an upstream sprint…</option>
+        {sprints.map((s) => <option key={s.id} value={String(s.id)} disabled={String(s.id) === from}>{s.name}</option>)}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={!from || !to || from === to || pending}>Link</Button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ---- Dependency arrows (SVG overlay) ---------------------------------------
+// Routes a finish-to-start elbow from each upstream bar's right edge to the
+// downstream bar's left edge. Positions come in as percentages; we measure the
+// grid's pixel width so the arrowheads stay round (no non-uniform SVG scaling).
+// Absolutely positioned, non-interactive, and sits just under the Today line.
+function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos: Map<string, BarPos>; rowH: number; rows: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const H = rows * rowH;
+  return (
+    <div ref={ref} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}>
+      {w > 0 && (
+        <svg width={w} height={H} style={{ position: "absolute", top: 0, left: 0, overflow: "visible" }} aria-hidden="true">
+          <defs>
+            <marker id="dep-arrowhead" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+            </marker>
+          </defs>
+          {edges.map((e) => {
+            const up = pos.get(`${e.toType}-${e.toId}`);
+            const down = pos.get(`${e.fromType}-${e.fromId}`);
+            if (!up || !down) return null;   // an endpoint is off-window / not shown
+            const x1 = ((up.left + up.width) / 100) * w, y1 = up.row * rowH + rowH / 2;
+            const x2 = (down.left / 100) * w, y2 = down.row * rowH + rowH / 2;
+            const midX = Math.max(x1 + 12, x2 - 12);
+            return (
+              <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
+                d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
+                stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
+                markerEnd="url(#dep-arrowhead)" opacity={0.85} />
+            );
+          })}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+// Measured dependency overlay — reads the on-screen rect of every bar tagged
+// with data-dep-key inside `containerRef` and draws arrows between them. Used on
+// the Project/Program timelines whose rows are non-uniform and expandable, so
+// positions come from the real DOM (correct by construction) rather than
+// hand-computed row math. `remeasure` is any value that changes when layout does
+// (window, expand state, edge list) to re-run the measurement.
+function MeasuredArrows({ containerRef, edges, remeasure }: {
+  containerRef: React.RefObject<HTMLDivElement | null>; edges: TimelineDep[]; remeasure: unknown;
+}) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [rects, setRects] = useState<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const base = el.getBoundingClientRect();
+      const m = new Map<string, { x: number; y: number; w: number; h: number }>();
+      el.querySelectorAll<HTMLElement>("[data-dep-key]").forEach((n) => {
+        const k = n.getAttribute("data-dep-key");
+        if (!k) return;
+        const r = n.getBoundingClientRect();
+        m.set(k, { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height });
+      });
+      setRects(m);
+      setBox({ w: el.clientWidth, h: el.scrollHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef, remeasure]);
+  return (
+    <svg width={box.w} height={box.h} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", overflow: "visible", zIndex: 4 }} aria-hidden="true">
+      <defs>
+        <marker id="dep-arrowhead-m" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+        </marker>
+      </defs>
+      {edges.map((e) => {
+        const up = rects.get(`${e.toType}-${e.toId}`), down = rects.get(`${e.fromType}-${e.fromId}`);
+        if (!up || !down) return null;
+        const x1 = up.x + up.w, y1 = up.y + up.h / 2, x2 = down.x, y2 = down.y + down.h / 2;
+        const midX = Math.max(x1 + 12, x2 - 12);
+        return (
+          <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
+            d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
+            stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
+            markerEnd="url(#dep-arrowhead-m)" opacity={0.85} />
+        );
+      })}
+    </svg>
+  );
+}
+
+// Shared portfolio/timeline dependency edges + link mutations (one row per
+// dependency; source manual|jira|project). Used by every timeline scope.
+function usePortfolioDeps() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["portfolio-deps"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; edges: TimelineDep[] }> =>
+      (await api<{ canEdit: boolean; edges: TimelineDep[] }>("/portfolio/dependencies")) ?? { canEdit: false, edges: [] },
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["portfolio-deps"] });
+  const add = useMutation({
+    mutationFn: (b: { fromType: string; fromId: string; toType: string; toId: string }) => api("/portfolio/dependencies", { method: "POST", body: JSON.stringify(b) }),
+    onSuccess: () => { toast("Dependency linked", "info"); invalidate(); }, onError: toastError,
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => api(`/portfolio/dependencies/${id}`, { method: "DELETE" }),
+    onSuccess: () => { toast("Dependency removed", "info"); invalidate(); }, onError: toastError,
+  });
+  return { edges: data?.edges ?? [], canEdit: data?.canEdit ?? false, add, remove };
 }
 
 // ---- Portfolio schedule (all entity types on one grid) --------------------
@@ -514,12 +750,26 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   const win = useWin();
   const gb = gridBg(win);
+  const [linking, setLinking] = useState(false);
+  const { edges, canEdit, add: addDep, remove: removeDep } = usePortfolioDeps();
   // Dated items (startLabel/endLabel are ISO/display dates) place across years;
   // items with only a derived month window anchor to the window's start year.
   const itemAbs = (label: string, month: number) => absOfIso(label) ?? yearOf(win.start) * 12 + month;
   if (items.length === 0) return <Note text={cat === "all" ? "Nothing with dates in the portfolio yet. Set start/end dates on projects, programs, products or releases to see them here." : "No dated items in this category."} />;
   const rowsHeight = Math.max(120, items.length * 38);
+  const nameOf = new Map(items.map((i) => [`${i.type}-${i.id}`, i.name]));
+  // Bar positions (%) for arrow routing — only items whose bar is on the window.
+  const pos = new Map<string, BarPos>();
+  items.forEach((i, row) => {
+    const g = barGeom(itemAbs(i.startLabel, i.startMonth), itemAbs(i.endLabel, i.endMonth), win);
+    if (g) pos.set(`${i.type}-${i.id}`, { row, left: g.left, width: g.width });
+  });
+  // Draw only edges whose BOTH ends are visible in the current filter + window.
+  const visibleEdges = edges.filter((e) => pos.has(`${e.toType}-${e.toId}`) && pos.has(`${e.fromType}-${e.fromId}`));
+  const manualEdges = edges.filter((e) => e.source === "manual");
+  const label = (type: string, id: string) => nameOf.get(`${type}-${id}`) ?? `${type} ${id}`;
   return (
+    <>
     <div style={{ display: "flex" }}>
       <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
         <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Item</div>
@@ -549,9 +799,68 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
               </div>
             );
           })}
+          <DependencyLayer edges={visibleEdges} pos={pos} rowH={38} rows={items.length} />
         </div>
       </div>
     </div>
+    {/* Dependency legend + manual link management */}
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 22px", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt, flexWrap: "wrap" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.subtle }}>
+        <svg width={26} height={8} aria-hidden="true"><line x1={0} y1={4} x2={20} y2={4} stroke={color.faint} strokeWidth={1.5} /><path d="M20,1 L25,4 L20,7 Z" fill={color.faint} /></svg>
+        depends on
+      </span>
+      <span style={{ fontSize: 11, color: color.faint3 }}>{visibleEdges.length} shown{edges.length !== visibleEdges.length ? ` · ${edges.length - visibleEdges.length} off-window` : ""}</span>
+      <div style={{ flex: 1 }} />
+      {canEdit && <Button variant="secondary" onClick={() => setLinking(true)}><Icon name="plus" size={14} /> Link dependency</Button>}
+    </div>
+    {manualEdges.length > 0 && (
+      <div style={{ display: "flex", gap: 8, padding: "0 22px 12px", flexWrap: "wrap" }}>
+        {manualEdges.map((e) => (
+          <span key={e.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.text, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 20, padding: "4px 6px 4px 11px" }}>
+            {label(e.fromType, e.fromId)} <Icon name="arrowRight" size={12} color={color.faint2} /> {label(e.toType, e.toId)}
+            {canEdit && <button onClick={() => removeDep.mutate(e.id)} aria-label="Remove dependency" title="Remove dependency" style={{ border: "none", background: "none", cursor: "pointer", color: color.faint3, padding: 2, lineHeight: 0 }}><Icon name="x" size={13} /></button>}
+          </span>
+        ))}
+      </div>
+    )}
+    {linking && <LinkDependencyModal items={items} onClose={() => setLinking(false)} onAdd={(b) => { addDep.mutate(b); setLinking(false); }} pending={addDep.isPending} />}
+    </>
+  );
+}
+
+// Modal to hand-draw a cross-entity dependency between two portfolio items.
+function LinkDependencyModal({ items, onClose, onAdd, pending }: {
+  items: PortfolioItem[]; onClose: () => void;
+  onAdd: (b: { fromType: string; fromId: string; toType: string; toId: string }) => void; pending?: boolean;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const opt = (i: PortfolioItem) => ({ key: `${i.type}-${i.id}`, label: `${(PF_TYPE[i.type] ?? PF_TYPE.project).label} · ${i.name}` });
+  const split = (key: string) => { const idx = key.indexOf("-"); return { type: key.slice(0, idx), id: key.slice(idx + 1) }; };
+  const submit = () => {
+    if (!from || !to || from === to) return;
+    const f = split(from), t = split(to);
+    onAdd({ fromType: f.type, fromId: f.id, toType: t.type, toId: t.id });
+  };
+  return (
+    <Overlay onClose={onClose} width={460}>
+      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 700, color: color.ink, marginBottom: 4 }}>Link a dependency</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Draw an arrow from the item that <b>depends on</b> another. Both must be visible in the current filter.</div>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>This item…</label>
+      <Select value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", marginBottom: 14 }}>
+        <option value="">Select an item…</option>
+        {items.map((i) => { const o = opt(i); return <option key={o.key} value={o.key}>{o.label}</option>; })}
+      </Select>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>…depends on</label>
+      <Select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", marginBottom: 18 }}>
+        <option value="">Select an upstream item…</option>
+        {items.map((i) => { const o = opt(i); return <option key={o.key} value={o.key} disabled={o.key === from}>{o.label}</option>; })}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={!from || !to || from === to || pending}>Link</Button>
+      </div>
+    </Overlay>
   );
 }
 
@@ -560,6 +869,12 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
   const win = useWin();
   const gb = gridBg(win);
   const msBase = yearOf(win.start) * 12;
+  // Read-only dependency arrows across the program's projects & sprints.
+  const { edges } = usePortfolioDeps();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const keys = new Set<string>();
+  rows.forEach((r) => { keys.add(`project-${r.projectId}`); (r.sprints ?? []).forEach((s) => keys.add(`sprint-${s.id}`)); });
+  const progEdges = edges.filter((e) => keys.has(`${e.fromType}-${e.fromId}`) && keys.has(`${e.toType}-${e.toId}`));
   if (rows.length === 0) return <Note text="No projects in this program, or no program selected." />;
   return (
     <div style={{ display: "flex" }}>
@@ -599,7 +914,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
       {/* right grid */}
       <div style={{ flex: 1, minWidth: 560, overflow: "hidden" }}>
         <MonthHeader />
-        <div style={{ position: "relative", ...gb }}>
+        <div ref={gridRef} style={{ position: "relative", ...gb }}>
           <NowLine />
           {rows.map((r) => {
             const hasWindow = r.startMonth != null && r.endMonth != null;
@@ -610,7 +925,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
                 <div style={{ height: 30, borderBottom: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
                 {hasWindow && (
                   <div style={{ position: "relative", height: 30, borderBottom: `1px solid ${color.surfaceAlt}`, background: color.surfaceAlt }}>
-                    <div title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barAbs(absOfIso(r.startDate) ?? base + Math.min(r.startMonth!, r.endMonth!), absOfIso(r.endDate) ?? base + Math.max(r.startMonth!, r.endMonth!), win), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
+                    <div data-dep-key={`project-${r.projectId}`} title={`${r.startDate || "?"} → ${r.endDate || "?"}`} style={{ ...barAbs(absOfIso(r.startDate) ?? base + Math.min(r.startMonth!, r.endMonth!), absOfIso(r.endDate) ?? base + Math.max(r.startMonth!, r.endMonth!), win), top: 6, height: 18, borderRadius: 6, background: `repeating-linear-gradient(45deg,${color.primaryTint2},${color.primaryTint2} 6px,${color.primaryTint2} 6px,${color.primaryTint2} 12px)`, border: `1.5px solid ${color.primary}` }} />
                   </div>
                 )}
                 {r.phases.map((p) => <PhaseBar key={p.id} phase={p} base={base} />)}
@@ -618,8 +933,8 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
                   const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
                   return (
                     <div key={s.id} style={{ position: "relative", height: 34, ...gb }}>
-                      <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                        style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                      <div data-dep-key={s.id >= 0 ? `sprint-${s.id}` : undefined} title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
+                        style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                     </div>
                   );
                 })}
@@ -627,6 +942,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
               </div>
             );
           })}
+          <MeasuredArrows containerRef={gridRef} edges={progEdges} remeasure={`${win.start}:${win.span}:${rows.length}:${progEdges.length}`} />
         </div>
         <div style={{ height: 72, position: "relative", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>
           {milestones.map((ms) => {

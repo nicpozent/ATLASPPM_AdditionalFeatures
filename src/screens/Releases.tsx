@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
-import { Card, EmptyBlock, Button, Input, Select, Modal as Overlay, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
+import { Card, Button, Input, Select, Modal as Overlay, RowMenu, MenuItem, MenuDivider } from "@/components/ui";
 import { usePermissions } from "@/components/usePermissions";
 import { Icon } from "@/components/Icon";
 import { TeamPanel } from "@/components/TeamPanel";
@@ -60,6 +60,88 @@ const RISK_COLORS: Record<string, { ink: string; tint: string }> = {
 };
 
 const GRID = "0.6fr 1.7fr 1.2fr 0.9fr 0.9fr 1fr 0.8fr 0.9fr 44px";
+
+const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const CAL_DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// Month-grid calendar of scheduled releases — places each release on its target
+// date, with prev/next/Today navigation. Undated releases are listed underneath
+// so they're never hidden. Clicking a release opens its editor.
+function ReleaseCalendar({ releases, onOpen }: { releases: Release[]; onOpen: (r: Release) => void }) {
+  const parse = (s: string) => { const d = new Date(s); return isNaN(d.getTime()) ? null : d; };
+  const dated = releases.map((r) => ({ r, d: parse(r.date) })).filter((x): x is { r: Release; d: Date } => x.d !== null);
+  const undated = releases.filter((r) => !parse(r.date));
+  const now = new Date();
+  // Default to the month of the soonest release on/after today, else this month.
+  const [cur, setCur] = useState(() => {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const upcoming = dated.map((x) => x.d).filter((d) => d.getTime() >= monthStart).sort((a, b) => +a - +b);
+    const base = upcoming[0] ?? now;
+    return { y: base.getFullYear(), m: base.getMonth() };
+  });
+  const step = (n: number) => setCur((c) => { const d = new Date(c.y, c.m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+
+  const first = new Date(cur.y, cur.m, 1);
+  const lead = (first.getDay() + 6) % 7;                 // Monday-first offset
+  const days = new Date(cur.y, cur.m + 1, 0).getDate();
+  const byDay = new Map<number, Release[]>();
+  for (const { r, d } of dated) if (d.getFullYear() === cur.y && d.getMonth() === cur.m) byDay.set(d.getDate(), [...(byDay.get(d.getDate()) ?? []), r]);
+  const cells: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const monthCount = dated.filter((x) => x.d.getFullYear() === cur.y && x.d.getMonth() === cur.m).length;
+
+  return (
+    <Card padding={0} style={{ overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: `1px solid ${color.bg}` }}>
+        <span style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink }}>{CAL_MONTHS[cur.m]} {cur.y}</span>
+        <span style={{ fontSize: 12, color: color.faint2 }}>{monthCount} release{monthCount === 1 ? "" : "s"}</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => step(-1)} aria-label="Previous month" style={calNav}><Icon name="chevronLeft" size={16} /></button>
+        <button onClick={() => setCur({ y: now.getFullYear(), m: now.getMonth() })} style={{ ...calNav, width: "auto", padding: "0 12px", fontSize: 12.5, fontWeight: 600 }}>Today</button>
+        <button onClick={() => step(1)} aria-label="Next month" style={calNav}><Icon name="chevronRight" size={16} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+        {CAL_DOW.map((d) => (
+          <div key={d} style={{ padding: "8px 10px", fontSize: 10.5, fontWeight: 700, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", borderBottom: `1px solid ${color.bg}`, textAlign: "center" }}>{d}</div>
+        ))}
+        {cells.map((day, i) => {
+          const isToday = day != null && cur.y === now.getFullYear() && cur.m === now.getMonth() && day === now.getDate();
+          const rels = day != null ? byDay.get(day) ?? [] : [];
+          return (
+            <div key={i} style={{ minHeight: 92, borderRight: (i % 7 !== 6) ? `1px solid ${color.surfaceAlt}` : "none", borderBottom: `1px solid ${color.surfaceAlt}`, padding: 5, background: day == null ? color.bg : color.surface }}>
+              {day != null && (
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? "#fff" : color.faint, width: 20, height: 20, borderRadius: "50%", background: isToday ? color.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 3 }}>{day}</div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {rels.map((r) => {
+                  const sc = STATUS_COLORS[r.status] ?? STATUS_COLORS.Planned;
+                  return (
+                    <button key={r.id} onClick={() => onOpen(r)} title={`${r.name} · ${r.status}`}
+                      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 10.5, fontWeight: 600, color: sc.ink, background: sc.tint, border: "none", borderRadius: 5, padding: "3px 6px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {undated.length > 0 && (
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${color.bg}` }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>No target date yet</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {undated.map((r) => {
+              const sc = STATUS_COLORS[r.status] ?? STATUS_COLORS.Planned;
+              return <button key={r.id} onClick={() => onOpen(r)} style={{ fontSize: 11, fontWeight: 600, color: sc.ink, background: sc.tint, border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>{r.name}</button>;
+            })}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+const calNav: React.CSSProperties = { width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1px solid ${color.border2}`, borderRadius: 8, background: color.surface, cursor: "pointer", color: color.subtle };
 
 const selectStyle: React.CSSProperties = {
   border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 11px",
@@ -195,9 +277,7 @@ export default function Releases() {
       </div>
 
       {view === "calendar" ? (
-        <Card padding={18}>
-          <EmptyBlock message="No releases scheduled. The calendar will populate as releases are planned." minHeight={220} />
-        </Card>
+        <ReleaseCalendar releases={live} onOpen={(r) => setEditing(r)} />
       ) : (
         <Card padding={0} style={{ overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: GRID, padding: "13px 22px", fontSize: 10.5, color: color.faint3, letterSpacing: "0.04em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>
