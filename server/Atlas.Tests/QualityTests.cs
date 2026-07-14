@@ -99,14 +99,25 @@ public class QualityTests : IClassFixture<AtlasApiFactory>
         var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Plan tasks project" }));
         var planId = await IntId(await c.PostAsJsonAsync($"/api/v1/projects/{projId}/test-plans", new { name = "Smoke", cases = 10 }));
 
-        var add = await c.PostAsJsonAsync($"/api/v1/test-plans/{planId}/tasks", new { title = "Login works", assignee = "QA" });
+        var add = await c.PostAsJsonAsync($"/api/v1/test-plans/{planId}/tasks",
+            new { title = "Login works", assignee = "QA", description = "Sign in with valid creds", startDate = "2026-03-02", dueDate = "2026-03-05", estimateHours = 2.5 });
         Assert.Equal(HttpStatusCode.OK, add.StatusCode);
         var taskId = await IntId(add);
+        using (var d = JsonDocument.Parse(await add.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("Sign in with valid creds", d.RootElement.GetProperty("description").GetString());
+            Assert.Equal("2026-03-05", d.RootElement.GetProperty("dueDate").GetString());
+            Assert.Equal(2.5, d.RootElement.GetProperty("estimateHours").GetDouble());
+        }
 
-        var patch = await c.PatchAsJsonAsync($"/api/v1/test-plan-tasks/{taskId}", new { status = "Passed" });
+        var patch = await c.PatchAsJsonAsync($"/api/v1/test-plan-tasks/{taskId}", new { status = "Passed", estimateHours = 4 });
         Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
         using (var d = JsonDocument.Parse(await patch.Content.ReadAsStringAsync()))
+        {
             Assert.Equal("Passed", d.RootElement.GetProperty("status").GetString());
+            Assert.Equal(4, d.RootElement.GetProperty("estimateHours").GetDouble());
+            Assert.Equal("2026-03-02", d.RootElement.GetProperty("startDate").GetString());   // untouched fields persist
+        }
 
         // Shows up nested under its plan in the quality payload.
         var q = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/quality");
@@ -124,5 +135,34 @@ public class QualityTests : IClassFixture<AtlasApiFactory>
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PatchAsJsonAsync("/api/v1/test-plans/999", new { stage = "UAT" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/defects/999")).StatusCode);
+    }
+
+    // A plan can carry a linked Jira board id; ingest is guarded on Jira config
+    // and a linked board (tests run with Jira unconfigured, so it's a clean 400).
+    [Fact]
+    public async Task Test_plan_carries_a_jira_board_and_ingest_is_guarded()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Jira QA project" }));
+        var planId = await IntId(await c.PostAsJsonAsync($"/api/v1/projects/{projId}/test-plans", new { name = "Board plan", jiraBoardId = 42 }));
+
+        var q = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/quality");
+        var plan = q.GetProperty("plans").EnumerateArray().First(p => p.GetProperty("id").GetInt32() == planId);
+        Assert.Equal(42, plan.GetProperty("jiraBoardId").GetInt32());
+
+        // Jira isn't configured in tests → a clear 400 rather than a crash.
+        var ingest = await c.PostAsync($"/api/v1/test-plans/{planId}/jira-ingest", null);
+        Assert.Equal(HttpStatusCode.BadRequest, ingest.StatusCode);
+
+        // Unlinking the board is a plain patch.
+        Assert.Equal(HttpStatusCode.OK, (await c.PatchAsJsonAsync($"/api/v1/test-plans/{planId}", new { jiraBoardId = 0 })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Jira_ingest_needs_edit_rights()
+    {
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/test-plans/999/jira-ingest", null)).StatusCode);
     }
 }

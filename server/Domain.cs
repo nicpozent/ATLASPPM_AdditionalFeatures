@@ -950,6 +950,7 @@ public class TestPlan
     public int Failed { get; set; }
     public int Blocked { get; set; }
     public int Ord { get; set; }
+    public int JiraBoardId { get; set; }                 // linked Jira agile board; 0 ⇒ none. Ingested issues land as tasks.
     public List<TestPlanTask> Tasks { get; set; } = new();
 }
 
@@ -961,6 +962,11 @@ public class TestPlanTask
     public string Title { get; set; } = default!;
     public string Status { get; set; } = "Not run";      // Not run | In test | Passed | Failed | Blocked
     public string Assignee { get; set; } = "";
+    public string Description { get; set; } = "";         // steps / expected result / notes
+    public string StartDate { get; set; } = "";           // ISO date the test work starts
+    public string DueDate { get; set; } = "";             // ISO date it's due
+    public double EstimateHours { get; set; }             // planned time to spend (hours)
+    public string JiraKey { get; set; } = "";             // source Jira issue key when ingested; "" = local
     public int Ord { get; set; }
 }
 

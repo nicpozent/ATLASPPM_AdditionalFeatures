@@ -109,6 +109,14 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   automatically. Built from the existing timeline geometry + theme. Jira
   issue-link ingestion and per-project (sprint-level) arrows are the next
   increments. Prototype needs the arrow visuals added.
+- **Quality test tasks — full details + Jira board ingest** — a test plan's tasks
+  now carry description/steps, start & due dates, assignee and a planned
+  time-to-spend, editable in a proper task window (was title + status only). A
+  plan may link a **Jira agile board** (`TestPlan.JiraBoardId`); "Ingest from
+  Jira" reuses the existing project Jira sync (same client/paging/parsing,
+  idempotent by issue key, prunes vanished issues) to pull the board's issues in
+  as test tasks (`cap-quality`, config-guarded, audited). Ingested tasks show
+  their Jira key. Built on the existing Quality tab + Jira integration.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs

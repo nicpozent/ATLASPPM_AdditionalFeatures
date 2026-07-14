@@ -100,9 +100,10 @@ public record ArchitectureDto(bool CanEdit, string ChangeType, List<AdmPhaseDto>
     List<ArchApprovalDto> Approvals, string ArbStatus);
 public record SetArbDecisionReq(string Decision, string? Note);
 
-public record TestPlanTaskDto(int Id, string Title, string Status, string Assignee);
+public record TestPlanTaskDto(int Id, string Title, string Status, string Assignee,
+    string Description, string StartDate, string DueDate, double EstimateHours, string JiraKey);
 public record TestPlanDto(int Id, string Name, string Stage, int Cases, int Passed, int Failed, int Blocked, int NotRun, int ExecPct,
-    List<TestPlanTaskDto> Tasks);
+    int JiraBoardId, List<TestPlanTaskDto> Tasks);
 public record DefectDto(int Id, string Code, string Title, string Severity, string Owner, string Status, string Test);
 public record QualityTotalsDto(int Cases, int Coverage, int PassRate, int Failed, int OpenDefects);
 public record QualityDto(bool CanEdit, QualityTotalsDto Totals, List<TestPlanDto> Plans, List<DefectDto> Defects);

@@ -858,6 +858,52 @@ public static class Jira
         _ => "To Do",
     };
 
+    // Atlas task status → a test-plan task status (best-effort; testers refine it).
+    public static string MapTestStatus(string taskStatus) => taskStatus switch
+    {
+        "Done" => "Passed",
+        "Blocked" => "Blocked",
+        "In Progress" or "In Review" => "In test",
+        _ => "Not run",
+    };
+
+    public record TestIngestResult(int Added, int Updated, int Removed, bool Truncated);
+
+    // Ingest a linked Jira board's issues into a test plan's tasks — reuses the
+    // same authenticated client, paging and field parsing as the project sync.
+    // Idempotent: upsert by Jira issue key, prune vanished Jira-sourced tasks,
+    // never touch locally-created ones (JiraKey == ""). Caller owns SaveChanges.
+    public static async Task<TestIngestResult> IngestTestTasksAsync(AtlasDbContext db, IConfiguration cfg, HttpClient c, TestPlan plan)
+    {
+        if (plan.JiraBoardId <= 0) throw new InvalidOperationException("This test plan has no linked Jira board.");
+        var truncated = false;
+        const string fields = "summary,description,status,assignee,duedate,timeoriginalestimate";
+        var issues = await FetchIssuesAsync(c, $"rest/agile/1.0/board/{plan.JiraBoardId}/issue", fields, () => truncated = true);
+        var existing = await db.TestPlanTasks.Where(t => t.TestPlanId == plan.Id).ToListAsync();
+        var ord = existing.Select(t => t.Ord).DefaultIfEmpty(0).Max();
+        var seen = new HashSet<string>();
+        int added = 0, updated = 0;
+        foreach (var ji in issues)
+        {
+            var key = Str(ji, "key");
+            if (key.Length == 0) continue;
+            var f = Prop(ji, "fields") ?? default;
+            seen.Add(key);
+            var t = existing.FirstOrDefault(x => x.JiraKey == key);
+            if (t is null) { t = new TestPlanTask { TestPlanId = plan.Id, JiraKey = key, Ord = ++ord }; db.TestPlanTasks.Add(t); existing.Add(t); added++; }
+            else updated++;
+            t.Title = Str(f, "summary") is { Length: > 0 } s ? s : key;
+            t.Status = MapTestStatus(MapIssueStatus(StrPath(f, "status", "statusCategory", "key")));
+            t.Assignee = StrPath(f, "assignee", "displayName");
+            t.Description = AdfToText(Prop(f, "description"));
+            t.DueDate = DatePart(Str(f, "duedate"));
+            t.EstimateHours = SecondsToHours(LongProp(f, "timeoriginalestimate"));
+        }
+        var removed = existing.Where(t => t.JiraKey.Length > 0 && !seen.Contains(t.JiraKey)).ToList();
+        db.TestPlanTasks.RemoveRange(removed);
+        return new TestIngestResult(added, updated, removed.Count, truncated);
+    }
+
     // Jira priority name → Atlas task Priority (Critical|High|Medium|Low).
     public static string MapPriority(string? name) => (name ?? "").ToLowerInvariant() switch
     {
