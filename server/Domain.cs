@@ -1291,6 +1291,7 @@ public class Skill
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public int Ord { get; set; }
+    public string Team { get; set; } = "";              // owning manager slot (teammgr/svcmgr/…); "" = shared/legacy, visible to every manager
 }
 public class SkillRating
 {

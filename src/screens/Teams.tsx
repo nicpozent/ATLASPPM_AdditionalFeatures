@@ -303,16 +303,16 @@ function CalcField({ label, children }: { label: string; children: ReactNode }) 
 // ---------------------------------------------------------------------------
 interface Skill { id: number; name: string }
 interface Rating { skillId: number; person: string; level: number }
-interface SkillsData { canEdit: boolean; skills: Skill[]; people: string[]; ratings: Rating[] }
+interface SkillsData { canEdit: boolean; canView: boolean; skills: Skill[]; people: string[]; ratings: Rating[] }
 const LEVELS = ["—", "1", "2", "3", "4"];
 const levelColor = (n: number) => n >= 4 ? "#0B6B37" : n === 3 ? "#15A34A" : n >= 1 ? "#C98A00" : color.faint3;
 
 function SkillsMatrix() {
   const qc = useQueryClient();
   const [newSkill, setNewSkill] = useState("");
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["skills"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<SkillsData> => (await api<SkillsData>("/skills")) ?? { canEdit: false, skills: [], people: [], ratings: [] },
+    queryFn: async (): Promise<SkillsData> => (await api<SkillsData>("/skills")) ?? { canEdit: false, canView: false, skills: [], people: [], ratings: [] },
   });
   const canEdit = data?.canEdit ?? false;
   const skills = data?.skills ?? [];
@@ -332,6 +332,12 @@ function SkillsMatrix() {
     mutationFn: (b: { skillId: number; person: string; level: number }) => api("/skill-ratings", { method: "PUT", body: JSON.stringify(b) }),
     onSuccess: invalidate, onError: toastError,
   });
+
+  // Manager-scoped: only a team's manager (or Platform Admin) sees the matrix.
+  // For everyone else the server returns canView=false and we render nothing, so
+  // the panel simply doesn't appear on their My Team. (Guard placed after all
+  // hooks to keep hook order stable.)
+  if (!isLoading && data && !data.canView) return null;
 
   const NAME_COL = 220;
   return (
