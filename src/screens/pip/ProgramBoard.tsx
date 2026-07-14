@@ -228,7 +228,7 @@ function LaneRow({
         const cards = cardsFor(objectives, lane.key, c.id, placements, iterationIds);
         const key = c.id ?? "nil";
         return (
-          <div key={String(c.id)}
+          <div key={String(c.id)} data-cell={`${lane.key}:${key}`}
             onDragOver={canEdit ? (e) => { e.preventDefault(); setOver(key); } : undefined}
             onDragLeave={() => setOver((o) => (o === key ? null : o))}
             onDrop={canEdit ? (e) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) onDropCard(id, c.id); } : undefined}
@@ -248,7 +248,7 @@ function ObjectiveCard({ obj, canEdit, cols, colId, onMove }: {
 }) {
   const pill = OBJ_PILL[obj.status] ?? OBJ_PILL.Planned;
   return (
-    <div draggable={canEdit}
+    <div draggable={canEdit} data-obj={obj.id}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", String(obj.id))}
       style={{ border: `1px solid ${color.border}`, borderLeft: `3px solid ${pill.dot}`, borderRadius: 8, padding: "8px 10px", background: color.surface, cursor: canEdit ? "grab" : "default", boxShadow: "0 1px 2px rgba(20,26,60,0.05)" }}>
       <div style={{ fontSize: 12.5, fontWeight: 600, color: color.ink, lineHeight: 1.35, marginBottom: 5 }}>{obj.title}</div>

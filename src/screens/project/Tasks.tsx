@@ -137,7 +137,7 @@ export function Tasks({ projectId }: { projectId: string | null }) {
             const cards = shown.filter((t) => t.status === c.label);
             const over = overCol === c.label;
             return (
-              <div key={c.label}
+              <div key={c.label} data-col={c.label}
                 onDragOver={(e) => { if (canMove) { e.preventDefault(); if (overCol !== c.label) setOverCol(c.label); } }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null); }}
                 onDrop={(e) => {
