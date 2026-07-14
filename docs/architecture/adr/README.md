@@ -70,5 +70,10 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0061](./0061-realtime-pi-program-board.md) | Real-time PI Program Board (SignalR presence/cursors + notify-and-refetch) | Accepted |
 | [0062](./0062-individual-development-plans.md) | Individual development plans (manager-scoped, development-framed, redacted) | Accepted |
 | [0063](./0063-personnel-data-processing-gate.md) | Personnel-data processing gate (SWOT/dev-plans off until DPIA + MBL sign-off) + Sweden compliance map | Accepted |
+| [0064](./0064-freeform-whiteboard.md) | Freeform whiteboard (typed rows, live co-edit, templates) | Accepted |
+| [0065](./0065-open-task-board-moves.md) | Task-board card moves scoped to planner roles (cap-schedule) | Accepted |
+| [0066](./0066-statement-of-applicability.md) | ISO 27001 Annex A Statement of Applicability (per-project) | Accepted |
+| [0067](./0067-openbao-secrets-provider.md) | OpenBao / Vault secrets provider (on-prem, KV v2, opt-in) | Accepted |
+| [0068](./0068-personnel-notes-field-encryption.md) | Field encryption (AES-GCM) for DPIA-gated personnel notes | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

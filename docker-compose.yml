@@ -36,6 +36,12 @@ x-atlas-api-env: &atlas-api-env
   AzureDevOps__Organization: ${ADO_ORG:-}
   AzureDevOps__Pat: ${ADO_PAT:-}
   AzureDevOps__MaxWorkItems: ${ADO_MAX_WORK_ITEMS:-}
+  # OpenBao / Vault (on-prem secrets). Inert unless BAO_ADDRESS + BAO_TOKEN set;
+  # see docker-compose.openbao.yml for a ready-to-run vault service.
+  Bao__Address: ${BAO_ADDRESS:-}
+  Bao__Token: ${BAO_TOKEN:-}
+  Bao__Mount: ${BAO_MOUNT:-}
+  Bao__Path: ${BAO_PATH:-}
 
 services:
   db:

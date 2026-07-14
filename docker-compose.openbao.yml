@@ -1,0 +1,56 @@
+# ============================================================================
+#  OpenBao (Vault-compatible) overlay (OPT-IN) — runs an on-prem secrets vault
+#  as another container and points the API/worker at it. Your base
+#  docker-compose.yml is unchanged; this only applies when you name it:
+#
+#    docker compose -f docker-compose.yml -f docker-compose.openbao.yml up -d
+#
+#  The service below runs in **dev mode** (in-memory, auto-unsealed, a fixed root
+#  token) so you can try the wiring in one command. Seed the app's secrets once:
+#
+#    docker compose exec openbao \
+#      bao kv put secret/atlas \
+#        ConnectionStrings__Postgres='Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas' \
+#        Jira__ApiToken='<token>'
+#
+#  The app reads secret/atlas at boot; a key `ConnectionStrings__Postgres` maps to
+#  config `ConnectionStrings:Postgres`, so it overrides the env-var default.
+#
+#  ⚠️  Dev mode is NOT for production — data is in-memory and the vault is
+#  auto-unsealed with a known token. For production run OpenBao with a real
+#  storage backend (file/raft/postgres), TLS, and a proper unseal/token flow,
+#  then set BAO_ADDRESS / BAO_TOKEN (or mount Bao__Token via /run/secrets).
+#  See docs/secrets.md · ADR-0067.
+# ============================================================================
+services:
+  openbao:
+    image: openbao/openbao:latest
+    cap_add:
+      - IPC_LOCK          # lets the vault mlock() its memory (dev convenience)
+    environment:
+      BAO_DEV_ROOT_TOKEN_ID: ${BAO_TOKEN:-atlas-dev-root}
+      BAO_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    command: server -dev
+    expose:
+      - "8200"
+    restart: unless-stopped
+
+  api:
+    environment:
+      Bao__Address: ${BAO_ADDRESS:-http://openbao:8200}
+      Bao__Token: ${BAO_TOKEN:-atlas-dev-root}
+      Bao__Mount: ${BAO_MOUNT:-secret}
+      Bao__Path: ${BAO_PATH:-atlas}
+    depends_on:
+      openbao:
+        condition: service_started
+
+  worker:
+    environment:
+      Bao__Address: ${BAO_ADDRESS:-http://openbao:8200}
+      Bao__Token: ${BAO_TOKEN:-atlas-dev-root}
+      Bao__Mount: ${BAO_MOUNT:-secret}
+      Bao__Path: ${BAO_PATH:-atlas}
+    depends_on:
+      openbao:
+        condition: service_started

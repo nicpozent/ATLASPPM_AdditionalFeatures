@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Microsoft.Extensions.Configuration;
 
 namespace Atlas.Api;
 
@@ -40,5 +41,18 @@ public static class Secrets
         var kvUri = cfg["KeyVault:Uri"];
         if (!string.IsNullOrWhiteSpace(kvUri))
             builder.Configuration.AddAzureKeyVault(new Uri(kvUri), new DefaultAzureCredential());
+
+        // OpenBao / HashiCorp Vault (on-prem, KV v2). Off unless an address AND a
+        // token are configured; the token itself may come from the file layer
+        // above (a `Bao__Token` secret). Non-fatal on read failure. See OpenBao.cs.
+        var baoAddr = cfg["Bao:Address"];
+        var baoToken = cfg["Bao:Token"];
+        if (!string.IsNullOrWhiteSpace(baoAddr) && !string.IsNullOrWhiteSpace(baoToken))
+            ((IConfigurationBuilder)builder.Configuration).Add(new OpenBaoSource
+            {
+                Address = baoAddr!, Token = baoToken!,
+                Mount = cfg["Bao:Mount"] is { Length: > 0 } m ? m : "secret",
+                Path = cfg["Bao:Path"] is { Length: > 0 } p ? p : "atlas",
+            });
     }
 }
