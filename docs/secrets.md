@@ -240,10 +240,47 @@ Secret names use `--` for section nesting (Key Vault doesn't allow `:`), e.g.
 No code change is needed — the provider is already wired and switches on the
 moment `KeyVault:Uri` is set.
 
+### 3. OpenBao / HashiCorp Vault (on-prem, cloud-neutral)
+
+For an **on-prem** central secrets store, Atlas ships a KV v2 provider that works
+against **OpenBao** (the MPL-2.0 open-source fork of Vault) or Vault itself —
+the API is the same. It's the on-prem counterpart to Key Vault: audited,
+centralized secrets without a cloud tie. See ADR-0067.
+
+Turn it on by pointing at the vault and giving it a token:
+
+```
+Bao__Address=http://openbao:8200
+Bao__Token=<token>          # can be file-mounted as a /run/secrets/Bao__Token
+Bao__Mount=secret           # optional (default: secret)
+Bao__Path=atlas             # optional (default: atlas)
+```
+
+Atlas reads `{Address}/v1/{Mount}/data/{Path}` at boot; each KV key maps to a
+config key with `__` → `:` (e.g. `ConnectionStrings__Postgres` →
+`ConnectionStrings:Postgres`), just like the other layers. A read failure is
+**non-fatal** — it's logged and boot continues on the lower layers, so a sealed
+or unreachable vault never wedges startup.
+
+**Try it in one command** with the bundled dev-mode overlay:
+
+```
+docker compose -f docker-compose.yml -f docker-compose.openbao.yml up -d
+docker compose exec openbao \
+  bao kv put secret/atlas \
+    ConnectionStrings__Postgres='Host=db;Port=5432;Database=atlas;Username=atlas;Password=atlas'
+```
+
+> ⚠️ Dev mode is in-memory and auto-unsealed with a known token — **not for
+> production**. Run OpenBao with a real storage backend (file/raft), TLS and a
+> proper unseal/token flow for real deployments. The natural next step is the
+> **database secrets engine** for dynamic, auto-rotated Postgres credentials —
+> which would close the manual-rotation gap called out above.
+
 ---
 
 ## Precedence (highest wins)
 
 ```
-Azure Key Vault  >  /run/secrets (KeyPerFile)  >  environment variables  >  appsettings.{env}.json  >  appsettings.json
+Azure Key Vault  >  OpenBao / Vault  >  /run/secrets (KeyPerFile)  >  environment variables  >  appsettings.{env}.json  >  appsettings.json
 ```
