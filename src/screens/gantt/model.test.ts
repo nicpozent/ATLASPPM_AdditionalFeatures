@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MONTHS, MAX_SPAN, monthOfIso, absOfIso, ymToAbs, absToYm, monthAbbr, yearOf,
-  anchored, makeWindow, spanPct, barGeom, segPct, centerPct, type Win,
+  anchored, makeWindow, fitWindowYM, spanPct, barGeom, segPct, centerPct, type Win,
 } from "./model";
 
 describe("gantt absolute-month conversions", () => {
@@ -114,5 +114,37 @@ describe("centerPct", () => {
   it("returns null outside the window", () => {
     expect(centerPct(ymToAbs("2025-12"), win)).toBeNull();
     expect(centerPct(ymToAbs("2027-01"), win)).toBeNull();
+  });
+});
+
+describe("fitWindowYM", () => {
+  it("returns null when there is nothing to fit", () => {
+    expect(fitWindowYM([])).toBeNull();
+  });
+  it("fits a project living in another year (so its sprints aren't off-screen)", () => {
+    // A project entirely in 2024 must open on 2024, not the current calendar year.
+    const fit = fitWindowYM([ymToAbs("2024-03"), ymToAbs("2024-09")])!;
+    expect(ymToAbs(fit.from)).toBeLessThanOrEqual(ymToAbs("2024-03"));
+    expect(ymToAbs(fit.to)).toBeGreaterThanOrEqual(ymToAbs("2024-09"));
+    expect(yearOf(ymToAbs(fit.from))).toBe(2024);
+  });
+  it("pads a month on each side of the content", () => {
+    const fit = fitWindowYM([ymToAbs("2026-06"), ymToAbs("2026-08")])!;
+    // 3-month content → still enforces the 12-month minimum, and includes the content.
+    expect(ymToAbs(fit.from)).toBeLessThanOrEqual(ymToAbs("2026-05"));
+    expect(ymToAbs(fit.to)).toBeGreaterThanOrEqual(ymToAbs("2026-09"));
+  });
+  it("enforces a 12-month minimum span for a short project", () => {
+    const fit = fitWindowYM([ymToAbs("2026-05"), ymToAbs("2026-06")])!;
+    expect(ymToAbs(fit.to) - ymToAbs(fit.from) + 1).toBeGreaterThanOrEqual(12);
+  });
+  it("caps the span at MAX_SPAN for a very long project", () => {
+    const fit = fitWindowYM([ymToAbs("2020-01"), ymToAbs("2030-12")])!;
+    expect(ymToAbs(fit.to) - ymToAbs(fit.from) + 1).toBe(MAX_SPAN);
+  });
+  it("spans multiple years across sprints in different years", () => {
+    const fit = fitWindowYM([ymToAbs("2025-11"), ymToAbs("2026-02")])!;
+    expect(yearOf(ymToAbs(fit.from))).toBe(2025);
+    expect(yearOf(ymToAbs(fit.to))).toBe(2026);
   });
 });

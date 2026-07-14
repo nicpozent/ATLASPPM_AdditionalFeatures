@@ -37,7 +37,9 @@ public static class GanttEndpoints
         if (undated) { a = winStart ?? DateTime.UtcNow.Month - 1; b = winEnd ?? a; }
         var start = Math.Min(a ?? b!.Value, b ?? a!.Value);
         var end = Math.Max(a ?? b!.Value, b ?? a!.Value);
-        return new GanttSprintDto(s.Id, s.Name, s.Status, start, end, undated);
+        // Carry the real ISO dates through so the client places the bar in its true
+        // calendar year; month-of-year above stays as the undated/anchored fallback.
+        return new GanttSprintDto(s.Id, s.Name, s.Status, start, end, undated, s.StartDate, s.EndDate);
     }
 
     static PhaseDto ToDto(Phase p) => new(p.Id, p.Name, p.StartMonth, p.EndMonth, p.Progress);

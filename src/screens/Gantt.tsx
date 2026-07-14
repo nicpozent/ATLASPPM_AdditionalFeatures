@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, createContext, useContext } from "react";
+import { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
@@ -7,7 +7,7 @@ import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
 import { Overlay } from "./Demands";
 import {
   type Win, MONTHS, nowAbs, monthOfIso, absOfIso, ymToAbs, absToYm,
-  monthAbbr, yearOf, anchored, makeWindow, segPct, barGeom, centerPct,
+  monthAbbr, yearOf, anchored, makeWindow, fitWindowYM, segPct, barGeom, centerPct,
 } from "./gantt/model";
 
 const VIEW_TABS = [["schedule", "Schedule"], ["tasks", "Tasks"], ["resources", "Resource allocation"], ["sprints", "Sprints"]] as const;
@@ -16,7 +16,7 @@ type ViewId = (typeof VIEW_TABS)[number][0];
 interface Phase { id: number; name: string; startMonth: number; endMonth: number; progress: number; }
 interface Milestone { id: number; label: string; month: number; date: string; }
 interface Gantt { canEdit: boolean; phases: Phase[]; milestones: Milestone[]; projectStart?: number | null; projectEnd?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
-interface ProgramSprint { id: number; name: string; status: string; startMonth: number; endMonth: number; undated: boolean; }
+interface ProgramSprint { id: number; name: string; status: string; startMonth: number; endMonth: number; undated: boolean; startDate?: string; endDate?: string; }
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; startMonth?: number | null; endMonth?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
@@ -110,7 +110,7 @@ export default function Gantt() {
       allTasks.filter((t) => t.sprint === name).map((t) => {
         const ta = monthOfIso(t.startDate), tb = monthOfIso(t.targetDate);
         const ts = ta ?? tb ?? start, te = tb ?? ta ?? end;
-        return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te) };
+        return { id: t.id, name: `${t.code} ${t.name}`.trim(), status: t.status, startMonth: Math.min(ts, te), endMonth: Math.max(ts, te), startDate: t.startDate, endDate: t.targetDate };
       });
 
     // Prefer the server-computed sprint bars from the gantt endpoint — the same
@@ -122,6 +122,7 @@ export default function Gantt() {
       return serverBars.map((s) => ({
         id: s.id, name: s.name, status: s.status, startMonth: s.startMonth, endMonth: s.endMonth,
         tasks: taskBars(s.name, s.startMonth, s.endMonth), undated: s.undated,
+        startDate: s.startDate, endDate: s.endDate,
       }));
     }
 
@@ -134,7 +135,7 @@ export default function Gantt() {
         const undated = a === null && b === null;
         if (undated) { a = gantt?.projectStart ?? nowM; b = gantt?.projectEnd ?? nowM; }
         const start = Math.min(a ?? b!, b ?? a!), end = Math.max(a ?? b!, b ?? a!);
-        return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks: taskBars(s.name, start, end), undated };
+        return { id: s.id, name: s.name, status: s.status, startMonth: start, endMonth: end, tasks: taskBars(s.name, start, end), undated, startDate: s.startDate, endDate: s.endDate };
       });
     }
 
@@ -151,6 +152,32 @@ export default function Gantt() {
       return { id: -1 - i, name, status: "Planned", startMonth: start, endMonth: end, tasks: taskBars(name, start, end), undated };
     });
   }, [sprintData, taskData, gantt]);
+
+  // Auto-fit the visible window to the selected project's actual span. Without
+  // this the window stays on the current calendar year, so a project whose
+  // phases/sprints live in another year shows an empty schedule ("sprints don't
+  // show"). We fit once per project (tracked by id) so manual window edits stick.
+  const fitYM = useMemo<{ from: string; to: string } | null>(() => {
+    if (scope !== "project" || !activeProjectId || !gantt) return null;
+    const base = yearOf(absOfIso(gantt.startDate) ?? nowAbs()) * 12;
+    const abs: number[] = [];
+    const add = (v: number | null | undefined) => { if (v != null) abs.push(v); };
+    add(absOfIso(gantt.startDate)); add(absOfIso(gantt.endDate));
+    (gantt.phases ?? []).forEach((p) => { abs.push(anchored(base, p.startMonth), anchored(base, p.endMonth)); });
+    sprintBars.forEach((s) => {
+      abs.push(absOfIso(s.startDate) ?? anchored(base, s.startMonth));
+      abs.push(absOfIso(s.endDate) ?? anchored(base, s.endMonth));
+    });
+    (gantt.milestones ?? []).forEach((m) => add(absOfIso(m.date) ?? base + m.month));
+    return fitWindowYM(abs);
+  }, [scope, activeProjectId, gantt, sprintBars]);
+
+  const fitRef = useRef<string>("");
+  useEffect(() => {
+    if (fitYM && activeProjectId && fitRef.current !== activeProjectId) {
+      setFromYM(fitYM.from); setToYM(fitYM.to); fitRef.current = activeProjectId;
+    }
+  }, [fitYM, activeProjectId]);
 
   const canEdit = scope === "project" && (gantt?.canEdit ?? false);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["gantt"] });
@@ -348,8 +375,8 @@ function NowLine() {
 }
 
 // ---- Project schedule ------------------------------------------------------
-interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; }
-interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; }
+interface SprintTaskBar { id: number; name: string; status: string; startMonth: number; endMonth: number; startDate?: string; endDate?: string; }
+interface SprintBar { id: number; name: string; status: string; startMonth: number; endMonth: number; tasks: SprintTaskBar[]; undated?: boolean; startDate?: string; endDate?: string; }
 const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Started:   { bg: color.successTint,  border: color.success },
   Completed: { bg: color.primaryTint2, border: color.primary },
@@ -468,7 +495,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
                 <div key={s.id}>
                   <div style={{ position: "relative", height: 34, ...gb }}>
                     <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                      style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                      style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                   </div>
                   {open && (s.tasks.length === 0
                     ? <div style={{ height: 28, ...gb }} />
@@ -476,7 +503,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
                       const tc = TASK_BAR[t.status] ?? TASK_BAR["To Do"];
                       return (
                         <div key={t.id} style={{ position: "relative", height: 28, ...gb }}>
-                          <div title={`${t.name} · ${t.status}`} style={{ ...barAbs(anchored(base, t.startMonth), anchored(base, t.endMonth), win), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
+                          <div title={`${t.name} · ${t.status}`} style={{ ...barAbs(absOfIso(t.startDate) ?? anchored(base, t.startMonth), absOfIso(t.endDate) ?? anchored(base, t.endMonth), win), top: 6, height: 15, borderRadius: 5, background: tc.bg, border: `1px solid ${tc.border}` }} />
                         </div>
                       );
                     }))}
@@ -619,7 +646,7 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
                   return (
                     <div key={s.id} style={{ position: "relative", height: 34, ...gb }}>
                       <div title={`${s.name} · ${s.undated ? "dates TBD in Jira" : `${MONTHS[s.startMonth]}–${MONTHS[s.endMonth]}`} · ${s.status}`}
-                        style={{ ...barAbs(anchored(base, s.startMonth), anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
+                        style={{ ...barAbs(absOfIso(s.startDate) ?? anchored(base, s.startMonth), absOfIso(s.endDate) ?? anchored(base, s.endMonth), win), top: 7, height: 20, borderRadius: 6, background: c.bg, border: `1px ${s.undated ? "dashed" : "solid"} ${c.border}`, display: "flex", alignItems: "center", paddingLeft: 8, fontSize: 10.5, fontWeight: 600, color: color.text, overflow: "hidden", whiteSpace: "nowrap" }}>{s.name}</div>
                     </div>
                   );
                 })}
