@@ -73,11 +73,13 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   notes, a rich shape set incl. triangle/hexagon/parallelogram/star/pill/
   cylinder, arrow connectors, icons, actors, freehand pen, colour palette) with
   **live co-editing** via the room hub (granular authorized ops, not
-  last-write-wins). Fluid authoring: drag-to-create-and-resize shapes,
-  drag-from-a-shape-handle to connect, and a **Templates** dropdown (mind map,
-  fishbone, and one per methodology — Waterfall/V-Model/Stage-Gate/Scrum/Kanban/
-  SAFe/Scrumban/Spiral/Iterative/RAD/DevOps). Persisted as a JSON scene per
-  entity; server-sanitised and scope-gated by the same capability as the entity.
+  last-write-wins; concurrent edits to different fields of one node field-merge).
+  Fluid authoring: drag-to-create-and-resize shapes, drag-from-a-shape-handle to
+  connect, **multi-select** (shift/⌘-click, marquee drag, select-all) with group
+  move + **bulk delete**, and a **Templates** dropdown (mind map, fishbone
+  [Ishikawa spine + ribs], and one per methodology — Waterfall/V-Model/Stage-Gate/
+  Scrum/Kanban/SAFe/Scrumban/Spiral/Iterative/RAD/DevOps). Persisted as typed rows
+  per entity; server-sanitised and scope-gated by the same capability as the entity.
   Save menu exports PNG/SVG/JSON (dependency-free) + import + clear. Spans PI
   Planning, projects, programs, releases, products and the **roadmap**
   (`roadmap:portfolio`, cap-roadmap). See ADR-0064.

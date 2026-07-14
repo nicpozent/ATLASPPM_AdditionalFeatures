@@ -47,18 +47,28 @@ function mindmap(ox: number, oy: number): Fragment {
 
 function fishbone(ox: number, oy: number): Fragment {
   const b = builder();
-  const spineY = oy + 220;
-  const headId = b.add("hexagon", ox + 760, spineY - 55, 150, 110, "Effect / Problem", PALETTE[1]);
-  // Six standard cause categories (6M), three above and three below the spine.
+  const spineY = oy + 250;
+  const headX = ox + 960;
+  // The effect ("fish head") sits on the right; the backbone runs into it.
+  b.add("hexagon", headX, spineY - 62, 168, 124, "Effect / Problem", PALETTE[1]);
+  // Horizontal spine (backbone) drawn as a thin bar from the left to the head.
+  const spineX0 = ox + 60;
+  b.add("rect", spineX0, spineY - 3, headX - spineX0, 6, undefined, INK);
+  // Six standard cause categories (6M): three ribs above, three below, each
+  // attaching to the backbone at its own joint (stepping toward the head) — this
+  // is what makes it an Ishikawa diagram rather than a hub-and-spoke.
   const cats = ["People", "Process", "Equipment", "Materials", "Environment", "Management"];
+  const colX = [ox + 150, ox + 420, ox + 690];   // rib joints along the spine
   cats.forEach((c, i) => {
     const above = i < 3;
-    const col = i % 3;
-    const x = ox + 120 + col * 210;
-    const y = above ? spineY - 150 : spineY + 90;
-    const cid = b.add("rect", x, y, 150, 56, c, PALETTE[(i + 2) % PALETTE.length]);
-    b.link(cid, headId, INK);
-    const cause = b.add("note", x + 12, above ? y - 74 : y + 66, 130, 54, "Cause…", PALETTE[0]);
+    const bx = colX[i % 3];
+    const by = above ? spineY - 190 : spineY + 132;
+    const cid = b.add("rect", bx, by, 156, 58, c, PALETTE[(i + 2) % PALETTE.length]);
+    // Joint where this rib meets the backbone (small node on the spine).
+    const joint = b.add("ellipse", bx + 71, spineY - 7, 14, 14, undefined, INK);
+    b.link(cid, joint, INK);
+    // A sub-cause offshoot further out along the rib.
+    const cause = b.add("note", bx + 10, above ? by - 76 : by + 68, 136, 54, "Cause…", PALETTE[0]);
     b.link(cause, cid, INK);
   });
   return { nodes: b.nodes, edges: b.edges };
@@ -90,7 +100,20 @@ function cycle(ox: number, oy: number, title: string, steps: string[]): Fragment
 }
 
 // ---- Methodologies (CLAUDE.md §5) + named SDLC models ----------------------
-const waterfall = (x: number, y: number) => linear(x, y, "Waterfall", ["Requirements", "Design", "Implementation", "Verification", "Maintenance"]);
+// Waterfall cascades down-and-right (each phase spills into the next) — the shape
+// the name implies, not a flat row.
+function waterfall(ox: number, oy: number): Fragment {
+  const b = builder();
+  b.add("text", ox, oy - 46, 320, 34, "Waterfall", "#141a3c");
+  const steps = ["Requirements", "Design", "Implementation", "Verification", "Maintenance"];
+  let prev = "";
+  steps.forEach((s, i) => {
+    const id = b.add("rect", ox + i * 180, oy + i * 96, 168, 68, s, PALETTE[i % PALETTE.length]);
+    if (prev) b.link(prev, id, INK);
+    prev = id;
+  });
+  return { nodes: b.nodes, edges: b.edges };
+}
 const rad = (x: number, y: number) => linear(x, y, "RAD", ["Business modeling", "Data modeling", "Process modeling", "Application", "Testing & turnover"]);
 const scrum = (x: number, y: number) => cycle(x, y, "Scrum", ["Product backlog", "Sprint planning", "Sprint", "Daily scrum", "Review", "Retrospective"]);
 const iterative = (x: number, y: number) => cycle(x, y, "Iterative / Incremental", ["Plan", "Requirements", "Design", "Build", "Test", "Evaluate"]);
