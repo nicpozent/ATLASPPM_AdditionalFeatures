@@ -1,0 +1,50 @@
+# ============================================================================
+#  Passwordless Postgres (TLS client-certificate auth) overlay (OPT-IN).
+#  Removes the DB password entirely: the API/worker authenticate to Postgres by
+#  presenting a client certificate whose CN is the DB role. Your base
+#  docker-compose.yml is unchanged; this only applies when you name it, AND it
+#  requires the certs to exist first (see docs/postgres-cert-auth.md):
+#
+#    sh deploy/gen-pg-cert.sh db atlas       # once — mint CA + server + client certs
+#    docker compose -f docker-compose.yml -f docker-compose.pgcert.yml up -d
+#
+#  ⚠️ Dev certs from gen-pg-cert.sh. For production, mint server/client certs from
+#     your own CA with the same CNs (server SAN = the DB host; client CN = the DB
+#     role) and drop them into deploy/pgcerts/ with these filenames.
+# ============================================================================
+services:
+  db:
+    # Enable TLS and force client-cert auth via the mounted hba file. The server
+    # key is bind-mounted owned by uid 70 (postgres in the alpine image) so it's
+    # readable without an entrypoint hack — see gen-pg-cert.sh.
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/pgcerts/server.crt
+      - -c
+      - ssl_key_file=/etc/pgcerts/server.key
+      - -c
+      - ssl_ca_file=/etc/pgcerts/ca.crt
+      - -c
+      - hba_file=/etc/pgcerts/pg_hba.conf
+    volumes:
+      - ./deploy/pgcerts:/etc/pgcerts:ro
+      - ./deploy/pg_hba_cert.conf:/etc/pgcerts/pg_hba.conf:ro
+
+  api:
+    environment:
+      # No password — auth is the client cert. VerifyFull checks the server cert
+      # against the CA; the client cert (CN=atlas) is how Postgres authenticates us.
+      ConnectionStrings__Postgres: >-
+        Host=${POSTGRES_HOST:-db};Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};SSL Mode=VerifyFull;Root Certificate=/etc/pgcerts/ca.crt;SSL Certificate=/etc/pgcerts/client.crt;SSL Key=/etc/pgcerts/client.key
+    volumes:
+      - ./deploy/pgcerts:/etc/pgcerts:ro
+
+  worker:
+    environment:
+      ConnectionStrings__Postgres: >-
+        Host=${POSTGRES_HOST:-db};Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};SSL Mode=VerifyFull;Root Certificate=/etc/pgcerts/ca.crt;SSL Certificate=/etc/pgcerts/client.crt;SSL Key=/etc/pgcerts/client.key
+    volumes:
+      - ./deploy/pgcerts:/etc/pgcerts:ro

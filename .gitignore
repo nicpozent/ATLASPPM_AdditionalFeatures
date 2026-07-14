@@ -7,6 +7,8 @@ dist/
 
 # Docker secret files (see docs/secrets.md) — never commit real secrets
 secrets/
+# Postgres client/server certs & keys for passwordless auth (dev-generated)
+deploy/pgcerts/
 .DS_Store
 
 # TypeScript / Vite build outputs
