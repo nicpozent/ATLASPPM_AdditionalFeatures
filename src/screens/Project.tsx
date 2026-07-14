@@ -46,7 +46,12 @@ export default function Project() {
   const [params] = useSearchParams();
   const id = params.get("id");
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabId>("overview");
+  // Initial tab is deep-linkable via ?tab= (validated against TABS), so a link
+  // can open a project straight on its Tasks / RAID / Security tab.
+  const [tab, setTab] = useState<TabId>(() => {
+    const t = params.get("tab");
+    return (TABS.some(([tid]) => tid === t) ? t : "overview") as TabId;
+  });
   const [editing, setEditing] = useState(false);
   const { data: p } = useProject(id);
   const { can } = usePermissions();

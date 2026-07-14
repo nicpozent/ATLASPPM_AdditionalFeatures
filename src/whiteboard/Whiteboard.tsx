@@ -87,8 +87,24 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const { peers, cursors, connected, sendCursor } = useRoomRealtime(roomKey, identity.name, reconcile, onOp);
 
   // --- Selection & tool state ---
+  // `sel` is the primary (last-clicked) node for single-node ops (edit/nudge);
+  // `selIds` is the full multi-selection used for move/recolour/delete.
   const [sel, setSel] = useState<string | null>(null);
+  const [selIds, setSelIds] = useState<string[]>([]);
   const [selEdge, setSelEdge] = useState<string | null>(null);
+  // Rubber-band multi-select on empty canvas (select tool).
+  const marquee = useRef<{ x0: number; y0: number } | null>(null);
+  const [marqueeLive, setMarqueeLive] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const selectOnly = useCallback((id: string) => { setSel(id); setSelIds([id]); setSelEdge(null); }, []);
+  const clearSel = useCallback(() => { setSel(null); setSelIds([]); setSelEdge(null); }, []);
+  const toggleSel = useCallback((id: string) => {
+    setSelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSel(id); setSelEdge(null);
+  }, []);
+  const selectAll = useCallback(() => {
+    const ids = sceneRef.current.nodes.map((n) => n.id);
+    setSelIds(ids); setSel(ids[ids.length - 1] ?? null); setSelEdge(null);
+  }, []);
   const [pending, setPending] = useState<{ kind: NodeKind; icon?: string } | null>(null);
   const [tool, setTool] = useState<"select" | "connector" | "pen">("select");   // pointer mode
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
@@ -110,7 +126,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     if (s) setView({ left: s.scrollLeft, top: s.scrollTop, w: s.clientWidth, h: s.clientHeight });
   }, []);
   useEffect(() => { syncView(); window.addEventListener("resize", syncView); return () => window.removeEventListener("resize", syncView); }, [syncView]);
-  const drag = useRef<{ id: string; mode: "move" | "resize"; ox: number; oy: number; start: WbNode } | null>(null);
+  const drag = useRef<{ id: string; mode: "move" | "resize"; ox: number; oy: number; start: WbNode; group?: { id: string; start: WbNode }[] } | null>(null);
   const pen = useRef<number[] | null>(null);                 // in-progress freehand points
   const [penLive, setPenLive] = useState<number[] | null>(null);
   // Drag-to-create: press-drag on the canvas with a shape tool armed rubber-bands
@@ -137,7 +153,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   const clearBoard = () => {
     if (sceneRef.current.nodes.length === 0 && sceneRef.current.edges.length === 0) return;
     if (!window.confirm("Clear the whole whiteboard? This removes every note, shape and connector for everyone.")) return;
-    setScene(EMPTY_SCENE); putWholeScene(EMPTY_SCENE); setSel(null); setSelEdge(null);
+    setScene(EMPTY_SCENE); putWholeScene(EMPTY_SCENE); clearSel();
   };
   const doExport = (fmt: "png" | "svg" | "json") => {
     setExportMenu(false);
@@ -158,9 +174,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  // --- Pointer: background (pen / add tool / deselect) ---
+  // --- Pointer: background (pen / add tool / marquee-select / deselect) ---
   const onCanvasDown = (e: React.PointerEvent) => {
-    if (!canEdit) { setSel(null); setSelEdge(null); return; }
+    if (!canEdit) { clearSel(); return; }
     const p = toCanvas(e);
     if (tool === "pen") {
       pen.current = [p.x, p.y]; setPenLive([p.x, p.y]); interacting.current = true;
@@ -175,7 +191,13 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
       return;
     }
-    setSel(null); setSelEdge(null); setLinkFrom(null);
+    // Empty-canvas press with the select tool → rubber-band multi-select. A plain
+    // click (no drag) collapses to an empty marquee and clears the selection.
+    setLinkFrom(null);
+    marquee.current = { x0: p.x, y0: p.y };
+    setMarqueeLive({ x: p.x, y: p.y, w: 0, h: 0 });
+    interacting.current = true;
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
   const onCanvasMove = (e: React.PointerEvent) => {
@@ -188,15 +210,34 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       return;
     }
     if (wire.current) { setWireLive({ from: wire.current.from, x: p.x, y: p.y }); return; }
+    if (marquee.current) {
+      const m = marquee.current;
+      setMarqueeLive({ x: Math.min(m.x0, p.x), y: Math.min(m.y0, p.y), w: Math.abs(p.x - m.x0), h: Math.abs(p.y - m.y0) });
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     const node = sceneRef.current.nodes.find((n) => n.id === d.id);
     if (!node) return;
     if (d.mode === "move") {
-      const nx = clamp(d.start.x + (p.x - d.ox), 0, CANVAS_W - node.w);
-      const ny = clamp(d.start.y + (p.y - d.oy), 0, CANVAS_H - node.h);
-      const patch = d.start.kind === "draw" ? translateNode(d.start, nx - d.start.x, ny - d.start.y) : { x: nx, y: ny };
-      setScene((s) => updateNode(s, d.id, patch));
+      const dx = p.x - d.ox, dy = p.y - d.oy;
+      if (d.group) {
+        // Group move — translate every selected node by the same delta.
+        setScene((s) => {
+          let ns = s;
+          for (const g of d.group!) {
+            const nx = clamp(g.start.x + dx, 0, CANVAS_W - g.start.w);
+            const ny = clamp(g.start.y + dy, 0, CANVAS_H - g.start.h);
+            ns = updateNode(ns, g.id, g.start.kind === "draw" ? translateNode(g.start, nx - g.start.x, ny - g.start.y) : { x: nx, y: ny });
+          }
+          return ns;
+        });
+      } else {
+        const nx = clamp(d.start.x + dx, 0, CANVAS_W - node.w);
+        const ny = clamp(d.start.y + dy, 0, CANVAS_H - node.h);
+        const patch = d.start.kind === "draw" ? translateNode(d.start, nx - d.start.x, ny - d.start.y) : { x: nx, y: ny };
+        setScene((s) => updateNode(s, d.id, patch));
+      }
     } else {
       const nw = clamp(d.start.w + (p.x - d.ox), 44, CANVAS_W - node.x);
       const nh = clamp(d.start.h + (p.y - d.oy), 32, CANVAS_H - node.y);
@@ -242,14 +283,28 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       }
       return;
     }
+    // Finish a rubber-band multi-select → select every node intersecting the box.
+    if (marquee.current) {
+      const m = marquee.current; marquee.current = null; setMarqueeLive(null); interacting.current = false;
+      const x1 = Math.min(m.x0, (e ? toCanvas(e).x : m.x0)), y1 = Math.min(m.y0, (e ? toCanvas(e).y : m.y0));
+      const x2 = Math.max(m.x0, (e ? toCanvas(e).x : m.x0)), y2 = Math.max(m.y0, (e ? toCanvas(e).y : m.y0));
+      if (x2 - x1 < 4 && y2 - y1 < 4) { clearSel(); return; }   // a plain click clears
+      const hit = sceneRef.current.nodes.filter((n) => n.x < x2 && n.x + n.w > x1 && n.y < y2 && n.y + n.h > y1).map((n) => n.id);
+      setSelIds(hit); setSel(hit[hit.length - 1] ?? null); setSelEdge(null);
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     drag.current = null; dragIdRef.current = null;
     interacting.current = false;
-    const node = sceneRef.current.nodes.find((n) => n.id === d.id);
-    // Persist only the geometry that a move/resize changes — a field-level patch,
-    // so a peer's concurrent recolour/text edit on the same node isn't lost.
-    if (node) patchNode({ id: node.id, x: node.x, y: node.y, w: node.w, h: node.h, points: node.points });
+    // Persist only the geometry that a move/resize changes — field-level patches,
+    // so a peer's concurrent recolour/text edit on the same node isn't lost. A
+    // group move patches every node that travelled.
+    const movedIds = d.group ? d.group.map((g) => g.id) : [d.id];
+    for (const mid of movedIds) {
+      const node = sceneRef.current.nodes.find((n) => n.id === mid);
+      if (node) patchNode({ id: node.id, x: node.x, y: node.y, w: node.w, h: node.h, points: node.points });
+    }
   };
 
   // Start a drag-to-connect wire from a node's connector handle.
@@ -264,7 +319,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   // --- Pointer: a node ---
   const onNodeDown = (e: React.PointerEvent, node: WbNode, mode: "move" | "resize") => {
     e.stopPropagation();
-    if (!canEdit) { setSel(node.id); setSelEdge(null); return; }
+    if (!canEdit) { selectOnly(node.id); return; }
     // Completing a connector (from the connector tool or the Connect button).
     if (linkFrom) {
       if (node.id !== linkFrom) {
@@ -274,11 +329,19 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
       setLinkFrom(null);
       return;
     }
-    if (tool === "connector") { setSel(node.id); setLinkFrom(node.id); return; }
-    setSel(node.id); setSelEdge(null);
+    if (tool === "connector") { selectOnly(node.id); setLinkFrom(node.id); return; }
+    // Shift/Ctrl/Cmd-click toggles membership in the multi-selection (no drag).
+    if (e.shiftKey || e.ctrlKey || e.metaKey) { toggleSel(node.id); return; }
+    // Plain click: keep an existing multi-selection if this node is part of it
+    // (so a drag moves the whole group); otherwise select just this node.
+    const inGroup = selIds.length > 1 && selIds.includes(node.id);
+    if (!inGroup) selectOnly(node.id); else setSel(node.id);
     interacting.current = true;
     const p = toCanvas(e);
-    drag.current = { id: node.id, mode, ox: p.x, oy: p.y, start: node };
+    const group = inGroup && mode === "move"
+      ? selIds.map((sid) => ({ id: sid, start: sceneRef.current.nodes.find((n) => n.id === sid)! })).filter((g) => g.start)
+      : undefined;
+    drag.current = { id: node.id, mode, ox: p.x, oy: p.y, start: node, group };
     dragIdRef.current = node.id;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
@@ -299,15 +362,21 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
   // --- Toolbar actions on the selection ---
   const recolor = (c: string) => {
     setNewColor(c); setInkColor(c);
-    if (sel) {
-      const node = sceneRef.current.nodes.find((n) => n.id === sel);
-      if (node) { setScene((s) => updateNode(s, sel, { color: c })); patchNode({ id: node.id, color: c }); }
+    const ids = selIds.length ? selIds : sel ? [sel] : [];
+    for (const nid of ids) {
+      if (sceneRef.current.nodes.some((n) => n.id === nid)) { setScene((s) => updateNode(s, nid, { color: c })); patchNode({ id: nid, color: c }); }
     }
   };
+  // Delete the whole selection — every selected node (one granular op each) or
+  // the selected connector.
   const deleteSel = useCallback(() => {
-    if (sel) { setScene((s) => removeNode(s, sel)); pushDelNode(sel); setSel(null); }
-    else if (selEdge) { setScene((s) => removeEdge(s, selEdge)); pushDelEdge(selEdge); setSelEdge(null); }
-  }, [sel, selEdge, pushDelNode, pushDelEdge]);
+    if (selIds.length) {
+      const ids = [...selIds];
+      setScene((s) => ids.reduce((acc, nid) => removeNode(acc, nid), s));
+      ids.forEach((nid) => pushDelNode(nid));
+      clearSel();
+    } else if (selEdge) { setScene((s) => removeEdge(s, selEdge)); pushDelEdge(selEdge); setSelEdge(null); }
+  }, [selIds, selEdge, pushDelNode, pushDelEdge, clearSel]);
 
   // Pick a shape/pen/connector tool (clears the others).
   const armShape = (k: NodeKind) => { setPending({ kind: k }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
@@ -330,21 +399,23 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return;
-    if ((e.key === "Delete" || e.key === "Backspace") && (sel || selEdge)) { e.preventDefault(); deleteSel(); return; }
-    if (e.key === "Escape") { setPending(null); setLinkFrom(null); setSel(null); setSelEdge(null); setTool("select"); return; }
+    // Ctrl/Cmd-A selects every shape (open to all — selecting isn't a write).
+    if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) { e.preventDefault(); selectAll(); return; }
+    if ((e.key === "Delete" || e.key === "Backspace") && (selIds.length || selEdge)) { e.preventDefault(); deleteSel(); return; }
+    if (e.key === "Escape") { setPending(null); setLinkFrom(null); clearSel(); setTool("select"); return; }
     if (!canEdit || !sel) return;
-    // Enter / F2 edits the selected node's text (shapes/notes/text only).
+    // Enter / F2 edits the primary selected node's text (shapes/notes/text only).
     if (e.key === "Enter" || e.key === "F2") {
       const node = sceneRef.current.nodes.find((n) => n.id === sel);
       if (node && node.kind !== "icon" && node.kind !== "draw") { e.preventDefault(); startEdit(node); }
       return;
     }
-    // Arrow keys move the selection (keyboard equivalent of dragging).
+    // Arrow keys move the whole selection (keyboard equivalent of dragging).
     const step = e.shiftKey ? 1 : 10;
     const delta: Record<string, [number, number]> = {
       ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
     };
-    if (delta[e.key]) { e.preventDefault(); const [dx, dy] = delta[e.key]; nudge(sel, dx, dy); }
+    if (delta[e.key]) { e.preventDefault(); const [dx, dy] = delta[e.key]; (selIds.length ? selIds : [sel]).forEach((sid) => nudge(sid, dx, dy)); }
   };
 
   return (
@@ -414,10 +485,16 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
               )}
             </div>
 
-            <button type="button" onClick={deleteSel} disabled={!sel && !selEdge} title="Delete selection (Del)"
-              style={{ ...actionBtn(!!(sel || selEdge)), color: (sel || selEdge) ? color.danger : color.faint3 }}>
-              <Icon name="trash" size={15} /> Delete
+            <button type="button" onClick={selectAll} disabled={scene.nodes.length === 0} title="Select all shapes (Ctrl/Cmd+A)"
+              style={{ ...actionBtn(scene.nodes.length > 0) }}>
+              <Icon name="grid" size={15} /> Select all
             </button>
+            {(() => { const n = selIds.length || (selEdge ? 1 : 0); const on = n > 0; return (
+              <button type="button" onClick={deleteSel} disabled={!on} title="Delete selection (Del) — shift/⌘-click or drag a box to select several"
+                style={{ ...actionBtn(on), color: on ? color.danger : color.faint3 }}>
+                <Icon name="trash" size={15} /> Delete{selIds.length > 1 ? ` (${selIds.length})` : ""}
+              </button>
+            ); })()}
 
             {/* Export / import / clear */}
             <div style={{ position: "relative" }}>
@@ -519,9 +596,9 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
           {/* Nodes */}
           {scene.nodes.map((node) => (
             <NodeView
-              key={node.id} node={node} selected={sel === node.id} canEdit={canEdit}
+              key={node.id} node={node} selected={selIds.includes(node.id)} canEdit={canEdit}
               editing={editing === node.id} linkSource={linkFrom === node.id}
-              onSelect={() => { setSel(node.id); setSelEdge(null); }}
+              onSelect={() => selectOnly(node.id)}
               onDown={(e, mode) => onNodeDown(e, node, mode)}
               onStartWire={(e) => startWire(e, node.id)}
               onDoubleClick={() => startEdit(node)}
@@ -533,6 +610,11 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
           {/* Rubber-band create preview */}
           {createLive && (createLive.w > 2 || createLive.h > 2) && (
             <div style={{ position: "absolute", left: createLive.x, top: createLive.y, width: createLive.w, height: createLive.h, border: `1.5px dashed ${color.primary}`, background: color.primaryTint, opacity: 0.5, borderRadius: 8, pointerEvents: "none" }} />
+          )}
+
+          {/* Rubber-band multi-select box */}
+          {marqueeLive && (marqueeLive.w > 2 || marqueeLive.h > 2) && (
+            <div style={{ position: "absolute", left: marqueeLive.x, top: marqueeLive.y, width: marqueeLive.w, height: marqueeLive.h, border: `1px dashed ${color.faint2}`, background: "rgba(20,26,60,0.06)", pointerEvents: "none" }} />
           )}
 
           {/* Peer cursors */}

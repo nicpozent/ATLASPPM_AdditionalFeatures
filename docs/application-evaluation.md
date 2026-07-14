@@ -24,9 +24,9 @@ _Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration
 | 7 | **Integrations** | ★★★★☆ | Jira (full sync + attachments), Microsoft Graph, **Azure DevOps (discovery + work-item sync, backgrounded, delta/changed-since pulls)** | ServiceNow/GitHub/Confluence/Teams/Slack/Power BI cosmetic |
 | 8 | **Async / background work** | ★★★★★ | Hosted services: Jira + **ADO** background queues/workers (202 + poll), scheduled Jira, retention, capacity alerts; **web/worker process split (`Atlas__Role`) runs recurring jobs in their own container off the request path (ADR-0048)** | — |
 | 9 | **Security & hardening** | ★★★★☆ | Security headers/CSP, rate limiting, upload limits, least-privilege DB role + **non-root API image**, secrets via env/Docker secrets + **Dependabot cooldown**, dependency audit gate, idle-logout; **gating** AppSec scanning — SAST (Semgrep) · SCA/secrets/IaC (Trivy), triaged baseline (ADR-0051/0053) + on-demand DAST (ZAP); portable `scripts/security-scan.sh` (runs off GitHub) + in-app **Admin → Security Posture**; CodeQL enablement note + **pen-test scope & remediation register (`docs/pentest-scope.md`)** | Human pen-test engagement + automated secret rotation outstanding |
-| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast**; mobile drawer; focus/dialog/menu semantics; **keyboard/AT operation of the pointer-first surfaces** — whiteboard canvas (focusable labelled nodes, arrow-move/edit/delete) + Kanban/funnel drag boards (focus + arrow-move) | Axe sweep covers 6 representative routes; extend to the whiteboard/board views |
+| 10 | **Accessibility (WCAG 2 AA)** | ★★★★★ | jsdom axe on primitives + **browser axe sweep gated incl. colour-contrast** across 7 routes, the whiteboard canvas AND the **Tasks Kanban + PI Program boards** (seeded via mocked API); **keyboard/AT operation of every pointer-first surface**; **documented screen-reader test procedure** (`docs/accessibility.md`); mobile drawer; focus/dialog/menu semantics | No third-party assistive-tech audit yet (internal SR procedure documented; external audit recommended pre-GA) |
 | 11 | **Observability** | ★★★★★ | OpenTelemetry (traces/metrics/logs), health/readiness, correlation IDs, reference stack; **domain metrics (sync/queue/capacity/DB) + tuned dashboards + Prometheus alert rules** | — |
-| 12 | **Testing** | ★★★★★ | Backend 442 xUnit; frontend 89 vitest + per-screen logic; Playwright e2e — axe sweep + full user-journey specs (navigation, role-nav, dashboard layouts, mocked demand drill-in); **k6 load/perf suite (smoke·load·stress + API volume seeder, ADR-0047)**; smoke wired into CI (`perf-smoke.yml`, seeded API + k6 vs hot roll-ups) | Deeper frontend logic tests for the new canvas/board interactions (in progress); full load/stress against a seeded env |
+| 12 | **Testing** | ★★★★★ | Backend 444 xUnit; frontend 111 vitest + per-screen logic (incl. Gantt-geometry, whiteboard field-merge/backfill, SoA roll-up/evidence); Playwright e2e — axe sweep **now covering the whiteboard canvas + demand funnel** + full user-journey specs; **k6 load/perf suite (ADR-0047)**; smoke wired into CI | Migrations/backfill exercised in-memory in tests, not yet against a live Postgres; task/PI-board drag e2e still thin |
 | 13 | **CI/CD** | ★★★★★ | GitHub Actions: frontend lint/test/build, API build/test, a11y sweep, NuGet + npm audit gates, SAST/SCA/DAST, **on-demand perf-smoke gate (seeded API + k6)**; **tag-triggered release pipeline publishing versioned api/web images to GHCR (Buildx + image scan, ADR-0052)** | Deploy-to-host step host-dependent (parked with k8s) |
 | 14 | **Delivery & runtime** | ★★★★★ | **On-prem single-node Docker (`docker compose`: web/worker/db/nginx edge) as the chosen, documented target (ADR-0054)**; images promoted from GHCR (ADR-0052); migrations on start; health-gated; secrets overlay; upgrade = pull-and-recreate | k8s parked (no scale/HA need at portfolio scale); HA is a single-node trade-off |
 | 15 | **Governance & compliance** | ★★★★★ | Stage gates, RAID, ARB sign-off, decision log, security controls, GDPR DSAR + retention; deterministic risk engine maps findings to GDPR/ISO 27001/ISO 42001/PCI-DSS/SOC 2/NIS2/NIST CSF/MITRE ATT&CK + generic per-framework coverage; **EU AI Act risk-tiering + ISO 42001 AI-management (tier→obligation rules, ADR-0050)**; Zero-Trust posture (ADR-0049); **ISO 27001:2022 Statement of Applicability — full 93-control Annex A coverage per project (ADR-0066)** | Per-control automated evidence linkage; SoAs for other frameworks |
@@ -79,8 +79,8 @@ _Last reviewed: 2026-07-13 · main (Teams notifications, real-time collaboration
 ## 4. Overall
 
 **Verdict: production-ready.** The core PPM product is complete, data-wired,
-tested (541 automated tests across stacks — 442 backend xUnit, 89 frontend
-vitest, 10 Playwright e2e: 6 axe + 4 full-journey — plus a k6 load/perf suite),
+tested (555 automated tests across stacks — 444 backend xUnit, 111 frontend
+vitest, 14 Playwright e2e: 10 axe + 4 full-journey — plus a k6 load/perf suite),
 accessible (AA-gated), observable, and documented to a professional standard
 (ABB/SBB traceability, 66 ADRs, HLD/LLD). Entra SSO is verified end-to-end on a
 live tenant. Remaining items are enhancements, not blockers: broadening connector
@@ -181,3 +181,36 @@ per project with applicability/justification/status + coverage roll-up (ADR-0066
 442 backend xUnit + 89 frontend vitest; ADRs to 66; user-stories, requirements
 and building-blocks (ABB/SBB) refreshed to match. No rating change (the affected
 dimensions were already ★★★★★); **Overall stays 4.9/5**._
+
+_Update 2026-07-13 (rev 2): second review-driven follow-up cycle — closed the
+remaining engineering gaps the review itself raised. **SoA automated evidence
+linkage** — ~20 Annex A controls the platform satisfies by construction (RBAC,
+audit log, backups, OpenTelemetry, CI SAST/SCA/DAST, secret redaction, TLS/CSP,
+Entra SSO) now carry a standing evidence note + a "platform-evidenced" coverage
+count (ADR-0066). **Whiteboard field-level merge** — co-editing ops send only the
+changed properties, so concurrent edits to *different* fields of one node merge
+instead of clobbering; a full CRDT/OT was evaluated and **declined** as
+disproportionate (ADR-0064). **Large-screen decomposition** continued — Governance
+out of `Project.tsx` (1617→1361) and the data-governance sections out of
+`Admin.tsx` (1177→897), shared Admin styles factored to `admin/styles.ts`
+(ADR-0041). **A11y** — the gated axe sweep now covers the whiteboard canvas + the
+demand funnel (fixing two real funnel violations: a non-focusable scroll region
+and a below-AA amber label). Tests 444 backend xUnit + 111 frontend vitest (+ the
+funnel now in the axe sweep). This closes the review's own follow-up list; the
+`docs/application-evaluation.md` scorecard and the published evaluation artifact
+were both re-scored. Remaining items are operator/organizational (auth-on,
+at-rest encryption, DPIA sign-off, the Azure move) plus one caveat — the new
+migrations + backfill are proven in-memory, not yet against a live Postgres. No
+rating change here (the dimensions were already ★★★★★)._
+
+_Update 2026-07-13 (rev 3): closed the accessibility follow-up. The gated axe
+sweep now also covers the **Tasks Kanban board** and the **PI Program Board** —
+both seeded via mocked `/api/v1/*` (`e2e/journeys/board-a11y.spec.ts`), which
+surfaced and fixed a real bug: the PI increment picker had no accessible name.
+Project tabs are now **deep-linkable** (`?tab=`) so a board is reachable directly.
+A **screen-reader test procedure** is documented (`docs/accessibility.md`),
+consolidating the automated coverage + a per-surface manual NVDA/VoiceOver
+checklist. Playwright grew to 14 specs (10 axe + 4 journey). The one remaining
+a11y item is an **external assistive-tech audit** (pre-GA) — analogous to the
+outstanding human pen-test on Security. In the broader 18-dimension evaluation
+artifact this lifts Accessibility to ★★★★★ (14/18 at the top band; overall 4.7)._
