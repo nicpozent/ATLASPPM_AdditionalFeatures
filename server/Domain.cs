@@ -921,6 +921,23 @@ public class ProjectDependency
     public int Ord { get; set; }
 }
 
+// ---- Timeline dependencies (generic cross-entity links) -------------------
+// A directed dependency drawn as an arrow on the portfolio/timeline views:
+// (FromType,FromId) depends on (ToType,ToId) — To is upstream/predecessor, so the
+// arrow points To → From. Types are project | program | product | release |
+// sprint. Source distinguishes hand-drawn links from ones ingested from Jira
+// issue links, so the sync can own its rows without clobbering manual ones.
+public class TimelineDependency
+{
+    public int Id { get; set; }
+    public string FromType { get; set; } = "project";
+    public string FromId { get; set; } = default!;
+    public string ToType { get; set; } = "project";
+    public string ToId { get; set; } = default!;
+    public string Source { get; set; } = "manual";   // manual | jira
+    public int Ord { get; set; }
+}
+
 // ---- Quality (test plans & defects) ---------------------------------------
 public class TestPlan
 {

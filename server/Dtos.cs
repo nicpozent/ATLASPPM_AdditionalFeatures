@@ -168,6 +168,14 @@ public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> 
 public record PortfolioGanttItemDto(string Type, string Id, string Name, string Status, int StartMonth, int EndMonth, int? Progress, string StartLabel, string EndLabel);
 public record PortfolioGanttDto(List<PortfolioGanttItemDto> Items);
 
+// A dependency edge drawn as a timeline arrow: (FromType,FromId) depends on
+// (ToType,ToId) — arrow points To → From. Source = manual | jira | project
+// (derived from the existing project→project links). Id is 0 for derived edges
+// that can't be deleted from here.
+public record TimelineDepDto(int Id, string FromType, string FromId, string ToType, string ToId, string Source);
+public record TimelineDepsDto(bool CanEdit, List<TimelineDepDto> Edges);
+public record CreateTimelineDepReq(string? FromType, string? FromId, string? ToType, string? ToId);
+
 // ---- Ways of working (methodology-specific ceremonies & artifacts) ---------
 public record WowItemDto(string Label, string Detail);
 public record WaysOfWorkingDto(string Methodology, string Cadence, string Summary,

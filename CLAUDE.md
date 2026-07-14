@@ -99,6 +99,16 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   status and owner, plus a coverage roll-up. The Annex A catalogue is static
   reference data; only the per-project decision is persisted (`SoaEntry`).
   Governance-scoped (cap-approve), server-authoritative, audited. See ADR-0066.
+- **Cross-entity timeline dependencies** — the Gantt header already promises
+  "dependencies", and project→project links existed; this generalises them to a
+  directed link between any two timeline items (`project`/`program`/`product`/
+  `release`/`sprint`) stored as `TimelineDependency` (`source` = manual | jira |
+  project). The **Portfolio timeline** now renders each dependency as a
+  finish-to-start arrow (upstream → downstream) and lets planners hand-draw /
+  remove links (cap-projects); the existing project links are folded in
+  automatically. Built from the existing timeline geometry + theme. Jira
+  issue-link ingestion and per-project (sprint-level) arrows are the next
+  increments. Prototype needs the arrow visuals added.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs

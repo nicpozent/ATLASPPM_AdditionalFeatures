@@ -4,6 +4,7 @@ import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
+import { toast, toastError } from "@/components/Toast";
 import { Overlay } from "./Demands";
 import {
   type Win, MONTHS, nowAbs, monthOfIso, absOfIso, ymToAbs, absToYm,
@@ -22,6 +23,11 @@ interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
 interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
 type PortfolioCat = "all" | "project" | "program" | "product" | "release";
+// A dependency edge on the timeline: (fromType,fromId) depends on (toType,toId),
+// so the arrow points to → from. `source` is manual | jira | project.
+interface TimelineDep { id: number; fromType: string; fromId: string; toType: string; toId: string; source: string; }
+// A laid-out bar's position for arrow routing: 0-based row + left/width in %.
+interface BarPos { row: number; left: number; width: number; }
 interface SprintT { id: number; name: string; startDate: string; endDate: string; status: string; }
 interface GTask { id: number; code: string; name: string; sprint: string; status: string; startDate: string; targetDate: string; jiraCreated?: string; startedAt?: string; resolvedAt?: string; assignee?: string; }
 const TASK_BAR: Record<string, { bg: string; border: string }> = {
@@ -531,6 +537,53 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectStart
   );
 }
 
+// ---- Dependency arrows (SVG overlay) ---------------------------------------
+// Routes a finish-to-start elbow from each upstream bar's right edge to the
+// downstream bar's left edge. Positions come in as percentages; we measure the
+// grid's pixel width so the arrowheads stay round (no non-uniform SVG scaling).
+// Absolutely positioned, non-interactive, and sits just under the Today line.
+function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos: Map<string, BarPos>; rowH: number; rows: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const H = rows * rowH;
+  return (
+    <div ref={ref} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}>
+      {w > 0 && (
+        <svg width={w} height={H} style={{ position: "absolute", top: 0, left: 0, overflow: "visible" }} aria-hidden="true">
+          <defs>
+            <marker id="dep-arrowhead" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+            </marker>
+          </defs>
+          {edges.map((e) => {
+            const up = pos.get(`${e.toType}-${e.toId}`);
+            const down = pos.get(`${e.fromType}-${e.fromId}`);
+            if (!up || !down) return null;   // an endpoint is off-window / not shown
+            const x1 = ((up.left + up.width) / 100) * w, y1 = up.row * rowH + rowH / 2;
+            const x2 = (down.left / 100) * w, y2 = down.row * rowH + rowH / 2;
+            const midX = Math.max(x1 + 12, x2 - 12);
+            return (
+              <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
+                d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
+                stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
+                markerEnd="url(#dep-arrowhead)" opacity={0.85} />
+            );
+          })}
+        </svg>
+      )}
+    </div>
+  );
+}
+
 // ---- Portfolio schedule (all entity types on one grid) --------------------
 const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: string }> = {
   project: { ink: "#7A3FB0", tint: color.accentTint, bar: "#7A3FB0", label: "Project" },
@@ -541,12 +594,42 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   const win = useWin();
   const gb = gridBg(win);
+  const qc = useQueryClient();
+  const [linking, setLinking] = useState(false);
+  const { data: depData } = useQuery({
+    queryKey: ["portfolio-deps"], retry: false, staleTime: 30_000,
+    queryFn: async (): Promise<{ canEdit: boolean; edges: TimelineDep[] }> =>
+      (await api<{ canEdit: boolean; edges: TimelineDep[] }>("/portfolio/dependencies")) ?? { canEdit: false, edges: [] },
+  });
+  const edges = depData?.edges ?? [];
+  const canEdit = depData?.canEdit ?? false;
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["portfolio-deps"] });
+  const addDep = useMutation({
+    mutationFn: (b: { fromType: string; fromId: string; toType: string; toId: string }) => api("/portfolio/dependencies", { method: "POST", body: JSON.stringify(b) }),
+    onSuccess: () => { toast("Dependency linked", "info"); setLinking(false); invalidate(); }, onError: toastError,
+  });
+  const removeDep = useMutation({
+    mutationFn: (id: number) => api(`/portfolio/dependencies/${id}`, { method: "DELETE" }),
+    onSuccess: () => { toast("Dependency removed", "info"); invalidate(); }, onError: toastError,
+  });
   // Dated items (startLabel/endLabel are ISO/display dates) place across years;
   // items with only a derived month window anchor to the window's start year.
   const itemAbs = (label: string, month: number) => absOfIso(label) ?? yearOf(win.start) * 12 + month;
   if (items.length === 0) return <Note text={cat === "all" ? "Nothing with dates in the portfolio yet. Set start/end dates on projects, programs, products or releases to see them here." : "No dated items in this category."} />;
   const rowsHeight = Math.max(120, items.length * 38);
+  const nameOf = new Map(items.map((i) => [`${i.type}-${i.id}`, i.name]));
+  // Bar positions (%) for arrow routing — only items whose bar is on the window.
+  const pos = new Map<string, BarPos>();
+  items.forEach((i, row) => {
+    const g = barGeom(itemAbs(i.startLabel, i.startMonth), itemAbs(i.endLabel, i.endMonth), win);
+    if (g) pos.set(`${i.type}-${i.id}`, { row, left: g.left, width: g.width });
+  });
+  // Draw only edges whose BOTH ends are visible in the current filter + window.
+  const visibleEdges = edges.filter((e) => pos.has(`${e.toType}-${e.toId}`) && pos.has(`${e.fromType}-${e.fromId}`));
+  const manualEdges = edges.filter((e) => e.source === "manual");
+  const label = (type: string, id: string) => nameOf.get(`${type}-${id}`) ?? `${type} ${id}`;
   return (
+    <>
     <div style={{ display: "flex" }}>
       <div style={{ width: LABEL_W, flex: "none", borderRight: `1px solid ${color.bg}` }}>
         <div style={{ height: 38, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, color: color.faint3, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600, borderBottom: `1px solid ${color.bg}` }}>Item</div>
@@ -576,9 +659,68 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
               </div>
             );
           })}
+          <DependencyLayer edges={visibleEdges} pos={pos} rowH={38} rows={items.length} />
         </div>
       </div>
     </div>
+    {/* Dependency legend + manual link management */}
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 22px", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt, flexWrap: "wrap" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.subtle }}>
+        <svg width={26} height={8} aria-hidden="true"><line x1={0} y1={4} x2={20} y2={4} stroke={color.faint} strokeWidth={1.5} /><path d="M20,1 L25,4 L20,7 Z" fill={color.faint} /></svg>
+        depends on
+      </span>
+      <span style={{ fontSize: 11, color: color.faint3 }}>{visibleEdges.length} shown{edges.length !== visibleEdges.length ? ` · ${edges.length - visibleEdges.length} off-window` : ""}</span>
+      <div style={{ flex: 1 }} />
+      {canEdit && <Button variant="secondary" onClick={() => setLinking(true)}><Icon name="plus" size={14} /> Link dependency</Button>}
+    </div>
+    {manualEdges.length > 0 && (
+      <div style={{ display: "flex", gap: 8, padding: "0 22px 12px", flexWrap: "wrap" }}>
+        {manualEdges.map((e) => (
+          <span key={e.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: color.text, background: color.surface, border: `1px solid ${color.border}`, borderRadius: 20, padding: "4px 6px 4px 11px" }}>
+            {label(e.fromType, e.fromId)} <Icon name="arrowRight" size={12} color={color.faint2} /> {label(e.toType, e.toId)}
+            {canEdit && <button onClick={() => removeDep.mutate(e.id)} aria-label="Remove dependency" title="Remove dependency" style={{ border: "none", background: "none", cursor: "pointer", color: color.faint3, padding: 2, lineHeight: 0 }}><Icon name="x" size={13} /></button>}
+          </span>
+        ))}
+      </div>
+    )}
+    {linking && <LinkDependencyModal items={items} onClose={() => setLinking(false)} onAdd={(b) => addDep.mutate(b)} pending={addDep.isPending} />}
+    </>
+  );
+}
+
+// Modal to hand-draw a cross-entity dependency between two portfolio items.
+function LinkDependencyModal({ items, onClose, onAdd, pending }: {
+  items: PortfolioItem[]; onClose: () => void;
+  onAdd: (b: { fromType: string; fromId: string; toType: string; toId: string }) => void; pending?: boolean;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const opt = (i: PortfolioItem) => ({ key: `${i.type}-${i.id}`, label: `${(PF_TYPE[i.type] ?? PF_TYPE.project).label} · ${i.name}` });
+  const split = (key: string) => { const idx = key.indexOf("-"); return { type: key.slice(0, idx), id: key.slice(idx + 1) }; };
+  const submit = () => {
+    if (!from || !to || from === to) return;
+    const f = split(from), t = split(to);
+    onAdd({ fromType: f.type, fromId: f.id, toType: t.type, toId: t.id });
+  };
+  return (
+    <Overlay onClose={onClose} width={460}>
+      <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 700, color: color.ink, marginBottom: 4 }}>Link a dependency</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 16 }}>Draw an arrow from the item that <b>depends on</b> another. Both must be visible in the current filter.</div>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>This item…</label>
+      <Select value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", marginBottom: 14 }}>
+        <option value="">Select an item…</option>
+        {items.map((i) => { const o = opt(i); return <option key={o.key} value={o.key}>{o.label}</option>; })}
+      </Select>
+      <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: color.subtle, marginBottom: 5 }}>…depends on</label>
+      <Select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", marginBottom: 18 }}>
+        <option value="">Select an upstream item…</option>
+        {items.map((i) => { const o = opt(i); return <option key={o.key} value={o.key} disabled={o.key === from}>{o.label}</option>; })}
+      </Select>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} disabled={!from || !to || from === to || pending}>Link</Button>
+      </div>
+    </Overlay>
   );
 }
 

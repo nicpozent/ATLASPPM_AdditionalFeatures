@@ -73,6 +73,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<TestPlanTask> TestPlanTasks => Set<TestPlanTask>();
     public DbSet<Defect> Defects => Set<Defect>();
     public DbSet<ProjectDependency> ProjectDependencies => Set<ProjectDependency>();
+    public DbSet<TimelineDependency> TimelineDependencies => Set<TimelineDependency>();
     public DbSet<Absence> Absences => Set<Absence>();
     public DbSet<CostLine> CostLines => Set<CostLine>();
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
@@ -309,5 +310,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
         b.Entity<RoadmapDependency>().HasIndex(x => x.ItemId);
         b.Entity<RoadmapLink>().HasKey(x => x.Id);
         b.Entity<RoadmapLink>().HasIndex(x => x.ItemId);
+        b.Entity<TimelineDependency>().HasKey(x => x.Id);
+        b.Entity<TimelineDependency>().HasIndex(x => new { x.FromType, x.FromId });
     }
 }
