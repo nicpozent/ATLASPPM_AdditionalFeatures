@@ -133,6 +133,90 @@ VITE_API_AUDIENCE=api://atlas-ppm
 The `secrets/` files live only on the host you deploy from (git-ignored), so
 repeat step 2 on each environment.
 
+### Encrypting the personnel notes at rest (step by step)
+
+The **Team SWOT** and **individual development-plan** notes are DPIA-gated
+personnel data (ADR-0062/0063). They can be **encrypted at rest** with an AES-256
+key you supply through a Docker secret file — the key lives only in that file (and
+your backup), never in the database, so a stolen DB or DB backup yields only
+ciphertext. It's **opt-in and inert until you set the key**: with no key the notes
+stay plaintext exactly as today, so nothing changes until you do this.
+
+The key is config `Personnel:EncryptionKey`; as a Docker secret its file is named
+`Personnel__EncryptionKey` (the `__` → `:` mapping), mounted at
+`/run/secrets/Personnel__EncryptionKey` and read by the file-secret layer. The
+repo ships `docker-compose.personnel.yml` so you don't hand-edit compose.
+
+**1. Generate a 256-bit key** (32 random bytes, base64) into the secret file. Use
+`tr -d '\n'` so no trailing newline sneaks into the key (the app trims it anyway,
+but keep the file clean):
+
+```bash
+mkdir -p ./secrets
+openssl rand -base64 32 | tr -d '\n' > ./secrets/personnel_key.txt
+chmod 600 ./secrets/personnel_key.txt
+```
+
+**2. Back the key up now — before you use it — separately from the database.**
+This is the one non-negotiable step (see the box below). Copy the string into
+your password manager / offline store; if you lose it the encrypted notes are
+**unrecoverable**, and if it sits next to a DB backup the encryption is pointless.
+
+**3. Bring the stack up with the overlay** (name it last so it wins; combine with
+the DB-secrets overlay if you use that too):
+
+```bash
+# personnel key only:
+docker compose -f docker-compose.yml -f docker-compose.personnel.yml up -d
+
+# with the DB-password overlay as well:
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml -f docker-compose.personnel.yml up -d
+```
+
+**4. Verify** the key is mounted as a file and is **not** exposed as an env var:
+
+```bash
+API=$(docker compose -f docker-compose.yml -f docker-compose.personnel.yml ps -q api)
+docker exec "$API" sh -c 'ls -l /run/secrets/Personnel__EncryptionKey'          # file present, mode 0400
+docker inspect "$API" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i personnel || echo "not in env ✓"
+```
+
+Then open **My Team → SWOT / development plan**, save an edit, and confirm in the
+database that the stored value is ciphertext, not readable JSON:
+
+```bash
+docker compose exec db psql -U atlas -d atlas \
+  -c "select left(\"Value\",16) from \"Settings\" where \"Key\" like 'team.swot.%' or \"Key\" like 'devplan.%';"
+#    → each row begins with  enc:v1:…   (encrypted). Plaintext rows start with {.
+```
+
+Existing notes written before you set the key stay readable (they're decrypted on
+the fly as legacy plaintext); they become ciphertext the next time they're saved.
+
+**5. Rotate the key** (zero downtime) by moving the current key to a second slot
+and issuing a new one, then re-saving the notes:
+
+```bash
+mv ./secrets/personnel_key.txt ./secrets/personnel_key.old.txt   # keep the old key readable
+openssl rand -base64 32 | tr -d '\n' > ./secrets/personnel_key.txt
+```
+
+Mount the old one as `Personnel__EncryptionKeyOld` alongside the new
+`Personnel__EncryptionKey` (add a second secret in a copy of the overlay), restart,
+and the app **writes with the new key but still reads the old** — so re-save each
+SWOT / dev-plan note once, then drop the `…Old` secret and delete
+`personnel_key.old.txt`.
+
+> **⚠️ The key is the crown jewel.** Rules that matter:
+> - **Back it up, separately from the database/its backups.** Same backup = no
+>   protection. Split it among 2–3 custodians / an offline store.
+> - **Lose it and the SWOT/dev-plan notes are gone** — there is no recovery by
+>   design. (Nothing else in Atlas depends on it, so the rest of the app is fine.)
+> - **Never commit it** — `./secrets/` is git-ignored; keep it that way.
+> - It only ever needs to be set **once per host** (and re-supplied when you
+>   move/rebuild the host). Unlike a vault, there is **no per-restart unseal** —
+>   the app just reads the file at boot.
+
 ### Running Postgres under a domain account?
 This comes up, so to be clear about what applies here:
 

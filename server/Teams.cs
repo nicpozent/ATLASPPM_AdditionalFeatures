@@ -305,8 +305,10 @@ public static class Teams
             var items = new Dictionary<string, TeamSwot>();
             foreach (var key in scope)
             {
-                var raw = (await db.Settings.FindAsync($"team.swot.{key}"))?.Value;
-                if (string.IsNullOrWhiteSpace(raw)) continue;
+                var stored = (await db.Settings.FindAsync($"team.swot.{key}"))?.Value;
+                if (string.IsNullOrWhiteSpace(stored)) continue;
+                var raw = PersonnelCrypto.Unprotect(cfg, stored);   // decrypt at rest; legacy plaintext passes through
+                if (string.IsNullOrWhiteSpace(raw)) continue;       // undecryptable (key missing/rotated) → not shown
                 try { if (JsonSerializer.Deserialize<TeamSwot>(raw) is { } s) items[key] = s; }
                 catch { /* tolerate a hand-edited/corrupt value */ }
             }
@@ -326,7 +328,7 @@ public static class Teams
             var swot = new TeamSwot(Clip(req.Strengths), Clip(req.Weaknesses), Clip(req.Opportunities), Clip(req.Threats),
                 DateTime.UtcNow.ToString("o"), Permissions.ActorName(http, cfg));
             var settingKey = $"team.swot.{key}";
-            var json = JsonSerializer.Serialize(swot);
+            var json = PersonnelCrypto.Protect(cfg, JsonSerializer.Serialize(swot));   // encrypt at rest when a key is set
             var existing = await db.Settings.FindAsync(settingKey);
             if (existing is null) db.Settings.Add(new Setting { Key = settingKey, Value = json });
             else existing.Value = json;
@@ -351,8 +353,10 @@ public static class Teams
             var items = new Dictionary<string, DevPlan>();
             foreach (var name in names)
             {
-                var raw = (await db.Settings.FindAsync($"devplan.{name}"))?.Value;
-                if (string.IsNullOrWhiteSpace(raw)) continue;
+                var stored = (await db.Settings.FindAsync($"devplan.{name}"))?.Value;
+                if (string.IsNullOrWhiteSpace(stored)) continue;
+                var raw = PersonnelCrypto.Unprotect(cfg, stored);   // decrypt at rest; legacy plaintext passes through
+                if (string.IsNullOrWhiteSpace(raw)) continue;       // undecryptable (key missing/rotated) → not shown
                 try { if (JsonSerializer.Deserialize<DevPlan>(raw) is { } p) items[name] = p; }
                 catch { /* tolerate a hand-edited/corrupt value */ }
             }
@@ -373,7 +377,7 @@ public static class Teams
             var plan = new DevPlan(Clip(req.Strengths), Clip(req.GrowthAreas), Clip(req.Goals),
                 DateTime.UtcNow.ToString("o"), Permissions.ActorName(http, cfg));
             var settingKey = $"devplan.{person}";
-            var json = JsonSerializer.Serialize(plan);
+            var json = PersonnelCrypto.Protect(cfg, JsonSerializer.Serialize(plan));   // encrypt at rest when a key is set
             var existing = await db.Settings.FindAsync(settingKey);
             if (existing is null) db.Settings.Add(new Setting { Key = settingKey, Value = json });
             else existing.Value = json;
