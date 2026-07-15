@@ -217,6 +217,69 @@ SWOT / dev-plan note once, then drop the `…Old` secret and delete
 >   move/rebuild the host). Unlike a vault, there is **no per-restart unseal** —
 >   the app just reads the file at boot.
 
+### Quick reference — rebuild & verify encryption (Windows · Linux/macOS)
+
+The `docker` and `psql` commands are **identical on every OS**. The only
+cross-platform differences are (a) the `COMPOSE_FILE` separator — `;` on Windows,
+`:` on Linux/macOS — and (b) shell quoting for the one-line SQL, so on Windows
+PowerShell use the **interactive** `psql` session (its quote handling mangles a
+`-c "…"` with embedded double-quotes).
+
+**1. Reset (drop the DB volume — dev only, wipes data):**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.pgcert.yml down -v
+```
+
+**2. Build & start (passwordless Postgres + personnel encryption):**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.pgcert.yml -f docker-compose.personnel.yml up --build -d
+```
+
+<details><summary>Using <code>COMPOSE_FILE</code> instead of repeating <code>-f</code></summary>
+
+```bash
+# Linux / macOS (bash/zsh) — ':' separator
+export COMPOSE_FILE="docker-compose.yml:docker-compose.pgcert.yml:docker-compose.personnel.yml"
+docker compose up --build -d
+```
+
+```powershell
+# Windows PowerShell — ';' separator
+$env:COMPOSE_FILE = "docker-compose.yml;docker-compose.pgcert.yml;docker-compose.personnel.yml"
+docker compose up --build -d
+```
+</details>
+
+**3. Open a database shell:**
+
+```bash
+docker compose exec db psql -U atlas -d atlas
+```
+
+**4. Validate encryption at rest.**
+
+*Interactive (works everywhere — recommended on Windows PowerShell):* at the
+`atlas=#` prompt from step 3, paste:
+
+```sql
+select "Key", left("Value",12) from "Settings" where "Key" like 'team.swot.%' or "Key" like 'devplan.%';
+```
+
+*One-liner (Linux/macOS bash/zsh — quotes survive):*
+
+```bash
+docker compose exec db psql -U atlas -d atlas \
+  -c 'select "Key", left("Value",12) from "Settings" where "Key" like '\''team.swot.%'\'' or "Key" like '\''devplan.%'\'';'
+```
+
+Read the `left("Value",12)` column: `enc:v1:…` = **encrypted at rest** ✅;
+`{"Strengths"` (or any `{`) = plaintext, i.e. the key isn't being applied.
+**0 rows** just means no SWOT/dev-plan notes are saved yet — turn the feature on
+(**Integrations → Governance → personnel-data processing**), save a note in
+**My Team → SWOT**, then re-run.
+
 ### Running Postgres under a domain account?
 This comes up, so to be clear about what applies here:
 
