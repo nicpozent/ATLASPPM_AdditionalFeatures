@@ -84,6 +84,48 @@ public class AssignmentPoolTests : IClassFixture<AtlasApiFactory>
         Assert.Contains("Owner Olga", names!);
     }
 
+    [Fact]
+    public async Task Delivery_roles_offer_tech_lead_always_and_scrum_master_only_when_agile()
+    {
+        // An onboarded person (Entra member) — the delivery-role candidate pool is
+        // the onboarded roster, independent of any team mapping.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            var g = new EntraGroup { Id = "onb-grp", DisplayName = "Onboarded", Manual = true };
+            g.Members.Add(new TeamMemberRow { GroupId = g.Id, Uid = "onb-1", DisplayName = "Deja Developer" });
+            db.EntraGroups.Add(g);
+            await db.SaveChangesAsync();
+        }
+        var c = Admin();
+
+        // Agile methodology → both Technical Lead and Scrum Master offered.
+        var agileId = await JsonId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Agile delivery", methodology = "Scrum" }));
+        var agile = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{agileId}/assignments");
+        var dRoles = agile.GetProperty("deliveryRoles").EnumerateArray().ToList();
+        var keys = dRoles.Select(r => r.GetProperty("key").GetString()).ToList();
+        Assert.Contains("techLead", keys);
+        Assert.Contains("scrumMaster", keys);
+        Assert.True(agile.GetProperty("canAssignDelivery").GetBoolean());
+        // Candidates are the onboarded roster (not a mapped architecture team).
+        var tlOpts = Names(dRoles.First(r => r.GetProperty("key").GetString() == "techLead").GetProperty("options"));
+        Assert.Contains("Deja Developer", tlOpts);
+
+        // Non-agile methodology → Technical Lead stays, Scrum Master is hidden.
+        var wfId = await JsonId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Waterfall delivery", methodology = "Waterfall" }));
+        var wf = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{wfId}/assignments");
+        var wfKeys = wf.GetProperty("deliveryRoles").EnumerateArray().Select(r => r.GetProperty("key").GetString()).ToList();
+        Assert.Contains("techLead", wfKeys);
+        Assert.DoesNotContain("scrumMaster", wfKeys);
+
+        // The assignment persists.
+        var put = await c.PutAsJsonAsync($"/api/v1/projects/{agileId}/assignments/techLead", new { person = "Deja Developer" });
+        Assert.True(put.IsSuccessStatusCode);
+        var after = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{agileId}/assignments");
+        var tl = after.GetProperty("deliveryRoles").EnumerateArray().First(r => r.GetProperty("key").GetString() == "techLead");
+        Assert.Equal("Deja Developer", tl.GetProperty("person").GetString());
+    }
+
     static async Task<string> JsonId(HttpResponseMessage res)
     {
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());

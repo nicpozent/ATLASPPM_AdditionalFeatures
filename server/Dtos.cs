@@ -265,7 +265,8 @@ public record RoadmapBoardDto(bool CanEdit, List<RoadmapItemDto> Items,
 // the Security Officer team, the lead ← PM Lead + PMO pool.
 public record RoleAssignmentDto(string Key, string Label, string Person, List<string> Options);
 public record AssignmentsDto(bool CanAssignLead, bool CanAssignArch, string LeadKey, string LeadLabel,
-    string Lead, List<string> LeadOptions, List<RoleAssignmentDto> ArchRoles, List<string> Options, List<string> MissingArch);
+    string Lead, List<string> LeadOptions, List<RoleAssignmentDto> ArchRoles, List<string> Options, List<string> MissingArch,
+    bool CanAssignDelivery, List<RoleAssignmentDto> DeliveryRoles);
 
 // ---- Risk engine & status report ------------------------------------------
 public record RiskFindingDto(string Severity, string Category, string Title, string Detail, string Framework, string Control);

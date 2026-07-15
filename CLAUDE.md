@@ -136,6 +136,16 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   idempotent by issue key, prunes vanished issues) to pull the board's issues in
   as test tasks (`cap-quality`, config-guarded, audited). Ingested tasks show
   their Jira key. Built on the existing Quality tab + Jira integration.
+- **Project delivery roles (Technical Lead + Scrum Master)** — the project
+  Overview *People & roles* panel gains a **Delivery roles** group alongside the
+  existing Project Manager + architecture roles: a **Technical Lead** (always
+  offered) and a **Scrum Master** (offered **only when the project's methodology
+  is agile** — Scrum/Kanban/SAFe/Scrumban/Disciplined Agile/XP; server-decided).
+  Unlike the architecture roles (candidates ← mapped Entra teams), the delivery
+  roles pick from the **onboarded application roster** (resource directory + Entra
+  members). Assigned by the PM/PMO (`admin`/`pmo`/`pm`/`pmlead`), server-enforced
+  and audited, stored as `RoleAssignment` rows like the other roles. Built on the
+  existing People & roles panel; prototype needs the Delivery roles group added.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs
