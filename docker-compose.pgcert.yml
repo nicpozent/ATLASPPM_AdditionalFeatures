@@ -5,7 +5,12 @@
 #  docker-compose.yml is unchanged; this only applies when you name it, AND it
 #  requires the certs to exist first (see docs/postgres-cert-auth.md):
 #
-#    sh deploy/gen-pg-cert.sh db atlas       # once — mint CA + server + client certs
+#    # Linux/macOS (or Windows git-bash / WSL with openssl):
+#    sh deploy/gen-pg-cert.sh db atlas
+#    # No local openssl? Generate them in a throwaway container instead:
+#    docker run --rm -v "${PWD}:/repo" -w /repo alpine \
+#      sh -c "apk add --no-cache openssl >/dev/null && sh deploy/gen-pg-cert.sh db atlas"
+#
 #    docker compose -f docker-compose.yml -f docker-compose.pgcert.yml up -d
 #
 #  ⚠️ Dev certs from gen-pg-cert.sh. For production, mint server/client certs from
@@ -14,29 +19,48 @@
 # ============================================================================
 services:
   db:
-    # Enable TLS and force client-cert auth via the mounted hba file. The server
-    # key is bind-mounted owned by uid 70 (postgres in the alpine image) so it's
-    # readable without an entrypoint hack — see gen-pg-cert.sh.
-    command:
-      - postgres
+    # Certs are bind-mounted READ-ONLY from the host at a *source* path, then
+    # copied into a container-internal dir with the ownership/permissions
+    # Postgres requires (server.key must be 0600, owned by the postgres user).
+    # This deliberately does NOT rely on host file permissions: they don't
+    # translate across Windows/WSL2 bind mounts (files surface as 0777 root, and
+    # Postgres then refuses the key as world-readable). The copy runs as root via
+    # the entrypoint below, then the stock docker-entrypoint drops back to the
+    # postgres user exactly as normal.
+    user: root
+    entrypoint:
+      - /bin/sh
       - -c
-      - ssl=on
-      - -c
-      - ssl_cert_file=/etc/pgcerts/server.crt
-      - -c
-      - ssl_key_file=/etc/pgcerts/server.key
-      - -c
-      - ssl_ca_file=/etc/pgcerts/ca.crt
-      - -c
-      - hba_file=/etc/pgcerts/pg_hba.conf
+      - |
+        set -e
+        if [ ! -f /etc/pgcerts-src/server.crt ]; then
+          echo "FATAL: /etc/pgcerts-src/server.crt not found — generate the certs first:" >&2
+          echo "  docker run --rm -v \"\${PWD}:/repo\" -w /repo alpine sh -c \"apk add --no-cache openssl >/dev/null && sh deploy/gen-pg-cert.sh db atlas\"" >&2
+          exit 1
+        fi
+        mkdir -p /etc/pgcerts
+        cp /etc/pgcerts-src/ca.crt /etc/pgcerts-src/server.crt /etc/pgcerts-src/server.key /etc/pgcerts/
+        chown postgres:postgres /etc/pgcerts/ca.crt /etc/pgcerts/server.crt /etc/pgcerts/server.key
+        chmod 600 /etc/pgcerts/server.key
+        chmod 644 /etc/pgcerts/ca.crt /etc/pgcerts/server.crt
+        exec docker-entrypoint.sh postgres \
+          -c ssl=on \
+          -c ssl_cert_file=/etc/pgcerts/server.crt \
+          -c ssl_key_file=/etc/pgcerts/server.key \
+          -c ssl_ca_file=/etc/pgcerts/ca.crt \
+          -c hba_file=/etc/pgcerts-hba/pg_hba.conf
     volumes:
-      - ./deploy/pgcerts:/etc/pgcerts:ro
-      - ./deploy/pg_hba_cert.conf:/etc/pgcerts/pg_hba.conf:ro
+      # Read-only SOURCE mount (host certs) + the hba file on a sibling path so it
+      # isn't nested inside a read-only mount (that fails on Docker Desktop/WSL2).
+      - ./deploy/pgcerts:/etc/pgcerts-src:ro
+      - ./deploy/pg_hba_cert.conf:/etc/pgcerts-hba/pg_hba.conf:ro
 
   api:
     environment:
       # No password — auth is the client cert. VerifyFull checks the server cert
       # against the CA; the client cert (CN=atlas) is how Postgres authenticates us.
+      # Npgsql reads the PEM key via .NET crypto and does not enforce unix perms,
+      # so the host bind mount is fine as-is for the client side.
       ConnectionStrings__Postgres: >-
         Host=${POSTGRES_HOST:-db};Port=5432;Database=${POSTGRES_DB:-atlas};Username=${POSTGRES_USER:-atlas};SSL Mode=VerifyFull;Root Certificate=/etc/pgcerts/ca.crt;SSL Certificate=/etc/pgcerts/client.crt;SSL Key=/etc/pgcerts/client.key
     volumes:

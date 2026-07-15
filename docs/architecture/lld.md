@@ -76,7 +76,23 @@ erDiagram
   TEAM_ASSIGNMENT ||--o{ TEAM_ASSIGNMENT_MEMBER : contains
   ROLE_DEF ||--o{ ROLE_PERMISSION : grants
   CAPABILITY ||--o{ ROLE_PERMISSION : referenced-by
+  TEST_PLAN ||--o{ TEST_PLAN_TASK : has
 ```
+
+**Recent additions (this cycle)**
+- `TimelineDependency` — a directed cross-entity link (`FromType/FromId →
+  ToType/ToId`, `Source` = manual\|jira\|project) across project/program/product/
+  release/sprint; drives the timeline dependency arrows (SBB-29). Index on
+  `(FromType, FromId)`; migration `TimelineDependencies`.
+- `Skill.Team` — owning manager slot ("" = shared/legacy) so the skills matrix is
+  manager-scoped (SBB-20); migration `SkillTeam`.
+- `TestPlanTask` gains `Description`, `StartDate`, `DueDate`, `EstimateHours`,
+  `JiraKey`; `TestPlan.JiraBoardId` links a Jira agile board (SBB-30); migrations
+  `TestPlanTaskFields`, `TestPlanJiraBoard`.
+- The DPIA-gated personnel notes (Team SWOT + development plans, stored as JSON in
+  `Settings`) are written/read through `PersonnelCrypto` (AES-256-GCM, `enc:v1:`
+  marker) — encrypted at rest, key from the secret layer, never a schema column
+  (SBB-31, ADR-0068).
 
 **Persistence conventions**
 - Human-facing ids (`PRJ-204`, `REL-…`, `OKR-…`) are `ValueGeneratedNever` strings
@@ -247,7 +263,9 @@ live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
 
 | Key | Purpose |
 |-----|---------|
-| `ConnectionStrings__Postgres` | DB connection (Host/Port/Database/Username/Password) |
+| `ConnectionStrings__Postgres` | DB connection; password-based, or **passwordless** with `SSL Mode=VerifyFull;Root Certificate=…;SSL Certificate=…;SSL Key=…` (client-cert auth, ADR-0069) |
+| `Bao:Address`, `Bao:Token`, `Bao:Mount`, `Bao:Path` | OpenBao/Vault KV v2 secrets provider (inert unless address+token set, ADR-0067) |
+| `Personnel:EncryptionKey`, `Personnel:EncryptionKeyOld` | AES-256-GCM key(s) for personnel-notes field encryption; primary + optional old key for rotation (inert unless set, ADR-0068) |
 | `Auth:Enabled`, `Auth:TenantId`, `Auth:Audience` | Entra JWT validation |
 | `VITE_AUTH_ENABLED`, `VITE_AUTH_*` | SPA MSAL config |
 | `Jira:BaseUrl`, `Jira:Email`, `Jira:ApiToken` | Jira connector |

@@ -1,3 +1,9 @@
+# check=skip=SecretsUsedInArgOrEnv
+# ^ The VITE_* build args below are PUBLIC SPA config (an Entra tenant GUID, a
+#   public OAuth client ID used with PKCE — no client secret — an audience id and
+#   a URL path), baked into the client bundle by design. They are not secrets, so
+#   this BuildKit check is skipped intentionally. The only real backend secret
+#   (Graph client secret) is sourced server-side via the secret layer, never here.
 # ============================================================================
 #  Atlas PPM frontend — multi-stage build.
 #  Stage 1 builds the Vite app; stage 2 serves the static output via nginx and

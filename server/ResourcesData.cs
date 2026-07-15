@@ -95,21 +95,113 @@ public static class ResourcesData
             .OrderByDescending(p => p.Project + p.Product + p.Ops).ThenBy(p => p.Name).ToList();
     }
 
+    // The capacity roster averaged over a [from,to] window: each person's Ops /
+    // Project / Product load is the mean of their per-working-day utilisation
+    // across the window (weekends excluded; if the window is all-weekend the days
+    // are counted anyway so a single Sat/Sun query still returns a value). This is
+    // the same per-day, time-phased maths as the single-day roster and the Excel
+    // export — reused so the three can't drift — just aggregated over the period.
+    public static async Task<List<RosterRow>> RosterWindowAsync(AtlasDbContext db, DateOnly from, DateOnly to)
+    {
+        if (to < from) to = from;
+        // Cap the span so a long window can't spin the per-day loop unbounded
+        // (mirrors the allocation-report guard).
+        if (to.DayNumber - from.DayNumber > 800) to = from.AddDays(800);
+
+        var productAllocs = await db.ProductAllocations.ToListAsync();
+        var projAssignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
+        var groups = await db.EntraGroups.Include(g => g.Members).ToListAsync();
+        var opsItems = await db.OpsItems.Where(i => i.Status != "Done" && i.Assignee != "" && i.Alloc > 0).ToListAsync();
+        var pw = (await db.Projects.Where(p => !p.Archived)
+            .Select(p => new { p.Id, p.StartDate, p.Due }).ToListAsync())
+            .ToDictionary(p => p.Id, p => new AllocationEngine.ProjWin(p.StartDate, p.Due));
+        var tasks = await db.ProjectTasks
+            .Where(t => t.Status != "Done" && t.EstimateHours > 0 && t.Assignee != "" && t.Assignee != "Unassigned")
+            .Select(t => new AllocationEngine.TaskLite(t.Assignee, t.ProjectId, t.EstimateHours, t.StartDate, t.TargetDate))
+            .ToListAsync();
+
+        // Days to average over: weekdays in the window, or every day if the window
+        // contains no weekday (e.g. a single Saturday).
+        var days = new List<DateOnly>();
+        for (var d = from; d <= to; d = d.AddDays(1))
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)) days.Add(d);
+        if (days.Count == 0) for (var d = from; d <= to; d = d.AddDays(1)) days.Add(d);
+
+        var sumProject = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        var sumProduct = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        var sumOps = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        static void Acc(Dictionary<string, double> m, string name, double v) =>
+            m[name] = (m.TryGetValue(name, out var s) ? s : 0) + v;
+
+        foreach (var on in days)
+        {
+            var proj = AllocationEngine.CombineProjectLoad(
+                AllocationEngine.ProjectPlannedFor(projAssignments, on),
+                AllocationEngine.TaskLoadFor(tasks, pw, on));
+            foreach (var (name, v) in proj) Acc(sumProject, name, v);
+            // Product allocations carry no date window today → constant per day.
+            foreach (var a in productAllocs) Acc(sumProduct, a.MemberName, a.Alloc);
+            foreach (var i in opsItems)
+                if (AllocMath.ActiveOn(i.StartDate, i.EndDate, on))
+                    Acc(sumOps, i.Assignee.Trim(), i.Alloc);
+        }
+        var n = days.Count;
+
+        // Identity (title/dept) — everyone on the directory or carrying any load in
+        // the window, so people show at 0% too (matches the single-day roster).
+        var titles = new Dictionary<string, (string Title, string Dept)>(StringComparer.OrdinalIgnoreCase);
+        void Id(string name, string? title, string? dept)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            titles.TryGetValue(name, out var cur);
+            titles[name] = (string.IsNullOrEmpty(cur.Title) ? (title ?? "") : cur.Title,
+                            string.IsNullOrEmpty(cur.Dept) ? (dept ?? "") : cur.Dept);
+        }
+        foreach (var a in projAssignments) foreach (var m in a.Members) Id(m.Name, m.Title, null);
+        foreach (var a in productAllocs) Id(a.MemberName, a.MemberTitle, null);
+        foreach (var g in groups) foreach (var m in g.Members) Id(m.DisplayName, m.JobTitle, g.DisplayName);
+        foreach (var name in sumProject.Keys) Id(name, null, null);
+        foreach (var name in sumOps.Keys) Id(name, null, null);
+
+        int Avg(Dictionary<string, double> m, string name) =>
+            m.TryGetValue(name, out var s) ? (int)Math.Round(s / n) : 0;
+
+        return titles.Keys
+            .Select(name => new RosterRow(name,
+                string.IsNullOrEmpty(titles[name].Title) ? "Team member" : titles[name].Title,
+                string.IsNullOrEmpty(titles[name].Dept) ? "Unassigned" : titles[name].Dept,
+                Avg(sumProject, name), Avg(sumProduct, name), Avg(sumOps, name)))
+            .OrderByDescending(p => p.Project + p.Product + p.Ops).ThenBy(p => p.Name).ToList();
+    }
+
     public static void MapResourceEndpoints(this RouteGroupBuilder api)
     {
         // The capacity roster: everyone with an allocation (product or project) or
-        // on the synced directory, with their rolled-up utilisation.
-        api.MapGet("/resources", async (AtlasDbContext db, string? asOf) =>
+        // on the synced directory, with their rolled-up utilisation. With no
+        // from/to it's a single-day snapshot (default today, or ?asOf=); with a
+        // from/to window it's the average utilisation over that period, which is
+        // what the Resources period toggle (day/week/…/year) and the date-range
+        // filter send.
+        api.MapGet("/resources", async (AtlasDbContext db, string? asOf, string? from, string? to) =>
         {
-            // Utilisation is time-phased: count each dated allocation segment only
-            // if it's live on the reference day (default today).
-            var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d)
-                ? d : DateOnly.FromDateTime(DateTime.UtcNow);
-            var rows = (await RosterAsync(db, on))
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            List<RosterRow> rows;
+            if (!string.IsNullOrWhiteSpace(from) || !string.IsNullOrWhiteSpace(to))
+            {
+                var f = DateOnly.TryParse(from, out var pf) ? pf : today;
+                var t = DateOnly.TryParse(to, out var pt) ? pt : f;
+                rows = await RosterWindowAsync(db, f, t);
+            }
+            else
+            {
+                var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d) ? d : today;
+                rows = await RosterAsync(db, on);
+            }
+            var dto = rows
                 .Select(p => new ResourceDto(p.Name, p.Title, p.Dept == "Unassigned" ? "" : p.Dept,
                     Initials(p.Name), ColorFor(p.Name), p.Ops, p.Project, p.Product, p.Project + p.Product + p.Ops > 100))
                 .ToList();
-            return Results.Ok(rows);
+            return Results.Ok(dto);
         });
 
         // By project: each project that has a team assigned, with its members and

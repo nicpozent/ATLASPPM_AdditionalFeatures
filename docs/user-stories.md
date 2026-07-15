@@ -155,8 +155,13 @@ full (F) levels. Authorization is always server-side.
   collapsible phases, so that iteration cadence is visible._
 - **US-GANTT-3** — _As a **PM**, I want synced Jira/ADO sprints to appear in the
   Schedule view, so that imported cadence shows without manual phases._
-  **Acceptance:** project gantt returns sprint bars; undated sprints fall back to
-  the project window.
+  **Acceptance:** project gantt returns sprint bars carrying their real ISO dates;
+  the Schedule **auto-fits the visible window to the selected project's own span**
+  (phases, sprints, milestones, project window) once per project, so a project
+  whose timeline is in another year isn't hidden behind the default calendar year;
+  undated sprints fall back to the anchored project window. **Verify:** open a
+  project with sprints → the window snaps to cover them and the sprint band shows;
+  `fitWindowYM` is unit-tested (other-year, padding, 12-month floor, 5-year cap).
 - **US-GANTT-4** — _As a **PMO**, I want a Program-scope timeline derived from its
   projects, tasks and sprints, so that cross-project schedule is visible._
 - **US-GANTT-5** — _As a **PM**, I want Resources and Sprints views on the timeline,
@@ -174,6 +179,20 @@ full (F) levels. Authorization is always server-side.
   sort + status filter; virtualized for large backlogs; `StartedAt` from the Jira
   changelog's first status change and `ResolvedAt` from `resolutiondate`, best-effort
   and populated on the next sync (ADR-0059)._
+- **US-GANTT-8** — _As a **PMO/PM**, I want dependency arrows between timeline items
+  — projects, programs, products, releases and sprints — for both hand-added and
+  Jira-derived links, so that I can see what blocks what across the roadmap._
+  **Acceptance:** a generic `TimelineDependency` (`fromType/fromId → toType/toId`,
+  `source` = manual | jira | project) drives finish-to-start arrows (upstream →
+  downstream). The **Portfolio timeline** renders arrows across all entity types
+  and lets planners hand-draw / remove links (`cap-projects`), folding in the
+  existing project→project links automatically. **Sprint-level arrows** render on
+  the Project timeline (hand-drawn per project) and read-only on the Program
+  timeline, via a DOM-measurement overlay so they stay correct on the expandable
+  rows. A guarded, idempotent **Jira issue-link ingest** derives sprint→sprint
+  links from a project's cross-sprint blocks/depends issue links (reuses the sync
+  client). **Verify:** link two visible items → a dashed/solid arrow (jira/manual)
+  connects them; e2e renders the arrow in a real browser (ADR — timeline deps)._
 
 ## 7. Programs
 
@@ -240,6 +259,11 @@ full (F) levels. Authorization is always server-side.
 
 - **US-REL-1** — _As a **release manager**, I want a release calendar and deployment
   tracking with per-status tabs and an overall view, so that I plan deployments._
+  **Acceptance:** the **calendar view renders a real month grid** (Monday-first,
+  prev/next/Today nav) with each release shown as a chip on its target date,
+  coloured by status, plus an undated-releases footer; clicking a chip opens the
+  editor. **Verify:** a release with a target date appears on that day in the
+  calendar (previously the calendar view was an empty stub)._
 - **US-REL-2** — _As a **release manager**, I want Cancelled status plus archive/
   delete and edit, so that the calendar stays clean._
 - **US-REL-3** — _As a **release manager**, I want to link a release to a project/
@@ -259,7 +283,18 @@ full (F) levels. Authorization is always server-side.
 - **US-TEAM-1** — _As a **manager**, I want My Team with members, skills, and a
   roll-up view, so that I see my org._
 - **US-TEAM-2** — _As a **manager**, I want a customizable skills/competency matrix
-  (name-keyed ratings), so that I plan by capability._
+  (name-keyed ratings) that only I (my team's manager) can see, showing only my
+  own team's skills, so that competency data stays manager-scoped and uncluttered
+  by other teams._
+  **Acceptance:** the matrix is **manager-only** — `GET /skills` returns
+  `canView=false` + an empty matrix for non-managers (the client hides the panel),
+  and a manager (or Platform Admin) sees only their own team's skill columns plus
+  legacy "shared" ones; a `Skill` carries an owning manager slot (`Team`, migration
+  `SkillTeam`), create assigns the caller's slot with per-team name uniqueness, and
+  rename/delete/rating are refused for a column outside the caller's scope; the
+  Excel export is manager-scoped too. **Verify:** a PM (no team) sees no matrix;
+  two managers each see only their own columns; Platform Admin sees all
+  (server tests cover manager-only + per-team scoping + cross-team refusal)._
 - **US-TEAM-3** — _As a **manager**, I want an internal-labour rate card
   (Junior→Expert) with a day/month/hour calculator, so that I estimate internal
   cost._
@@ -356,6 +391,12 @@ full (F) levels. Authorization is always server-side.
 
 - **US-GOV-1** — _As a **Chief Architect**, I want stage gates (G0–G5) and gate
   reviews (architecture/security), so that decisions are gated._
+  **Acceptance:** the Governance tab's "Architecture & security review
+  checkpoints" is a live list (Gate / Type / Reviewer / Date / Status), not a
+  static card — an "+ Add checkpoint" action (with edit) writes review gates on
+  the project's security record, reusing the Security tab's review-gate model,
+  scope-gated and audited. **Verify:** add a checkpoint on the Governance tab →
+  it appears in the list and on the Security tab._
 - **US-GOV-2** — _As a **Chief Architect**, I want an ARB sign-off panel, architecture
   domains/waivers, and TOGAF ADM phases, so that architecture is governed._
 - **US-GOV-3** — _As a **governance lead**, I want a decision log (ADR) with
@@ -371,6 +412,20 @@ full (F) levels. Authorization is always server-side.
   is mapped to existing controls (ADR-0049).
 - **US-GOV-5** — _As a **QA lead**, I want a Quality module (plan → stages → tests +
   defects, tasks/test cases per plan), so that quality is tracked._
+- **US-GOV-5.1** — _As a **QA lead/tester**, I want each test task under a plan to
+  carry full details in a proper window — description/steps, start & due dates,
+  assignee and the planned time to spend — and I want to link a Jira board and
+  ingest its issues as test tasks, so that test work is planned like real work and
+  imported cadence shows without re-keying._
+  **Acceptance:** the test-task window edits title/description/status/assignee/
+  start/due/estimate-hours (was title + status only), with due-before-start
+  validation; a plan may link a Jira agile board (`TestPlan.JiraBoardId`) and
+  "Ingest from Jira" reuses the project Jira sync client to upsert the board's
+  issues as tasks (idempotent by issue key, prunes vanished issues, config- and
+  board-guarded, `cap-quality`, audited); ingested tasks show their Jira key.
+  **Verify:** save a task with dates/estimate → they persist and show on the row;
+  with Jira configured + a board linked, "Ingest from Jira" pulls the board's
+  issues in (server tests cover the fields + the ingest guards)._
 - **US-GOV-6** — _As a **compliance officer**, I want each project's AI use
   classified under the EU AI Act and ISO 42001, so that AI obligations are explicit
   and evidenced._
@@ -391,6 +446,16 @@ full (F) levels. Authorization is always server-side.
   (applicable / excluded / reviewed / implemented %); the catalogue is fixed
   reference data so coverage is complete by construction; editing needs
   `cap-approve` and is audited (ADR-0066).
+- **US-GOV-8** — _As a **compliance officer**, I want the data-classification &
+  privacy profile to tell me **every** DPIA/PIA obligation that applies, not just
+  one, so that I don't miss a requirement when several processing factors are in
+  scope._
+  **Acceptance:** the DPIA verdict accumulates one reason per active factor —
+  special-category data → Art. 9/35, automated decision-making → Art. 22,
+  Restricted classification, personal data → Art. 30, cardholder data → PCI-DSS —
+  and the banner lists all of them (previously it showed a single requirement);
+  the level is the strongest applicable (Required / Recommended / Not required).
+  **Verify:** toggle two factors on → both requirement lines show._
 
 ## 22. Ops (run-the-business)
 
@@ -495,6 +560,45 @@ full (F) levels. Authorization is always server-side.
   is on-prem single-node Docker (`docker compose`: web/worker/db/nginx edge), off
   the public internet, upgraded by pull-and-recreate — Kubernetes is parked, not
   required, at portfolio scale (ADR-0054).
+- **US-OBS-8** — _As an **operator**, I want an on-prem, cloud-neutral secrets
+  store option so that I can centralise and audit secrets without a cloud KMS._
+  **Acceptance:** an **OpenBao / HashiCorp Vault (KV v2)** configuration provider
+  layers into the existing secret stack, **inert unless `Bao:Address` + a token
+  are set** (the token itself may come from the `/run/secrets` file layer); it
+  reads `{Address}/v1/{Mount}/data/{Path}` with `X-Vault-Token`, maps keys `__`→`:`
+  like the other layers, is added after the file layer so a vaulted secret wins,
+  and is non-fatal on read failure (a sealed/unreachable vault never wedges boot);
+  an opt-in `docker-compose.openbao.yml` runs it. **Verify:** set `Bao:*` → the
+  vaulted value overrides `appsettings`/env; the KV-v2→config mapping is
+  unit-tested (ADR-0067, `docs/secrets.md`)._
+- **US-OBS-9** — _As an **operator**, I want to run Postgres **passwordless** via
+  TLS client-certificate auth, so that the database credential simply doesn't
+  exist to be stored, rotated or leaked._
+  **Acceptance:** an opt-in overlay (`docker-compose.pgcert.yml`) turns on TLS +
+  a `hostssl … cert clientcert=verify-full` `pg_hba`, so every network login must
+  present a client cert whose **CN equals the DB role**; the app connection string
+  carries the client cert/key/CA and **no password** (zero app-code change —
+  Npgsql keywords); `deploy/gen-pg-cert.sh` mints the CA/server/client certs with
+  the right per-container key permissions. **Verify (proven on real Postgres 16):**
+  a passwordless client-cert connect succeeds over TLS; a connection with no
+  client cert — or a password without a cert — is rejected
+  ("connection requires a valid client certificate") (ADR-0069,
+  `docs/postgres-cert-auth.md`)._
+- **US-OBS-10** — _As a **data-protection owner**, I want the DPIA-gated personnel
+  notes (Team SWOT + development plans) encrypted at rest, so that a stolen DB or
+  backup yields only ciphertext._
+  **Acceptance:** the SWOT/dev-plan values are encrypted with **AES-256-GCM**
+  (per-value nonce, `enc:v1:` marker) using a key from the secret layer
+  (`Personnel:EncryptionKey`, never stored in the DB); **inert until the key is
+  set** (gated-off default unchanged, no migration/backfill), legacy plaintext
+  reads through and upgrades on next save, a second key
+  (`Personnel:EncryptionKeyOld`) allows zero-downtime rotation, and an
+  undecryptable/tampered value fails closed (not shown, never crashes); an opt-in
+  `docker-compose.personnel.yml` mounts the key. **Verify:** mount the key, save a
+  SWOT/dev-plan note, then inspect the DB — its stored value begins with `enc:v1:`
+  while the note still displays correctly in the app; the crypto contract is
+  unit-tested (round-trip, inert, legacy passthrough, rotation, wrong-key/tamper →
+  null) (ADR-0068, `docs/secrets.md`)._
 
 ## 28. Real-time Collaboration & Whiteboard
 

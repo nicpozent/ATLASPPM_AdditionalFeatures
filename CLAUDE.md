@@ -112,6 +112,22 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   from a project's cross-sprint "blocks"/"depends" issue links (separate guarded
   endpoint reusing the Jira sync client, idempotent, `source` = jira). Built from
   the existing timeline geometry + theme. Prototype needs the arrow visuals added.
+  The **project-timeline sprint band** now colours each sprint bar from the
+  established Atlas hue set (cycled by row order, same palette as avatars/method
+  chips), with a matching chip in the left rail, so consecutive sprints read as
+  distinct bands even when they share a status; status still shows as the rail
+  label. Prototype needs the multi-hue sprint bars reflected.
+- **Resources — period-windowed utilisation + date-range filter** — the
+  By-person utilisation is now the **average over the selected window** rather
+  than a single-day snapshot: the day/week/month/quarter/half/year toggle maps to
+  a concrete calendar window and a **date-to-date filter** lets the user pick an
+  arbitrary allocation window. `GET /resources` gained optional `from`/`to`
+  params; the roster averages each person's per-working-day Ops/Project/Product
+  load across the window using the **same time-phased engine** as the single-day
+  roster and the Excel export (refactored to shared in-memory helpers so the
+  three can't drift). Manual project allocations and Jira-derived task load both
+  feed it. Built on the existing Resources screen; prototype needs the date
+  inputs reflected.
 - **Quality test tasks — full details + Jira board ingest** — a test plan's tasks
   now carry description/steps, start & due dates, assignee and a planned
   time-to-spend, editable in a proper task window (was title + status only). A

@@ -282,8 +282,22 @@ flowchart LR
 - The DB is never exposed to the browser; only the API holds its credentials.
 - The browser reaches the API same-origin through nginx (no CORS in prod).
 - Outbound integration calls are the only egress from the trust zone.
-- Full control set: [security-hardening.md](../security-hardening.md); decisions in
-  ADR-0004 (RBAC), ADR-0005 (SSO), ADR-0008 (edge/headers), ADR-0009 (secrets).
+- **Secrets** come from a layered provider stack (Docker `/run/secrets` →
+  optional Azure Key Vault → optional on-prem **OpenBao/Vault** KV v2), each
+  inert-until-configured; the vaulted value wins and a vault read failure is
+  non-fatal (ADR-0067).
+- **Database credential** can be eliminated entirely: **passwordless Postgres**
+  via TLS client-certificate auth (the API presents a client cert whose CN is the
+  DB role; no password in the connection string), verified against real Postgres
+  (ADR-0069).
+- **Data at rest**: the DPIA-gated personnel notes (Team SWOT + development plans)
+  are encryptable with AES-256-GCM using a key from the secret layer that is never
+  stored in the DB, so a stolen DB/backup yields only ciphertext (ADR-0068). Pairs
+  with host disk encryption + the least-privilege DB role.
+- Full control set: [security-hardening.md](../security-hardening.md),
+  [secrets.md](../secrets.md), [postgres-cert-auth.md](../postgres-cert-auth.md);
+  decisions in ADR-0004 (RBAC), ADR-0005 (SSO), ADR-0008 (edge/headers),
+  ADR-0009/0067 (secrets), ADR-0068 (field encryption), ADR-0069 (passwordless DB).
 
 ## 9. Technology stack (summary)
 

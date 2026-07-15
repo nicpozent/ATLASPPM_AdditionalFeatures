@@ -31,13 +31,25 @@ public static class AllocationEngine
     }
     const int DefaultTaskWeeks = 4;  // undated task with no clean project window → rolling ~4-week horizon
 
+    // Minimal, pre-loaded shapes so the per-day maths can run in memory across a
+    // window without a DB round-trip per day (used by the windowed roster).
+    public sealed record TaskLite(string Assignee, string ProjectId, double EstimateHours, string? StartDate, string? TargetDate);
+    public sealed record ProjWin(string? StartDate, string? End);
+
     // Planned project allocation per person per project, time-phased as-of `on`
     // (base segment + extension), summed within a project.
     public static async Task<Dictionary<string, Dictionary<string, int>>> ProjectPlannedAsync(AtlasDbContext db, DateOnly on)
     {
-        var map = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
         var assigns = await db.TeamAssignments.Include(a => a.Members)
             .Where(a => a.EntityType == "project").ToListAsync();
+        return ProjectPlannedFor(assigns, on);
+    }
+
+    // In-memory core of ProjectPlannedAsync — operates on an already-loaded set of
+    // project team assignments so a caller can evaluate many days without re-querying.
+    public static Dictionary<string, Dictionary<string, int>> ProjectPlannedFor(IEnumerable<TeamAssignment> assigns, DateOnly on)
+    {
+        var map = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
         foreach (var a in assigns)
             foreach (var m in a.Members)
             {
@@ -55,31 +67,39 @@ public static class AllocationEngine
     // and summed per project. Only tasks live on `on` count.
     public static async Task<Dictionary<string, Dictionary<string, int>>> TaskLoadAsync(AtlasDbContext db, DateOnly on)
     {
-        var map = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
-        var projWindows = await db.Projects.Where(p => !p.Archived)
-            .Select(p => new { p.Id, p.StartDate, p.Due }).ToListAsync();
-        var pw = projWindows.ToDictionary(p => p.Id, p => (StartDate: p.StartDate, End: p.Due));
+        var pw = (await db.Projects.Where(p => !p.Archived)
+            .Select(p => new { p.Id, p.StartDate, p.Due }).ToListAsync())
+            .ToDictionary(p => p.Id, p => new ProjWin(p.StartDate, p.Due));
 
         var tasks = await db.ProjectTasks
             .Where(t => t.Status != "Done" && t.EstimateHours > 0
                      && t.Assignee != "" && t.Assignee != "Unassigned")
-            .Select(t => new { t.Assignee, t.ProjectId, t.EstimateHours, t.StartDate, t.TargetDate })
+            .Select(t => new TaskLite(t.Assignee, t.ProjectId, t.EstimateHours, t.StartDate, t.TargetDate))
             .ToListAsync();
 
+        return TaskLoadFor(tasks, pw, on);
+    }
+
+    // In-memory core of TaskLoadAsync — operates on already-loaded tasks + project
+    // windows so a caller can evaluate many days without re-querying.
+    public static Dictionary<string, Dictionary<string, int>> TaskLoadFor(
+        IEnumerable<TaskLite> tasks, IReadOnlyDictionary<string, ProjWin> pw, DateOnly on)
+    {
+        var map = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in tasks)
         {
             pw.TryGetValue(t.ProjectId, out var proj);
             var hasTaskDates = !string.IsNullOrEmpty(t.StartDate) || !string.IsNullOrEmpty(t.TargetDate);
             // Effective window for the "is it live now?" test (task dates first,
             // else the project window; unparseable/empty bounds are open).
-            var winStart = hasTaskDates ? t.StartDate : proj.StartDate;
-            var winEnd = hasTaskDates ? t.TargetDate : proj.End;
+            var winStart = hasTaskDates ? t.StartDate : proj?.StartDate;
+            var winEnd = hasTaskDates ? t.TargetDate : proj?.End;
             if (!AllocMath.ActiveOn(winStart, winEnd, on)) continue;
 
             // Weeks to smooth the estimate over: the task's own window, else the
             // project window, else the rolling default horizon.
             int weeks = TryWeeks(t.StartDate, t.TargetDate, out var tw) ? tw
-                      : TryWeeks(proj.StartDate, proj.End, out var pw2) ? pw2
+                      : TryWeeks(proj?.StartDate, proj?.End, out var pw2) ? pw2
                       : DefaultTaskWeeks;
 
             var pct = AllocMath.PctFromHours((int)Math.Round(t.EstimateHours / (double)weeks));
@@ -96,6 +116,14 @@ public static class AllocationEngine
     {
         var planned = await ProjectPlannedAsync(db, on);
         var task = await TaskLoadAsync(db, on);
+        return CombineProjectLoad(planned, task);
+    }
+
+    // In-memory combine of planned + task maps — the max(planned, task) per project,
+    // summed per person. Split out so the windowed roster reuses the exact rule.
+    public static Dictionary<string, int> CombineProjectLoad(
+        Dictionary<string, Dictionary<string, int>> planned, Dictionary<string, Dictionary<string, int>> task)
+    {
         var people = new HashSet<string>(planned.Keys, StringComparer.OrdinalIgnoreCase);
         people.UnionWith(task.Keys);
 

@@ -57,6 +57,32 @@ public class AllocationEngineTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Roster_window_averages_utilisation_over_the_period()
+    {
+        var c = Admin();
+        var pid = await NewProject(c, "ALLOCWIN", "Alloc window");
+
+        // 40h over one working week (Mon–Fri) ⇒ 100% while live.
+        await c.PostAsJsonAsync($"/api/v1/projects/{pid}/tasks", new
+        {
+            name = "One-week spike", assignee = "Ada Lovelace", status = "In Progress",
+            startDate = "2026-07-06", targetDate = "2026-07-10", estimateHours = 40,
+        });
+
+        // A window that is exactly that week ⇒ live every counted day ⇒ ~100%.
+        var week = await c.GetFromJsonAsync<JsonElement>("/api/v1/resources?from=2026-07-06&to=2026-07-10");
+        var wAda = week.EnumerateArray().First(r => r.GetProperty("name").GetString() == "Ada Lovelace");
+        Assert.Equal(100, wAda.GetProperty("projectPct").GetInt32());
+
+        // The whole of July ⇒ live only ~5 of ~23 weekdays ⇒ averaged well below
+        // 100. This is the behaviour the period toggle relies on: the same person's
+        // number differs by window (previously it never changed).
+        var month = await c.GetFromJsonAsync<JsonElement>("/api/v1/resources?from=2026-07-01&to=2026-07-31");
+        var mAda = month.EnumerateArray().First(r => r.GetProperty("name").GetString() == "Ada Lovelace");
+        Assert.InRange(mAda.GetProperty("projectPct").GetInt32(), 15, 30);
+    }
+
+    [Fact]
     public async Task Planned_and_task_load_take_the_higher_per_project_not_the_sum()
     {
         var c = Admin();
