@@ -27,6 +27,11 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2)
 const avatarColor = (name: string) => AVATAR_COLORS[[...name].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export default function Teams() {
+  // The Platform Administrator is deliberately excluded from the internal-labour
+  // rate card — compensation/rate data is not information that role should see
+  // (segregation of duties). The server is authoritative (it returns no rate for
+  // admin and no longer honours header-preview); this hides the card too.
+  const { role } = useRole();
   const { data } = useQuery({
     queryKey: ["myteam"], retry: false, staleTime: 30_000,
     queryFn: async (): Promise<MyTeam> => (await api<MyTeam>("/myteam")) ?? { isAdmin: false, managerKey: "", managerLabel: "", teams: [] },
@@ -118,7 +123,7 @@ export default function Teams() {
         </div>
       )}
 
-      <div style={{ marginTop: 18 }}><LaborRateCard /></div>
+      {role !== "admin" && <div style={{ marginTop: 18 }}><LaborRateCard /></div>}
 
       <div style={{ marginTop: 18 }}><SkillsMatrix /></div>
 

@@ -63,6 +63,17 @@ lines the caller's effective UI role may see; `PUT` scopes writes to owned lines
   the header identity remains cosmetic (CLAUDE.md §7), with the server filtering as
   the authoritative boundary for what leaves the API.
 
+## Amendment — Platform Admin excluded from rate visibility
+Originally the Platform Administrator (owning no rate line) could still **preview**
+any role's rates by switching persona in the header. On the product owner's
+instruction this preview was removed: compensation/rate data is not information the
+Platform Admin role should see (segregation of duties — the admin manages the
+platform, not pay/rate data). `RateIdentities` now pins every identity to its own
+role in both auth modes and explicitly drops `admin`, so the admin resolves to no
+rate line and cannot elevate via the header; the API returns no rate for the admin,
+and the *My Team* rate card is hidden for that persona. CTO/CIO and the regional
+managers are unchanged.
+
 ## Alternatives considered
 - **A region dropdown on one discipline line** — rejected: visibility is
   per-region, so region must be part of the ownable unit, not a filter.
