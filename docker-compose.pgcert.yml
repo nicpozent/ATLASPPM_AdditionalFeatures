@@ -28,10 +28,13 @@ services:
       - -c
       - ssl_ca_file=/etc/pgcerts/ca.crt
       - -c
-      - hba_file=/etc/pgcerts/pg_hba.conf
+      - hba_file=/etc/pgcerts-hba/pg_hba.conf
     volumes:
       - ./deploy/pgcerts:/etc/pgcerts:ro
-      - ./deploy/pg_hba_cert.conf:/etc/pgcerts/pg_hba.conf:ro
+      # Mounted OUTSIDE /etc/pgcerts: nesting a file mount inside the read-only
+      # cert dir fails on Docker Desktop / WSL2 (runc can't create the mountpoint
+      # in a read-only parent). A sibling dir sidesteps that.
+      - ./deploy/pg_hba_cert.conf:/etc/pgcerts-hba/pg_hba.conf:ro
 
   api:
     environment:
