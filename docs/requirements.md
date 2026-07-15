@@ -154,7 +154,18 @@ differ only in labour-rate visibility (ADR-0057).
   dependency arrows, a month grid and export. *Trace: ABB-01, ADR-0029.*
 - **FR-GANTT-2** [Implemented] The timeline SHALL show sprints (manual and
   Jira/ADO-synced) as collapsible phases below the schedule; undated sprints SHALL
-  fall back to the project window. *Trace: SBB-09/SBB-25.*
+  fall back to the project window; sprint bars SHALL carry their real dates and the
+  Project Schedule SHALL **auto-fit the visible window to the selected project's
+  own span** so a project whose timeline is in another year is not hidden behind
+  the default calendar year. *Trace: SBB-09/SBB-25.*
+- **FR-GANTT-6** [Implemented] The system SHALL render **dependency arrows**
+  between timeline items — project/program/product/release/sprint — for
+  hand-added and Jira-derived links (generic `TimelineDependency`, source
+  manual\|jira\|project). The Portfolio timeline SHALL let planners draw/remove
+  links (`cap-projects`) and fold in existing project→project links; sprint-level
+  arrows SHALL render on the Project timeline (editable) and Program timeline
+  (read-only); a guarded, idempotent endpoint SHALL derive sprint→sprint links
+  from a project's cross-sprint Jira issue links. *Trace: SBB-29.*
 - **FR-GANTT-3** [Implemented] Programme and portfolio timelines SHALL derive
   windows from their projects', tasks' and sprints' dates so views are not empty. *Trace: ADR-0029.*
 - **FR-GANTT-4** [Implemented] The timeline SHALL support a **calendar window of
@@ -191,6 +202,12 @@ differ only in labour-rate visibility (ADR-0057).
   intelligence (skills-based staffing, my-allocations, capacity-vs-demand). *Trace: SBB-24, ADR-0024/0028.*
 - **FR-RES-4** [Implemented] The system SHALL export colour-graded Excel
   (allocation histogram, skills matrix). *Trace: SBB-21, ADR-0015.*
+- **FR-RES-5** [Implemented] The My-Team skills/competency matrix SHALL be
+  **manager-scoped**: visible only to a team's manager (or Platform Admin), with
+  each skill column owned by a manager slot so a manager sees only their own team's
+  skills (plus legacy shared ones); create SHALL be per-team-unique, and
+  rename/delete/rating and export SHALL be refused for columns outside the
+  caller's scope. *Trace: SBB-20, ADR-0016.*
 - **FR-FIN-1** [Implemented] The system SHALL present budget vs actual, CapEx/OpEx
   split, forecast-at-completion, savings/benefit and ROI, overall and per
   project/programme/product, with a source toggle and an ROI explanation. *Trace: ABB-01.*
@@ -207,7 +224,9 @@ differ only in labour-rate visibility (ADR-0057).
 - **FR-REL-1** [Implemented] The system SHALL provide a release calendar and
   deployment tracking with per-status tabs (incl. Cancelled), an overall view,
   edit/archive/delete, and scope-aware linking to connector-mapped or manual
-  projects/products/programmes. *Trace: ABB-01.*
+  projects/products/programmes. The **calendar view SHALL render a month grid**
+  (Monday-first, prev/next/Today) with each release as a status-coloured chip on
+  its target date plus an undated footer, clickable to open the editor. *Trace: ABB-01.*
 - **FR-NEWS-1** [Implemented] The system SHALL provide an editable news wall
   (headline, highlight metric, shout-out, image, milestone, doc blocks) with
   themes, masonry layout and an edit mode. *Trace: ABB-07.*
@@ -268,7 +287,10 @@ differ only in labour-rate visibility (ADR-0057).
 ### 3.12 Governance & compliance
 - **FR-GOV-1** [Implemented] The system SHALL enforce stage gates (G0–G5) with
   architecture/security gate reviews and an ARB sign-off panel, TOGAF ADM phases,
-  architecture domains/waivers, and an editable decision log (ADR). *Trace: SBB-15, ABB-10.*
+  architecture domains/waivers, and an editable decision log (ADR). The Governance
+  tab's architecture & security **review checkpoints** SHALL be an add/editable
+  list (Gate/Type/Reviewer/Date/Status) backed by the project security record,
+  scope-gated and audited. *Trace: SBB-15, ABB-10.*
 - **FR-GOV-2** [Implemented] The system SHALL provide a deterministic risk engine
   (no LLM) mapping each project's real data to GDPR, ISO 27001, ISO 42001,
   PCI-DSS, SOC 2, NIS2, NIST CSF 2.0 and MITRE ATT&CK via a generic per-framework
@@ -277,7 +299,17 @@ differ only in labour-rate visibility (ADR-0057).
   the EU AI Act (tier + Annex III) and ISO 42001 and derive obligations
   (Art 5/6/9/10/14/50). *Trace: SBB-15, ADR-0050.*
 - **FR-GOV-4** [Implemented] The system SHALL provide a Quality module (plan →
-  stages → tests + defects, tasks/test cases per plan). *Trace: SBB-15.*
+  stages → tests + defects, tasks/test cases per plan). Each test task SHALL carry
+  description/steps, start & due dates, assignee and a planned time-to-spend,
+  editable in a task window (due-before-start validated); a plan MAY link a Jira
+  agile board and ingest its issues as test tasks (reusing the Jira sync client,
+  idempotent by issue key, config- and board-guarded, `cap-quality`, audited).
+  *Trace: SBB-15, SBB-30, ADR-0018.*
+- **FR-GOV-6** [Implemented] The data-classification & privacy profile SHALL list
+  **every** applicable DPIA/PIA obligation when multiple processing factors are in
+  scope (special-category → Art. 9/35, automated decisions → Art. 22, Restricted
+  classification, personal data → Art. 30, cardholder data → PCI-DSS), reporting
+  the strongest applicable level. *Trace: SBB-15.*
 - **FR-GOV-5** [Implemented] The system SHALL provide a per-project ISO 27001:2022
   Statement of Applicability covering all 93 Annex A controls (four themes), each
   with an applicability decision, justification, implementation status and owner,
@@ -336,8 +368,22 @@ differ only in labour-rate visibility (ADR-0057).
 - **NFR-SEC-2** [Implemented] The edge SHALL apply security headers/CSP, CORS
   (same-origin), rate limiting and upload size limits; the API image SHALL run
   non-root with a least-privilege DB role. *Trace: SBB-14, ADR-0008.*
-- **NFR-SEC-3** [Implemented] Secrets SHALL come from environment/Docker secrets,
-  never VCS. *Trace: SBB-16, ADR-0009.*
+- **NFR-SEC-3** [Implemented] Secrets SHALL come from a layered provider stack —
+  environment/Docker `/run/secrets` (never VCS), with optional Azure Key Vault and
+  an on-prem **OpenBao/HashiCorp Vault (KV v2)** provider — each inert unless
+  configured, a vaulted secret taking precedence over env/appsettings, and a vault
+  read failure non-fatal to boot. *Trace: SBB-16, ADR-0009, ADR-0067.*
+- **NFR-SEC-6** [Implemented] The system SHALL support **passwordless database
+  authentication** via TLS client-certificate auth (server `hostssl … cert
+  clientcert=verify-full`; app presents a client cert whose CN is the DB role; no
+  password in the connection string), so the database credential need not exist.
+  *Trace: SBB-16, ADR-0069, `docs/postgres-cert-auth.md`.*
+- **NFR-SEC-7** [Implemented] Sensitive personnel notes (DPIA-gated Team SWOT +
+  development plans) SHALL be **encryptable at rest** with AES-256-GCM using a key
+  sourced from the secret layer and never stored in the database; encryption SHALL
+  be inert until the key is set (no forced migration), support zero-downtime key
+  rotation, and fail closed (an undecryptable value is not shown, never crashes).
+  *Trace: SBB-31, ADR-0068.*
 - **NFR-SEC-4** [Implemented] Every change SHALL be scanned by gating SAST
   (Semgrep) + SCA/secrets/IaC (Trivy) with a triaged baseline, on-demand DAST
   (OWASP ZAP), and a portable off-GitHub scan script. *Trace: SBB-14, ADR-0051/0053.*
