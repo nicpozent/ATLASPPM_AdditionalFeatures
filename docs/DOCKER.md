@@ -76,6 +76,117 @@ docker compose up --build web
   site origin (e.g. `https://localhost`) as a **SPA** redirect URI on the
   Atlas PPM Web app registration, and make sure the API audience matches.
 
+## Composition recipes (base + hardening overlays)
+
+The base `docker-compose.yml` runs the full app with a password-authenticated
+database — fine for dev. Each hardening concern is an **opt-in overlay** you add
+with `-f`; the base file is never edited. Overlays compose, with one exception
+(the two DB-credential overlays are alternatives — pick one).
+
+| Overlay | What it does | One-time prep |
+|---------|--------------|---------------|
+| `docker-compose.secrets.yml` | DB password via `/run/secrets` file, not env | `sh deploy/gen-secrets.sh` |
+| `docker-compose.pgcert.yml` | **Passwordless** DB via TLS client-cert (no password at all) | generate certs — see below |
+| `docker-compose.personnel.yml` | AES-256-GCM key for the DPIA-gated SWOT / dev-plan notes | create `secrets/personnel_key.txt` |
+| `docker-compose.openbao.yml` | On-prem OpenBao/Vault feeding secrets to the API | seed `bao kv put` after up |
+
+> Don't combine `secrets.yml` **and** `pgcert.yml`: the cert overlay removes the
+> password entirely, so the password-file overlay is redundant.
+
+### Recommended lean production stack (no HSM required)
+
+Passwordless Postgres + encrypted personnel notes. This is the stack most sites
+should run.
+
+**1. Enable SSO** (edit `.env`; `VITE_*` are baked into the bundle at build time):
+
+```dotenv
+VITE_AUTH_ENABLED=true
+VITE_AUTH_TENANT_ID=<entra-tenant-guid>
+VITE_AUTH_CLIENT_ID=<web-SPA-app-registration-guid>
+VITE_API_AUDIENCE=api://atlas-ppm     # or the API app GUID for a single-app setup
+```
+
+Compose forwards the matching `Auth__*` values to the API automatically, so the
+API validates the same tokens. (Full walkthrough: `docs/sso-setup.md`.)
+
+**2. Generate the Postgres client-auth certs** into `deploy/pgcerts/`:
+
+```bash
+sh deploy/gen-pg-cert.sh db atlas
+```
+
+On **Windows** (no local OpenSSL), generate them in a throwaway container:
+
+```powershell
+docker run --rm -v "${PWD}:/repo" -w /repo alpine `
+  sh -c "apk add --no-cache openssl >/dev/null && sh deploy/gen-pg-cert.sh db atlas"
+```
+
+> These go in `deploy/pgcerts/` — **not** `deploy/certs/` (that folder holds the
+> separate nginx web-TLS cert). The overlay copies the certs into the `db`
+> container and sets `server.key` to `600` at startup, so key permissions work
+> the same on Linux, macOS and Windows. Details + verification:
+> `docs/postgres-cert-auth.md`.
+
+**3. Create the personnel-notes encryption key**:
+
+```bash
+openssl rand -base64 32 | tr -d '\n' > secrets/personnel_key.txt
+```
+
+Windows PowerShell:
+
+```powershell
+docker run --rm alpine sh -c "apk add --no-cache openssl >/dev/null && openssl rand -base64 32 | tr -d '\n'" > secrets\personnel_key.txt
+```
+
+**4. Bring the stack up** (overlays named after the base so they win):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.pgcert.yml -f docker-compose.personnel.yml up --build -d
+```
+
+Windows PowerShell is identical, or use `COMPOSE_FILE` (note the `;` separator on
+Windows, `:` on Linux/macOS):
+
+```powershell
+$env:COMPOSE_FILE = "docker-compose.yml;docker-compose.pgcert.yml;docker-compose.personnel.yml"
+docker compose up --build -d
+```
+
+**5. Verify each layer:**
+
+```bash
+# DB up over TLS with a client cert (no password):
+docker compose exec db psql -U atlas -d atlas \
+  -c "select usename, ssl, client_dn from pg_stat_ssl join pg_stat_activity using (pid) where usename='atlas';"
+#   → ssl = t, client_dn = /CN=atlas
+
+# Personnel key mounted as a FILE (not leaking as an env var):
+api=$(docker compose ps -q api)
+docker exec "$api" ls -l /run/secrets/Personnel__EncryptionKey     # present, ~44 bytes
+docker inspect "$api" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -i personnel   # no output = good
+```
+
+To confirm the personnel notes are actually **encrypted at rest**: turn the
+feature on (Integrations → Governance → personnel-data processing, or
+`insert into "Settings" ("Key","Value") values ('personnel.assessmentsEnabled','true')`),
+save a Team SWOT note, then check the stored value — it should start with
+`enc:v1:` (ciphertext), not `{` (plaintext). See `docs/secrets.md`.
+
+> **Windows/PowerShell quoting tip:** `docker compose exec db psql … -c "select ""X"" …"`
+> strips the quotes and Postgres lowercases the identifier. Use an interactive
+> shell (`docker compose exec db psql -U atlas -d atlas`) or pipe a here-string.
+
+### First-boot gotcha (all DB-credential overlays)
+
+Postgres only applies `POSTGRES_PASSWORD` / initialises credentials on the
+**first** creation of the `atlas_db` volume. If you switch credential approach
+after the volume exists, either `docker compose down -v` (wipes data — dev only)
+or reconcile the role manually. Migrations run automatically on API boot, so
+there's no separate migration step.
+
 ## Production notes
 
 - Change `POSTGRES_PASSWORD` (and ideally the user/db) from the defaults; use a

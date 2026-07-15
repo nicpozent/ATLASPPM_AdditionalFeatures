@@ -8,7 +8,7 @@ import { toast, toastError } from "@/components/Toast";
 import { InsightsTab } from "./resources/Capacity";
 import { AvailabilityTab } from "./resources/Availability";
 import { EmptyPanel } from "./resources/shared";
-import { selectStyle } from "./resources/util";
+import { selectStyle, periodWindow } from "./resources/util";
 
 // ---------------------------------------------------------------------------
 // Structural chrome constants (lifted from the prototype's resource builder).
@@ -47,14 +47,22 @@ interface ByProduct { id: string; name: string; members: AllocRow[] }
 // mount, on focus, and on a light interval so this screen stays current.
 const LIVE = { retry: false, staleTime: 0, refetchOnMount: "always" as const, refetchOnWindowFocus: true, refetchInterval: 30_000 };
 
-function useResources() {
+function useResources(from?: string, to?: string) {
   return useQuery({
-    queryKey: ["resources"], ...LIVE,
+    queryKey: ["resources", from ?? "", to ?? ""], ...LIVE,
     queryFn: async (): Promise<Resource[]> => {
-      try { return (await api<Resource[]>("/resources")) ?? []; } catch { return []; }
+      // With a window the roster is averaged over [from,to]; without one it's a
+      // single-day snapshot (the server default). The period toggle + date filter
+      // always send a window, so utilisation reflects the selected period.
+      const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : "";
+      try { return (await api<Resource[]>(`/resources${qs}`)) ?? []; } catch { return []; }
     },
   });
 }
+
+// Map a period id to a concrete [from,to] window anchored on `today` (local ISO
+// yyyy-MM-dd). This is what makes the day/week/…/year toggle actually change the
+// numbers — each period is the calendar window the utilisation is averaged over.
 function useByProject() {
   return useQuery({
     queryKey: ["resources-by-project"], ...LIVE,
@@ -85,15 +93,24 @@ const CAP_COLS = "1.7fr 0.6fr 0.6fr 0.6fr 1.1fr 0.6fr 0.6fr";
 
 export default function Resources() {
   const [tab, setTab] = useState<ResTab>("capacity");
-  const [period, setPeriod] = useState("week");
+  const [period, setPeriod] = useState("month");
   const [person, setPerson] = useState("all");
   const [proj, setProj] = useState("all");
-  const { data: resources = [] } = useResources();
+  // Allocation window: the period toggle sets it; the date inputs (#3) can then
+  // override it for an arbitrary range. `custom` tracks a manual override so the
+  // period chips don't fight the dates the user typed.
+  const [range, setRange] = useState(() => periodWindow("month"));
+  const [custom, setCustom] = useState(false);
+  const { data: resources = [] } = useResources(range.from, range.to);
   const { data: byProject = [] } = useByProject();
   const { data: byProduct = [] } = useByProduct();
   const { data: unonboarded = [] } = useUnonboarded();
 
-  const periodLabel = PERIODS.find((p) => p.id === period)?.label ?? "Week";
+  const pickPeriod = (id: string) => { setPeriod(id); setRange(periodWindow(id)); setCustom(false); };
+  const setBound = (key: "from" | "to", v: string) =>
+    setRange((r) => { const next = { ...r, [key]: v }; if (next.from && next.to && next.to < next.from) next.to = next.from; return next; });
+  const fmt = (iso: string) => { const d = new Date(iso + "T00:00:00"); return isNaN(+d) ? iso : d.toLocaleDateString(undefined, { day: "numeric", month: "short" }); };
+  const periodLabel = custom ? `${fmt(range.from)} → ${fmt(range.to)}` : (PERIODS.find((p) => p.id === period)?.label ?? "Month");
   const overCount = resources.filter((r) => r.over).length;
 
   return (
@@ -123,8 +140,8 @@ export default function Resources() {
           </span>
         )}
         <button
-          onClick={() => { const y = new Date().getFullYear(); apiDownload(`/resources/allocation-report.xlsx?period=${period}&from=${y}-01-01&to=${y}-12-31`, `atlas-allocation-${period}.xlsx`); }}
-          title={`Download this year's allocation as a colour-graded Excel, bucketed by ${period}`}
+          onClick={() => apiDownload(`/resources/allocation-report.xlsx?period=${custom ? "week" : period}&from=${range.from}&to=${range.to}`, `atlas-allocation-${custom ? "custom" : period}.xlsx`)}
+          title={`Download the selected window (${range.from} → ${range.to}) as a colour-graded Excel, bucketed by ${custom ? "week" : period}`}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: color.primary, background: color.surface, border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
           <Icon name="download" size={15} /> Export .xlsx
         </button>
@@ -135,17 +152,35 @@ export default function Resources() {
         <span style={{ fontSize: 12.5, fontWeight: 600, color: color.subtle }}>Period:</span>
         <div style={{ display: "inline-flex", background: color.surface, border: `1px solid ${color.border3}`, borderRadius: 10, padding: 3, gap: 2, flexWrap: "wrap" }}>
           {PERIODS.map((p) => {
-            const active = period === p.id;
+            const active = !custom && period === p.id;
             return (
-              <button key={p.id} onClick={() => setPeriod(p.id)} style={{
+              <button key={p.id} onClick={() => pickPeriod(p.id)} style={{
                 padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
                 background: active ? color.primary : "transparent", color: active ? "#fff" : color.subtle,
               }}>{p.label}</button>
             );
           })}
         </div>
+        {/* Date-to-date allocation window (#3) — overrides the period chips. */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <input type="date" value={range.from} aria-label="Allocation window start"
+            max={range.to || undefined}
+            onChange={(e) => { setBound("from", e.target.value); setCustom(true); }}
+            style={{ border: `1px solid ${custom ? color.primary : color.border3}`, borderRadius: 8, padding: "5px 8px", fontSize: 12, fontFamily: "inherit", color: color.text, background: color.surface }} />
+          <span style={{ fontSize: 12, color: color.faint3 }}>→</span>
+          <input type="date" value={range.to} aria-label="Allocation window end"
+            min={range.from || undefined}
+            onChange={(e) => { setBound("to", e.target.value); setCustom(true); }}
+            style={{ border: `1px solid ${custom ? color.primary : color.border3}`, borderRadius: 8, padding: "5px 8px", fontSize: 12, fontFamily: "inherit", color: color.text, background: color.surface }} />
+          {custom && (
+            <button onClick={() => pickPeriod(period)} title="Back to the period window"
+              style={{ background: "none", border: "none", cursor: "pointer", color: color.faint3, padding: 2, display: "inline-flex" }} aria-label="Reset window to period">
+              <Icon name="x" size={15} />
+            </button>
+          )}
+        </div>
         <span style={{ fontSize: 12, color: color.faint3 }}>
-          Utilisation = Ops % + Project % + Product % · over 100% flags over-allocation. Project % is set in By Project; Product % in By Product.
+          Utilisation = Ops % + Project % + Product %, averaged over the selected window · over 100% flags over-allocation.
         </span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle }}>Filter</span>

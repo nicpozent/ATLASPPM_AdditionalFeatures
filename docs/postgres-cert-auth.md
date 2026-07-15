@@ -36,6 +36,16 @@ sh deploy/gen-pg-cert.sh db atlas
 #   (git-ignored). server cert SAN=db,localhost,127.0.0.1 · client cert CN=atlas
 ```
 
+> **Windows (no local `openssl`)** — generate the certs inside a throwaway
+> container so you don't need OpenSSL on the host. From the repo root in
+> PowerShell:
+>
+> ```powershell
+> docker run --rm -v "${PWD}:/repo" -w /repo alpine `
+>   sh -c "apk add --no-cache openssl >/dev/null && sh deploy/gen-pg-cert.sh db atlas"
+> dir deploy\pgcerts   # confirm ca.crt, server.crt/key, client.crt/key exist
+> ```
+
 **2. Bring the stack up with the overlay** (name it last so it wins):
 
 ```bash
@@ -45,6 +55,17 @@ docker compose -f docker-compose.yml -f docker-compose.pgcert.yml up -d
 The overlay turns on TLS + the cert-only `pg_hba` on `db`, mounts the certs into
 `db` and `api`/`worker`, and sets each app connection string to the **passwordless
 cert form** (`SSL Mode=VerifyFull;Root Certificate=…;SSL Certificate=…;SSL Key=…`).
+
+> **Cross-platform note (how the overlay handles key permissions).** The `db`
+> service mounts the cert folder **read-only** at `/etc/pgcerts-src` and, at
+> startup, copies the server cert/key/CA into `/etc/pgcerts` **owned by the
+> postgres user with `server.key` at `600`**. This is deliberate: host file
+> permissions do **not** translate across Windows/WSL2 Docker Desktop bind mounts
+> (files surface as `0777 root`, which Postgres rejects as world-readable). By
+> copying-and-`chmod`-ing inside the container, cert auth works identically on
+> Linux, macOS and Windows with no host `chown`. The `pg_hba.conf` is mounted at a
+> **sibling** path (`/etc/pgcerts-hba/`), not inside the read-only cert dir —
+> nesting a file mount inside a read-only mount fails on Docker Desktop.
 
 **3. Verify** the app connected over TLS with no password:
 
@@ -56,25 +77,20 @@ docker compose exec db psql -U atlas -d atlas \
 #   → ssl = t, client_dn = /CN=atlas
 ```
 
-**4. The one gotcha — private-key file permissions.** Postgres and Npgsql both
-refuse a key that's group/world-readable, and each key must be **readable by the
-container user that opens it**. `gen-pg-cert.sh` already sets this up for the
-shipped images (bind-mounts preserve host uid):
+**4. Key file permissions — mostly handled for you now.**
 
-| Key | chmod | owner (uid) | read by |
-| --- | ----- | ----------- | ------- |
-| `server.key` | 600 | **70** | postgres in `postgres:16-alpine` |
-| `client.key` | 600 | **1654** | the non-root `app` user in the Atlas image |
-| `ca.key` | 600 | (root) | nobody at runtime — keep offline |
+- **Server key** (`db` side): handled automatically. The overlay copies the key
+  into the container and `chmod 600` + `chown postgres` it at startup (step 2
+  note), so the historical *"private key file has group or world access"* failure
+  can't occur — including on Windows bind mounts.
+- **Client key** (`api`/`worker` side): Npgsql reads the PEM client key via .NET
+  crypto and does **not** enforce unix file permissions, so the read-only host
+  mount is fine as-is on every platform.
+- **CA key** (`ca.key`): never used at runtime — keep it offline.
 
-If you run **different images** (e.g. a Debian `postgres` whose user is uid 999,
-or a customised API image), re-`chown` the keys to those uids:
-
-```bash
-sudo chown 999  deploy/pgcerts/server.key      # match your Postgres image's user
-sudo chown <api-uid> deploy/pgcerts/client.key # match your API image's user
-sudo chmod 600 deploy/pgcerts/*.key
-```
+If you swap in a **different Postgres image** whose runtime user isn't uid 70
+(e.g. a Debian `postgres` on uid 999), change the two `chown` targets in the `db`
+entrypoint of `docker-compose.pgcert.yml` to that uid; nothing else changes.
 
 ## First-boot / existing-volume notes
 - The base `db` service still creates the `atlas` role on first init (with the

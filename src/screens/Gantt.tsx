@@ -394,6 +394,16 @@ const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
   Active:    { bg: color.successTint,  border: color.success },
   Closed:    { bg: color.primaryTint2, border: color.primary },
 };
+// Per-sprint bar colours — the established Atlas hue set (same palette as avatars
+// and methodology chips) cycled by row order, so consecutive sprints read as
+// distinct bands on the timeline even when they share a status. The hue carries
+// identity; status still shows as the label in the left rail (and undated stays
+// dashed). A light alpha wash of the same hue is the fill.
+const SPRINT_HUES = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"];
+function sprintHue(index: number): { bg: string; border: string } {
+  const h = SPRINT_HUES[((index % SPRINT_HUES.length) + SPRINT_HUES.length) % SPRINT_HUES.length];
+  return { bg: `${h}22`, border: h }; // ~13% tint fill + solid hue border
+}
 function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean; projectId: string;
   projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string; sprints?: SprintBar[];
@@ -468,12 +478,14 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
         {sprints.length > 0 && (
           <>
             <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>Sprints</div>
-            {sprints.map((s) => {
+            {sprints.map((s, i) => {
               const open = openSprints.has(s.id);
+              const hue = sprintHue(i).border;
               return (
                 <div key={s.id}>
                   <div onClick={() => toggleSprint(s.id)} title="Show tasks" style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 14px 0 18px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
                     <Icon name={open ? "chevronDown" : "chevronRight"} size={14} color={color.faint} />
+                    <span aria-hidden style={{ width: 9, height: 9, borderRadius: 3, background: hue, flex: "none" }} />
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
                     <span style={{ fontSize: 9.5, fontWeight: 700, color: (SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned).border }}>{s.status}</span>
                   </div>
@@ -511,8 +523,8 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
         {sprints.length > 0 && (
           <div>
             <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
-            {sprints.map((s) => {
-              const c = SPRINT_BAR[s.status] ?? SPRINT_BAR.Planned;
+            {sprints.map((s, i) => {
+              const c = sprintHue(i);
               const open = openSprints.has(s.id);
               return (
                 <div key={s.id}>
