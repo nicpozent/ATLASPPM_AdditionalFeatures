@@ -30,6 +30,14 @@ const pgToDisplay = (iso: string): string => {
   const [y, m, d] = iso.split("-").map(Number);
   return y && m && d ? `${d} ${PG_MONTHS[m - 1]} ${y}` : "";
 };
+// Inverse of pgToDisplay: a stored program date ("10 Dec 2026", or already-ISO)
+// back to yyyy-MM-dd for an <input type="date">. Empty/unparseable → "".
+const pgToIso = (v: string): string => {
+  if (!v) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const d = new Date(v);
+  return isNaN(+d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const STATUS_OPTS = ["Planning", "On track", "At risk", "Critical", "On hold", "Completed", "Closed"] as const;
 const STATUS_COLOR: Record<string, { tint: string; ink: string; dot: string }> = {
@@ -226,6 +234,10 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
     mutationFn: (projects: string[]) => api(`/programs/${program.id}`, { method: "PATCH", body: JSON.stringify({ projects }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
   });
+  const setDates = useMutation({
+    mutationFn: (patch: { startDate?: string; endDate?: string }) => api(`/programs/${program.id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["programs"] }),
+  });
   const [costsOpen, setCostsOpen] = useState(false);
   const [view, setView] = useState<"overview" | "whiteboard">("overview");
   const projectRows = projectOpts.filter((p) => program.projects.includes(p.id));
@@ -252,7 +264,7 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
           <div style={{ flex: 1, minWidth: 240 }}>
             <h2 style={{ fontFamily: font.head, fontSize: 22, fontWeight: 600, color: color.navy, margin: "0 0 4px" }}>{program.name}</h2>
             <div style={{ fontSize: 13, color: color.faint2 }}>{program.goal}</div>
-            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}{program.dept ? ` · ${program.dept}` : ""}{program.startDate ? ` · Start ${program.startDate}` : ""}{program.endDate ? ` · End ${program.endDate}` : ""}</div>
+            <div style={{ fontSize: 12, color: color.faint3, fontFamily: font.mono, marginTop: 4 }}>{program.id} · Owner {program.owner}{program.dept ? ` · ${program.dept}` : ""}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {mayEdit ? (
@@ -265,6 +277,25 @@ function ProgramDetail({ program, projectOpts, onClose }: { program: Program; pr
             <SubscribeButton targetType="program" targetId={program.id} />
             <Button variant="secondary" onClick={() => setCostsOpen(true)}><Icon name="coins" size={15} /> Costs</Button>
           </div>
+        </div>
+        {/* Program timeline — start & end dates, editable in place (cap-projects). */}
+        <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Timeline</span>
+          {mayEdit ? (
+            <>
+              <input type="date" aria-label="Program start date" value={pgToIso(program.startDate ?? "")}
+                max={pgToIso(program.endDate ?? "") || undefined} disabled={setDates.isPending}
+                onChange={(e) => setDates.mutate({ startDate: pgToDisplay(e.target.value) })}
+                style={pgDateInput} />
+              <span style={{ fontSize: 12, color: color.faint3 }}>→</span>
+              <input type="date" aria-label="Program end date" value={pgToIso(program.endDate ?? "")}
+                min={pgToIso(program.startDate ?? "") || undefined} disabled={setDates.isPending}
+                onChange={(e) => setDates.mutate({ endDate: pgToDisplay(e.target.value) })}
+                style={pgDateInput} />
+            </>
+          ) : (
+            <span style={{ fontSize: 13, color: color.text }}>{program.startDate || "—"} → {program.endDate || "—"}</span>
+          )}
         </div>
         {program.projects.length > 0 && (
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.bg}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -449,6 +480,11 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
     </Overlay>
   );
 }
+
+const pgDateInput: React.CSSProperties = {
+  border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 9px", fontSize: 12.5,
+  fontFamily: "inherit", color: color.text, background: color.surface,
+};
 
 function folderBadge(size: number, br = 12): React.CSSProperties {
   return { width: size, height: size, borderRadius: br, background: color.primaryTint, color: color.primary, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
