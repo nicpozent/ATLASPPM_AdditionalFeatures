@@ -361,6 +361,7 @@ interface RoleRow { key: string; label: string; person: string; options: string[
 interface Assignments {
   canAssignLead: boolean; canAssignArch: boolean; leadKey: string; leadLabel: string;
   lead: string; leadOptions: string[]; archRoles: RoleRow[]; options: string[]; missingArch: string[];
+  canAssignDelivery: boolean; deliveryRoles: RoleRow[];
 }
 
 function PeopleRoles({ projectId }: { projectId: string | null }) {
@@ -390,12 +391,12 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
   // Candidate people come from the team mapped to this role (Admin → Teams):
   // architecture roles ← Chief Architect team, Security Officer ← its own team,
   // the lead ← PM Lead + PMO. Empty until a team is mapped.
-  const selRow = (key: string, label: string, val: string, opts: string[]) => (
+  const selRow = (key: string, label: string, val: string, opts: string[], emptyLabel = "— No team mapped —") => (
     <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${color.surfaceAlt}` }}>
       <span style={{ flex: 1, fontSize: 12.5, color: color.subtle }}>{label}</span>
       <select value={val || ""} onChange={(e) => assign.mutate({ key, person: e.target.value })} disabled={!projectId || assign.isPending}
         style={{ border: `1px solid ${color.border2}`, borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", color: color.text, background: color.surface, cursor: "pointer", minWidth: 190 }}>
-        <option value="">{opts.length ? "— Unassigned —" : "— No team mapped —"}</option>
+        <option value="">{opts.length ? "— Unassigned —" : emptyLabel}</option>
         <option value="N/A">N/A</option>
         {opts.map((m) => <option key={m} value={m}>{m}</option>)}
       </select>
@@ -416,6 +417,14 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
       ) : (
         <>
           {data?.canAssignLead ? selRow(data.leadKey, data.leadLabel, data.lead, data.leadOptions ?? []) : roRow(data?.leadLabel ?? "Project Manager", data?.lead ?? "")}
+          {(data?.deliveryRoles?.length ?? 0) > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#5E2E89", letterSpacing: "0.05em", textTransform: "uppercase", margin: "16px 0 2px" }}>Delivery roles</div>
+              {(data?.deliveryRoles ?? []).map((r) => data?.canAssignDelivery
+                ? selRow(r.key, r.label, r.person, r.options ?? [], "— No people onboarded —")
+                : roRow(r.label, r.person))}
+            </>
+          )}
           {data?.canAssignArch && (data.missingArch.length > 0) && (
             <div style={{ margin: "12px 0 4px", fontSize: 12, color: color.warningInk, background: color.warningTint, border: `1px solid ${color.warnBorder}`, borderRadius: 9, padding: "9px 12px", lineHeight: 1.45 }}>
               ⚠ {data.missingArch.length} architecture role{data.missingArch.length > 1 ? "s" : ""} not yet assigned: {data.missingArch.join(", ")}
