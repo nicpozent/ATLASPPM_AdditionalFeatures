@@ -85,26 +85,32 @@ public static class LaborRates
         return ids;
     }
 
-    // The active identity's fine rate-owning keys. The rate card follows the
-    // ACTIVE role so a Platform Admin — who owns no rate line, and therefore sees
-    // NOTHING as themselves — can preview a role's rates by switching to it:
+    // The active identity's fine rate-owning keys.
     //   • auth off (dev): the X-Atlas-Role switcher IS the identity;
-    //   • auth on: the Entra role claims are authoritative, so a real manager is
-    //     pinned to their own lines and can't elevate via the header — EXCEPT a
-    //     Platform Admin, who may impersonate any role through the switcher.
-    // Need-to-know UI filter, not a hard security boundary (ADR-0057).
+    //   • auth on: the Entra role claims are authoritative — every identity is
+    //     pinned to its real role claims and cannot elevate via the header.
+    // The **Platform Administrator is never granted rate visibility**: it owns no
+    // rate line, and (unlike before) it may NOT preview other roles' rates by
+    // switching persona — compensation/rate data is not information that role
+    // should see (segregation of duties). Enforced here, server-side, for both
+    // auth modes. Need-to-know filter (ADR-0057, revised).
     static HashSet<string> RateIdentities(HttpContext http, IConfiguration cfg)
     {
-        var header = http.Request.Headers["X-Atlas-Role"].ToString();
-        if (!cfg.GetValue("Auth:Enabled", false)) return Resolve(header);
-
-        var tokenIds = new HashSet<string>();
-        foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role)))
-            if (RateRole.TryGetValue(c.Value, out var k)) tokenIds.Add(k);
-        // A Platform Admin may impersonate via the switcher; everyone else is
-        // pinned to their real role claims (the header can't grant them a line).
-        if (tokenIds.Contains("admin") && !string.IsNullOrWhiteSpace(header)) return Resolve(header);
-        return tokenIds;
+        HashSet<string> ids;
+        if (!cfg.GetValue("Auth:Enabled", false))
+        {
+            ids = Resolve(http.Request.Headers["X-Atlas-Role"].ToString());
+        }
+        else
+        {
+            ids = new HashSet<string>();
+            foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role)))
+                if (RateRole.TryGetValue(c.Value, out var k)) ids.Add(k);
+        }
+        // The Platform Admin owns no rate line anyway; drop it explicitly so no
+        // future Access entry could ever expose rates to the admin.
+        ids.Remove("admin");
+        return ids;
     }
 
     // Disciplines the active identity may see/edit — exactly the lines whose owner
