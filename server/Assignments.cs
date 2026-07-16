@@ -42,6 +42,7 @@ public static class Assignments
     };
     static readonly HashSet<string> DeliveryKeys = DeliveryRoles.Select(r => r.Key).ToHashSet();
     const string ScrumMasterKey = "scrumMaster";
+    const string TechLeadKey = "techLead";
 
     // Methodologies that make the Scrum Master role relevant (the agile family).
     static readonly HashSet<string> AgileMethods = new(StringComparer.OrdinalIgnoreCase)
@@ -110,16 +111,24 @@ public static class Assignments
             var lead = Person(LeadKey);
             var leadOptions = WithCurrent(pmPool, lead);
 
-            // Delivery roles — candidates are the onboarded roster; Scrum Master is
-            // only offered on an agile methodology.
+            // Delivery roles — Scrum Master is only offered on an agile methodology.
+            //  • Technical Lead ← the engineering-team pool: the Infrastructure,
+            //    Global Engineering, BLOG IT and Dev/Developer teams mapped to their
+            //    managers (falls back to the onboarded roster until any team is
+            //    mapped, so it's usable out of the box).
+            //  • Scrum Master   ← the onboarded application roster.
             var onboarded = await OnboardedAsync(db);
+            var techLeadPool = mapped
+                ? await Teams.PoolAsync(db, "inframgr", "inframgr_apac", "teammgr", "blogit", "devmgr", "devapac")
+                : onboarded;
             var agile = IsAgile(project.Methodology);
             var delivery = DeliveryRoles
                 .Where(r => r.Key != ScrumMasterKey || agile)
                 .Select(r =>
                 {
                     var person = Person(r.Key);
-                    return new RoleAssignmentDto(r.Key, r.Label, person, WithCurrent(onboarded, person));
+                    var pool = r.Key == TechLeadKey ? techLeadPool : onboarded;
+                    return new RoleAssignmentDto(r.Key, r.Label, person, WithCurrent(pool, person));
                 }).ToList();
 
             return Results.Ok(new AssignmentsDto(

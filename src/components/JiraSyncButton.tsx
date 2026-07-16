@@ -1,7 +1,6 @@
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { color, radius } from "@/theme";
 import { Icon } from "@/components/Icon";
-import { usePermissions } from "@/components/usePermissions";
 import { toast, toastError } from "@/components/Toast";
 import { syncJira, syncToast } from "@/lib/jiraSync";
 
@@ -16,8 +15,10 @@ export function JiraSyncButton({ path, lastSync, invalidateKeys = [] }: {
   invalidateKeys?: string[];    // react-query keys to refresh after a sync
 }) {
   const qc = useQueryClient();
-  const { can } = usePermissions();
-  const maySync = can("cap-integrations", "E");
+  // A Jira sync is an idempotent, pull-only refresh of shared project data, so it
+  // is open to every authenticated role (server-enforced the same way) — no
+  // capability gate on the per-entity "Sync from Jira" / "Full re-sync" buttons.
+  const maySync = true;
 
   const sync = useMutation({
     mutationFn: (delta: boolean) => syncJira(path, delta),

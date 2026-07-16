@@ -189,7 +189,7 @@ public static class GanttEndpoints
         {
             var items = new List<PortfolioGanttItemDto>();
 
-            void Add(string type, string id, string name, string status, int? progress, string startRaw, string endRaw)
+            void Add(string type, string id, string name, string status, int? progress, string startRaw, string endRaw, string dept = "")
             {
                 var s = MonthOf(startRaw);
                 var e = MonthOf(endRaw);
@@ -197,15 +197,15 @@ public static class GanttEndpoints
                 var start = Math.Min(s ?? e!.Value, e ?? s!.Value);
                 var end = Math.Max(s ?? e!.Value, e ?? s!.Value);
                 items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress,
-                    string.IsNullOrWhiteSpace(startRaw) ? endRaw : startRaw, string.IsNullOrWhiteSpace(endRaw) ? startRaw : endRaw));
+                    string.IsNullOrWhiteSpace(startRaw) ? endRaw : startRaw, string.IsNullOrWhiteSpace(endRaw) ? startRaw : endRaw, dept));
             }
             // Place an item by month indices directly, when its window was derived
             // (not from an explicit date) — labels show the month names.
-            void AddMonths(string type, string id, string name, string status, int? progress, int startMonth, int endMonth)
+            void AddMonths(string type, string id, string name, string status, int? progress, int startMonth, int endMonth, string dept = "")
             {
                 var start = Math.Clamp(Math.Min(startMonth, endMonth), 0, 11);
                 var end = Math.Clamp(Math.Max(startMonth, endMonth), 0, 11);
-                items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress, MonthLabel(start), MonthLabel(end)));
+                items.Add(new PortfolioGanttItemDto(type, id, name, status, start, end, progress, MonthLabel(start), MonthLabel(end), dept));
             }
 
             // Preload month spans of phases/sprints/tasks so an undated project can
@@ -229,14 +229,14 @@ public static class GanttEndpoints
                 if (MonthOf(p.StartDate) is null && MonthOf(pend) is null)
                 {
                     var m = DerivedMonths(p.Id);
-                    if (m.Count > 0) AddMonths("project", p.Id, p.Name, p.Status, p.Progress, m.Min(), m.Max());
+                    if (m.Count > 0) AddMonths("project", p.Id, p.Name, p.Status, p.Progress, m.Min(), m.Max(), p.Dept);
                 }
-                else Add("project", p.Id, p.Name, p.Status, p.Progress, p.StartDate, pend);
+                else Add("project", p.Id, p.Name, p.Status, p.Progress, p.StartDate, pend, p.Dept);
             }
             foreach (var g in await db.Programs.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
-                Add("program", g.Id, g.Name, g.Status, g.Progress, g.StartDate, g.EndDate);
+                Add("program", g.Id, g.Name, g.Status, g.Progress, g.StartDate, g.EndDate, g.Dept);
             foreach (var pr in await db.Products.OrderBy(x => x.Name).ToListAsync())
-                Add("product", pr.Id, pr.Name, pr.Status, null, pr.StartDate, pr.EndDate);
+                Add("product", pr.Id, pr.Name, pr.Status, null, pr.StartDate, pr.EndDate, pr.Dept);
             foreach (var r in await db.Releases.Where(x => !x.Archived).OrderBy(x => x.Name).ToListAsync())
                 Add("release", r.Id, r.Name, r.Status, r.Progress, r.Date, r.Date);
 

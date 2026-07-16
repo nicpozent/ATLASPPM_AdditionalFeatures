@@ -166,7 +166,7 @@ public record ProgramGanttRowDto(string ProjectId, string ProjectName, List<Phas
 public record ProgramGanttDto(List<ProgramGanttRowDto> Rows, List<MilestoneDto> Milestones);
 
 // Portfolio-wide timeline: one bar per entity on the 12-month grid.
-public record PortfolioGanttItemDto(string Type, string Id, string Name, string Status, int StartMonth, int EndMonth, int? Progress, string StartLabel, string EndLabel);
+public record PortfolioGanttItemDto(string Type, string Id, string Name, string Status, int StartMonth, int EndMonth, int? Progress, string StartLabel, string EndLabel, string Dept = "");
 public record PortfolioGanttDto(List<PortfolioGanttItemDto> Items);
 
 // A dependency edge drawn as a timeline arrow: (FromType,FromId) depends on

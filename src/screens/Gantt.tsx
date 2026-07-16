@@ -21,7 +21,7 @@ interface ProgramSprint { id: number; name: string; status: string; startMonth: 
 interface ProgramRow { projectId: string; projectName: string; phases: Phase[]; startMonth?: number | null; endMonth?: number | null; startDate?: string; endDate?: string; sprints?: ProgramSprint[]; }
 interface ProgramGantt { rows: ProgramRow[]; milestones: Milestone[]; }
 interface Opt { id: string; name: string; }
-interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; }
+interface PortfolioItem { type: string; id: string; name: string; status: string; startMonth: number; endMonth: number; progress: number | null; startLabel: string; endLabel: string; dept: string; }
 type PortfolioCat = "all" | "project" | "program" | "product" | "release";
 // A dependency edge on the timeline: (fromType,fromId) depends on (toType,toId),
 // so the arrow points to → from. `source` is manual | jira | project.
@@ -66,6 +66,7 @@ function useOpts(path: string, key: string) {
 export default function Gantt() {
   const [scope, setScope] = useState<"project" | "program" | "portfolio">("project");
   const [cat, setCat] = useState<PortfolioCat>("all");
+  const [pfDept, setPfDept] = useState("all");
   const [view, setView] = useState<ViewId>("schedule");
   const [projectId, setProjectId] = useState<string>("");
   const [programId, setProgramId] = useState<string>("");
@@ -244,10 +245,16 @@ export default function Gantt() {
           </div>
           <div style={{ flex: 1 }} />
           {scope === "portfolio" ? (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {([["all", "All"], ["project", "Projects"], ["program", "Programs"], ["product", "Products"], ["release", "Releases"]] as const).map(([c, label]) => (
                 <button key={c} onClick={() => setCat(c)} style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "5px 11px", borderRadius: 8, border: `1px solid ${cat === c ? color.primary : color.border}`, background: cat === c ? color.primary : "#fff", color: cat === c ? "#fff" : color.textMuted }}>{label}</button>
               ))}
+              <select value={pfDept} onChange={(e) => setPfDept(e.target.value)} aria-label="Filter by department"
+                style={{ ...selectStyle, marginLeft: 4 }}>
+                <option value="all">All departments</option>
+                {Array.from(new Set((portfolio?.items ?? []).map((i) => i.dept).filter((d) => !!d))).sort()
+                  .map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
           ) : (
             <select value={activeId} onChange={(e) => setActive(e.target.value)} aria-label={scope === "program" ? "Select program" : "Select project"} style={selectStyle}>
@@ -292,7 +299,7 @@ export default function Gantt() {
 
         <WinCtx.Provider value={win}>
         {scope === "portfolio" ? (
-          <PortfolioSchedule items={(portfolio?.items ?? []).filter((i) => cat === "all" || i.type === cat)} cat={cat} />
+          <PortfolioSchedule items={(portfolio?.items ?? []).filter((i) => (cat === "all" || i.type === cat) && (pfDept === "all" || i.dept === pfDept))} cat={cat} />
         ) : view === "schedule" ? (
           scope === "program"
             ? <ProgramSchedule rows={programGantt?.rows ?? []} milestones={milestones} />
@@ -663,12 +670,19 @@ function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos
             if (!up || !down) return null;   // an endpoint is off-window / not shown
             const x1 = ((up.left + up.width) / 100) * w, y1 = up.row * rowH + rowH / 2;
             const x2 = (down.left / 100) * w, y2 = down.row * rowH + rowH / 2;
-            const midX = Math.max(x1 + 12, x2 - 12);
+            // Route the long horizontal run through the target row's GUTTER (bars
+            // sit at top:9 h:20, so 0–9 / 29–38 are clear) rather than across the
+            // bar's centre, and drop into the target from just left of its bar — so
+            // the connector never runs over a timeline bar. A short stub exits the
+            // source's right edge; a short stub enters the target's left edge.
+            const xR = x1 + 12;                         // stub right of the source bar
+            const xE = Math.max(2, x2 - 10);            // just left of the target bar
+            const yG = down.row >= up.row ? down.row * rowH + 5 : down.row * rowH + rowH - 5;
             return (
               <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
-                d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
+                d={`M ${x1} ${y1} H ${xR} V ${yG} H ${xE} V ${y2} H ${x2}`} fill="none"
                 stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
-                markerEnd="url(#dep-arrowhead)" opacity={0.85} />
+                markerEnd="url(#dep-arrowhead)" opacity={0.9} />
             );
           })}
         </svg>
@@ -759,6 +773,16 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
   product: { ink: color.successInk, tint: color.successTint, bar: "#15A34A", label: "Product" },
   release: { ink: color.warningInk, tint: color.warningTint, bar: "#E0A100", label: "Release" },
 };
+// Per-item bar colour — a distinct hue from the established Atlas palette, keyed
+// by the item's stable id so each timeline bar reads as its own band (the type
+// stays identified by the left-rail chip). Makes a newly-added item visibly
+// distinct rather than merging into a wall of one colour.
+const PF_HUES = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"];
+function pfHue(key: string): { bar: string; tint: string } {
+  let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const hue = PF_HUES[h % PF_HUES.length];
+  return { bar: hue, tint: `${hue}22` };
+}
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   const win = useWin();
   const gb = gridBg(win);
@@ -801,12 +825,12 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
         <div style={{ position: "relative", height: rowsHeight, ...gb }}>
           <NowLine />
           {items.map((i) => {
-            const t = PF_TYPE[i.type] ?? PF_TYPE.project;
+            const c = pfHue(`${i.type}-${i.id}`);
             return (
               <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
-                  style={{ ...barAbs(itemAbs(i.startLabel, i.startMonth), itemAbs(i.endLabel, i.endMonth), win), borderRadius: 6, background: t.tint, border: `1px solid ${t.bar}`, overflow: "hidden" }}>
-                  {i.progress !== null && <div style={{ height: "100%", width: `${i.progress}%`, background: t.bar }} />}
+                  style={{ ...barAbs(itemAbs(i.startLabel, i.startMonth), itemAbs(i.endLabel, i.endMonth), win), borderRadius: 6, background: c.tint, border: `1px solid ${c.bar}`, overflow: "hidden" }}>
+                  {i.progress !== null && <div style={{ height: "100%", width: `${i.progress}%`, background: c.bar }} />}
                 </div>
               </div>
             );

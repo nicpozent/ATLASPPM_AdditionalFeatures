@@ -85,16 +85,19 @@ public class AssignmentPoolTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
-    public async Task Delivery_roles_offer_tech_lead_always_and_scrum_master_only_when_agile()
+    public async Task Delivery_roles_scope_tech_lead_to_engineering_teams_and_gate_scrum_master_on_agile()
     {
-        // An onboarded person (Entra member) — the delivery-role candidate pool is
-        // the onboarded roster, independent of any team mapping.
+        // An engineering-team member (Dev/Developer team, mapped to devmgr) and a
+        // non-engineering onboarded member (PMO team). Technical Lead draws only
+        // from the engineering teams; Scrum Master from the whole onboarded roster.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
-            var g = new EntraGroup { Id = "onb-grp", DisplayName = "Onboarded", Manual = true };
-            g.Members.Add(new TeamMemberRow { GroupId = g.Id, Uid = "onb-1", DisplayName = "Deja Developer" });
-            db.EntraGroups.Add(g);
+            var eng = new EntraGroup { Id = "dl-dev", DisplayName = "Developers", ManagerKey = "devmgr", Manual = true };
+            eng.Members.Add(new TeamMemberRow { GroupId = eng.Id, Uid = "dl-dev-1", DisplayName = "Dev Engström" });
+            var pm = new EntraGroup { Id = "dl-pmo", DisplayName = "PMO", ManagerKey = "pmo", Manual = true };
+            pm.Members.Add(new TeamMemberRow { GroupId = pm.Id, Uid = "dl-pmo-1", DisplayName = "Paula PMO" });
+            db.EntraGroups.AddRange(eng, pm);
             await db.SaveChangesAsync();
         }
         var c = Admin();
@@ -107,9 +110,16 @@ public class AssignmentPoolTests : IClassFixture<AtlasApiFactory>
         Assert.Contains("techLead", keys);
         Assert.Contains("scrumMaster", keys);
         Assert.True(agile.GetProperty("canAssignDelivery").GetBoolean());
-        // Candidates are the onboarded roster (not a mapped architecture team).
+
+        // Technical Lead ← engineering teams only: includes the Dev-team member,
+        // excludes the PMO member.
         var tlOpts = Names(dRoles.First(r => r.GetProperty("key").GetString() == "techLead").GetProperty("options"));
-        Assert.Contains("Deja Developer", tlOpts);
+        Assert.Contains("Dev Engström", tlOpts);
+        Assert.DoesNotContain("Paula PMO", tlOpts);
+        // Scrum Master ← the whole onboarded roster: includes the PMO member too.
+        var smOpts = Names(dRoles.First(r => r.GetProperty("key").GetString() == "scrumMaster").GetProperty("options"));
+        Assert.Contains("Paula PMO", smOpts);
+        Assert.Contains("Dev Engström", smOpts);
 
         // Non-agile methodology → Technical Lead stays, Scrum Master is hidden.
         var wfId = await JsonId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "Waterfall delivery", methodology = "Waterfall" }));
@@ -119,11 +129,11 @@ public class AssignmentPoolTests : IClassFixture<AtlasApiFactory>
         Assert.DoesNotContain("scrumMaster", wfKeys);
 
         // The assignment persists.
-        var put = await c.PutAsJsonAsync($"/api/v1/projects/{agileId}/assignments/techLead", new { person = "Deja Developer" });
+        var put = await c.PutAsJsonAsync($"/api/v1/projects/{agileId}/assignments/techLead", new { person = "Dev Engström" });
         Assert.True(put.IsSuccessStatusCode);
         var after = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{agileId}/assignments");
         var tl = after.GetProperty("deliveryRoles").EnumerateArray().First(r => r.GetProperty("key").GetString() == "techLead");
-        Assert.Equal("Deja Developer", tl.GetProperty("person").GetString());
+        Assert.Equal("Dev Engström", tl.GetProperty("person").GetString());
     }
 
     static async Task<string> JsonId(HttpResponseMessage res)
