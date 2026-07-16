@@ -117,7 +117,7 @@ All groups are mapped in `Endpoints.cs`. Representative surface (`/api/v1` prefi
 | Gantt | `/projects/{id}/gantt`, `/phases`, `/milestones`, `/programs/{id}/gantt`, `/portfolio/gantt` | month-grid model |
 | PIP | `/increments`, `/pi-iterations`, `/pi-objectives`, `/pi-dependencies` | quarterly PI planning |
 | Portfolio objects | `/programs`, `/products`, `/releases`, `/okrs`, `/demands` | CRUD + lifecycle |
-| People & capacity | `/teams/*`, `/subteams/*`, `/resources`, `/resources/by-project|by-product|unonboarded|onboard`, `/projects/{id}/capacity`, `/assignments` | Entra + allocation-derived |
+| People & capacity | `/teams/*`, `/subteams/*`, `/resources` (opt. `from`/`to` window, ADR-0071), `/resources/by-project|by-product|unonboarded|onboard`, `/projects/{id}/capacity`, `/projects/{id}/assignments` (lead + architecture + **delivery roles** Technical Lead/Scrum Master, ADR-0070), `/labor-rates` (need-to-know; **admin sees none**, ADR-0057) | Entra + allocation-derived |
 | Governance | `/gates`, `/raid`, `/dependencies`, `/architecture` (ADM/ARB), `/security`, `/quality`, `/decisions` | |
 | Financials | `/financials`, `/costs`, ROI | overall + per entity |
 | Comms | `/notifications`, `/news`, `/delivery`, comments | Graph email best-effort |
@@ -218,7 +218,11 @@ product allocations (`ProductAllocation.Alloc`) + project team-assignment member
 Entra roster, keyed by name. Utilisation = Ops% + Project% + Product%; >100% flags
 over-allocation. `/resources/unonboarded` lists task assignees absent from the
 directory; `/resources/onboard` adds them to a manual directory group so they
-become "known" on the next read/sync.
+become "known" on the next read/sync. With `from`/`to` (ADR-0071) the roster is
+the **average of each person's per-working-day load over the window**
+(`RosterWindowAsync`), computed from the same per-day helpers as the snapshot and
+the Excel export (`AllocationEngine.ProjectPlannedFor`/`TaskLoadFor`/
+`CombineProjectLoad`) so the three can't drift; no window ⇒ single-day snapshot.
 
 ### 7.5 Time-phased allocation & availability (ADR-0013)
 `TeamAssignmentMember` is a **dated segment**: base (`Alloc`/`AllocHours`,

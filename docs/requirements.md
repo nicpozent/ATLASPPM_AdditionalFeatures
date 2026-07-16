@@ -129,6 +129,14 @@ differ only in labour-rate visibility (ADR-0057).
   Admin, PMO, Project Manager, PM Lead) and audited; every other task edit stays
   behind `cap-projects`. The board SHALL be keyboard-operable (focus a card;
   Arrow Left/Right moves columns). *Trace: SBB-27, ADR-0061/0065.*
+- **FR-PROJ-9** [Implemented] The Overview People & roles panel SHALL provide a
+  **Delivery roles** group — a **Technical Lead** (always) and a **Scrum Master**
+  (offered only when the project's methodology is agile: Scrum / Kanban / SAFe /
+  Scrumban / Disciplined Agile / XP, decided server-side). Candidates SHALL come
+  from the **onboarded application roster** (resource directory + Entra members),
+  not a mapped architecture team; assignment SHALL be gated on
+  `admin`/`pmo`/`pm`/`pmlead`, server-enforced, audited, and stored as
+  `RoleAssignment` rows. *Trace: ABB-01, ADR-0070.*
 
 ### 3.5 Demands (intake)
 - **FR-DEM-1** [Implemented] The system SHALL provide a value-vs-effort scored
@@ -178,11 +186,18 @@ differ only in labour-rate visibility (ADR-0057).
   items show only the age track (aging in the backlog); open items run to a NOW
   line. It SHALL offer sort (created / status / longest-running) and a status
   filter, and SHALL virtualise the row list for large backlogs. *Trace: ABB-01, ADR-0059.*
+- **FR-GANTT-7** [Implemented] Each sprint bar in the project-timeline Schedule
+  band SHALL take a distinct hue from the established Atlas palette (cycled by row
+  order), with a matching chip in the left rail, so consecutive sprints read as
+  separate bands even when they share a status; status stays the rail label and
+  undated sprints stay dashed. *Trace: SBB-25.*
 
 ### 3.7 Programmes, products, OKRs
 - **FR-PROG-1** [Implemented] The system SHALL provide a programme list and detail
   (stakeholder power/interest matrix, linked projects, status, start/end),
-  create, link/unlink projects, and archive/delete. *Trace: ABB-01.*
+  create, link/unlink projects, and archive/delete. Programme **start/end dates
+  SHALL be editable from the detail header** (not only at creation), gated on
+  `cap-projects`, and reflected on the programme/portfolio timeline. *Trace: ABB-01.*
 - **FR-PROD-1** [Implemented] The system SHALL provide a product portfolio with
   Jira/ADO tasks mapped to releases, linked projects, start/end dates and a
   timeline, and a product team with per-member allocations. *Trace: ABB-01/SBB-18.*
@@ -208,14 +223,25 @@ differ only in labour-rate visibility (ADR-0057).
   skills (plus legacy shared ones); create SHALL be per-team-unique, and
   rename/delete/rating and export SHALL be refused for columns outside the
   caller's scope. *Trace: SBB-20, ADR-0016.*
+- **FR-RES-6** [Implemented] By-person utilisation SHALL reflect the selected
+  **period** (day/week/month/quarter/half/year) and an arbitrary **date-to-date
+  window**: `GET /resources` accepts optional `from`/`to` and SHALL return each
+  person's Ops/Project/Product load **averaged over the working days in the
+  window**, using the same time-phased engine as the single-day roster and the
+  Excel export (shared in-memory helpers so they cannot drift). The period toggle
+  SHALL map to a concrete calendar window; a date-range filter SHALL override it
+  and the export SHALL follow the selection. *Trace: SBB-24, ADR-0071.*
 - **FR-FIN-1** [Implemented] The system SHALL present budget vs actual, CapEx/OpEx
   split, forecast-at-completion, savings/benefit and ROI, overall and per
   project/programme/product, with a source toggle and an ROI explanation. *Trace: ABB-01.*
 - **FR-FIN-2** [Implemented] The system SHALL provide an internal-labour rate card
   (Junior→Expert) with a day/month/hour calculator, where each **discipline×region
   line** is visible **and** editable only by its owning roles, filtered
-  server-side (no hidden rate on the wire); Platform Admin owns no line and SHALL
-  see none. *Trace: SBB-04, ADR-0055/0057.*
+  server-side (no hidden rate on the wire). The **Platform Administrator SHALL
+  never see rates** (segregation of duties): it owns no line and — unlike before —
+  SHALL NOT preview rates by switching persona; `RateIdentities` pins every
+  identity to its own role in both auth modes and drops `admin`, and the rate card
+  is hidden for that persona. *Trace: SBB-04, ADR-0055/0057.*
 
 ### 3.9 Delivery, releases, weekly updates
 - **FR-DEL-1** [Implemented] The system SHALL produce a stakeholder delivery report
