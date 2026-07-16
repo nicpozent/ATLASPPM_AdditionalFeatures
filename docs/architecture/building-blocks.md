@@ -30,7 +30,7 @@ requirement → capability → implementation → decision.
 | SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL); **per-profile dark mode** via CSS-variable palettes (top-bar toggle, persisted per identity); **timelines on an absolute-month model with a user-selected calendar window up to 5 years** (project/programme/portfolio); **task lifecycle timeline** (created → work-started → resolved, virtualized) | ABB-01, ABB-02 | ADR-0003, ADR-0056, ADR-0058, ADR-0059 |
 | SBB-02 | i18n message catalogue (6 locales) | ABB-01 | completeness test |
 | SBB-03 | Microsoft Entra ID (OIDC) + MSAL, with a client-side idle-logout policy (default 15 min, `VITE_AUTH_IDLE_MINUTES`) | ABB-02, ABB-09 | ADR-0005, ADR-0038 |
-| SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); **regional manager identities (Infrastructure Mgr APAC, Dev APAC Mgr, BLOG IT Manager) cloning their base role's capabilities**; data-driven header switcher (created roles selectable); **need-to-know internal-labour rates — per discipline×region line, server-filtered** | ABB-02 | ADR-0004, ADR-0043, ADR-0046, ADR-0055, ADR-0057 |
+| SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); **regional manager identities (Infrastructure Mgr APAC, Dev APAC Mgr, BLOG IT Manager) cloning their base role's capabilities**; data-driven header switcher (created roles selectable); **need-to-know internal-labour rates — per discipline×region line, server-filtered; Platform Admin excluded entirely (no line owned, no persona-switch preview)** | ABB-02 | ADR-0004, ADR-0043, ADR-0046, ADR-0055, ADR-0057 |
 | SBB-05 | .NET 8 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
 | SBB-07 | EF Core 9 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
@@ -50,7 +50,7 @@ requirement → capability → implementation → decision.
 | SBB-21 | Colour-graded Excel exports (ClosedXML: allocation histogram, skills matrix) | ABB-06, ABB-01 | ADR-0015 |
 | SBB-22 | GDPR data-subject admin surface (DSAR export, erase, run-retention) | ABB-10 | ADR-0017 |
 | SBB-23 | Strategic roadmap (`RoadmapItem` + milestones/links/deps, `cap-roadmap`, Now/Next/Later board + **By-year board** + timeline) | ABB-06 | ADR-0019 |
-| SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity) | ABB-06 | ADR-0020 |
+| SBB-24 | Task-estimate allocation engine (`AllocationEngine`: max(planned, task) per project; shared by Resources + capacity); **period-windowed roster** — `GET /resources` `from`/`to` averages each person's per-working-day load over the window via shared in-memory helpers (`ProjectPlannedFor`/`TaskLoadFor`/`CombineProjectLoad`) reused by the snapshot, the window and the Excel export so they can't drift; UI period toggle + date-range filter | ABB-06 | ADR-0020, ADR-0071 |
 | SBB-25 | Azure DevOps connector (`AzureDevOps.cs`: PAT auth, status/test, discovery + import/map `Project.AdoProject`, **work-item sync** — WIQL work items → epics/tasks, iterations → sprints, idempotent by `AdoId`; **background queue/worker**; **delta/changed-since pulls** via `LastAdoSync` + WIQL `[System.ChangedDate]`) | ABB-05, ABB-06 | ADR-0035, ADR-0036, ADR-0039, ADR-0044 |
 | SBB-26 | k6 performance/load suite (`perf/`: smoke·load·stress + public-API volume seeder; env-driven URL/auth; hot roll-up endpoints; Prometheus remote-write into the reference stack) | ABB-08, ABB-12 | ADR-0047 |
 | SBB-27 | **Real-time collaboration hub** (`BoardHub`, SignalR over `/hubs/board`): opaque scope "rooms" (pi · demands · wb · tasks) carry live presence, peer cursors, off-screen peer indicators and change/op pings; server-only op broadcast (clients can't send ops) so peers render only server-authorized deltas; open to all roles (writes stay capability-gated) | ABB-07, ABB-01 | ADR-0061, ADR-0065 |
@@ -58,13 +58,14 @@ requirement → capability → implementation → decision.
 | SBB-29 | **Cross-entity timeline dependencies** (`Dependencies.cs`, `TimelineDependency`: `fromType/fromId → toType/toId`, source manual\|jira\|project across project/program/product/release/sprint): finish-to-start arrows on the Portfolio timeline (hand-drawn + existing project links folded in), sprint-level arrows on the Project (editable) & Program (read-only) timelines via a DOM-measurement SVG overlay; **Jira issue-link ingest** derives sprint→sprint edges from cross-sprint blocks/depends links (reuses the Jira sync client, idempotent, guarded) | ABB-03, ABB-01, ABB-05 | ADR — timeline deps |
 | SBB-30 | **Quality test-task detail + Jira board ingest** (`Quality.cs`, `TestPlanTask` gains description/start/due/estimate-hours/JiraKey; `TestPlan.JiraBoardId`): a full test-task window and a linked Jira agile board whose issues ingest as test tasks (reuses the Jira sync client/paging/parsing, idempotent by issue key, prunes vanished, `cap-quality`, audited) | ABB-05, ABB-10, ABB-01 | ADR-0018 |
 | SBB-31 | **Personnel-notes field encryption** (`PersonnelCrypto.cs`, AES-256-GCM, per-value nonce, `enc:v1:` marker): the DPIA-gated Team-SWOT + development-plan values encrypted at rest with a key from the secret layer (`Personnel:EncryptionKey`, never in the DB); inert-until-set, legacy-plaintext passthrough, two-key rotation, fail-closed; opt-in `docker-compose.personnel.yml` mounts the key | ABB-09, ABB-10, ABB-04 | ADR-0068 |
+| SBB-32 | **Project delivery roles** (`Assignments.cs`, `RoleAssignment`): a People & roles *Delivery roles* group — Technical Lead (always) + Scrum Master (agile-only, server-decided from `Project.Methodology`); candidates from the **onboarded roster** (resource directory + Entra members), not a mapped team; assignable by `admin`/`pmo`/`pm`/`pmlead`, audited; `AssignmentsDto` gains `CanAssignDelivery`+`DeliveryRoles` | ABB-01, ABB-02 | ADR-0070 |
 
 ## 3. Traceability (ABB → SBB)
 
 ```mermaid
 flowchart LR
-  ABB01["ABB-01 UX"] --> SBB01 & SBB02
-  ABB02["ABB-02 IAM"] --> SBB03 & SBB04 & SBB01
+  ABB01["ABB-01 UX"] --> SBB01 & SBB02 & SBB32
+  ABB02["ABB-02 IAM"] --> SBB03 & SBB04 & SBB01 & SBB32
   ABB03["ABB-03 API"] --> SBB05 & SBB06 & SBB29
   ABB04["ABB-04 Data"] --> SBB07 & SBB08 & SBB31
   ABB05["ABB-05 Integration"] --> SBB09 & SBB10 & SBB25 & SBB30

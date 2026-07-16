@@ -76,5 +76,7 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0067](./0067-openbao-secrets-provider.md) | OpenBao / Vault secrets provider (on-prem, KV v2, opt-in) | Accepted |
 | [0068](./0068-personnel-notes-field-encryption.md) | Field encryption (AES-GCM) for DPIA-gated personnel notes | Accepted |
 | [0069](./0069-passwordless-postgres-cert-auth.md) | Passwordless Postgres via TLS client-certificate auth (opt-in) | Accepted |
+| [0070](./0070-project-delivery-roles.md) | Project delivery roles — Technical Lead (always) + Scrum Master (agile-only), from the onboarded roster | Accepted |
+| [0071](./0071-period-windowed-resource-utilisation.md) | Period-windowed resource utilisation + date-range filter (shared time-phased engine) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

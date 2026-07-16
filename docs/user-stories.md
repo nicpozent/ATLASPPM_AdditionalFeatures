@@ -131,6 +131,20 @@ full (F) levels. Authorization is always server-side.
   **Acceptance:** e.g. Sprints tab only for agile-with-sprints.
 - **US-PROJ-12** — _As a **PM**, I want an Ops-impact panel on Overview, so that I
   see run-the-business load pulling on delivery capacity._
+- **US-PROJ-13** — _As a **PM/PMO**, I want to assign delivery roles — a
+  **Technical Lead** (always) and a **Scrum Master** (only on an agile
+  methodology) — from the onboarded application roster, so that delivery
+  leadership is named alongside the project manager and architecture roles._
+  **Acceptance:** the People & roles panel gains a **Delivery roles** group; the
+  server decides visibility of the Scrum Master from the project's methodology
+  (Scrum/Kanban/SAFe/Scrumban/Disciplined Agile/XP) and offers candidates from
+  the **onboarded roster** (resource directory + Entra members) — not a mapped
+  architecture team; assignment is gated on `admin`/`pmo`/`pm`/`pmlead`,
+  server-enforced and audited, stored as `RoleAssignment` rows. **Verify:** a
+  Scrum project shows both roles with the onboarded people in the dropdown; a
+  Waterfall project shows only Technical Lead; server tests cover
+  always-Technical-Lead, agile-only-Scrum-Master, onboarded-pool and persistence
+  (ADR-0070)._
 
 ## 5. Demands
 
@@ -193,6 +207,14 @@ full (F) levels. Authorization is always server-side.
   links from a project's cross-sprint blocks/depends issue links (reuses the sync
   client). **Verify:** link two visible items → a dashed/solid arrow (jira/manual)
   connects them; e2e renders the arrow in a real browser (ADR — timeline deps)._
+- **US-GANTT-9** — _As a **PM**, I want each sprint bar in the project-timeline
+  Schedule band to be a distinct colour, so that consecutive sprints read as
+  separate bands even when they share a status._
+  **Acceptance:** sprint bars cycle the established Atlas hue set by row order
+  (the same palette as avatars/method chips), with a matching colour chip in the
+  left rail; status still shows as the rail label and undated sprints stay dashed.
+  **Verify:** a project of several same-status ("Completed") sprints renders them
+  in different hues; prototype needs the multi-hue bars reflected._
 
 ## 7. Programs
 
@@ -203,6 +225,16 @@ full (F) levels. Authorization is always server-side.
   so that the program portfolio stays accurate._
 - **US-PROG-3** — _As a **PMO**, I want to archive/delete a program, so that retired
   programs don't clutter the view._
+- **US-PROG-4** — _As a **PMO**, I want to edit a program's **start and end dates**
+  from the program detail header (not only at creation), so that a program's
+  timeline stays current as plans shift._
+  **Acceptance:** an inline, editable Timeline row (start → end date pickers) in
+  the detail header, gated on `cap-projects` (viewers see the dates read-only);
+  `PATCH /programs/{id}` already accepts `startDate`/`endDate`, stored in the
+  program display-date format so the Gantt reads them with no migration.
+  **Verify:** editing the end date persists and the portfolio/program timeline
+  reflects it; an e2e opens the detail, confirms the inputs are pre-filled and the
+  edit PATCHes in the display format._
 
 ## 8. Products
 
@@ -237,6 +269,21 @@ full (F) levels. Authorization is always server-side.
   histogram, skills matrix), so that I can share offline._
 - **US-RES-5** — _As a **manager**, I want allocation to include Ops load and
   absences, so that capacity numbers are honest._
+- **US-RES-6** — _As a **manager**, I want the By-person utilisation to reflect
+  the **selected period** (day/week/month/quarter/half/year) and an arbitrary
+  **date-to-date window**, so that the numbers actually change with the period
+  rather than only relabelling._
+  **Acceptance:** `GET /resources` gained optional `from`/`to`; the roster now
+  **averages each person's per-working-day Ops/Project/Product load over the
+  window** using the same time-phased engine as the single-day roster and the
+  Excel export (refactored to shared in-memory helpers — `ProjectPlannedFor` /
+  `TaskLoadFor` / `CombineProjectLoad` — so the three can't drift). The period
+  toggle maps to a concrete calendar window; a date-range filter overrides it and
+  the export follows the selection. Manual project allocations **and** Jira-derived
+  task load both feed it. **Verify:** the same person reads e.g. 100% over their
+  active week but ~22% over the month and ~2% over the year; a windowed-roster
+  server test, `periodWindow` unit tests, and a `resources-window` e2e prove the
+  toggle + date filter refetch with a window (ADR-0071)._
 
 ## 11. Financials & ROI
 
@@ -310,6 +357,15 @@ full (F) levels. Authorization is always server-side.
   PM/PO CH (PMO, CTO, CIO). Three regional manager identities (Infrastructure
   Manager APAC, Dev APAC Manager, BLOG IT Manager) clone their base role's
   capabilities and differ only in rate visibility (ADR-0055, ADR-0057).
+  The **Platform Administrator is excluded from rate visibility entirely**
+  (segregation of duties — compensation/rate data is not information that role
+  should see): it owns no rate line and can no longer preview rates by switching
+  persona. `RateIdentities` pins every identity to its own role in both auth
+  modes and explicitly drops `admin`, so the API returns no rate for the admin,
+  and the rate card is hidden for that persona on My Team. **Verify:**
+  `GET /labor-rates` as admin returns 0 disciplines / `canEdit=false` while CTO
+  returns all region lines; the My Team rate card is absent for the admin persona
+  and present for CTO (ADR-0057 amendment; `LaborCostingTests`)._
 
 ## 16. Methodologies & Create-Project Wizard
 
