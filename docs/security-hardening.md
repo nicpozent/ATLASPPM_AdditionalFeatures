@@ -171,3 +171,12 @@ The automated SAST/SCA/DAST above is the machine-checkable half. A human
 penetration test / red-team is a separate external engagement it does not
 replace — scope, rules of engagement, and the remediation register live in
 [`docs/pentest-scope.md`](./pentest-scope.md).
+
+### Threat model
+
+The qualitative companion to these gates is the platform
+[**threat model**](./threat-model.md) — a STRIDE analysis over the system's trust
+boundaries, a LINDDUN privacy pass over the personal/personnel data, an OWASP-rated
+risk register, and a MITRE ATT&CK mapping, each tied back to the implemented
+controls and their ADRs. Re-review it every release and on any new trust boundary,
+external interface, or data class.
