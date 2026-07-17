@@ -638,6 +638,32 @@ function LinkSprintModal({ projectId, sprints, onClose, onAdd, pending }: {
 }
 
 // ---- Dependency arrows (SVG overlay) ---------------------------------------
+// Connector styling shared by the timeline dependency overlays. Manual (hand-
+// drawn) links read as a solid accent line; Jira/project-derived links stay a
+// dashed neutral, so the two sources are visually distinct at a glance.
+const DEP_MANUAL = color.primary;
+const DEP_DERIVED = color.faint;
+
+// Build an orthogonal (right-angled) path through `pts` with rounded corners of
+// radius `r`, so elbow connectors read as smooth pipes rather than hard steps.
+// Degenerate (coincident) waypoints collapse to a near-zero radius safely.
+function roundedOrthPath(pts: { x: number; y: number }[], r: number): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i - 1], c = pts[i], n = pts[i + 1];
+    const l1 = Math.hypot(c.x - p.x, c.y - p.y) || 1;
+    const l2 = Math.hypot(n.x - c.x, n.y - c.y) || 1;
+    const rr = Math.min(r, l1 / 2, l2 / 2);
+    const ax = c.x - ((c.x - p.x) / l1) * rr, ay = c.y - ((c.y - p.y) / l1) * rr;
+    const bx = c.x + ((n.x - c.x) / l2) * rr, by = c.y + ((n.y - c.y) / l2) * rr;
+    d += ` L ${ax} ${ay} Q ${c.x} ${c.y} ${bx} ${by}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x} ${last.y}`;
+  return d;
+}
+
 // Routes a finish-to-start elbow from each upstream bar's right edge to the
 // downstream bar's left edge. Positions come in as percentages; we measure the
 // grid's pixel width so the arrowheads stay round (no non-uniform SVG scaling).
@@ -660,8 +686,11 @@ function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos
       {w > 0 && (
         <svg width={w} height={H} style={{ position: "absolute", top: 0, left: 0, overflow: "visible" }} aria-hidden="true">
           <defs>
-            <marker id="dep-arrowhead" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+            <marker id="dep-ah-derived" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,0 L6,3 L0,6 Z" fill={DEP_DERIVED} />
+            </marker>
+            <marker id="dep-ah-manual" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,0 L6,3 L0,6 Z" fill={DEP_MANUAL} />
             </marker>
           </defs>
           {edges.map((e) => {
@@ -675,14 +704,20 @@ function DependencyLayer({ edges, pos, rowH, rows }: { edges: TimelineDep[]; pos
             // bar's centre, and drop into the target from just left of its bar — so
             // the connector never runs over a timeline bar. A short stub exits the
             // source's right edge; a short stub enters the target's left edge.
-            const xR = x1 + 12;                         // stub right of the source bar
-            const xE = Math.max(2, x2 - 10);            // just left of the target bar
-            const yG = down.row >= up.row ? down.row * rowH + 5 : down.row * rowH + rowH - 5;
+            const xR = x1 + 14;                         // stub right of the source bar
+            const xE = Math.max(2, x2 - 14);            // just left of the target bar
+            const yG = down.row >= up.row ? down.row * rowH + 6 : down.row * rowH + rowH - 6;
+            const manual = e.source === "manual";
+            const d = roundedOrthPath([
+              { x: x1, y: y1 }, { x: xR, y: y1 }, { x: xR, y: yG },
+              { x: xE, y: yG }, { x: xE, y: y2 }, { x: x2, y: y2 },
+            ], 5);
             return (
               <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
-                d={`M ${x1} ${y1} H ${xR} V ${yG} H ${xE} V ${y2} H ${x2}`} fill="none"
-                stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
-                markerEnd="url(#dep-arrowhead)" opacity={0.9} />
+                d={d} fill="none"
+                stroke={manual ? DEP_MANUAL : DEP_DERIVED} strokeWidth={manual ? 1.75 : 1.5} strokeLinejoin="round"
+                strokeDasharray={manual ? "" : "4 3"}
+                markerEnd={`url(#${manual ? "dep-ah-manual" : "dep-ah-derived"})`} opacity={0.9} />
             );
           })}
         </svg>
@@ -725,20 +760,34 @@ function MeasuredArrows({ containerRef, edges, remeasure }: {
   return (
     <svg width={box.w} height={box.h} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", overflow: "visible", zIndex: 4 }} aria-hidden="true">
       <defs>
-        <marker id="dep-arrowhead-m" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-          <path d="M0,0 L6,3 L0,6 Z" fill={color.faint} />
+        <marker id="dep-ahm-derived" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,3 L0,6 Z" fill={DEP_DERIVED} />
+        </marker>
+        <marker id="dep-ahm-manual" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,3 L0,6 Z" fill={DEP_MANUAL} />
         </marker>
       </defs>
       {edges.map((e) => {
         const up = rects.get(`${e.toType}-${e.toId}`), down = rects.get(`${e.fromType}-${e.fromId}`);
         if (!up || !down) return null;
         const x1 = up.x + up.w, y1 = up.y + up.h / 2, x2 = down.x, y2 = down.y + down.h / 2;
-        const midX = Math.max(x1 + 12, x2 - 12);
+        // Route the long leg just outside the target bar (above it when the target
+        // sits below the source, else below it) so the connector clears every bar,
+        // mirroring the percentage overlay. Stubs exit/enter each bar's edge.
+        const xR = x1 + 14;
+        const xE = Math.max(2, x2 - 14);
+        const yG = down.y >= up.y ? Math.max(2, down.y - 5) : down.y + down.h + 5;
+        const manual = e.source === "manual";
+        const d = roundedOrthPath([
+          { x: x1, y: y1 }, { x: xR, y: y1 }, { x: xR, y: yG },
+          { x: xE, y: yG }, { x: xE, y: y2 }, { x: x2, y: y2 },
+        ], 5);
         return (
           <path key={e.id || `${e.fromType}${e.fromId}~${e.toType}${e.toId}`}
-            d={`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`} fill="none"
-            stroke={color.faint} strokeWidth={1.5} strokeDasharray={e.source === "manual" ? "" : "4 3"}
-            markerEnd="url(#dep-arrowhead-m)" opacity={0.85} />
+            d={d} fill="none"
+            stroke={manual ? DEP_MANUAL : DEP_DERIVED} strokeWidth={manual ? 1.75 : 1.5} strokeLinejoin="round"
+            strokeDasharray={manual ? "" : "4 3"}
+            markerEnd={`url(#${manual ? "dep-ahm-manual" : "dep-ahm-derived"})`} opacity={0.85} />
         );
       })}
     </svg>
@@ -773,14 +822,13 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
   product: { ink: color.successInk, tint: color.successTint, bar: "#15A34A", label: "Product" },
   release: { ink: color.warningInk, tint: color.warningTint, bar: "#E0A100", label: "Release" },
 };
-// Per-item bar colour — a distinct hue from the established Atlas palette, keyed
-// by the item's stable id so each timeline bar reads as its own band (the type
-// stays identified by the left-rail chip). Makes a newly-added item visibly
-// distinct rather than merging into a wall of one colour.
+// Per-item bar colour — a distinct hue from the established Atlas palette,
+// assigned by row order so adjacent bars are always maximally different and a
+// newly-added item reads as its own band rather than merging into a wall of one
+// colour (the type stays identified by the left-rail chip).
 const PF_HUES = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"];
-function pfHue(key: string): { bar: string; tint: string } {
-  let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  const hue = PF_HUES[h % PF_HUES.length];
+function pfHue(index: number): { bar: string; tint: string } {
+  const hue = PF_HUES[((index % PF_HUES.length) + PF_HUES.length) % PF_HUES.length];
   return { bar: hue, tint: `${hue}22` };
 }
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
@@ -824,8 +872,8 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
         <MonthHeader />
         <div style={{ position: "relative", height: rowsHeight, ...gb }}>
           <NowLine />
-          {items.map((i) => {
-            const c = pfHue(`${i.type}-${i.id}`);
+          {items.map((i, row) => {
+            const c = pfHue(row);
             return (
               <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
