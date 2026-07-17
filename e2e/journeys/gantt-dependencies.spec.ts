@@ -46,8 +46,9 @@ test("timeline: sprint dependency arrow renders on the Project timeline", async 
   await expect(page.locator('[data-dep-key="sprint-1"]')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('[data-dep-key="sprint-2"]')).toBeVisible();
 
-  // The measured overlay draws an arrow path with the arrowhead marker.
-  const arrow = page.locator('path[marker-end="url(#dep-arrowhead-m)"]');
+  // The measured overlay draws an arrow path with the arrowhead marker
+  // (source-specific: dep-ahm-manual / dep-ahm-derived).
+  const arrow = page.locator('path[marker-end^="url(#dep-ahm-"]');
   await expect(arrow.first()).toBeVisible({ timeout: 15_000 });
   expect(await arrow.count()).toBeGreaterThanOrEqual(1);
 

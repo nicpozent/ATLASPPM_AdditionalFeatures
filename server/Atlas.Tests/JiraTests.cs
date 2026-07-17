@@ -47,10 +47,26 @@ public class JiraTests : IClassFixture<AtlasApiFactory>
     {
         var c = _factory.CreateClient();
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        // Integration *configuration* stays behind cap-integrations.
         Assert.Equal(HttpStatusCode.Forbidden, (await c.GetAsync("/api/v1/integrations/jira/status")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/jira/test", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/jira/sync", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Per_project_sync_is_open_to_every_role()
+    {
+        // A Jira sync / full re-sync is a pull-only refresh of shared project data,
+        // so the per-entity endpoint is open to any authenticated role — a
+        // stakeholder is NOT forbidden (it reports not-configured gracefully here
+        // rather than 403). Integration *configuration* stays gated (above).
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        var res = await c.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null);
+        Assert.NotEqual(HttpStatusCode.Forbidden, res.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());   // Jira not configured in tests
     }
 
     [Fact]

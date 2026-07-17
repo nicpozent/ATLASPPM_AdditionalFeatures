@@ -102,11 +102,14 @@ public static class Jira
             }
         });
 
-        // Sync one project from its mapped Jira board. Managing integrations
-        // requires Edit on "Integrations & connectors".
+        // Sync one project from its mapped Jira board. Open to **any authenticated
+        // role** — a Jira sync is an idempotent, pull-only refresh of shared project
+        // data (it grants no data the caller couldn't already see), so every role
+        // may run a sync or a full re-sync from the entity's "Sync from Jira" /
+        // "Full re-sync" buttons. (Integration *configuration* — connection test,
+        // credentials, the portfolio-wide bulk sync — stays behind cap-integrations.)
         api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
