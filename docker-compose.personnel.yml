@@ -1,7 +1,7 @@
 # ============================================================================
 #  Personnel-notes encryption key (OPT-IN) — mounts the AES key that encrypts
-#  the DPIA-gated Team SWOT + development-plan notes at rest. Your base
-#  docker-compose.yml is unchanged; this only applies when you name it, AND it
+#  the DPIA-gated Team SWOT + development-plan notes at rest. The base
+#  docker-compose.yml is unchanged; this only applies when it is named, AND it
 #  requires ./secrets/personnel_key.txt to exist first (see docs/secrets.md):
 #
 #    openssl rand -base64 32 | tr -d '\n' > ./secrets/personnel_key.txt
