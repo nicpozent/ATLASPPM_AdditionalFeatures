@@ -6,7 +6,7 @@
 #    docker compose -f docker-compose.yml -f docker-compose.openbao.yml up -d
 #
 #  The service below runs in **dev mode** (in-memory, auto-unsealed, a fixed root
-#  token) so you can try the wiring in one command. Seed the app's secrets once:
+#  token) so anyone can try the wiring in one command. Seed the app's secrets once:
 #
 #    docker compose exec openbao \
 #      bao kv put secret/atlas \
