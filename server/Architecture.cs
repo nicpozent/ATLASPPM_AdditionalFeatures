@@ -19,9 +19,13 @@ public static class Architecture
     // The Architecture Review Board roster — each an independent sign-off. These
     // are the architecture roles that own architectural correctness (per the
     // prototype: assigned in People & roles; ARB, not the PMO, owns this).
+    // Ordered to cover the four TOGAF architecture domains — Business, Data,
+    // Application (Solution) and Technology (Infrastructure) — plus the Chief
+    // Architect (overall) and Security Architect. Data Architect owns the Data
+    // domain (the "Data Architecture" artefact / phase C's data half).
     static readonly string[] ArbRoster =
     {
-        "Chief Architect", "Business Architect", "Solution Architect",
+        "Chief Architect", "Business Architect", "Data Architect", "Solution Architect",
         "Infrastructure Architect", "Security Architect",
     };
     static readonly string[] Decisions = { "pending", "approved", "conditions", "rejected" };
@@ -61,9 +65,19 @@ public static class Architecture
                 var t = Template[i];
                 db.AdmPhases.Add(new AdmPhase { ProjectId = projectId, Code = t.Code, Phase = t.Phase, Focus = t.Focus, Owner = t.Owner, Artefact = t.Artefact, Ord = i });
             }
-        if (!await db.ArchApprovals.AnyAsync(a => a.ProjectId == projectId))
-            for (var i = 0; i < ArbRoster.Length; i++)
+        // Reconcile the ARB roster against this project: add any roster role that
+        // is missing and keep each row's order aligned to the roster. This means a
+        // board role added later (e.g. Data Architect) appears on already-seeded
+        // projects too, without disturbing any sign-off already recorded.
+        var approvals = await db.ArchApprovals.Where(a => a.ProjectId == projectId).ToListAsync();
+        for (var i = 0; i < ArbRoster.Length; i++)
+        {
+            var row = approvals.FirstOrDefault(a => a.Role == ArbRoster[i]);
+            if (row is null)
                 db.ArchApprovals.Add(new ArchApproval { ProjectId = projectId, Role = ArbRoster[i], Ord = i });
+            else if (row.Ord != i)
+                row.Ord = i;
+        }
         await db.SaveChangesAsync();
     }
 
