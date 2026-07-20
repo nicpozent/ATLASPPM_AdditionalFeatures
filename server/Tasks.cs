@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreateTaskReq(string Name, string? Epic, string? Assignee, string? Status, string? Sprint, string? Baseline, string? Priority,
     string? StartDate, string? TargetDate, int? Points, string? Size, int? EstimateHours);

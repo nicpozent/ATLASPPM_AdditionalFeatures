@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 // ============================================================================
 //  Project completion % derived from task state.

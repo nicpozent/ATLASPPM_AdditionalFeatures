@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // One slice of a person's load on a given day — a single project/program/release/
 // product/ops commitment.

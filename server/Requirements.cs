@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 public record CreateRequirementReq(string Title, string? Type, string? Priority, string? Status,
     string? Epic, string? Story, string? Test, string? TestStatus, string? Release, string? Description);

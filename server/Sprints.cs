@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreateSprintReq(string Name, string? Goal, string? StartDate, string? EndDate, string? Status, int? CommittedPoints);
 public record UpdateSprintReq(string? Name, string? Goal, string? StartDate, string? EndDate, string? Status, int? CommittedPoints);

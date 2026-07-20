@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CommEntryReq(string? Stakeholder, string? Channel, string? CommType, string? Schedule, string? Owner, string? Notes);
 public record WowReq(string? Cadence, string? Summary, List<WowItemDto>? Ceremonies, List<string>? Artifacts, List<string>? Roles);

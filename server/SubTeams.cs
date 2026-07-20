@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Sub-teams & team assignments.

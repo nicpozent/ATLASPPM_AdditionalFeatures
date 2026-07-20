@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Operations;
 
 public record CreateOperationalReq(string Title, string? Type, string? Severity, string? Owner, string? Source);
 public record UpdateOperationalReq(string? Status, string? Severity);

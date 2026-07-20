@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Portfolio;
 
 public record CreateNewsBlockReq(string Kind);
 public record UpdateNewsBlockReq(string? Title, string? Body, string? Metric, string? Label,

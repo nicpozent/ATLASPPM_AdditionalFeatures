@@ -1,4 +1,4 @@
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Capacity model — one canonical basis for turning weekly hours into a % of a

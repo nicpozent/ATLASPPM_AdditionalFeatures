@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Portfolio;
 
 public record RoadmapMilestoneReq(string Title, string? Date, bool? Done);
 public record RoadmapLinkReq(string EntityType, string EntityId);

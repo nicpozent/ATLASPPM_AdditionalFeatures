@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Allocation engine — the single source of a person's PROJECT load, combining

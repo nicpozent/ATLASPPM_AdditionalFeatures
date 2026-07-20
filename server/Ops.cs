@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Operations;
 
 public record CreateOpsServiceReq(string Name, string? Category, string? Dept, string? Owner, string? Description);
 public record UpdateOpsServiceReq(string? Name, string? Category, string? Dept, string? Owner, string? Status, string? Description);

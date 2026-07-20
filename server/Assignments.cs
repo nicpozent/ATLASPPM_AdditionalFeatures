@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  People & roles — assigning the project lead and the architecture roles.

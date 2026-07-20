@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Platform;
 
 // ============================================================================
 //  Help centre — data-driven. Role-based guides and error-category

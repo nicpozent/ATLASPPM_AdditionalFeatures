@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 // ============================================================================
 //  GDPR data-subject access & portability (Articles 15 & 20).

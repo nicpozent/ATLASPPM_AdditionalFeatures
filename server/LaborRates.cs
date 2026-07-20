@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 public record LaborRatesReq(Dictionary<string, decimal>? Rates);
 

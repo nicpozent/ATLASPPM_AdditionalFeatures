@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record SetPlacementReq(int ObjectiveId, int? IterationId);
 

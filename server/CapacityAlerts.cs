@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Over-allocation alerts. The Capacity insight screen already shows who is

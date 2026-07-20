@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreateIncrementReq(string? Key, string? Name, string? StartDate, string? EndDate, string? State);
 public record UpdateIncrementReq(string? Key, string? Name, string? StartDate, string? EndDate, string? State);

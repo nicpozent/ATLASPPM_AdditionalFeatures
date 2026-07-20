@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Portfolio;
 
 public record CreateStakeholderReq(string Name, string? Role, string? Power, string? Interest);
 public record StakeholderDto(int Id, string Name, string Role, string Power, string Interest);

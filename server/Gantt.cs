@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreatePhaseReq(string? Name, int? StartMonth, int? EndMonth, int? Progress);
 public record UpdatePhaseReq(string? Name, int? StartMonth, int? EndMonth, int? Progress);

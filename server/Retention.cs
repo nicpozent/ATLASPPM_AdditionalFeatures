@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 // ============================================================================
 //  Data retention & the right to erasure — by ANONYMISATION, not deletion.

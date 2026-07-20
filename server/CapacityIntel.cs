@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Capacity intelligence — portfolio-level reads over the shared capacity roster
