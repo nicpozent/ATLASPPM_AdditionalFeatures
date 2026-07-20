@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Atlas.Tests;
@@ -104,5 +105,53 @@ public class GovernanceTests : IClassFixture<AtlasApiFactory>
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");   // lacks Full on cap-approve
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsJsonAsync("/api/v1/gates/1/criteria", new { label = "X" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync("/api/v1/gates/criteria/1")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Arb_roster_covers_all_four_togaf_domains_including_data_architect()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "ARB roster project" }));
+        // First read seeds the Architecture Review Board roster.
+        var arch = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/architecture");
+        var roles = arch.GetProperty("approvals").EnumerateArray()
+            .Select(a => a.GetProperty("role").GetString()).ToList();
+
+        Assert.Equal(new[]
+        {
+            "Chief Architect", "Business Architect", "Data Architect",
+            "Solution Architect", "Infrastructure Architect", "Security Architect",
+        }, roles);
+    }
+
+    [Fact]
+    public async Task Arb_roster_is_reconciled_onto_a_project_seeded_before_data_architect()
+    {
+        var c = Admin();
+        var projId = await ProjId(await c.PostAsJsonAsync("/api/v1/projects", new { name = "ARB reconcile project" }));
+
+        // Simulate a project seeded under the old five-role roster (no Data
+        // Architect), then record a decision on one of the existing rows.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Atlas.Api.AtlasDbContext>();
+            db.ArchProfiles.Add(new Atlas.Api.ArchProfile { ProjectId = projId });
+            string[] old = { "Chief Architect", "Business Architect", "Solution Architect", "Infrastructure Architect", "Security Architect" };
+            for (var i = 0; i < old.Length; i++)
+                db.ArchApprovals.Add(new Atlas.Api.ArchApproval { ProjectId = projId, Role = old[i], Ord = i, Decision = old[i] == "Chief Architect" ? "approved" : "pending" });
+            await db.SaveChangesAsync();
+        }
+
+        // A read reconciles the roster: Data Architect is added in TOGAF order
+        // and the prior Chief Architect sign-off is preserved.
+        var arch = await c.GetFromJsonAsync<JsonElement>($"/api/v1/projects/{projId}/architecture");
+        var approvals = arch.GetProperty("approvals").EnumerateArray().ToList();
+        var roles = approvals.Select(a => a.GetProperty("role").GetString()).ToList();
+
+        Assert.Contains("Data Architect", roles);
+        Assert.Equal(6, roles.Count);
+        Assert.Equal("Data Architect", roles[2]);   // Business, [Data], Solution …
+        var chief = approvals.First(a => a.GetProperty("role").GetString() == "Chief Architect");
+        Assert.Equal("approved", chief.GetProperty("decision").GetString());
     }
 }
