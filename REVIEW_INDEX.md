@@ -27,8 +27,15 @@ Plus the two cross-cutting references that everything traces back to:
 
 | Document | What's in it |
 |----------|--------------|
-| [`docs/architecture/adr/`](./docs/architecture/adr/) | **71 Architecture Decision Records** — the "why" behind each significant decision (context → options → decision → consequences). Index at [`adr/README.md`](./docs/architecture/adr/README.md). |
+| [`docs/architecture/adr/`](./docs/architecture/adr/) | **72 Architecture Decision Records** — the "why" behind each significant decision (context → options → decision → consequences). Index at [`adr/README.md`](./docs/architecture/adr/README.md). |
 | [`docs/requirements.md`](./docs/requirements.md) | Consolidated **functional / non-functional / candidate** requirements (SHALL/SHOULD/MAY), each traced to a building block and ADR |
+
+> **Recent modularity hardening (this review's focus).**
+> [`ADR-0072`](./docs/architecture/adr/0072-enforced-module-boundaries.md) is the
+> best starting point for assessing how the modular monolith holds together:
+> per-domain namespaces (`Atlas.Api.<Domain>`) with boundaries **enforced** by an
+> IL-level dependency ratchet (`server/Atlas.Tests/ArchitectureTests.cs`) — new
+> cross-module coupling or cycles fail the build.
 
 ---
 
