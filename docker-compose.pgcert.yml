@@ -14,7 +14,7 @@
 #    docker compose -f docker-compose.yml -f docker-compose.pgcert.yml up -d
 #
 #  ⚠️ Dev certs from gen-pg-cert.sh. For production, mint server/client certs from
-#     your own CA with the same CNs (server SAN = the DB host; client CN = the DB
+#     our own CA with the same CNs (server SAN = the DB host; client CN = the DB
 #     role) and drop them into deploy/pgcerts/ with these filenames.
 # ============================================================================
 services:
