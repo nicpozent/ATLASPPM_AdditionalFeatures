@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 public record SetSoaEntryReq(bool? Applicable, string? Justification, string? Status, string? Owner);
 

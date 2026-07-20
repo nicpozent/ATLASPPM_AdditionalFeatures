@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreateCommentReq(string Body);
 public record CommentDto(int Id, string Author, string Initials, string Body, string At);

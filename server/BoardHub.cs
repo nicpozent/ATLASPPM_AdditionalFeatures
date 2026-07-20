@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Platform;
 
 // ============================================================================
 //  Real-time collaboration hub (ADR-0061). A single SignalR hub that gives any

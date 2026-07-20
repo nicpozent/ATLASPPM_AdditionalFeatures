@@ -1,7 +1,7 @@
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 public record CreateSkillReq(string? Name);
 public record RenameSkillReq(string? Name);

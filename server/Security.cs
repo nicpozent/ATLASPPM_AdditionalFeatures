@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 // PATCH is partial — every field is optional.
 public record UpdateSecurityProfileReq(

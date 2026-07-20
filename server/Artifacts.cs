@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Delivery;
 
 public record CreateArtifactReq(string Name, string? Type, string? Owner, string? Status);
 public record UpdateArtifactReq(string? Name, string? Type, string? Owner, string? Status);

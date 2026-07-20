@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Comms;
 
 public record TeamsConfigReq(string? WebhookUrl, bool? Enabled);
 

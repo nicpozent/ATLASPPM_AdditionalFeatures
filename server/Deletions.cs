@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 // ============================================================================
 //  Deletion requests & archive administration (Admin → Archive & Deletions).

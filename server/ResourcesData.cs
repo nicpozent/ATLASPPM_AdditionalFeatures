@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 public record SetAllocReq(int? Alloc, int? AllocHours, string? StartDate, string? EndDate,
     int? ExtAlloc, int? ExtHours, string? ExtStartDate, string? ExtEndDate);

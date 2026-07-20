@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Platform;
 
 // ---- Wire model (a scene = free-form nodes + connectors) -------------------
 // Points is only used by freehand "draw" nodes: a flat [x0,y0,x1,y1,…] polyline

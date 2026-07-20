@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Finance;
 
 public record UpdateCostReq(decimal Amount);
 public record CreateCostReq(string Label, string? Note, List<string>? OwnerRoles, decimal? Amount);

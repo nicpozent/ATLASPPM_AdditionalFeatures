@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Integrations;
 
 // ============================================================================
 //  Background Azure DevOps sync (ADR-0039) — the ADO analogue of JiraSyncQueue

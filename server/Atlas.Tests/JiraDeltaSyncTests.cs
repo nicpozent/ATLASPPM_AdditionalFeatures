@@ -25,7 +25,7 @@ public class JiraDeltaSyncTests : IClassFixture<AtlasApiFactory>
     [InlineData(true, "", "")]                                                    // delta but no watermark → full
     [InlineData(true, "2026-07-01 10:00", " AND updated >= \"2026-07-01 10:00\"")] // delta with watermark
     public void DeltaClause_only_filters_when_delta_and_watermark(bool delta, string lastSync, string expected)
-        => Assert.Equal(expected, Atlas.Api.Jira.DeltaClause(delta, lastSync));
+        => Assert.Equal(expected, Atlas.Api.Integrations.Jira.DeltaClause(delta, lastSync));
 
     [Fact]
     public async Task Project_carries_last_sync_and_delta_param_is_accepted()

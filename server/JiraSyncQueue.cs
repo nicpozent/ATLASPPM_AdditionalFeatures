@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Integrations;
 
 // ============================================================================
 //  Background Jira sync. A full re-sync of a large project can take longer than

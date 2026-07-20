@@ -78,5 +78,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0069](./0069-passwordless-postgres-cert-auth.md) | Passwordless Postgres via TLS client-certificate auth (opt-in) | Accepted |
 | [0070](./0070-project-delivery-roles.md) | Project delivery roles — Technical Lead (always) + Scrum Master (agile-only), from the onboarded roster | Accepted |
 | [0071](./0071-period-windowed-resource-utilisation.md) | Period-windowed resource utilisation + date-range filter (shared time-phased engine) | Accepted |
+| [0072](./0072-enforced-module-boundaries.md) | Enforced per-domain module boundaries (namespaces + Mono.Cecil dependency ratchet) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

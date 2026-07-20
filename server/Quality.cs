@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 public record CreateTestPlanReq(string Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked, int? JiraBoardId);
 public record UpdateTestPlanReq(string? Name, string? Stage, int? Cases, int? Passed, int? Failed, int? Blocked, int? JiraBoardId);

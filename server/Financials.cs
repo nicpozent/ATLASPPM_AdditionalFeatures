@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Finance;
 
 public record RoiOverrideReq(decimal? Value);   // null clears → automatic
 

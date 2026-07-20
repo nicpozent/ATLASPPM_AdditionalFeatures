@@ -1,7 +1,7 @@
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // ============================================================================
 //  Allocation histogram export — a colour-graded Excel of per-person utilisation

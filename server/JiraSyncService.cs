@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Integrations;
 
 // ============================================================================
 //  Scheduled Jira sync — a background service that re-pulls every Jira-linked

@@ -1,4 +1,4 @@
-namespace Atlas.Api;
+namespace Atlas.Api.People;
 
 // The fixed set of owning departments for projects, programs and products.
 // Kept in one place so the API validates against exactly the list the UI offers.

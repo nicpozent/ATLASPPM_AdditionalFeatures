@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 public record SetChangeTypeReq(string ChangeType);
 public record SetAdmStatusReq(string Status);

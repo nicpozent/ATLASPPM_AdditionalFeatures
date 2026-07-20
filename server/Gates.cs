@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 public record ToggleCriterionReq(bool? Met, string? Label);
 public record AddCriterionReq(string Label);

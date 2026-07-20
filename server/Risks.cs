@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Atlas.Api;
+namespace Atlas.Api.Governance;
 
 // ============================================================================
 //  Deterministic risk engine + status report. Rules run over the project's real
