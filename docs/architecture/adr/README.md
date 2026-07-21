@@ -79,5 +79,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0070](./0070-project-delivery-roles.md) | Project delivery roles — Technical Lead (always) + Scrum Master (agile-only), from the onboarded roster | Accepted |
 | [0071](./0071-period-windowed-resource-utilisation.md) | Period-windowed resource utilisation + date-range filter (shared time-phased engine) | Accepted |
 | [0072](./0072-enforced-module-boundaries.md) | Enforced per-domain module boundaries (namespaces + Mono.Cecil dependency ratchet) | Accepted |
+| [0073](./0073-dotnet-10-migration.md) | Migrate the backend to .NET 10 (LTS) | Proposed |
 
 Template: Context · Decision · Consequences · Alternatives considered.

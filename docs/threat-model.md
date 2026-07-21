@@ -28,7 +28,7 @@ not aspirational. Residual gaps are stated, not smoothed over.
 
 ## 1. Scope & assumptions
 
-**In scope:** the Atlas web app (React SPA), the .NET 8 API (`/api/v1`), the
+**In scope:** the Atlas web app (React SPA), the .NET 10 API (`/api/v1`), the
 SignalR collaboration hub, the background **worker**, PostgreSQL, the nginx TLS
 edge, and the outbound integrations (Jira, Azure DevOps, Microsoft Graph,
 Microsoft Teams). On-prem single-node Docker Compose is the deployment target
@@ -77,7 +77,7 @@ flowchart TB
     NGINX["nginx — TLS, HTTP→HTTPS, static SPA, /api proxy"]
   end
   subgraph AppTrust["Trust boundary: application (container network)"]
-    API["Atlas API (.NET 8, /api/v1)"]
+    API["Atlas API (.NET 10, /api/v1)"]
     HUB["SignalR hub (presence/cursors/live sync)"]
     WORKER["Worker (Jira/ADO sync, retention, alerts)"]
   end

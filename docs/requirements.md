@@ -24,8 +24,8 @@ blocks](./architecture/building-blocks.md) and the [decision log](./architecture
 ## 1. Scope & context
 
 Atlas is a **modular-monolith web application**: a React 18 + TypeScript SPA
-served same-origin behind an nginx edge, talking to a .NET 8 minimal API
-(`/api/v1`) backed by PostgreSQL 16 (EF Core 9). It integrates with Microsoft
+served same-origin behind an nginx edge, talking to a .NET 10 minimal API
+(`/api/v1`) backed by PostgreSQL 16 (EF Core 10). It integrates with Microsoft
 Entra ID (SSO + directory), Jira and Azure DevOps (delivery data), and Microsoft
 Graph (mail). The supported deployment target is **on-prem single-node Docker**
 (ADR-0054). Recurring background work runs in a separate worker process

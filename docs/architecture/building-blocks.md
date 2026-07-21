@@ -31,9 +31,9 @@ requirement → capability → implementation → decision.
 | SBB-02 | i18n message catalogue (6 locales) | ABB-01 | completeness test |
 | SBB-03 | Microsoft Entra ID (OIDC) + MSAL, with a client-side idle-logout policy (default 15 min, `VITE_AUTH_IDLE_MINUTES`) | ABB-02, ABB-09 | ADR-0005, ADR-0038 |
 | SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); **regional manager identities (Infrastructure Mgr APAC, Dev APAC Mgr, BLOG IT Manager) cloning their base role's capabilities**; data-driven header switcher (created roles selectable); **need-to-know internal-labour rates — per discipline×region line, server-filtered; Platform Admin excluded entirely (no line owned, no persona-switch preview)** | ABB-02 | ADR-0004, ADR-0043, ADR-0046, ADR-0055, ADR-0057 |
-| SBB-05 | .NET 8 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
+| SBB-05 | .NET 10 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
-| SBB-07 | EF Core 9 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
+| SBB-07 | EF Core 10 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |
 | SBB-09 | Jira connector (agile + enhanced JQL, board-optional; full-field + comments + attachments; **board auto-discovery by project key when no board id is mapped, so sprints import regardless**; **changelog import (`expand=changelog`) → task lifecycle timestamps: `StartedAt` from the earliest status transition, `ResolvedAt` from `resolutiondate`**) | ABB-05 | ADR-0006, ADR-0018, ADR-0059 |
 | SBB-10 | Microsoft Graph (directory sync, Mail.Send) | ABB-05, ABB-07 | |
