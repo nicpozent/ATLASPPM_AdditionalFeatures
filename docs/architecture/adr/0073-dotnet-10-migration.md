@@ -1,6 +1,6 @@
 # ADR-0073 — Migrate the backend to .NET 10 (LTS)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-20
 **Relates to:** ADR-0001 (modular monolith / minimal API), ADR-0002 (PostgreSQL + EF Core), ADR-0054 (on-prem single-node Docker)
 
