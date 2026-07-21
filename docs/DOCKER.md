@@ -198,7 +198,7 @@ there's no separate migration step.
 
 ## The API (`server/`)
 
-.NET 8 minimal API + EF Core (Npgsql). Implements the `/api/v1` surface the
+.NET 10 minimal API + EF Core (Npgsql). Implements the `/api/v1` surface the
 frontend calls; entities are projected to the exact DTOs the client expects.
 Auth is off unless `Auth__Enabled=true`, matching the frontend. See
 `server/` for the domain model, endpoints and seed data.

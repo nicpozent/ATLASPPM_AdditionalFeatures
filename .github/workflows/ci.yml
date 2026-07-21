@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v5.4.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.x"
       - run: dotnet restore Atlas.sln
       # Supply-chain gate — fail if any referenced NuGet package (including
       # transitive) has a known vulnerability. `dotnet list` exits 0 either

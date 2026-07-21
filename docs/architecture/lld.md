@@ -16,7 +16,7 @@ atlas-frontend/
 │  ├─ auth.ts                # MSAL / Entra glue
 │  ├─ nav.ts · theme.ts      # screen catalogue + design tokens
 │  └─ i18n/                  # 6-locale message catalogue
-├─ server/                   # .NET 8 minimal API
+├─ server/                   # .NET 10 minimal API
 │  ├─ Program.cs             # host build, middleware order, hosted services
 │  ├─ Endpoints.cs           # MapAtlasEndpoints → all endpoint groups
 │  ├─ <Feature>.cs           # one file per domain area (Tasks, Sprints, Jira, Pip, …)

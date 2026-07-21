@@ -61,10 +61,10 @@ flowchart TB
   end
 
   subgraph app["Application tier"]
-    api[".NET 8 Minimal API\n/api/v1/*  ·  RBAC  ·  background workers"]
+    api[".NET 10 Minimal API\n/api/v1/*  ·  RBAC  ·  background workers"]
   end
 
-  db[("PostgreSQL 16\nEF Core 9, migrations on boot")]
+  db[("PostgreSQL 16\nEF Core 10, migrations on boot")]
 
   entra["Entra ID"]
   jira["Jira Cloud"]
@@ -87,7 +87,7 @@ Three containers plus the database:
 | Container | Tech | Responsibility |
 |-----------|------|----------------|
 | **web** | nginx + built SPA assets | Serve the SPA; reverse-proxy `/api` to the API so the browser is same-origin (no CORS in prod); apply security headers |
-| **api** | .NET 8 minimal API (Kestrel) | REST surface under `/api/v1`, authN/Z, business logic, EF Core persistence, background sync/retention workers |
+| **api** | .NET 10 minimal API (Kestrel) | REST surface under `/api/v1`, authN/Z, business logic, EF Core persistence, background sync/retention workers |
 | **db** | PostgreSQL 16 | Durable store; EF Core migrations applied automatically at API start |
 
 Deployed via `docker-compose.yml` (`db`, `api`, `web`) with a `docker-compose.secrets.yml`
@@ -100,7 +100,7 @@ The API is a modular monolith: one process, cohesive endpoint groups mapped unde
 
 ```mermaid
 flowchart LR
-  subgraph API[".NET 8 Minimal API"]
+  subgraph API[".NET 10 Minimal API"]
     direction TB
     delivery["Delivery\nProjects · Tasks · Sprints · Epics\nGantt/Phases/Milestones · PIP"]
     portfolio["Portfolio\nPrograms · Products · Releases · OKRs · Demands"]
@@ -114,7 +114,7 @@ flowchart LR
   end
   xcut["Cross-cutting:\nPermissions · Logging/correlation · RateLimiter · Telemetry · Health"]
   API --- xcut
-  API --> EF["EF Core 9 / AtlasDbContext"] --> PG[("PostgreSQL")]
+  API --> EF["EF Core 10 / AtlasDbContext"] --> PG[("PostgreSQL")]
 ```
 
 Cross-cutting services wrap every request: `Permissions` (authorization),
@@ -225,8 +225,8 @@ flowchart TB
   browser["Browser (internal network)"]
   subgraph Host["On-prem host — Linux VM / Windows Server + Docker (single node)"]
     web["web — nginx + SPA\nTLS edge :443 / :80"]
-    api["api — .NET 8, role=web\nmigrations + seed + /api/v1\nexpose :8080"]
-    worker["worker — .NET 8, role=worker\nrecurring jobs (Jira sync,\nretention, capacity alerts)\nno HTTP surface (ADR-0048)"]
+    api["api — .NET 10, role=web\nmigrations + seed + /api/v1\nexpose :8080"]
+    worker["worker — .NET 10, role=worker\nrecurring jobs (Jira sync,\nretention, capacity alerts)\nno HTTP surface (ADR-0048)"]
     db[("db — PostgreSQL 16\nnamed volume atlas_db\nno published port")]
   end
   browser ==>|"TLS, same-origin /api"| web --> api --> db
@@ -304,7 +304,7 @@ flowchart LR
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18, TypeScript 5, Vite 8, react-router 6, TanStack Query 5, MSAL browser 5, inline-styled design tokens (light/dark CSS-variable palettes, ADR-0056) |
-| Backend | .NET 8, ASP.NET Core minimal APIs, EF Core 9, Npgsql 9 |
+| Backend | .NET 10, ASP.NET Core minimal APIs, EF Core 10, Npgsql 10 |
 | Data | PostgreSQL 16 |
 | Identity | Microsoft Entra ID (OIDC), Microsoft Graph |
 | Integrations | Jira Cloud REST (agile + enhanced JQL) |

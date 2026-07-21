@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -14,12 +14,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.17" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.28" />
-    <!-- EF Core 9 references System.Text.Json 9.0.x; the ASP.NET Core 8 test
-         host pulls 8.0.x. Pin 9.0.x here so the reference to Atlas.Api (built
-         against STJ 9) unifies instead of failing with CS1705. -->
-    <PackageReference Include="System.Text.Json" Version="9.0.17" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Api.csproj" />
