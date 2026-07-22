@@ -78,7 +78,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
         </select>
       </div>
 
-      {/* Theme picker — Atlas Light (default) + the three Zeus brand themes
+      {/* Theme picker — Atlas Light (default) + the three Atlas brand themes
           (ADR-0074). Per-profile, persisted against the selected identity. */}
       <ThemePicker />
 
@@ -104,7 +104,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
 
 // Per-profile theme picker. Sits by the role switcher; the choice persists
 // against the selected identity (ADR-0056, ADR-0074). Atlas Light is the
-// default; the three Zeus brand themes are always offered, Atlas Dark only when
+// default; the three Atlas brand themes are always offered, Atlas Dark only when
 // its flag is on (both handled by THEME_IDS).
 function ThemePicker() {
   const { theme, setTheme } = useTheme();

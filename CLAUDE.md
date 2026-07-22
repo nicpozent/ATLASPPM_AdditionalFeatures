@@ -147,14 +147,14 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   and audited, stored as `RoleAssignment` rows like the other roles. Built on the
   existing People & roles panel; prototype needs the Delivery roles group added.
 
-- **Zeus brand themes** — three product-owner-approved, selectable visual themes
+- **Atlas brand themes** — three product-owner-approved, selectable visual themes
   (**Command** deep-navy · **Daylight** light · **Carbon** near-black) layered onto
   the *existing* token mechanism: each is a full palette in `theme.ts`'s
-  `colorPalettes` map (the Zeus source `--panel/--brandA/--accent/--ok/…` mapped to
+  `colorPalettes` map (the Atlas source `--panel/--brandA/--accent/--ok/…` mapped to
   the Atlas token keys, with tints / `*Ink` text-on-tint pairs / sidebar tokens
   derived), chosen via a per-profile **theme picker** in the top bar. **Atlas Light
   stays the default**; text/surface/ink pairs are tuned to WCAG AA and the axe
-  sweep colour-contrast-gates **all three** Zeus themes. The brand colour is split
+  sweep colour-contrast-gates **all three** Atlas themes. The brand colour is split
   into `primary` (foreground/accent, readable on each ground) and `primaryFill`
   (white-text button background); they coincide on the light palettes (default look
   unchanged) and diverge only on the dark themes so both roles clear AA — this also
