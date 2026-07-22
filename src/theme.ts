@@ -4,11 +4,25 @@
 //  truth. These tokens must match it exactly; do not invent new colors.
 // ============================================================================
 
+// Fonts. `head` (display) is Space Grotesk on every theme. `body` and `mono` are
+// themeable `var(--atlas-font-*)` references (applied via the `style` prop, where
+// var() resolves): Atlas Light/Dark keep the prototype's Public Sans / Space Mono;
+// the Atlas brand themes use IBM Plex Sans / IBM Plex Mono (ADR-0077). The var
+// fallback is the light stack, so first paint (before applyThemeVars) is correct.
 export const font = {
   head: "'Space Grotesk', sans-serif", // headings, numbers, titles
-  body: "'Public Sans', -apple-system, sans-serif", // body copy, UI
-  mono: "'Space Mono', monospace", // ids, metrics, code-ish values
+  body: "var(--atlas-font-body, 'Public Sans', -apple-system, sans-serif)", // body copy, UI
+  mono: "var(--atlas-font-mono, 'Space Mono', monospace)", // ids, metrics, code-ish values
 } as const;
+
+// Per-theme body/mono stacks written onto :root by applyThemeVars.
+const fontStacks: Record<ThemeId, { body: string; mono: string }> = {
+  light: { body: "'Public Sans', -apple-system, sans-serif", mono: "'Space Mono', monospace" },
+  dark: { body: "'Public Sans', -apple-system, sans-serif", mono: "'Space Mono', monospace" },
+  "atlas-command": { body: "'IBM Plex Sans', -apple-system, sans-serif", mono: "'IBM Plex Mono', monospace" },
+  "atlas-daylight": { body: "'IBM Plex Sans', -apple-system, sans-serif", mono: "'IBM Plex Mono', monospace" },
+  "atlas-carbon": { body: "'IBM Plex Sans', -apple-system, sans-serif", mono: "'IBM Plex Mono', monospace" },
+};
 
 // ---------------------------------------------------------------------------
 //  Theming — light + dark palettes surfaced through CSS custom properties.
@@ -194,6 +208,9 @@ export function applyThemeVars(id: ThemeId) {
   for (const k of Object.keys(pal) as ColorKey[]) root.style.setProperty(`--atlas-${k}`, pal[k]);
   const cpal = chartPalettes[id] ?? chartPalettes.light;
   for (const k of Object.keys(cpal) as (keyof typeof cpal)[]) root.style.setProperty(`--atlas-chart-${k}`, cpal[k]);
+  const fonts = fontStacks[id] ?? fontStacks.light;
+  root.style.setProperty("--atlas-font-body", fonts.body);
+  root.style.setProperty("--atlas-font-mono", fonts.mono);
   root.style.colorScheme = (THEMES[id] ?? THEMES.light).scheme;
   root.dataset.theme = id;
 }
