@@ -82,5 +82,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0073](./0073-dotnet-10-migration.md) | Migrate the backend to .NET 10 (LTS) | Accepted |
 | [0074](./0074-zeus-brand-themes.md) | Zeus brand themes (selectable, token-mapped, AA-gated) | Accepted |
 | [0075](./0075-primary-fill-text-token-split.md) | Split `primary` into fill + text tokens; contrast-gate all themes | Accepted |
+| [0076](./0076-theme-persistence-and-themed-charts.md) | Server-persisted per-user theme (cross-device) + theme-aware charts | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

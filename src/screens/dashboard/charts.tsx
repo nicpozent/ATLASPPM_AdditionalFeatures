@@ -93,7 +93,7 @@ export function BudgetChart({ months, planned, actual, max, width = 300, height 
       </defs>
       {grid}
       <path d={area} fill="url(#bgrad)" />
-      <path d={line(planned)} fill="none" stroke={chart.planned} strokeWidth={2} strokeDasharray="5 4" strokeLinecap="round" />
+      <path d={line(planned)} fill="none" style={{ stroke: chart.planned }} strokeWidth={2} strokeDasharray="5 4" strokeLinecap="round" />
       <path d={line(actual)} fill="none" style={{ stroke: color.primary }} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
       {actual.map((v, i) => (
         <circle key={i} cx={X(i)} cy={Y(v)} r={i === actual.length - 1 ? 3.5 : 2.4} style={{ fill: color.primary }} stroke="#fff" strokeWidth={1.4} />

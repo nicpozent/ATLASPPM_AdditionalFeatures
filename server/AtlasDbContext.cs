@@ -89,6 +89,7 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<SkillRating> SkillRatings => Set<SkillRating>();
     public DbSet<DashboardLayout> DashboardLayouts => Set<DashboardLayout>();
+    public DbSet<ThemePref> ThemePrefs => Set<ThemePref>();
     public DbSet<RoadmapItem> RoadmapItems => Set<RoadmapItem>();
     public DbSet<RoadmapMilestone> RoadmapMilestones => Set<RoadmapMilestone>();
     public DbSet<RoadmapDependency> RoadmapDependencies => Set<RoadmapDependency>();
@@ -301,6 +302,8 @@ public class AtlasDbContext(DbContextOptions<AtlasDbContext> options) : DbContex
 
         b.Entity<DashboardLayout>().HasKey(x => x.UserKey);
         b.Entity<DashboardLayout>().Property(x => x.UserKey).ValueGeneratedNever();
+        b.Entity<ThemePref>().HasKey(x => x.UserKey);
+        b.Entity<ThemePref>().Property(x => x.UserKey).ValueGeneratedNever();
         b.Entity<RoadmapItem>().HasKey(x => x.Id);
         b.Entity<RoadmapItem>().HasMany(x => x.Milestones).WithOne().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<RoadmapItem>().HasMany(x => x.Links).WithOne().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Cascade);

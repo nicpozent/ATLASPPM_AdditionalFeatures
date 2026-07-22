@@ -192,6 +192,8 @@ export function applyThemeVars(id: ThemeId) {
   const root = document.documentElement;
   const pal = colorPalettes[id] ?? colorPalettes.light;
   for (const k of Object.keys(pal) as ColorKey[]) root.style.setProperty(`--atlas-${k}`, pal[k]);
+  const cpal = chartPalettes[id] ?? chartPalettes.light;
+  for (const k of Object.keys(cpal) as (keyof typeof cpal)[]) root.style.setProperty(`--atlas-chart-${k}`, cpal[k]);
   root.style.colorScheme = (THEMES[id] ?? THEMES.light).scheme;
   root.dataset.theme = id;
 }
@@ -199,26 +201,59 @@ export function applyThemeVars(id: ThemeId) {
 // Chart / status palette — exact values lifted from the prototype's chart
 // builders (makeDonut, makeBudgetChart, pipeline, sparklines). Kept here so no
 // screen invents its own hex; extend from the prototype only.
-export const chart = {
-  onTrack: "#15A34A",
-  atRisk: "#E0A100",
-  critical: "#D13438",
-  onHold: "#8A93A6",
-  planned: "#B6BECE",
-  grid: "#EEF1F6",
-  track: "#EEF1F6", // empty progress/bar track
+// Chart / status palette. Ported from the prototype's chart builders. Like
+// `color.*`, each flat token is a themeable `var(--atlas-chart-<key>, <light-hex>)`
+// reference so charts re-skin per theme — the chart primitives apply these via the
+// `style` prop (CSSOM), where var() resolves (SVG presentation attributes don't).
+// Chart hues are graphics, not text, so they're not contrast-gated; per-theme
+// values are tuned for harmony on each ground. `method` stays literal (brand chip
+// hues that read on every ground). See ADR-0074/0076.
+const lightChart = {
+  onTrack: "#15A34A", atRisk: "#E0A100", critical: "#D13438", onHold: "#8A93A6",
+  planned: "#B6BECE", grid: "#EEF1F6", track: "#EEF1F6",
   // demand pipeline stages
-  pipeDraft: "#8A93A6",
-  pipeBacklog: "#0F6CBD",
-  pipeApproved: "#15A34A",
-  pipeInProgress: "#7A3FB0",
-  pipeOnHold: "#E0A100",
-  // methodology chips
+  pipeDraft: "#8A93A6", pipeBacklog: "#0F6CBD", pipeApproved: "#15A34A",
+  pipeInProgress: "#7A3FB0", pipeOnHold: "#E0A100",
+} as const;
+type ChartKey = keyof typeof lightChart;
+
+const darkChart: Record<ChartKey, string> = {
+  onTrack: "#35C46B", atRisk: "#F0B429", critical: "#F0656A", onHold: "#6E778F",
+  planned: "#4E5A78", grid: "#2C3247", track: "#252B3E",
+  pipeDraft: "#6E778F", pipeBacklog: "#4C9DE0", pipeApproved: "#35C46B",
+  pipeInProgress: "#B98AE0", pipeOnHold: "#F0B429",
+};
+const commandChart: Record<ChartKey, string> = {
+  onTrack: "#37d39b", atRisk: "#ffb020", critical: "#ff5c7e", onHold: "#6e778f",
+  planned: "#566490", grid: "#22305c", track: "#16233f",
+  pipeDraft: "#6e778f", pipeBacklog: "#6fa8ef", pipeApproved: "#37d39b",
+  pipeInProgress: "#b79bf0", pipeOnHold: "#ffb020",
+};
+const carbonChart: Record<ChartKey, string> = {
+  onTrack: "#2fd98a", atRisk: "#ffb020", critical: "#ff4d6b", onHold: "#6e778f",
+  planned: "#5e6676", grid: "#20242e", track: "#151922",
+  pipeDraft: "#6e778f", pipeBacklog: "#6fb0f5", pipeApproved: "#2fd98a",
+  pipeInProgress: "#b79bf0", pipeOnHold: "#ffb020",
+};
+
+export const chartPalettes: Record<ThemeId, Record<ChartKey, string>> = {
+  light: { ...lightChart },
+  dark: darkChart,
+  "atlas-command": commandChart,
+  "atlas-daylight": { ...lightChart }, // light ground — same hues as Atlas Light
+  "atlas-carbon": carbonChart,
+};
+
+export const chart: Record<ChartKey, string> & { method: Record<string, string> } = {
+  ...(Object.fromEntries(
+    (Object.keys(lightChart) as ChartKey[]).map((k) => [k, `var(--atlas-chart-${k}, ${lightChart[k]})`]),
+  ) as Record<ChartKey, string>),
+  // methodology chips — literal brand hues (read on every ground; not themed)
   method: {
     SAFe: "#0F6CBD", Waterfall: "#7A3FB0", Scrum: "#15A34A", "V-Model": "#E0A100",
     Kanban: "#0E7C7B", "Stage-Gate": "#C24A1F", Scrumban: "#5B8FCB",
-  } as Record<string, string>,
-} as const;
+  },
+};
 
 export const radius = { sm: 8, md: 9, lg: 11, xl: 14, xxl: 16 } as const;
 

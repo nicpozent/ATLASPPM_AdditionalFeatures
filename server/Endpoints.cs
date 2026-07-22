@@ -237,10 +237,35 @@ public static class Endpoints
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = true });
         });
+
+        // UI theme preference, saved per user server-side so it follows them across
+        // devices (the client falls back to localStorage when signed out). ADR-0076.
+        api.MapGet("/prefs/theme", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            var me = Permissions.CallerKey(http, cfg);
+            var row = await db.ThemePrefs.FindAsync(me);
+            return Results.Ok(new { theme = row?.Theme });
+        });
+        api.MapPut("/prefs/theme", async (ThemePrefReq req, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // Whitelist the known theme ids; anything else is ignored (stored as-is
+            // would let a client persist arbitrary strings). Keep in sync with
+            // theme.ts THEMES.
+            var allowed = new[] { "light", "dark", "atlas-command", "atlas-daylight", "atlas-carbon" };
+            var theme = req.Theme ?? "";
+            if (Array.IndexOf(allowed, theme) < 0) return Results.BadRequest(new { error = "unknown theme" });
+            var me = Permissions.CallerKey(http, cfg);
+            var row = await db.ThemePrefs.FindAsync(me);
+            if (row is null) { row = new ThemePref { UserKey = me }; db.ThemePrefs.Add(row); }
+            row.Theme = theme;
+            await db.SaveChangesAsync();
+            return Results.Ok(new { ok = true });
+        });
     }
 }
 
 public record DashboardLayoutReq(string? Widgets);
+public record ThemePrefReq(string? Theme);
 
 public static class DashboardEndpoint
 {
