@@ -152,17 +152,22 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   the *existing* token mechanism: each is a full palette in `theme.ts`'s
   `colorPalettes` map (the Atlas source `--panel/--brandA/--accent/--ok/…` mapped to
   the Atlas token keys, with tints / `*Ink` text-on-tint pairs / sidebar tokens
-  derived), chosen via a per-profile **theme picker** in the top bar. **Atlas Light
-  stays the default**; text/surface/ink pairs are tuned to WCAG AA and the axe
-  sweep colour-contrast-gates **all three** Atlas themes. The brand colour is split
+  derived), chosen via a per-profile **theme picker** in the top bar. The choice is
+  **saved per user server-side** (`/prefs/theme`, `ThemePref`) so it follows a
+  signed-in user across devices; signed out it falls back to localStorage per
+  persona (ADR-0076). **Atlas Light stays the default**; text/surface/ink pairs are
+  tuned to WCAG AA and the axe sweep colour-contrast-gates **all three** Atlas
+  themes. The brand colour is split
   into `primary` (foreground/accent, readable on each ground) and `primaryFill`
   (white-text button background); they coincide on the light palettes (default look
   unchanged) and diverge only on the dark themes so both roles clear AA — this also
   repairs Atlas Dark's buttons (ADR-0075). New white-content buttons use
   `primaryFill`. Colours only — fonts unchanged
-  (Space Grotesk / Public Sans / Space Mono); `chart.*` stays literal hex (SVG
-  presentation attributes don't resolve `var()`), so charts keep their vivid hues.
-  Built entirely on the ADR-0056 theming machinery. Prototype needs the theme
+  (Space Grotesk / Public Sans / Space Mono). **Charts are theme-aware too**:
+  `chart.*` tokens are `var(--atlas-chart-*)` references with per-theme palettes
+  (applied via the `style` prop so `var()` resolves, since SVG presentation
+  attributes don't); `chart.method` chip hues stay literal (ADR-0076). Built
+  entirely on the ADR-0056 theming machinery. Prototype needs the theme
   picker + palettes reflected. See ADR-0074.
 
 When you add an approved extension: build it in the existing UI/UX, record it

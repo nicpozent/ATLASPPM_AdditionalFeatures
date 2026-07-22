@@ -145,6 +145,15 @@ public class DashboardLayout
     public string Widgets { get; set; } = "";          // JSON array of { uid, key }
 }
 
+// A user's UI theme preference, saved server-side so the chosen theme follows
+// them across devices (the client falls back to localStorage when signed out).
+// One row per user, keyed by Permissions.CallerKey. See ADR-0076.
+public class ThemePref
+{
+    public string UserKey { get; set; } = default!;   // Permissions.CallerKey
+    public string Theme { get; set; } = "light";       // theme id (theme.ts ThemeId)
+}
+
 // ---- Roadmap ---------------------------------------------------------------
 // A strategic roadmap initiative. Lives in one of three horizon lanes
 // (Now/Next/Later) AND carries optional start/end dates so the same items
