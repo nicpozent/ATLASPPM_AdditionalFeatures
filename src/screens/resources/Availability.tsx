@@ -38,7 +38,7 @@ export function AvailabilityTab() {
 
   const pill = (active: boolean): React.CSSProperties => ({
     padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-    fontFamily: "inherit", background: active ? color.primary : "transparent", color: active ? "#fff" : color.subtle,
+    fontFamily: "inherit", background: active ? color.primaryFill : "transparent", color: active ? "#fff" : color.subtle,
   });
   const dateBox: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 8, padding: "6px 9px", fontSize: 12.5, fontFamily: "inherit", color: color.text };
 

@@ -159,7 +159,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   return (
     <button onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
       width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer", position: "relative",
-      background: on ? color.primary : "#CBD2DE", transition: "background 0.15s", flex: "none",
+      background: on ? color.primaryFill : "#CBD2DE", transition: "background 0.15s", flex: "none",
     }}>
       <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: color.surface, transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
     </button>

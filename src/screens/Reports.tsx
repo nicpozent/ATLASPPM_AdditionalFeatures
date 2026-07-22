@@ -275,7 +275,7 @@ export default function Reports() {
           <select value={month} onChange={(e) => setMonth(e.target.value)} style={selStyle}>
             {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
-          <button onClick={() => run("portfolio", "html")} disabled={!!busy} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "8px 13px", borderRadius: 8, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}>
+          <button onClick={() => run("portfolio", "html")} disabled={!!busy} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "8px 13px", borderRadius: 8, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}>
             <Icon name="download" size={16} /> Export snapshot
           </button>
         </div>

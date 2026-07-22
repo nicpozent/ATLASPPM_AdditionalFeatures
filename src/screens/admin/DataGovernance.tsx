@@ -62,7 +62,7 @@ function SecretRotationCard() {
           </span>
           {data.canManage && (
             <button onClick={() => mark.mutate()} disabled={mark.isPending}
-              style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: mark.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: mark.isPending ? 0.7 : 1 }}>
+              style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 15px", borderRadius: 9, cursor: mark.isPending ? "default" : "pointer", fontFamily: "inherit", opacity: mark.isPending ? 0.7 : 1 }}>
               Mark as rotated today
             </button>
           )}

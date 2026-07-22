@@ -219,7 +219,7 @@ function LaneRow({
         </div>
         {canEdit && lane.key !== "unassigned" && (
           <button onClick={onLink} title={linking ? "Set as dependency target" : "Link a dependency from this lane"} aria-label="Link dependency"
-            style={{ border: "none", background: isLinkSource ? color.primary : "transparent", color: isLinkSource ? "#fff" : color.faint2, cursor: "pointer", padding: 4, borderRadius: 6, lineHeight: 0, flex: "none" }}>
+            style={{ border: "none", background: isLinkSource ? color.primaryFill : "transparent", color: isLinkSource ? "#fff" : color.faint2, cursor: "pointer", padding: 4, borderRadius: 6, lineHeight: 0, flex: "none" }}>
             <Icon name="gitBranch" size={14} />
           </button>
         )}

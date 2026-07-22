@@ -37,7 +37,7 @@ function NavItem({ id, badge, onNavigate }: { id: ScreenId; badge?: string; onNa
           <span style={{ flex: 1 }}>{t(`screen.${id}.label`, s.label)}</span>
           {shown && (
             <span style={{
-              fontSize: 11, fontWeight: 700, background: color.primary, color: "#fff",
+              fontSize: 11, fontWeight: 700, background: color.primaryFill, color: "#fff",
               borderRadius: 20, padding: "1px 8px", fontFamily: font.mono,
             }}>{shown}</span>
           )}

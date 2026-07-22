@@ -483,7 +483,7 @@ function ProductTimeline({ startDate, endDate, releases, canManage, onDates }: {
               return (
                 <div key={r.id} title={`${r.name}${r.date ? ` · ${r.date}` : ""}`} style={{ position: "absolute", top: -20, left: `${pct}%`, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: color.primary, whiteSpace: "nowrap" }}>{r.name}</span>
-                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: color.primary, border: "2px solid #fff", boxShadow: "0 0 0 1px " + color.primary, marginTop: 2 }} />
+                  <span style={{ width: 11, height: 11, borderRadius: "50%", background: color.primaryFill, border: "2px solid #fff", boxShadow: "0 0 0 1px " + color.primary, marginTop: 2 }} />
                 </div>
               );
             })}

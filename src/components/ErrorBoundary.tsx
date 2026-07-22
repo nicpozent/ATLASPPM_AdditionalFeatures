@@ -31,7 +31,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
           </div>
           <div style={{ fontFamily: font.mono, fontSize: 14, fontWeight: 700, color: color.textMuted, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 8, padding: "8px 12px", marginBottom: 20, display: "inline-block" }}>{this.state.code}</div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-            <button onClick={() => window.location.reload()} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontFamily: "inherit" }}>Reload</button>
+            <button onClick={() => window.location.reload()} style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", borderRadius: 10, padding: "10px 18px", cursor: "pointer", fontFamily: "inherit" }}>Reload</button>
             <a href="/help?code=APP" style={{ fontSize: 13.5, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, borderRadius: 10, padding: "10px 18px", textDecoration: "none" }}>Troubleshooting</a>
           </div>
         </div>

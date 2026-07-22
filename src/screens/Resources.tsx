@@ -156,7 +156,7 @@ export default function Resources() {
             return (
               <button key={p.id} onClick={() => pickPeriod(p.id)} style={{
                 padding: "6px 13px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                background: active ? color.primary : "transparent", color: active ? "#fff" : color.subtle,
+                background: active ? color.primaryFill : "transparent", color: active ? "#fff" : color.subtle,
               }}>{p.label}</button>
             );
           })}
@@ -430,7 +430,7 @@ function UnonboardedPanel({ people }: { people: Unonboarded[] }) {
             <span style={{ flex: 1, fontSize: 11.5, color: color.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.projects.join(", ")}</span>
             {canOnboard
               ? <button onClick={() => onboard.mutate(p.name)} disabled={onboard.isPending}
-                  style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", flex: "none" }}>
+                  style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", flex: "none" }}>
                   <Icon name="userCheck" size={14} /> Onboard
                 </button>
               : <span style={{ fontSize: 11, color: color.faint3, flex: "none" }}>Ask an admin to onboard</span>}

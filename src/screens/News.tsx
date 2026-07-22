@@ -296,7 +296,7 @@ export default function News() {
         <button onClick={() => setEdit((e) => !e)} disabled={!canEdit}
           title={canEdit ? undefined : "Your role can't edit the news wall"} style={{
           display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, cursor: canEdit ? "pointer" : "not-allowed", fontFamily: "inherit",
-          color: edit ? "#fff" : color.primary, background: edit ? color.primary : color.primaryTint,
+          color: edit ? "#fff" : color.primary, background: edit ? color.primaryFill : color.primaryTint,
           border: `1px solid ${edit ? color.primary : color.primaryTint2}`, padding: "7px 13px", borderRadius: 8,
           opacity: canEdit ? 1 : 0.55,
         }}>

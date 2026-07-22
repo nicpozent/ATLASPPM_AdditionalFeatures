@@ -192,7 +192,7 @@ export function Security({ projectId }: { projectId: string | null }) {
             const on = !!p[f.key];
             return (
               <div key={f.key} onClick={() => canEdit && patch.mutate({ [f.key]: !on } as Partial<SecProfile>)} style={{ minWidth: 150, borderRadius: 11, border: `1px solid ${color.border}`, overflow: "hidden", cursor: canEdit ? "pointer" : "default" }}>
-                <div style={{ background: on ? color.primary : color.neutralTint, color: on ? "#fff" : "#7B849A", fontSize: 13, fontWeight: 700, padding: "9px 13px" }}>{f.label}</div>
+                <div style={{ background: on ? color.primaryFill : color.neutralTint, color: on ? "#fff" : "#7B849A", fontSize: 13, fontWeight: 700, padding: "9px 13px" }}>{f.label}</div>
                 <div style={{ fontSize: 11, color: "#7B849A", padding: "8px 13px", lineHeight: 1.4 }}>{f.desc}</div>
               </div>
             );

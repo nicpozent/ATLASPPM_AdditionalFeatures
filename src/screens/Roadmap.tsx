@@ -130,7 +130,7 @@ export default function Roadmap() {
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
                 border: "none", borderRadius: radius.sm, padding: "6px 12px", cursor: "pointer",
-                background: view === v ? color.primary : "transparent", color: view === v ? "#fff" : color.textMuted,
+                background: view === v ? color.primaryFill : "transparent", color: view === v ? "#fff" : color.textMuted,
               }}>
               <Icon name={v === "board" ? "grid" : v === "year" ? "calendar" : v === "timeline" ? "gantt" : "edit"} size={14} /> {v === "board" ? "Now / Next / Later" : v === "year" ? "By year" : v === "timeline" ? "Timeline" : "Whiteboard"}
             </button>
@@ -358,7 +358,7 @@ function Timeline({ items, onEdit }: { items: Item[]; onEdit: (i: Item) => void 
                       style={{ width: LABEL, flex: "none", padding: "0 14px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, color: color.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {i.title}
                     </button>
-                    <div style={{ position: "absolute", left, top: (ROW - 18) / 2, width, height: 18, borderRadius: 5, background: LANE_ACCENT[i.lane] ?? color.primary, opacity: i.status === "Cancelled" ? 0.4 : 0.9, display: "flex", alignItems: "center", paddingLeft: 7 }}
+                    <div style={{ position: "absolute", left, top: (ROW - 18) / 2, width, height: 18, borderRadius: 5, background: LANE_ACCENT[i.lane] ?? color.primaryFill, opacity: i.status === "Cancelled" ? 0.4 : 0.9, display: "flex", alignItems: "center", paddingLeft: 7 }}
                       title={`${i.lane} · ${i.status} · ${i.confidence}% confidence`}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{i.confidence}%</span>
                     </div>

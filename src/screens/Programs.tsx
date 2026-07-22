@@ -467,7 +467,7 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
           const on = selected.includes(o.id);
           return (
             <div key={o.id} onClick={() => toggle(o.id)} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 13px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
-              <span style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${color.border2}`, background: on ? color.primary : color.surface, color: on ? "#fff" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>✓</span>
+              <span style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${color.border2}`, background: on ? color.primaryFill : color.surface, color: on ? "#fff" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "none" }}>✓</span>
               <span style={{ fontSize: 13, color: color.text }}>{o.name}</span>
             </div>
           );
@@ -475,7 +475,7 @@ function NewProgramModal({ projectOpts, onClose, onCreate, submitting }: { proje
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 18 }}>
         <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "10px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-        <button onClick={submit} disabled={submitting} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "10px 18px", borderRadius: 9, cursor: submitting ? "default" : "pointer", fontFamily: "inherit", opacity: submitting ? 0.6 : 1 }}>{submitting ? "Creating…" : "Create program"}</button>
+        <button onClick={submit} disabled={submitting} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "10px 18px", borderRadius: 9, cursor: submitting ? "default" : "pointer", fontFamily: "inherit", opacity: submitting ? 0.6 : 1 }}>{submitting ? "Creating…" : "Create program"}</button>
       </div>
     </Overlay>
   );

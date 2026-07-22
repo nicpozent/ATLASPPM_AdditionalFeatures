@@ -95,7 +95,7 @@ const BTN_BASE: React.CSSProperties = {
   fontSize: 13, fontWeight: 600, borderRadius: 9, cursor: "pointer", fontFamily: "inherit",
 };
 const BTN_VARIANT: Record<"primary" | "secondary", React.CSSProperties> = {
-  primary:   { color: "#fff", background: color.primary, border: "none", padding: "10px 15px" },
+  primary:   { color: "#fff", background: color.primaryFill, border: "none", padding: "10px 15px" },
   secondary: { color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 14px" },
 };
 

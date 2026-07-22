@@ -15,14 +15,13 @@ const ROUTES = ["/", "/portfolio", "/gantt", "/roadmap", "/resources", "/admin",
 // enough — contrast is token-global, not per-route. The theme is a per-profile
 // preference keyed by the active role (default `pmo`, RoleContext).
 const ZEUS_ROUTES = ["/", "/portfolio", "/admin"];
-// Zeus Daylight (a light theme) is fully colour-contrast gated like Atlas Light.
-// Zeus Command / Carbon (dark) are gated for STRUCTURAL a11y only — colour-
-// contrast is not enforced on them yet, mirroring how Atlas Dark is treated
-// (ADR-0056): the single `primary` token can't be both a white-text button
-// background and readable accent text on a near-black surface without an
-// app-wide token split (ADR-0074 follow-up). Body text/tables/headings ARE AA.
-const ZEUS_CONTRAST_GATED = ["zeus-daylight"];
-const ZEUS_STRUCTURAL_ONLY = ["zeus-command", "zeus-carbon"];
+// All three Zeus themes are fully colour-contrast gated. The primary token was
+// split into `primary` (foreground/accent, readable on each ground) and
+// `primaryFill` (white-text button background, dark enough for white), so the
+// dark themes (Command/Carbon) now clear AA too (ADR-0075, superseding the
+// ADR-0074 follow-up note).
+const ZEUS_CONTRAST_GATED = ["zeus-command", "zeus-daylight", "zeus-carbon"];
+const ZEUS_STRUCTURAL_ONLY: string[] = [];
 
 async function sweep(
   page: import("@playwright/test").Page,

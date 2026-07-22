@@ -153,13 +153,13 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   `colorPalettes` map (the Zeus source `--panel/--brandA/--accent/--ok/…` mapped to
   the Atlas token keys, with tints / `*Ink` text-on-tint pairs / sidebar tokens
   derived), chosen via a per-profile **theme picker** in the top bar. **Atlas Light
-  stays the default**; text/surface/ink pairs are tuned to WCAG AA. The axe sweep
-  colour-contrast-gates **Zeus Daylight** (light) alongside Atlas Light; the two
-  **dark** Zeus themes (Command/Carbon) are selectable + structurally gated but
-  not yet contrast-gated — the single `primary` token can't be both a white-text
-  button background and readable accent text on near-black, so a `primary`
-  fill/text token split is the follow-up (same footing as Atlas Dark, ADR-0037).
-  Colours only — fonts unchanged
+  stays the default**; text/surface/ink pairs are tuned to WCAG AA and the axe
+  sweep colour-contrast-gates **all three** Zeus themes. The brand colour is split
+  into `primary` (foreground/accent, readable on each ground) and `primaryFill`
+  (white-text button background); they coincide on the light palettes (default look
+  unchanged) and diverge only on the dark themes so both roles clear AA — this also
+  repairs Atlas Dark's buttons (ADR-0075). New white-content buttons use
+  `primaryFill`. Colours only — fonts unchanged
   (Space Grotesk / Public Sans / Space Mono); `chart.*` stays literal hex (SVG
   presentation attributes don't resolve `var()`), so charts keep their vivid hues.
   Built entirely on the ADR-0056 theming machinery. Prototype needs the theme

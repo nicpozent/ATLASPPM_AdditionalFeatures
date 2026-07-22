@@ -148,7 +148,7 @@ export function TeamPanel({ entityType, entityId }: { entityType: string; entity
 function AllocEditor({ value, onChange }: { value: AllocEdit; onChange: (a: AllocEdit) => void }) {
   const set = (patch: Partial<AllocEdit>) => onChange({ ...value, ...patch });
   const dateInput: React.CSSProperties = { border: `1px solid ${color.border2}`, borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontFamily: "inherit", color: color.text };
-  const modeBtn = (active: boolean): React.CSSProperties => ({ fontSize: 11, fontWeight: 700, padding: "3px 8px", border: "none", cursor: "pointer", background: active ? color.primary : color.surfaceAlt, color: active ? "#fff" : color.subtle, fontFamily: "inherit" });
+  const modeBtn = (active: boolean): React.CSSProperties => ({ fontSize: 11, fontWeight: 700, padding: "3px 8px", border: "none", cursor: "pointer", background: active ? color.primaryFill : color.surfaceAlt, color: active ? "#fff" : color.subtle, fontFamily: "inherit" });
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 7 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -198,7 +198,7 @@ function MemberChecklist({ members, selected, onToggle, edits, onEdit }: {
           <div key={m.id}
             style={{ background: on ? color.primaryTint : color.surfaceAlt, border: `1px solid ${on ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "8px 10px" }}>
             <button type="button" onClick={() => onToggle(m.name)} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: "none", border: "none", width: "100%", minWidth: 0, padding: 0 }}>
-              <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primary : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
+              <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: on ? color.primaryFill : "#fff", border: on ? "none" : `1.5px solid ${color.border2}` }}>{on && <Icon name="check" size={11} color="#fff" />}</span>
               <Avatar name={m.name} />
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12.5, color: color.text }}>{m.name}</span>{m.title && <span style={{ fontSize: 11, color: color.faint3 }}> · {m.title}</span>}</span>
             </button>
