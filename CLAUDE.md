@@ -147,6 +147,24 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   and audited, stored as `RoleAssignment` rows like the other roles. Built on the
   existing People & roles panel; prototype needs the Delivery roles group added.
 
+- **Zeus brand themes** — three product-owner-approved, selectable visual themes
+  (**Command** deep-navy · **Daylight** light · **Carbon** near-black) layered onto
+  the *existing* token mechanism: each is a full palette in `theme.ts`'s
+  `colorPalettes` map (the Zeus source `--panel/--brandA/--accent/--ok/…` mapped to
+  the Atlas token keys, with tints / `*Ink` text-on-tint pairs / sidebar tokens
+  derived), chosen via a per-profile **theme picker** in the top bar. **Atlas Light
+  stays the default**; text/surface/ink pairs are tuned to WCAG AA. The axe sweep
+  colour-contrast-gates **Zeus Daylight** (light) alongside Atlas Light; the two
+  **dark** Zeus themes (Command/Carbon) are selectable + structurally gated but
+  not yet contrast-gated — the single `primary` token can't be both a white-text
+  button background and readable accent text on near-black, so a `primary`
+  fill/text token split is the follow-up (same footing as Atlas Dark, ADR-0037).
+  Colours only — fonts unchanged
+  (Space Grotesk / Public Sans / Space Mono); `chart.*` stays literal hex (SVG
+  presentation attributes don't resolve `var()`), so charts keep their vivid hues.
+  Built entirely on the ADR-0056 theming machinery. Prototype needs the theme
+  picker + palettes reflected. See ADR-0074.
+
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs
 updating — never hand-edit `design/` yourself.

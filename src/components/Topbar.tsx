@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { color, font, layout, DARK_MODE_ENABLED } from "@/theme";
+import { color, font, layout, THEMES, THEME_IDS } from "@/theme";
 import { Icon } from "./Icon";
 import { useRole } from "./RoleContext";
 import { useTheme } from "./ThemeContext";
@@ -78,9 +78,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
         </select>
       </div>
 
-      {/* Dark-mode toggle — hidden while the feature is finished off (theme.ts
-          DARK_MODE_ENABLED). Flip that flag back on to restore it. */}
-      {DARK_MODE_ENABLED && <ThemeToggle />}
+      {/* Theme picker — Atlas Light (default) + the three Zeus brand themes
+          (ADR-0074). Per-profile, persisted against the selected identity. */}
+      <ThemePicker />
 
       {/* Language */}
       <LanguagePicker />
@@ -102,27 +102,33 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
   );
 }
 
-// Per-profile dark-mode toggle. Sits by the role switcher; the choice persists
-// against the selected identity (ADR-0056).
-function ThemeToggle() {
-  const { mode, toggle } = useTheme();
+// Per-profile theme picker. Sits by the role switcher; the choice persists
+// against the selected identity (ADR-0056, ADR-0074). Atlas Light is the
+// default; the three Zeus brand themes are always offered, Atlas Dark only when
+// its flag is on (both handled by THEME_IDS).
+function ThemePicker() {
+  const { theme, setTheme } = useTheme();
   const t = useT();
-  const dark = mode === "dark";
-  const label = dark ? t("common.lightMode", "Switch to light mode") : t("common.darkMode", "Switch to dark mode");
+  const label = t("common.theme", "Theme");
   return (
-    <button
-      onClick={toggle}
-      aria-label={label}
-      aria-pressed={dark}
-      title={label}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        width: 40, height: 40, flex: "none",
-        background: color.surfaceInput, border: `1px solid ${color.border3}`,
-        borderRadius: 9, color: color.faint2, cursor: "pointer", fontFamily: "inherit",
-      }}
-    >
-      <Icon name={dark ? "sun" : "moon"} size={17} />
-    </button>
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8,
+      background: color.surfaceInput, border: `1px solid ${color.border3}`,
+      borderRadius: 9, padding: "8px 12px",
+    }}>
+      <span style={{ color: color.primary, display: "flex" }}><Icon name="palette" size={16} /></span>
+      <span style={{ fontSize: 11, color: color.faint3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+      <select
+        value={theme}
+        onChange={(e) => setTheme(e.target.value as (typeof THEME_IDS)[number])}
+        aria-label={label}
+        style={{
+          border: "none", background: "transparent", fontSize: 13, fontWeight: 600,
+          color: color.ink, fontFamily: "inherit", cursor: "pointer", outline: "none",
+        }}
+      >
+        {THEME_IDS.map((id) => <option key={id} value={id}>{THEMES[id].label}</option>)}
+      </select>
+    </div>
   );
 }
