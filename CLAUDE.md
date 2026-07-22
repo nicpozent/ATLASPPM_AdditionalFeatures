@@ -162,13 +162,14 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   (white-text button background); they coincide on the light palettes (default look
   unchanged) and diverge only on the dark themes so both roles clear AA — this also
   repairs Atlas Dark's buttons (ADR-0075). New white-content buttons use
-  `primaryFill`. Colours only — fonts unchanged
-  (Space Grotesk / Public Sans / Space Mono). **Charts are theme-aware too**:
-  `chart.*` tokens are `var(--atlas-chart-*)` references with per-theme palettes
-  (applied via the `style` prop so `var()` resolves, since SVG presentation
-  attributes don't); `chart.method` chip hues stay literal (ADR-0076). Built
-  entirely on the ADR-0056 theming machinery. Prototype needs the theme
-  picker + palettes reflected. See ADR-0074.
+  `primaryFill`. **Typography is theme-aware**: display stays Space Grotesk on
+  every theme; Atlas Light/Dark keep the prototype's Public Sans / Space Mono, and
+  the three brand themes use IBM Plex Sans / IBM Plex Mono via `var(--atlas-font-*)`
+  (ADR-0077). **Charts are theme-aware too**: `chart.*` tokens are
+  `var(--atlas-chart-*)` references with per-theme palettes (applied via the `style`
+  prop so `var()` resolves, since SVG presentation attributes don't); `chart.method`
+  chip hues stay literal (ADR-0076). Built entirely on the ADR-0056 theming
+  machinery. Prototype needs the theme picker + palettes reflected. See ADR-0074.
 
 When you add an approved extension: build it in the existing UI/UX, record it
 here (and in an ADR when it's architectural), and flag that the prototype needs
