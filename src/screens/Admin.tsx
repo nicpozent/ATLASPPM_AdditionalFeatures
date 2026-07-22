@@ -399,7 +399,7 @@ function StakeholdersSection() {
             <div><label style={labelStyle}>Power</label><Select><option>High</option><option>Low</option></Select></div>
             <div><label style={labelStyle}>Interest</label><Select><option>High</option><option>Low</option></Select></div>
           </div>
-          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Assign stakeholder</button>
+          <button style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit" }}>Assign stakeholder</button>
         </Card>
         <Card>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
@@ -695,7 +695,7 @@ function GuidesSection({ kind, openGuide, setOpenGuide }: {
                 <div style={{ padding: "6px 22px 20px 70px" }}>
                   {g.steps.map((text, i) => (
                     <div key={i} style={{ display: "flex", gap: 13, padding: "8px 0" }}>
-                      <span style={{ width: 24, height: 24, borderRadius: "50%", background: color.primary, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, fontWeight: 700, flex: "none", fontFamily: font.head }}>{i + 1}</span>
+                      <span style={{ width: 24, height: 24, borderRadius: "50%", background: color.primaryFill, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, fontWeight: 700, flex: "none", fontFamily: font.head }}>{i + 1}</span>
                       <span style={{ fontSize: 13.5, lineHeight: 1.55, color: color.textMuted, paddingTop: 2 }}>{text}</span>
                     </div>
                   ))}

@@ -155,7 +155,7 @@ export default function Integrations() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 13 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: color.faint, letterSpacing: "0.07em", textTransform: "uppercase" }}>Connected tools &amp; data sources</span>
         <div style={{ flex: 1 }} />
-        <button style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>
+        <button style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>
           <Icon name="plus" size={16} /> Add connector
         </button>
       </div>
@@ -186,7 +186,7 @@ export default function Integrations() {
                       onClick={() => syncAll.mutate()}
                       disabled={syncAll.isPending || !jira?.canManage}
                       title={jira?.canManage ? "Pull all Jira-mapped projects (map a project's Jira key & board id in its details)" : "Needs Edit on Integrations & connectors"}
-                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAll.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: syncAll.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAll.isPending || !jira?.canManage ? "not-allowed" : "pointer", opacity: syncAll.isPending || !jira?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                     >{syncAll.isPending ? "Syncing…" : "Sync now"}</button>
                   )}
                 </div>
@@ -225,7 +225,7 @@ export default function Integrations() {
                         onClick={() => syncAllAdo.mutate(false)}
                         disabled={syncAllAdo.isPending || !ado?.canManage}
                         title={ado?.canManage ? "Full pull of all Azure DevOps-mapped projects (map a project from Discover below, or in its details)" : "Needs Edit on Integrations & connectors"}
-                        style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                        style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "7px 12px", borderRadius: 8, cursor: syncAllAdo.isPending || !ado?.canManage ? "not-allowed" : "pointer", opacity: syncAllAdo.isPending || !ado?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                       >{syncAllAdo.isPending ? "Syncing…" : "Sync now"}</button>
                     </>
                   )}
@@ -259,7 +259,7 @@ export default function Integrations() {
                       onClick={() => testTeams.mutate()}
                       disabled={testTeams.isPending || !teams?.canManage}
                       title={teams?.canManage ? "Post a test card to the channel" : "Needs Edit on Integrations & connectors"}
-                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 12px", borderRadius: 8, cursor: testTeams.isPending || !teams?.canManage ? "not-allowed" : "pointer", opacity: testTeams.isPending || !teams?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "7px 12px", borderRadius: 8, cursor: testTeams.isPending || !teams?.canManage ? "not-allowed" : "pointer", opacity: testTeams.isPending || !teams?.canManage ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}
                     >{testTeams.isPending ? "Sending…" : "Send test"}</button>
                   )}
                 </div>
@@ -359,7 +359,7 @@ function ConfigureTeamsModal({ enabled, configured, onClose, onDone }: { enabled
           )}
           <div style={{ flex: configured ? "none" : 1 }} />
           <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={() => save.mutate()} disabled={save.isPending || (!configured && !webhook.trim())} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: save.isPending || (!configured && !webhook.trim()) ? "not-allowed" : "pointer", opacity: save.isPending || (!configured && !webhook.trim()) ? 0.6 : 1, fontFamily: "inherit" }}>{save.isPending ? "Saving…" : "Save"}</button>
+          <button onClick={() => save.mutate()} disabled={save.isPending || (!configured && !webhook.trim())} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 15px", borderRadius: 9, cursor: save.isPending || (!configured && !webhook.trim()) ? "not-allowed" : "pointer", opacity: save.isPending || (!configured && !webhook.trim()) ? 0.6 : 1, fontFamily: "inherit" }}>{save.isPending ? "Saving…" : "Save"}</button>
         </div>
       </div>
     </div>
@@ -400,7 +400,7 @@ function DiscoverJira() {
               <span style={{ fontSize: 11.5, fontWeight: 600, color: color.successInk, background: color.successTint, padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
             ) : (
               <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Jira project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
-                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
+                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
             )}
           </div>
         ))}
@@ -444,7 +444,7 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
           {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"], ["ops", "A new Ops service (run-the-business)"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? color.primaryTint : color.surfaceAlt, border: `1px solid ${target === v ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
-              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
+              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primaryFill : "#fff", flex: "none" }} />
               {label}
             </button>
           ))}
@@ -472,7 +472,7 @@ function ImportJiraModal({ proj, onClose, onDone }: { proj: JiraProj; onClose: (
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
+          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
         </div>
       </div>
     </div>
@@ -512,7 +512,7 @@ function DiscoverAdo() {
               <span style={{ fontSize: 11.5, fontWeight: 600, color: color.successInk, background: color.successTint, padding: "4px 11px", borderRadius: 20 }}>Mapped → {p.mappedProjectName}</span>
             ) : (
               <button onClick={() => setImporting(p)} disabled={!canManage} title={canManage ? "Import & map this Azure DevOps project" : "Needs Full on Projects & tasks (Platform Admin / PMO / PM)"}
-                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
+                style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "7px 14px", borderRadius: 8, cursor: canManage ? "pointer" : "not-allowed", opacity: canManage ? 1 : 0.6, fontFamily: "inherit", flex: "none" }}>Import</button>
             )}
           </div>
         ))}
@@ -554,7 +554,7 @@ function ImportAdoModal({ proj, onClose, onDone }: { proj: AdoProj; onClose: () 
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14 }}>
           {([["new", "A new Atlas project"], ["existing", "An existing project"], ["program", "A new project under a program"]] as const).map(([v, label]) => (
             <button key={v} onClick={() => { setTarget(v); setAtlasId(""); }} style={{ display: "flex", alignItems: "center", gap: 9, textAlign: "left", cursor: "pointer", fontFamily: "inherit", background: target === v ? color.primaryTint : color.surfaceAlt, border: `1px solid ${target === v ? color.primaryTint2 : color.border}`, borderRadius: 9, padding: "9px 12px", fontSize: 13, color: color.text }}>
-              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primary : "#fff", flex: "none" }} />
+              <span style={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${target === v ? color.primary : color.border2}`, background: target === v ? color.primaryFill : "#fff", flex: "none" }} />
               {label}
             </button>
           ))}
@@ -574,7 +574,7 @@ function ImportAdoModal({ proj, onClose, onDone }: { proj: AdoProj; onClose: () 
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.textMuted, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
+          <button onClick={() => valid && doImport.mutate()} disabled={!valid || doImport.isPending} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 15px", borderRadius: 9, cursor: valid && !doImport.isPending ? "pointer" : "not-allowed", opacity: valid && !doImport.isPending ? 1 : 0.6, fontFamily: "inherit" }}>{doImport.isPending ? "Importing…" : "Import"}</button>
         </div>
       </div>
     </div>

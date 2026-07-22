@@ -158,7 +158,7 @@ function StaffingFinder() {
           <input type="number" min={0} max={100} value={minFree} onChange={(e) => setMinFree(Number(e.target.value) || 0)} style={{ display: "block", marginTop: 3, ...inp, width: 90 }} />
         </label>
         <button onClick={() => skill.trim() && setQuery({ skill: skill.trim(), minFree })}
-          style={{ background: color.primary, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Find people</button>
+          style={{ background: color.primaryFill, color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Find people</button>
       </div>
       {query && (
         (data?.candidates.length ?? 0) === 0

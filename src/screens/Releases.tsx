@@ -110,7 +110,7 @@ function ReleaseCalendar({ releases, onOpen }: { releases: Release[]; onOpen: (r
           return (
             <div key={i} style={{ minHeight: 92, borderRight: (i % 7 !== 6) ? `1px solid ${color.surfaceAlt}` : "none", borderBottom: `1px solid ${color.surfaceAlt}`, padding: 5, background: day == null ? color.bg : color.surface }}>
               {day != null && (
-                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? "#fff" : color.faint, width: 20, height: 20, borderRadius: "50%", background: isToday ? color.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 3 }}>{day}</div>
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? "#fff" : color.faint, width: 20, height: 20, borderRadius: "50%", background: isToday ? color.primaryFill : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 3 }}>{day}</div>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 {rels.map((r) => {
@@ -259,7 +259,7 @@ export default function Releases() {
           {(["all", ...RELEASE_STATUSES] as string[]).map((s) => {
             const count = s === "all" ? live.length : live.filter((r) => r.status === s).length;
             const active = status === s;
-            const sc = s === "all" ? { ink: "#fff", tint: color.primary } : (STATUS_COLORS[s] ?? STATUS_COLORS.Planned);
+            const sc = s === "all" ? { ink: "#fff", tint: color.primaryFill } : (STATUS_COLORS[s] ?? STATUS_COLORS.Planned);
             return (
               <button key={s} onClick={() => setStatus(s)} style={{
                 fontSize: 12.5, fontWeight: 600, padding: "6px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit",

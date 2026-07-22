@@ -516,7 +516,7 @@ function IconChoice({ options, value, onChange }: {
             background: on ? color.primaryTint : color.surface,
             border: `1px solid ${on ? color.primary : color.border2}`, borderRadius: 9, padding: "9px 12px",
           }}>
-            <span style={{ width: 15, height: 15, borderRadius: "50%", flex: "none", border: `2px solid ${on ? color.primary : color.faint3}`, boxShadow: on ? `inset 0 0 0 3px ${color.surface}` : "none", background: on ? color.primary : "transparent" }} />
+            <span style={{ width: 15, height: 15, borderRadius: "50%", flex: "none", border: `2px solid ${on ? color.primary : color.faint3}`, boxShadow: on ? `inset 0 0 0 3px ${color.surface}` : "none", background: on ? color.primaryFill : "transparent" }} />
             <span style={{ fontSize: 16 }}>{o.icon}</span>
             <span>{o.label}</span>
           </button>
@@ -534,7 +534,7 @@ function ChipMulti({ options, selected, onToggle }: { options: string[]; selecte
         return (
           <button key={o} type="button" onClick={() => onToggle(o)} style={{
             fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-            color: on ? "#fff" : color.textMuted, background: on ? color.primary : color.surface,
+            color: on ? "#fff" : color.textMuted, background: on ? color.primaryFill : color.surface,
             border: `1px solid ${on ? color.primary : color.border2}`, borderRadius: 20, padding: "6px 13px",
           }}>{on ? "✓ " : ""}{o}</button>
         );
@@ -552,7 +552,7 @@ function YesNo({ value, onChange, yesFirst = true }: { value: boolean; onChange:
           display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontFamily: "inherit",
           fontSize: 13.5, color: color.text, background: "transparent", border: "none", padding: 0,
         }}>
-          <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${value === v ? color.primary : color.faint3}`, boxShadow: value === v ? `inset 0 0 0 3px ${color.surface}` : "none", background: value === v ? color.primary : "transparent" }} />
+          <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${value === v ? color.primary : color.faint3}`, boxShadow: value === v ? `inset 0 0 0 3px ${color.surface}` : "none", background: value === v ? color.primaryFill : "transparent" }} />
           {v ? "Yes" : "No"}
         </button>
       ))}

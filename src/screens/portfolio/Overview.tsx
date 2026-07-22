@@ -88,7 +88,7 @@ export default function PortfolioOverview() {
           const active = cat === c.key;
           const n = counts[c.key];
           return (
-            <button key={c.key} onClick={() => setCat(c.key)} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "7px 13px", borderRadius: 9, border: `1px solid ${active ? color.primary : color.border}`, background: active ? color.primary : "#fff", color: active ? "#fff" : color.textMuted }}>
+            <button key={c.key} onClick={() => setCat(c.key)} style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "7px 13px", borderRadius: 9, border: `1px solid ${active ? color.primary : color.border}`, background: active ? color.primaryFill : "#fff", color: active ? "#fff" : color.textMuted }}>
               <Icon name={c.icon} size={14} /> {c.label}
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: font.mono, background: active ? "rgba(255,255,255,0.22)" : color.bg, borderRadius: 20, padding: "0 7px" }}>{n}</span>
             </button>

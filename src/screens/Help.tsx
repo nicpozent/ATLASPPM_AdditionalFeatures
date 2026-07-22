@@ -180,7 +180,7 @@ export default function Help() {
             </ul>
           </div>
           <button onClick={() => setContactOpen(true)}
-            style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>
+            style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: 11, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", marginBottom: 9 }}>
             Contact the PMO
           </button>
           <button onClick={() => { setQuery(""); setRole("all"); window.scrollTo({ top: 0, behavior: "smooth" }); }}

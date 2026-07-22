@@ -42,8 +42,12 @@ export const DARK_MODE_ENABLED = false;
 // The light palette is the single source of truth for the token keys AND the
 // var() fallbacks (the exact values the a11y contrast gate was tuned against).
 const lightColors = {
-  // Brand
-  primary: "#0F6CBD", primaryDark: "#0C5798", navy: "#11163A", accent: "#7A3FB0",
+  // Brand. `primary` is the foreground/accent (text, icons, borders, meters);
+  // `primaryFill` is the background for white-content buttons/badges/avatars.
+  // They coincide on light grounds but diverge on dark themes, where the accent
+  // must be light (readable text) while the button fill must stay dark enough for
+  // white text (ADR-0075).
+  primary: "#0F6CBD", primaryFill: "#0F6CBD", primaryDark: "#0C5798", navy: "#11163A", accent: "#7A3FB0",
   // Sidebar (dark in both themes)
   sidebarBg: "#11163A", sidebarText: "#AEB6D0", sidebarMuted: "#7E88AD", sidebarLabel: "#7C86AC",
   // Text (navy/ink are heading-text tokens; navy-as-background was repointed to sidebarBg)
@@ -70,7 +74,7 @@ type ColorKey = keyof typeof lightColors;
 // light; surfaces/borders go dark; status hues brighten slightly; tints become
 // low-luminance washes. Contrast for text on `surface`/`bg` is ≥ AA.
 const darkColors: Record<ColorKey, string> = {
-  primary: "#4C9DE0", primaryDark: "#7FB6E8", navy: "#E8EBF5", accent: "#B98AE0",
+  primary: "#4C9DE0", primaryFill: "#2c6fce", primaryDark: "#7FB6E8", navy: "#E8EBF5", accent: "#B98AE0",
   sidebarBg: "#0C1024", sidebarText: "#AEB6D0", sidebarMuted: "#8891B0", sidebarLabel: "#9AA3C4",
   ink: "#EDEFF6", text: "#E6E9F2", textMuted: "#B7BECE", subtle: "#9AA2B4",
   faint: "#98A0B2", faint2: "#949CAF", faint3: "#9098AB",
@@ -97,7 +101,7 @@ const darkColors: Record<ColorKey, string> = {
 //  status colours read on every ground.
 // ---------------------------------------------------------------------------
 const zeusCommand: Record<ColorKey, string> = {
-  primary: "#2c6fce", primaryDark: "#9fc2f2", navy: "#eef2ff", accent: "#b79bf0",
+  primary: "#6fa8ef", primaryFill: "#2c6fce", primaryDark: "#9fc2f2", navy: "#eef2ff", accent: "#b79bf0",
   sidebarBg: "#0b1330", sidebarText: "#aeb6d0", sidebarMuted: "#93a0c6", sidebarLabel: "#9aa6cc",
   ink: "#eef2ff", text: "#eef2ff", textMuted: "#c6d2f0", subtle: "#aab8e0",
   faint: "#9aa8d4", faint2: "#93a2cf", faint3: "#8c9cca",
@@ -112,10 +116,10 @@ const zeusCommand: Record<ColorKey, string> = {
 };
 
 const zeusDaylight: Record<ColorKey, string> = {
-  // primary is held a touch darker than Zeus's --brandA (#117AC0) so it clears
-  // WCAG AA in all of its roles: white-text button background AND accent text on
-  // both surface and the app bg (ADR-0074). Visually indistinguishable mid-blue.
-  primary: "#0e6ab0", primaryDark: "#0f5f97", navy: "#111a3a", accent: "#6a45d0",
+  // Light theme: accent text and button fill coincide (a mid-blue clears AA for
+  // both white-on-fill and text-on-surface/bg). Held a touch darker than Zeus's
+  // --brandA (#117AC0). See ADR-0074/0075.
+  primary: "#0e6ab0", primaryFill: "#0e6ab0", primaryDark: "#0f5f97", navy: "#111a3a", accent: "#6a45d0",
   sidebarBg: "#111f47", sidebarText: "#c2cbe6", sidebarMuted: "#9aa6c8", sidebarLabel: "#aab4d2",
   ink: "#111a3a", text: "#111a3a", textMuted: "#3d4c72", subtle: "#546086",
   faint: "#586688", faint2: "#586688", faint3: "#566285",
@@ -130,7 +134,7 @@ const zeusDaylight: Record<ColorKey, string> = {
 };
 
 const zeusCarbon: Record<ColorKey, string> = {
-  primary: "#2f6fd0", primaryDark: "#8fc0f5", navy: "#f2f4f8", accent: "#b79bf0",
+  primary: "#6fb0f5", primaryFill: "#2f6fd0", primaryDark: "#8fc0f5", navy: "#f2f4f8", accent: "#b79bf0",
   sidebarBg: "#0b0d14", sidebarText: "#aeb6c6", sidebarMuted: "#909aac", sidebarLabel: "#99a3b4",
   ink: "#f2f4f8", text: "#f2f4f8", textMuted: "#cdd3de", subtle: "#aab2c0",
   faint: "#9aa3b4", faint2: "#949eaf", faint3: "#8f99aa",

@@ -476,7 +476,7 @@ function ModalActions({ onClose, onSave, saveLabel, disabled }: { onClose: () =>
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, padding: "0 20px 20px" }}>
       <button onClick={onClose} style={{ fontSize: 13, fontWeight: 600, color: color.subtle, background: color.surface, border: `1px solid ${color.border2}`, padding: "9px 15px", borderRadius: 9, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-      <button onClick={onSave} disabled={disabled} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: "9px 16px", borderRadius: 9, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit" }}>{saveLabel}</button>
+      <button onClick={onSave} disabled={disabled} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: "9px 16px", borderRadius: 9, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit" }}>{saveLabel}</button>
     </div>
   );
 }

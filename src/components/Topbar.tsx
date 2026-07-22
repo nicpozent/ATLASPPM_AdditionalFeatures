@@ -90,7 +90,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void } = {}) {
 
       {/* Export */}
       <button style={{
-        display: "flex", alignItems: "center", gap: 8, background: color.primary, color: "#fff",
+        display: "flex", alignItems: "center", gap: 8, background: color.primaryFill, color: "#fff",
         border: "none", borderRadius: 9, padding: "10px 15px", fontSize: 13.5, fontWeight: 600,
         fontFamily: "inherit", cursor: "pointer",
       }}>

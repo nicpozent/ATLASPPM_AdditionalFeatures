@@ -498,7 +498,7 @@ function BlockersTab({ blockers, counts, projects, onRaise, submitting }: {
           </Select>
         </Field>
         {(() => { const may = can("cap-projects", "E"); const off = submitting || !may; return (
-        <button onClick={submit} disabled={off} title={may ? undefined : "Your role can't raise blockers"} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primary, border: "none", padding: 11, borderRadius: 10, cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
+        <button onClick={submit} disabled={off} title={may ? undefined : "Your role can't raise blockers"} style={{ width: "100%", fontSize: 13.5, fontWeight: 600, color: "#fff", background: color.primaryFill, border: "none", padding: 11, borderRadius: 10, cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1, fontFamily: "inherit", marginTop: 4 }}>{submitting ? "Adding…" : "Add blocker"}</button>
         ); })()}
       </Card>
 

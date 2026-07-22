@@ -81,5 +81,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0072](./0072-enforced-module-boundaries.md) | Enforced per-domain module boundaries (namespaces + Mono.Cecil dependency ratchet) | Accepted |
 | [0073](./0073-dotnet-10-migration.md) | Migrate the backend to .NET 10 (LTS) | Accepted |
 | [0074](./0074-zeus-brand-themes.md) | Zeus brand themes (selectable, token-mapped, AA-gated) | Accepted |
+| [0075](./0075-primary-fill-text-token-split.md) | Split `primary` into fill + text tokens; contrast-gate all themes | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

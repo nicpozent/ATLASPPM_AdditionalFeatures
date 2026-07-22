@@ -247,7 +247,7 @@ export default function Gantt() {
           {scope === "portfolio" ? (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {([["all", "All"], ["project", "Projects"], ["program", "Programs"], ["product", "Products"], ["release", "Releases"]] as const).map(([c, label]) => (
-                <button key={c} onClick={() => setCat(c)} style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "5px 11px", borderRadius: 8, border: `1px solid ${cat === c ? color.primary : color.border}`, background: cat === c ? color.primary : "#fff", color: cat === c ? "#fff" : color.textMuted }}>{label}</button>
+                <button key={c} onClick={() => setCat(c)} style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "5px 11px", borderRadius: 8, border: `1px solid ${cat === c ? color.primary : color.border}`, background: cat === c ? color.primaryFill : "#fff", color: cat === c ? "#fff" : color.textMuted }}>{label}</button>
               ))}
               <select value={pfDept} onChange={(e) => setPfDept(e.target.value)} aria-label="Filter by department"
                 style={{ ...selectStyle, marginLeft: 4 }}>
@@ -1216,11 +1216,11 @@ function TaskTimeline({ tasks, hasProject }: { tasks: GTask[]; hasProject: boole
         <span style={{ fontSize: 11.5, fontWeight: 600, color: color.subtle, marginRight: 2 }}>Status</span>
         {(["all", ...statuses]).map((s) => {
           const active = statusFilter === s;
-          const c = s === "all" ? { bg: color.primary, border: color.primary } : (TASK_BAR[s] ?? TASK_BAR["To Do"]);
+          const c = s === "all" ? { bg: color.primaryFill, border: color.primary } : (TASK_BAR[s] ?? TASK_BAR["To Do"]);
           return (
             <button key={s} onClick={() => setStatusFilter(s)} style={{
               fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", padding: "4px 11px", borderRadius: 20,
-              border: `1px solid ${active ? c.border : color.border}`, background: active ? (s === "all" ? color.primary : c.bg) : color.surface,
+              border: `1px solid ${active ? c.border : color.border}`, background: active ? (s === "all" ? color.primaryFill : c.bg) : color.surface,
               color: active && s === "all" ? "#fff" : active ? c.border : color.textMuted,
             }}>{s === "all" ? "All" : s} · {s === "all" ? tasks.length : tasks.filter((t) => t.status === s).length}</button>
           );
