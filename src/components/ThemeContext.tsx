@@ -12,7 +12,7 @@ function readTheme(role: string): ThemeId {
   if (!isThemeId(stored)) return "light";
   // Atlas Dark stays gated behind DARK_MODE_ENABLED — if the flag is off, a
   // stored "dark" preference falls back to light (the value is preserved and
-  // honoured again once the flag is re-enabled). Zeus themes are not gated.
+  // honoured again once the flag is re-enabled). Atlas themes are not gated.
   if (stored === "dark" && !DARK_MODE_ENABLED) return "light";
   return stored;
 }

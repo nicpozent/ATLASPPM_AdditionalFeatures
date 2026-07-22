@@ -10,18 +10,18 @@ import AxeBuilder from "@axe-core/playwright";
 // board chrome is covered alongside the static screens.
 const ROUTES = ["/", "/portfolio", "/gantt", "/roadmap", "/resources", "/admin", "/demands"];
 
-// The Zeus brand themes (ADR-0074) re-skin the whole app through the same
+// The Atlas brand themes (ADR-0074) re-skin the whole app through the same
 // var()-driven palette mechanism. A dense representative subset of routes is
 // enough — contrast is token-global, not per-route. The theme is a per-profile
 // preference keyed by the active role (default `pmo`, RoleContext).
-const ZEUS_ROUTES = ["/", "/portfolio", "/admin"];
-// All three Zeus themes are fully colour-contrast gated. The primary token was
+const ATLAS_ROUTES = ["/", "/portfolio", "/admin"];
+// All three Atlas themes are fully colour-contrast gated. The primary token was
 // split into `primary` (foreground/accent, readable on each ground) and
 // `primaryFill` (white-text button background, dark enough for white), so the
 // dark themes (Command/Carbon) now clear AA too (ADR-0075, superseding the
 // ADR-0074 follow-up note).
-const ZEUS_CONTRAST_GATED = ["zeus-command", "zeus-daylight", "zeus-carbon"];
-const ZEUS_STRUCTURAL_ONLY: string[] = [];
+const ATLAS_CONTRAST_GATED = ["atlas-command", "atlas-daylight", "atlas-carbon"];
+const ATLAS_STRUCTURAL_ONLY: string[] = [];
 
 async function sweep(
   page: import("@playwright/test").Page,
@@ -57,9 +57,9 @@ function withTheme(page: import("@playwright/test").Page, theme: string) {
   }, theme);
 }
 
-// Zeus light theme — full WCAG A/AA incl. colour-contrast.
-for (const theme of ZEUS_CONTRAST_GATED) {
-  for (const route of ZEUS_ROUTES) {
+// Atlas light theme — full WCAG A/AA incl. colour-contrast.
+for (const theme of ATLAS_CONTRAST_GATED) {
+  for (const route of ATLAS_ROUTES) {
     test(`a11y: ${route} [${theme}]`, async ({ page }) => {
       await withTheme(page, theme);
       const violations = await sweep(page, route, { gateContrast: true });
@@ -68,9 +68,9 @@ for (const theme of ZEUS_CONTRAST_GATED) {
   }
 }
 
-// Zeus dark themes — structural WCAG A/AA (colour-contrast follow-up, ADR-0074).
-for (const theme of ZEUS_STRUCTURAL_ONLY) {
-  for (const route of ZEUS_ROUTES) {
+// Atlas dark themes — structural WCAG A/AA (colour-contrast follow-up, ADR-0074).
+for (const theme of ATLAS_STRUCTURAL_ONLY) {
+  for (const route of ATLAS_ROUTES) {
     test(`a11y (structural): ${route} [${theme}]`, async ({ page }) => {
       await withTheme(page, theme);
       const violations = await sweep(page, route, { gateContrast: false });
