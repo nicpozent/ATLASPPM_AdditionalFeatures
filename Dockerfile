@@ -44,6 +44,10 @@ FROM nginx:1.27-alpine AS runtime
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80 443
+# Probe the plaintext /healthz endpoint over HTTP (nginx.conf serves it on :80
+# without redirecting). Plain HTTP avoids relying on BusyBox wget's HTTPS
+# support, which nginx:alpine's wget lacks — the previous https:// probe always
+# failed and marked the container unhealthy even when nginx was serving fine.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD wget --no-check-certificate -qO- https://localhost/ >/dev/null 2>&1 || exit 1
+  CMD wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1
 CMD ["nginx", "-g", "daemon off;"]
