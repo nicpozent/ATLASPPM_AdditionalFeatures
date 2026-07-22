@@ -26,7 +26,11 @@ export const font = {
 //  SVG *presentation attributes*, where `var()` does not resolve; the vivid
 //  status hues read fine on either background. See ADR-0056.
 // ---------------------------------------------------------------------------
+// A theme id is either the two original Atlas modes (light/dark, ADR-0056) or one
+// of the three Zeus brand themes (ADR-0074). Each id maps to a full palette below
+// and to a light/dark `color-scheme` (drives form-control/scrollbar rendering).
 export type ThemeMode = "light" | "dark";
+export type ThemeId = ThemeMode | "zeus-command" | "zeus-daylight" | "zeus-carbon";
 
 // Feature flag — dark mode is hidden for now (toggle removed from the top bar
 // and the app pinned to light) while the feature is finished off later. All the
@@ -80,10 +84,97 @@ const darkColors: Record<ColorKey, string> = {
   warnBorder: "#5C4A1E", dangerBorder: "#5A2A2E",
 };
 
-export const colorPalettes: Record<ThemeMode, Record<ColorKey, string>> = {
+// ---------------------------------------------------------------------------
+//  Zeus brand palettes (ADR-0074) — product-owner-approved themes layered onto
+//  the same var()-driven mechanism as light/dark. Each is the Zeus source
+//  palette (zeusthemes.css: --panel/--brandA/--accent/--ok/…) translated into
+//  the Atlas token keys, with the keys Zeus doesn't define (tint washes, the
+//  *Ink text-on-tint pairs, sidebar tokens) derived. Every text pair was tuned
+//  to WCAG AA against the axe contrast gate (ADR-0037); `primary` doubles as the
+//  white-text button background used on every page, so it's held dark enough for
+//  white ≥ AA rather than matching Zeus's brighter --brandA. Charts keep their
+//  literal hues (SVG presentation attributes don't resolve var()); the vivid
+//  status colours read on every ground.
+// ---------------------------------------------------------------------------
+const zeusCommand: Record<ColorKey, string> = {
+  primary: "#2c6fce", primaryDark: "#9fc2f2", navy: "#eef2ff", accent: "#b79bf0",
+  sidebarBg: "#0b1330", sidebarText: "#aeb6d0", sidebarMuted: "#93a0c6", sidebarLabel: "#9aa6cc",
+  ink: "#eef2ff", text: "#eef2ff", textMuted: "#c6d2f0", subtle: "#aab8e0",
+  faint: "#9aa8d4", faint2: "#93a2cf", faint3: "#8c9cca",
+  bg: "#0a1024", surface: "#111c42", surfaceAlt: "#0e1738", surfaceInput: "#16224e",
+  border: "#26315e", border2: "#2c3768", border3: "#222c56",
+  success: "#37d39b", successInk: "#63e3b2", warning: "#ffb020", warningAlt: "#f0a400",
+  warningInk: "#f6c15a", danger: "#ff5c7e", dangerInk: "#ff90a7",
+  holdInk: "#aeb6c6", holdBorder: "#6e778f",
+  primaryTint: "#16233f", primaryTint2: "#182742", accentTint: "#241c3a", dangerTint: "#3a1a26",
+  successTint: "#103026", warningTint: "#2e2410", neutralTint: "#1a2140",
+  warnBorder: "#4a3c18", dangerBorder: "#55232f",
+};
+
+const zeusDaylight: Record<ColorKey, string> = {
+  // primary is held a touch darker than Zeus's --brandA (#117AC0) so it clears
+  // WCAG AA in all of its roles: white-text button background AND accent text on
+  // both surface and the app bg (ADR-0074). Visually indistinguishable mid-blue.
+  primary: "#0e6ab0", primaryDark: "#0f5f97", navy: "#111a3a", accent: "#6a45d0",
+  sidebarBg: "#111f47", sidebarText: "#c2cbe6", sidebarMuted: "#9aa6c8", sidebarLabel: "#aab4d2",
+  ink: "#111a3a", text: "#111a3a", textMuted: "#3d4c72", subtle: "#546086",
+  faint: "#586688", faint2: "#586688", faint3: "#566285",
+  bg: "#e8eef8", surface: "#ffffff", surfaceAlt: "#f4f7fd", surfaceInput: "#eef2fb",
+  border: "#dbe2ee", border2: "#d3dbea", border3: "#e0e5f0",
+  success: "#0f9d68", successInk: "#0b6b47", warning: "#c77700", warningAlt: "#b26a00",
+  warningInk: "#8a5400", danger: "#DE0A45", dangerInk: "#a5082f",
+  holdInk: "#4a5266", holdBorder: "#8a93a6",
+  primaryTint: "#e7f0fb", primaryTint2: "#e0ecfb", accentTint: "#efe9fb", dangerTint: "#fce4ea",
+  successTint: "#e5f4ee", warningTint: "#f9efdc", neutralTint: "#eef2f8",
+  warnBorder: "#eadcba", dangerBorder: "#f3c9d3",
+};
+
+const zeusCarbon: Record<ColorKey, string> = {
+  primary: "#2f6fd0", primaryDark: "#8fc0f5", navy: "#f2f4f8", accent: "#b79bf0",
+  sidebarBg: "#0b0d14", sidebarText: "#aeb6c6", sidebarMuted: "#909aac", sidebarLabel: "#99a3b4",
+  ink: "#f2f4f8", text: "#f2f4f8", textMuted: "#cdd3de", subtle: "#aab2c0",
+  faint: "#9aa3b4", faint2: "#949eaf", faint3: "#8f99aa",
+  bg: "#08090d", surface: "#101319", surfaceAlt: "#0c0f15", surfaceInput: "#151922",
+  border: "#20242e", border2: "#262b36", border3: "#1c1f28",
+  success: "#2fd98a", successInk: "#5fe6a6", warning: "#ffb020", warningAlt: "#f0a400",
+  warningInk: "#f6c15a", danger: "#ff4d6b", dangerInk: "#ff87a0",
+  holdInk: "#aeb6c6", holdBorder: "#6e778f",
+  primaryTint: "#13233c", primaryTint2: "#152740", accentTint: "#221c34", dangerTint: "#331a22",
+  successTint: "#0f2a20", warningTint: "#2c230f", neutralTint: "#161a24",
+  warnBorder: "#463916", dangerBorder: "#4e2028",
+};
+
+export const colorPalettes: Record<ThemeId, Record<ColorKey, string>> = {
   light: { ...lightColors },
   dark: darkColors,
+  "zeus-command": zeusCommand,
+  "zeus-daylight": zeusDaylight,
+  "zeus-carbon": zeusCarbon,
 };
+
+// Theme catalogue for the picker: display label + the light/dark `color-scheme`
+// each id renders as. Light stays the default (ADR-0074). Atlas Dark is only
+// offered when DARK_MODE_ENABLED (ADR-0056).
+export const THEMES: Record<ThemeId, { label: string; scheme: ThemeMode }> = {
+  light: { label: "Atlas Light", scheme: "light" },
+  dark: { label: "Atlas Dark", scheme: "dark" },
+  "zeus-command": { label: "Zeus Command", scheme: "dark" },
+  "zeus-daylight": { label: "Zeus Daylight", scheme: "light" },
+  "zeus-carbon": { label: "Zeus Carbon", scheme: "dark" },
+};
+
+// Ids offered in the picker, in order. Atlas Dark is conditional on its flag.
+export const THEME_IDS: ThemeId[] = [
+  "light",
+  ...(DARK_MODE_ENABLED ? (["dark"] as ThemeId[]) : []),
+  "zeus-command",
+  "zeus-daylight",
+  "zeus-carbon",
+];
+
+export function isThemeId(v: string | null | undefined): v is ThemeId {
+  return v != null && v in THEMES;
+}
 
 // Public token map — every value is a themeable CSS variable with the light
 // value as its fallback.
@@ -92,13 +183,13 @@ export const color = Object.fromEntries(
 ) as Record<ColorKey, string>;
 
 // Write the active palette's variables onto :root. Called by ThemeContext on
-// mount and whenever the selected profile's mode changes.
-export function applyThemeVars(mode: ThemeMode) {
+// mount and whenever the selected profile's theme changes.
+export function applyThemeVars(id: ThemeId) {
   const root = document.documentElement;
-  const pal = colorPalettes[mode];
+  const pal = colorPalettes[id] ?? colorPalettes.light;
   for (const k of Object.keys(pal) as ColorKey[]) root.style.setProperty(`--atlas-${k}`, pal[k]);
-  root.style.colorScheme = mode;
-  root.dataset.theme = mode;
+  root.style.colorScheme = (THEMES[id] ?? THEMES.light).scheme;
+  root.dataset.theme = id;
 }
 
 // Chart / status palette — exact values lifted from the prototype's chart
