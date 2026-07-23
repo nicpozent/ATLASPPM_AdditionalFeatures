@@ -84,5 +84,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0075](./0075-primary-fill-text-token-split.md) | Split `primary` into fill + text tokens; contrast-gate all themes | Accepted |
 | [0076](./0076-theme-persistence-and-themed-charts.md) | Server-persisted per-user theme (cross-device) + theme-aware charts | Accepted |
 | [0077](./0077-per-theme-brand-typography.md) | Per-theme brand typography (IBM Plex on the Atlas brand themes) | Accepted |
+| [0078](./0078-self-hosted-fonts.md) | Self-hosted fonts (no external font CDN; air-gapped on-prem) | Accepted |
 
 Template: Context · Decision · Consequences · Alternatives considered.

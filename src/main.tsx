@@ -1,3 +1,4 @@
+import "./fonts/fonts.css"; // self-hosted webfonts (no external CDN) — ADR-0078
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
