@@ -165,7 +165,8 @@ of sanctioned deviations. Extend it whenever the product owner approves another.
   `primaryFill`. **Typography is theme-aware**: display stays Space Grotesk on
   every theme; Atlas Light/Dark keep the prototype's Public Sans / Space Mono, and
   the three brand themes use IBM Plex Sans / IBM Plex Mono via `var(--atlas-font-*)`
-  (ADR-0077). **Charts are theme-aware too**: `chart.*` tokens are
+  (ADR-0077). All fonts are **self-hosted/bundled** (`src/fonts/`), no external CDN,
+  so the app renders correctly on air-gapped on-prem (ADR-0078). **Charts are theme-aware too**: `chart.*` tokens are
   `var(--atlas-chart-*)` references with per-theme palettes (applied via the `style`
   prop so `var()` resolves, since SVG presentation attributes don't); `chart.method`
   chip hues stay literal (ADR-0076). Built entirely on the ADR-0056 theming
