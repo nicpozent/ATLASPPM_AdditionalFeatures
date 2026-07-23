@@ -55,13 +55,22 @@ full (F) levels. Authorization is always server-side.
   switch my UI role view, so that I understand which persona's nav I'm seeing._
   **Acceptance:** topbar shows identity + role switcher; switching changes nav
   only, never server permissions.
-- **US-AUTH-6** — _As a **user**, I want a dark mode I can toggle per profile, so
-  that each persona I use keeps my preferred appearance._
-  **Acceptance:** a sun/moon toggle in the top bar flips light/dark app-wide via
-  CSS variables; the choice persists in `localStorage` keyed by the selected
-  identity (`atlas.theme.<role>`), so switching persona restores that persona's
-  choice; the light palette (and its gated WCAG-AA contrast) is unchanged
-  (ADR-0056).
+- **US-AUTH-6** — _As a **user**, I want to choose a visual theme, so that the app
+  matches my preference and my environment (bright office vs dark room)._
+  **Acceptance:** a top-bar **theme picker** offers **Atlas Light** (default) and
+  the brand themes **Atlas Command** (deep navy), **Atlas Daylight** (light) and
+  **Atlas Carbon** (near-black); selecting one re-skins the whole app instantly via
+  CSS-variable palettes; text/surface/ink contrast meets **WCAG AA on every theme**
+  (axe-gated), and Atlas Light is unchanged from the prototype (ADR-0074, ADR-0075).
+  Charts and typography re-skin too — brand themes use IBM Plex (ADR-0076, ADR-0077).
+
+- **US-AUTH-7** — _As a **signed-in user**, I want my theme to follow me across
+  devices, so that I don't have to re-pick it on each machine._
+  **Acceptance:** the chosen theme is saved **per user on the server**
+  (`GET/PUT /prefs/theme`, whitelisted ids) and hydrated on load; signed out (demo),
+  it falls back to `localStorage` per persona; the app ships all fonts **bundled
+  (no external CDN)** so it renders correctly on air-gapped on-prem (ADR-0076,
+  ADR-0078).
 
 ## 2. Dashboard
 

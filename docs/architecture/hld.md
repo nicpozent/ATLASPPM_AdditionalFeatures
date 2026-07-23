@@ -303,7 +303,7 @@ flowchart LR
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript 5, Vite 8, react-router 6, TanStack Query 5, MSAL browser 5, inline-styled design tokens (light/dark CSS-variable palettes, ADR-0056) |
+| Frontend | React 18, TypeScript 5, Vite 8, react-router 6, TanStack Query 5, MSAL browser 5, inline-styled design tokens; selectable CSS-variable themes (Atlas Light + Command/Daylight/Carbon brand themes, AA-gated, saved per user via `/prefs/theme`) with bundled self-hosted fonts — no external CDN (ADR-0056, ADR-0074/0075/0076/0077/0078) |
 | Backend | .NET 10, ASP.NET Core minimal APIs, EF Core 10, Npgsql 10 |
 | Data | PostgreSQL 16 |
 | Identity | Microsoft Entra ID (OIDC), Microsoft Graph |

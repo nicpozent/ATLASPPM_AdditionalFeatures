@@ -20,7 +20,8 @@ atlas-frontend/
 │  ├─ Program.cs             # host build, middleware order, hosted services
 │  ├─ Endpoints.cs           # MapAtlasEndpoints → all endpoint groups
 │  ├─ <Feature>.cs           # one file per domain area (Tasks, Sprints, Jira, Pip, …)
-│  ├─ Domain.cs · Dtos.cs    # entities and response DTOs
+│  ├─ Domain.<Domain>.cs · Dtos.cs   # entities split per domain (Delivery/Portfolio/
+│  │                         #   Ops/People/Governance/Financials/Planning/Comms/Platform) + DTOs
 │  ├─ AtlasDbContext.cs      # DbSets + model config
 │  ├─ Permissions.cs · Rbac.cs   # authorization + capability matrix seed/reconcile
 │  ├─ Migrations/            # EF Core migrations (applied on boot)
@@ -32,6 +33,14 @@ The API is a **modular monolith** (ADR-0001): a single deployable process with
 cohesive, independently-testable endpoint groups. This keeps operational and
 cognitive overhead low at this scale while leaving a clean seam to extract a
 service later (each group already talks only through `AtlasDbContext` + DTOs).
+
+**Module boundaries are enforced** (ADR-0072): each domain lives in an
+`Atlas.Api.<Domain>` namespace (Delivery/Portfolio/Operations/People/Governance/
+Finance/Planning/Comms/Platform/Integrations) over a shared kernel, and an
+IL-level dependency **ratchet** (NetArchTest + Mono.Cecil, in `Atlas.Tests`) fails
+the build on new cross-domain cycles. The god-file `Domain.cs`/`WriteEndpoints.cs`
+were split accordingly (`Domain.<Domain>.cs`, `WriteRequests.cs`). Runtime is
+**.NET 10 / EF Core 10** (ADR-0073).
 
 ## 2. Request lifecycle & middleware order
 
@@ -53,7 +62,9 @@ capabilities/roles idempotently, and (optionally) seeds the demo portfolio when
 
 ## 3. Data model
 
-~80 entities persisted via EF Core. Grouped logically (not an exhaustive ERD):
+~90 entities persisted via EF Core. Grouped logically (not an exhaustive ERD).
+Per-user preferences are single-row-per-user tables keyed by `Permissions.CallerKey`
+— `DashboardLayout` (custom dashboard) and `ThemePref` (selected UI theme, ADR-0076):
 
 ```mermaid
 erDiagram
@@ -121,7 +132,7 @@ All groups are mapped in `Endpoints.cs`. Representative surface (`/api/v1` prefi
 | Governance | `/gates`, `/raid`, `/dependencies`, `/architecture` (ADM/ARB), `/security`, `/quality`, `/decisions` | |
 | Financials | `/financials`, `/costs`, ROI | overall + per entity |
 | Comms | `/notifications`, `/news`, `/delivery`, comments | Graph email best-effort |
-| Platform | `/roles`, `/audit(.csv)`, `/backups`, `/help`, `/gdpr`, retention, secret-rotation | admin |
+| Platform | `/roles`, `/audit(.csv)`, `/backups`, `/help`, `/gdpr`, retention, secret-rotation, `/dashboard/custom`, `/prefs/theme` (per-user, ADR-0076) | admin + per-user prefs |
 | Integrations | `/projects/{id}/jira/sync`, discovery | pull-only |
 
 ## 5. Authorization (RBAC) internals
@@ -256,6 +267,18 @@ live utilisation from §7.4–7.5 — not the legacy `Resources` sheet.
   Live views (dashboard, resources) refetch on mount/focus/interval.
 - **Styling**: inline styles from `theme.ts` tokens only — no CSS framework
   (ADR-0003). Shared primitives in `components/ui.tsx`.
+- **Theming**: every colour/chart/font token is a `var(--atlas-*, <fallback>)`
+  reference; `applyThemeVars(id)` writes the active palette onto `:root` (resolved
+  through the `style` prop, so no global stylesheet). Five themes — **Atlas Light**
+  (default) + **Atlas Command/Daylight/Carbon** brand themes (ADR-0074) + gated
+  Atlas Dark — chosen via a top-bar picker; `primary` (accent text) and
+  `primaryFill` (white-text button bg) are split so all clear WCAG AA on every
+  ground (ADR-0075, axe-gated). Charts re-skin via `--atlas-chart-*` (ADR-0076).
+  Fonts are **theme-aware** (Public Sans/Space Mono on Light/Dark; IBM Plex on the
+  brand themes, ADR-0077) and **self-hosted/bundled** — no font CDN (ADR-0078).
+  The chosen theme is saved **per user server-side** (`/prefs/theme`) so it follows
+  a signed-in user across devices; signed out it falls back to `localStorage`
+  (ADR-0056, ADR-0076).
 - **Testable logic** lives in `screens/<screen>/data.ts` (pure funcs, unit-tested);
   components stay thin (e.g. `pip/data.ts`, `portfolio/data.ts`).
 - **Large screens are decomposed** into a folder of per-tab modules with a
