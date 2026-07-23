@@ -27,11 +27,11 @@ requirement → capability → implementation → decision.
 
 | ID | SBB (component / technology) | Realises | Notes / ADR |
 |----|------------------------------|----------|-------------|
-| SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL); **per-profile dark mode** via CSS-variable palettes (top-bar toggle, persisted per identity); **timelines on an absolute-month model with a user-selected calendar window up to 5 years** (project/programme/portfolio); **task lifecycle timeline** (created → work-started → resolved, virtualized) | ABB-01, ABB-02 | ADR-0003, ADR-0056, ADR-0058, ADR-0059 |
+| SBB-01 | React 18 + TypeScript + Vite SPA (inline design tokens, TanStack Query, MSAL); **selectable themes** via CSS-variable palettes (top-bar picker) — Atlas Light (default) + **Command/Daylight/Carbon** brand themes + gated Atlas Dark, `primary`/`primaryFill` split so all clear WCAG AA (axe-gated), **theme-aware charts**, **per-theme typography** (Public Sans/Space Mono · IBM Plex on brand themes) with **self-hosted/bundled fonts** (no CDN), chosen theme **saved per user server-side** (`/prefs/theme`, follows across devices; localStorage fallback signed out); **timelines on an absolute-month model with a user-selected calendar window up to 5 years** (project/programme/portfolio); **task lifecycle timeline** (created → work-started → resolved, virtualized) | ABB-01, ABB-02 | ADR-0003, ADR-0056, ADR-0058, ADR-0059, ADR-0074, ADR-0075, ADR-0076, ADR-0077, ADR-0078 |
 | SBB-02 | i18n message catalogue (6 locales) | ABB-01 | completeness test |
 | SBB-03 | Microsoft Entra ID (OIDC) + MSAL, with a client-side idle-logout policy (default 15 min, `VITE_AUTH_IDLE_MINUTES`) | ABB-02, ABB-09 | ADR-0005, ADR-0038 |
 | SBB-04 | RBAC capability matrix (`Rbac.cs` + `Permissions.cs`); CTO/CIO roles (Executive-enforced); **regional manager identities (Infrastructure Mgr APAC, Dev APAC Mgr, BLOG IT Manager) cloning their base role's capabilities**; data-driven header switcher (created roles selectable); **need-to-know internal-labour rates — per discipline×region line, server-filtered; Platform Admin excluded entirely (no line owned, no persona-switch preview)** | ABB-02 | ADR-0004, ADR-0043, ADR-0046, ADR-0055, ADR-0057 |
-| SBB-05 | .NET 10 minimal API (`/api/v1`, modular groups) | ABB-03 | ADR-0001 |
+| SBB-05 | .NET 10 minimal API (`/api/v1`, modular groups); **enforced module boundaries** (`Atlas.Api.<Domain>` namespaces + IL-level dependency ratchet in tests) | ABB-03 | ADR-0001, ADR-0072, ADR-0073 |
 | SBB-06 | OpenAPI / Swagger (Swashbuckle) | ABB-03 | contract docs |
 | SBB-07 | EF Core 10 + `AtlasDbContext` + migrations | ABB-04 | ADR-0002 |
 | SBB-08 | PostgreSQL 16 | ABB-04 | ADR-0002 |

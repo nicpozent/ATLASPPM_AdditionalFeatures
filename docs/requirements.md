@@ -82,10 +82,15 @@ differ only in labour-rate visibility (ADR-0057).
 - **FR-AUTH-4** [Implemented] The system SHALL provide a top-bar identity display
   and a UI role switcher that changes visible navigation/affordances only, never
   server permissions. *Trace: SBB-04, ADR-0046.*
-- **FR-AUTH-5** [Implemented] The system SHALL offer a per-profile dark mode
-  toggle persisted in `localStorage` keyed by identity, leaving the (WCAG-AA
-  gated) light palette unchanged. *Trace: SBB-01, ADR-0056.* **Note:** the toggle
-  is currently feature-flagged **off** (`DARK_MODE_ENABLED`) pending completion.
+- **FR-AUTH-5** [Implemented] The system SHALL offer a top-bar **theme picker** —
+  Atlas Light (default) + the Atlas Command/Daylight/Carbon brand themes — that
+  re-skins the app (colours, charts, typography) via CSS-variable palettes, with
+  **WCAG-AA contrast gated on every theme** and Atlas Light unchanged from the
+  prototype. The selected theme SHALL be saved **per user server-side**
+  (`/prefs/theme`) so it follows a signed-in user across devices, falling back to
+  `localStorage` per persona when signed out. *Trace: SBB-01, ADR-0056, ADR-0074,
+  ADR-0075, ADR-0076, ADR-0077.* **Note:** the legacy Atlas Dark palette remains
+  feature-flagged **off** (`DARK_MODE_ENABLED`); the brand themes are not gated.
 
 ### 3.2 Dashboard
 - **FR-DASH-1** [Implemented] The system SHALL provide four dashboard layouts —
@@ -427,7 +432,8 @@ differ only in labour-rate visibility (ADR-0057).
 ### 4.5 Accessibility, i18n & usability
 - **NFR-A11Y-1** [Implemented] Shared primitives SHALL meet an accessibility
   baseline (focus management, dialogs, menus, ≥44px targets); CI SHALL run a
-  browser-based full-page axe sweep with **gated colour-contrast** (WCAG AA). *Trace: ADR-0025/0026/0033/0037.*
+  browser-based full-page axe sweep with **gated colour-contrast** (WCAG AA) — run
+  across **every selectable theme** (Atlas Light + the brand themes). *Trace: ADR-0025/0026/0033/0037/0074/0075.*
 - **NFR-A11Y-2** [Implemented] The pointer-first surfaces SHALL be keyboard/AT
   operable: the whiteboard canvas is a labelled application region with focusable,
   labelled nodes (arrow-move, Enter/F2 edit, Delete), and the Kanban/funnel drag
@@ -457,7 +463,9 @@ differ only in labour-rate visibility (ADR-0057).
   a merge; `pg_dump` remains authoritative for full DR. *Trace: ADR-0022.*
 - **NFR-DEP-1** [Implemented] The system SHALL deploy as on-prem single-node Docker
   (api=web + worker + db + nginx, one image/role) via a tag-triggered pipeline
-  publishing versioned images to GHCR; hosts upgrade by pull-and-recreate. *Trace: SBB-17, ADR-0052/0054.*
+  publishing versioned images to GHCR; hosts upgrade by pull-and-recreate. The
+  build SHALL be **self-contained** — all fonts bundled/served same-origin, no
+  external CDN — so it renders correctly with no outbound internet egress. *Trace: SBB-17, ADR-0052/0054/0078.*
 - **NFR-CFG-1** [Implemented] Configuration SHALL be externalised and
   environment-specific; the process role (`Atlas__Role`) SHALL select
   web/worker/all from one image. *Trace: SBB-16, ADR-0048.*
