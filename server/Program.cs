@@ -96,6 +96,29 @@ builder.Services.AddCors(o => o.AddPolicy(Hardening.CorsPolicy, p =>
 // Entra ID bearer validation — enabled only when Auth:Enabled=true (parity with
 // the frontend's VITE_AUTH_ENABLED). When off, the API is anonymous for local runs.
 var authEnabled = cfg.GetValue("Auth:Enabled", false);
+
+// ---- Production safety fuses -------------------------------------------------
+// The convenient local defaults (anonymous API, baked-in "atlas" DB password)
+// are fine for a dev box but must never reach a real deployment. Refuse to boot
+// in the Production environment if either slipped through, rather than silently
+// serving an unauthenticated API or connecting with the shipped default
+// credential. Development/Testing runs (and the test suite) are unaffected.
+if (builder.Environment.IsProduction())
+{
+    if (!authEnabled)
+        throw new InvalidOperationException(
+            "Auth:Enabled=false in the Production environment. The API would serve " +
+            "every request anonymously with full access. Set Auth:Enabled=true and " +
+            "configure Auth__TenantId / Auth__Audience, or run outside Production.");
+
+    var pw = new Npgsql.NpgsqlConnectionStringBuilder(pgConnString).Password;
+    if (pw == "atlas")
+        throw new InvalidOperationException(
+            "The database is using the built-in default password 'atlas' in the " +
+            "Production environment. Set a real credential via the Postgres " +
+            "connection string (env: ConnectionStrings__Postgres) or a mounted secret.");
+}
+
 if (authEnabled)
 {
     var tenantId = cfg["Auth:TenantId"];

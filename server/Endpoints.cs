@@ -84,7 +84,14 @@ public static class Endpoints
                 .Select(e => new { e.At, e.Actor, e.Role, e.Category, e.Action, e.Target }).ToListAsync();
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("Timestamp,Actor,Role,Category,Action,Target");
-            static string Q(string s) => "\"" + s.Replace("\"", "\"\"") + "\"";
+            // Neutralise spreadsheet formula injection (leading = + - @, tab, CR)
+            // before RFC-4180 quoting, so a crafted Actor/Action/Target value can't
+            // execute as a formula when the CSV is opened in Excel/Sheets.
+            static string Q(string s)
+            {
+                if (s.Length > 0 && "=+-@\t\r".IndexOf(s[0]) >= 0) s = "'" + s;
+                return "\"" + s.Replace("\"", "\"\"") + "\"";
+            }
             foreach (var r in rows)
                 sb.AppendLine(string.Join(",", Q(r.At.ToString("o")), Q(r.Actor), Q(r.Role), Q(r.Category), Q(r.Action), Q(r.Target)));
             return Results.File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "atlas-audit-log.csv");
@@ -92,8 +99,11 @@ public static class Endpoints
 
         // Buckets: archived (soft-deleted), completed (terminal, kept visible), or
         // active (the default working set — neither archived nor completed).
-        api.MapGet("/projects", async (AtlasDbContext db, bool? archived, bool? completed) =>
+        api.MapGet("/projects", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, bool? archived, bool? completed) =>
         {
+            // Portfolio-wide read — internal roles only (cap-dashboards). Stakeholders
+            // are scoped to their own projects via /projects/my (ADR-0004).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var q = db.Projects.AsQueryable();
             q = (archived ?? false) ? q.Where(p => p.Archived)
               : (completed ?? false) ? q.Where(p => !p.Archived && p.Status == "completed")
@@ -101,10 +111,10 @@ public static class Endpoints
             var list = await q.OrderBy(p => p.Id).ToListAsync();
             // Completion is derived from task state where a project has tasks.
             var derived = await ProjectProgress.MapAsync(db, list.Select(p => p.Id).ToList());
-            return list.Select(p => new ProjectDto(
+            return Results.Ok(list.Select(p => new ProjectDto(
                 p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
                 derived.TryGetValue(p.Id, out var pr) ? pr : p.Progress,
-                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate)).ToList();
+                p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate)).ToList());
         });
 
         api.MapGet("/projects/my", async (AtlasDbContext db) =>
@@ -123,9 +133,13 @@ public static class Endpoints
                     p.JiraProjectKey, p.JiraBoardId, p.LastJiraSync, p.AdoProject));
         });
 
-        api.MapGet("/blockers", async (AtlasDbContext db) =>
-            await db.Blockers.OrderBy(x => x.Id).Select(x => new BlockerDto(
+        api.MapGet("/blockers", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // Portfolio-wide read — internal roles only (cap-dashboards).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
+            return Results.Ok(await db.Blockers.OrderBy(x => x.Id).Select(x => new BlockerDto(
                 x.Id, x.Title, x.ProjectId, x.Project!.Name, x.Owner, x.Status, x.Description)).ToListAsync());
+        });
 
         // Blockers for one project (drives the project's Blockers tab), with a
         // can-edit flag so the tab can gate create/edit/delete.
@@ -138,18 +152,27 @@ public static class Endpoints
             return Results.Ok(new ProjectBlockersDto(canEdit, items));
         });
 
-        api.MapGet("/demands", async (AtlasDbContext db) =>
-            await db.Demands.OrderBy(d => d.Id).Select(d => new DemandDto(
+        api.MapGet("/demands", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // Full demand pipeline — internal roles only (cap-dashboards). Stakeholders
+            // see only their own via /demands/my (ADR-0004).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
+            return Results.Ok(await db.Demands.OrderBy(d => d.Id).Select(d => new DemandDto(
                 d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date)).ToListAsync());
+        });
 
         api.MapGet("/demands/my", async (AtlasDbContext db) =>
             await db.Demands.Where(d => d.Mine).OrderByDescending(d => d.Id).Select(d =>
                 new MyDemandDto(d.Id, d.Title, d.Dept, d.Priority, d.Date, d.Stage)).ToListAsync());
 
-        api.MapGet("/programs", async (AtlasDbContext db) =>
-            await db.Programs.OrderBy(x => x.Id).Select(x => new ProgramDto(
+        api.MapGet("/programs", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // Portfolio-wide read — internal roles only (cap-dashboards).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
+            return Results.Ok(await db.Programs.OrderBy(x => x.Id).Select(x => new ProgramDto(
                 x.Id, x.Name, x.Owner, x.Goal, x.Status, x.Projects, x.Budget, x.Spent, x.Progress, x.Health, x.StartDate, x.Archived, x.EndDate, x.Dept))
                 .ToListAsync());
+        });
 
         api.MapGet("/products", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {

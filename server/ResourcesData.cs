@@ -182,8 +182,10 @@ public static class ResourcesData
         // from/to window it's the average utilisation over that period, which is
         // what the Resources period toggle (day/week/…/year) and the date-range
         // filter send.
-        api.MapGet("/resources", async (AtlasDbContext db, string? asOf, string? from, string? to) =>
+        api.MapGet("/resources", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, string? asOf, string? from, string? to) =>
         {
+            // People roster + utilisation — internal roles only (cap-dashboards).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             List<RosterRow> rows;
             if (!string.IsNullOrWhiteSpace(from) || !string.IsNullOrWhiteSpace(to))
@@ -208,6 +210,7 @@ public static class ResourcesData
         // their editable allocation %. Edit needs "Project schedule" (cap-schedule).
         api.MapGet("/resources/by-project", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var canEdit = await Permissions.Allows(http, db, cfg, "cap-schedule", "E");
             var projects = await db.Projects.Where(p => !p.Archived).ToDictionaryAsync(p => p.Id, p => p.Name);
             var assignments = await db.TeamAssignments.Where(t => t.EntityType == "project").Include(t => t.Members).ToListAsync();
@@ -224,8 +227,9 @@ public static class ResourcesData
 
         // By product: each product's allocated members and their allocation %
         // (allocations are maintained on the Products screen; shown here read-only).
-        api.MapGet("/resources/by-product", async (AtlasDbContext db) =>
+        api.MapGet("/resources/by-product", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var products = await db.Products.ToDictionaryAsync(p => p.Id, p => p.Name);
             var allocs = await db.ProductAllocations.ToListAsync();
             var byProduct = allocs
@@ -291,8 +295,9 @@ public static class ResourcesData
         // Task assignees that aren't in the onboarded set (Resources + Entra members)
         // — typically people imported from Jira. Surfaced so the name isn't lost and
         // an admin can onboard them in one click. Grouped with the projects they're on.
-        api.MapGet("/resources/unonboarded", async (AtlasDbContext db) =>
+        api.MapGet("/resources/unonboarded", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var known = await KnownNamesAsync(db);
             var projNames = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Name);
             var tasks = await db.ProjectTasks

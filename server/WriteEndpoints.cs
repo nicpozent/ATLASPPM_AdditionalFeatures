@@ -129,9 +129,11 @@ public static class WriteEndpoints
             return Results.Ok(saved);
         });
 
-        // Download an attachment's bytes.
-        api.MapGet("/attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        // Download an attachment's bytes. Internal roles only (cap-dashboards) —
+        // guards the sequential attachment id against enumeration by outsiders.
+        api.MapGet("/attachments/{attId:int}", async (int attId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var a = await db.DemandAttachments.FindAsync(attId);
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });

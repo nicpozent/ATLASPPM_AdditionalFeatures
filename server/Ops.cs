@@ -278,8 +278,10 @@ public static class Ops
         });
 
         // Download an Ops work-item attachment (bytes stored in the DB).
-        api.MapGet("/ops/item-attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        // Internal roles only (cap-dashboards) — guards the sequential id.
+        api.MapGet("/ops/item-attachments/{attId:int}", async (int attId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var a = await db.OpsItemAttachments.FindAsync(attId);
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });

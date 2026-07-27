@@ -151,8 +151,9 @@ public static class Requirements
             return Results.NoContent();
         });
 
-        api.MapGet("/requirement-attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        api.MapGet("/requirement-attachments/{attId:int}", async (int attId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var att = await db.RequirementAttachments.FindAsync(attId);
             return att is null ? Results.NotFound() : Results.File(att.Bytes, att.ContentType, att.FileName);
         });

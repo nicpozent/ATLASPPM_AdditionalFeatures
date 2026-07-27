@@ -162,14 +162,35 @@ public class AuthorizationTests : IClassFixture<AtlasApiFactory>
         Assert.True((int)res.StatusCode < 500, $"unexpected {(int)res.StatusCode}");
     }
 
-    // ---- Reads stay open regardless of role ----------------------------------
+    // ---- Portfolio-wide reads are for internal roles only --------------------
+    // The whole-portfolio lists (projects, blockers, demands, programs,
+    // financials, resources) expose every entity in the org. They are gated at
+    // View on cap-dashboards, which every internal role holds but the external
+    // Stakeholder does not — Stakeholders reach only their own work through the
+    // "/my" endpoints. (cap-dashboards is the right gate here: it is the only
+    // capability where exactly the Stakeholder role is denied; cap-projects
+    // would also wrongly lock out the Executive.)
 
     [Theory]
-    [InlineData("stakeholder")]
     [InlineData("teammgr")]
-    public async Task Listing_projects_is_open(string role)
+    [InlineData("pm")]
+    [InlineData("Executive")]
+    public async Task Listing_projects_is_open_to_internal_roles(string role)
     {
         var res = await As(role, HttpMethod.Get, "/api/v1/projects");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/projects")]
+    [InlineData("/api/v1/blockers")]
+    [InlineData("/api/v1/demands")]
+    [InlineData("/api/v1/programs")]
+    [InlineData("/api/v1/financials")]
+    [InlineData("/api/v1/resources")]
+    public async Task Stakeholder_cannot_read_the_whole_portfolio(string path)
+    {
+        var res = await As("stakeholder", HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 }

@@ -173,8 +173,9 @@ public static class Tasks
             return Results.Ok(items);
         });
 
-        api.MapGet("/task-attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        api.MapGet("/task-attachments/{attId:int}", async (int attId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var a = await db.TaskAttachments.FindAsync(attId);
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });
