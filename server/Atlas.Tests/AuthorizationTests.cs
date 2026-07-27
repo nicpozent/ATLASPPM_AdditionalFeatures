@@ -188,9 +188,30 @@ public class AuthorizationTests : IClassFixture<AtlasApiFactory>
     [InlineData("/api/v1/programs")]
     [InlineData("/api/v1/financials")]
     [InlineData("/api/v1/resources")]
+    [InlineData("/api/v1/resources/availability")]
+    [InlineData("/api/v1/resources/allocation-report.xlsx")]
+    [InlineData("/api/v1/dashboard")]
+    [InlineData("/api/v1/okrs")]
+    [InlineData("/api/v1/portfolio/gantt")]
+    [InlineData("/api/v1/capacity/insight")]
+    [InlineData("/api/v1/capacity/staffing")]
+    [InlineData("/api/v1/assignable/all")]
+    [InlineData("/api/v1/artifact-versions/1")]
     public async Task Stakeholder_cannot_read_the_whole_portfolio(string path)
     {
         var res = await As("stakeholder", HttpMethod.Get, path);
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    // The same portfolio-wide reads stay available to internal roles.
+    [Theory]
+    [InlineData("/api/v1/dashboard")]
+    [InlineData("/api/v1/okrs")]
+    [InlineData("/api/v1/portfolio/gantt")]
+    [InlineData("/api/v1/capacity/insight")]
+    public async Task Portfolio_reads_stay_open_to_internal_roles(string path)
+    {
+        var res = await As("pm", HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 }

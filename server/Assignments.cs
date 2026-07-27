@@ -140,8 +140,9 @@ public static class Assignments
         // Candidate people for an assignment pool, for dropdowns outside the
         // project role panel (e.g. Product Owner). Falls back to the resource
         // directory until Entra teams are mapped.
-        api.MapGet("/assignable/{pool}", async (string pool, AtlasDbContext db) =>
+        api.MapGet("/assignable/{pool}", async (string pool, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             if (!await Teams.AnyTeamMappedAsync(db))
                 return Results.Ok(await db.Resources.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync());
             var names = pool switch

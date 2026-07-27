@@ -193,8 +193,9 @@ public static class Endpoints
         // A key result linked to a deliverable measures itself from that deliverable's
         // real advancement: a project → its % complete; a program/product → the mean
         // % of the projects under it. Unlinked KRs keep their manually-entered value.
-        api.MapGet("/okrs", async (AtlasDbContext db) =>
+        api.MapGet("/okrs", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var objectives = await db.Objectives.OrderBy(o => o.Id).Include(o => o.Krs).ToListAsync();
             var projProgress = await db.Projects.ToDictionaryAsync(p => p.Id, p => p.Progress);
             // Prefer task-derived completion so OKRs reflect real delivery.
@@ -222,12 +223,12 @@ public static class Endpoints
                 : productProjects.ContainsKey(link) ? Derive("product", link)
                 : null;
 
-            return objectives.Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
+            return Results.Ok(objectives.Select(o => new ObjectiveDto(o.Id, o.Title, o.Owner, o.Horizon,
                 o.Krs.OrderBy(k => k.Id).Select(k =>
                 {
                     var derived = k.LinkType.Length > 0 ? Derive(k.LinkType, k.LinkId) : DeriveLegacy(k.Link);
                     return new KrDto(k.Id, k.Title, k.Link, derived ?? k.Progress, k.LinkType, k.LinkId, derived is not null);
-                }).ToList(), o.Status, o.Health, o.StartDate, o.TargetDate)).ToList();
+                }).ToList(), o.Status, o.Health, o.StartDate, o.TargetDate)).ToList());
         });
 
         api.MapGet("/releases", async (AtlasDbContext db) =>
@@ -241,7 +242,12 @@ public static class Endpoints
                 r.BlockersOpen, r.Milestones, r.BudgetBurn, r.SpendPct, r.Satisfaction, r.CostPerDeliverable,
                 r.ValuePerEuro)));
 
-        api.MapGet("/dashboard", DashboardEndpoint.Build);
+        api.MapGet("/dashboard", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
+        {
+            // Portfolio dashboard aggregate — internal roles only (cap-dashboards).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
+            return Results.Ok(await DashboardEndpoint.Build(db));
+        });
 
         // Custom-dashboard layout, saved per user server-side so it follows them
         // across devices (the client falls back to localStorage when signed out).

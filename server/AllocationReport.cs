@@ -17,8 +17,11 @@ public static class AllocationReport
 
     public static void MapAllocationReportEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/resources/allocation-report.xlsx", async (AtlasDbContext db, string? from, string? to, string? period) =>
+        api.MapGet("/resources/allocation-report.xlsx", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, string? from, string? to, string? period) =>
         {
+            // Whole-roster export — internal roles only (cap-dashboards), matching
+            // the JSON /resources gate so the Excel path can't be used to bypass it.
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var f = DateOnly.TryParse(from, out var pf) ? pf : new DateOnly(today.Year, 1, 1);
             var t = DateOnly.TryParse(to, out var pt) && pt >= f ? pt : new DateOnly(today.Year, 12, 31);

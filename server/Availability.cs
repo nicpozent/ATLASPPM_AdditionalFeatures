@@ -24,8 +24,9 @@ public static class Availability
 {
     public static void MapAvailabilityEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/resources/availability", async (AtlasDbContext db, string? on, string? from, string? to) =>
+        api.MapGet("/resources/availability", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, string? on, string? from, string? to) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var d0 = !string.IsNullOrWhiteSpace(on) && DateOnly.TryParse(on, out var od) ? od : today;
             DateOnly f = default, t = default;
