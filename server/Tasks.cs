@@ -165,8 +165,10 @@ public static class Tasks
         });
 
         // ---- Task attachments (files mirrored from Jira) ------------------
-        api.MapGet("/tasks/{taskId:int}/attachments", async (int taskId, AtlasDbContext db) =>
+        api.MapGet("/tasks/{taskId:int}/attachments", async (int taskId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            // Task detail is internal-only (stakeholders have no task board).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             if (!await db.ProjectTasks.AnyAsync(t => t.Id == taskId)) return Results.NotFound();
             var items = await db.TaskAttachments.Where(a => a.TaskId == taskId).OrderBy(a => a.Id)
                 .Select(a => new TaskAttachmentDto(a.Id, a.FileName, a.ContentType, a.Size, a.Author, a.CreatedAt)).ToListAsync();

@@ -122,8 +122,11 @@ public static class Endpoints
                 new StakeholderProjectDto(p.Id, p.Name, p.Dept, p.Status, p.Health, p.Progress, p.Target, p.Phase))
                 .ToListAsync());
 
-        api.MapGet("/projects/{id}", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            // Internal roles, or a Stakeholder for a project in their own visible set.
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(x => x.Id == id && x.StakeholderVisible && !x.Archived)) is { } deny) return deny;
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
             var derived = await ProjectProgress.MapAsync(db, new[] { id });

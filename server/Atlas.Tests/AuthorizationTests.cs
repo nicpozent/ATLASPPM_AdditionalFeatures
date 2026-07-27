@@ -214,4 +214,42 @@ public class AuthorizationTests : IClassFixture<AtlasApiFactory>
         var res = await As("pm", HttpMethod.Get, path);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
+
+    // ---- Per-object by-id reads: Stakeholder is scoped to what they own -------
+    // The project/demand detail endpoints let a Stakeholder open only their own
+    // visible items (a StakeholderVisible project, a demand they raised); an
+    // internal role reads any of them, and ops detail is internal-only.
+    [Fact]
+    public async Task Stakeholder_by_id_reads_are_scoped_to_owned_entities()
+    {
+        int opsId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            static Project P(string id, string name, bool vis) => new()
+            {
+                Id = id, Name = name, StakeholderVisible = vis,
+                Dept = "", Due = "", Methodology = "", Owner = "", Phase = "", Target = "",
+            };
+            db.Projects.Add(P("OWN-VIS", "Visible", true));
+            db.Projects.Add(P("OWN-HID", "Hidden", false));
+            db.Demands.Add(new Demand { Id = "DM-MINE", Title = "Mine", Mine = true, Date = "", Dept = "", Requester = "" });
+            db.Demands.Add(new Demand { Id = "DM-NOT", Title = "Not mine", Mine = false, Date = "", Dept = "", Requester = "" });
+            var ops = new OpsItem { Title = "Op", Status = "Open" };
+            db.OpsItems.Add(ops);
+            await db.SaveChangesAsync();
+            opsId = ops.Id;
+        }
+
+        // Stakeholder: own items readable, others' are 403 (not 404 — no id oracle).
+        Assert.Equal(HttpStatusCode.OK, (await As("stakeholder", HttpMethod.Get, "/api/v1/projects/OWN-VIS")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, "/api/v1/projects/OWN-HID")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await As("stakeholder", HttpMethod.Get, "/api/v1/demands/DM-MINE")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, "/api/v1/demands/DM-NOT")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, $"/api/v1/ops/items/{opsId}")).StatusCode);
+
+        // Internal role reads any of them (even the stakeholder-hidden project).
+        Assert.Equal(HttpStatusCode.OK, (await As("pm", HttpMethod.Get, "/api/v1/projects/OWN-HID")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await As("pm", HttpMethod.Get, $"/api/v1/ops/items/{opsId}")).StatusCode);
+    }
 }

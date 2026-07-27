@@ -263,8 +263,10 @@ public static class Ops
         });
 
         // Full work-item detail incl. Jira comment thread + attachment metadata.
-        api.MapGet("/ops/items/{id:int}", async (int id, AtlasDbContext db) =>
+        api.MapGet("/ops/items/{id:int}", async (int id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            // Ops detail is internal-only — no stakeholder-facing ops surface.
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var item = await db.OpsItems.FindAsync(id);
             if (item is null) return Results.NotFound();
             var svc = await db.OpsServices.FindAsync(item.ServiceId);
@@ -315,8 +317,10 @@ public static class Ops
 
         // Ops load impacting one project — shown on Project Detail. Active items
         // tagged to this project, with the total capacity they pull off delivery.
-        api.MapGet("/projects/{id}/ops-impact", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/ops-impact", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var items = await db.OpsItems.Where(i => i.ImpactProjectId == id && i.Status != "Done")
                 .OrderByDescending(i => i.Alloc).ThenBy(i => i.Id).ToListAsync();

@@ -81,6 +81,8 @@ public static class Assignments
     {
         api.MapGet("/projects/{id}/assignments", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
             if (project is null) return Results.NotFound();
             var ui = Permissions.EffectiveUiRole(http, cfg);

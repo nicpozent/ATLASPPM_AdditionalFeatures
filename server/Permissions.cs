@@ -142,6 +142,18 @@ public static class Permissions
             statusCode: StatusCodes.Status403Forbidden);
     }
 
+    // Per-object read gate for entity-detail endpoints. Internal roles (and the
+    // dev no-header identity) pass via cap-dashboards View; the external
+    // Stakeholder passes only when `stakeholderOwns` confirms the specific entity
+    // is in their own visible set (a StakeholderVisible project, a demand they
+    // raised). So a stakeholder can open their own items — MyProjects drills into
+    // the project screen — but can't read others' by guessing a sequential/known id.
+    public static async Task<IResult?> DenyRead(HttpContext http, AtlasDbContext db, IConfiguration cfg, Func<Task<bool>> stakeholderOwns)
+    {
+        if (await Deny(http, db, cfg, "cap-dashboards", "V") is not { } forbidden) return null; // internal / dev
+        return await stakeholderOwns() ? null : forbidden;                                       // own entity, else 403
+    }
+
     // True when the caller is a Platform Administrator (or the dev no-header
     // default, which has full access). Gates the destructive, admin-only actions
     // such as hard-deleting a project — separate from the capability matrix so it

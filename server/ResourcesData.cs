@@ -268,8 +268,10 @@ public static class ResourcesData
         // project (role assignments + team/sub-team/individual members) first, then
         // the rest of the onboarded roster as a fallback pool — so the task-assignee
         // dropdown is populated even when no sub-team is attached yet.
-        api.MapGet("/projects/{id}/assignee-options", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/assignee-options", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             var ordered = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             void AddName(string? n)
