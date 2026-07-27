@@ -85,6 +85,8 @@ public static class Financials
     {
         api.MapGet("/financials", async (string? scope, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            // Portfolio financials (budget/actual/ROI) — internal roles only (cap-dashboards).
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var s = scope is "program" or "product" ? scope : "project";
             var canEditRoi = await Permissions.Allows(http, db, cfg, "cap-projects", "E");
             var rows = await RowsAsync(db, s);

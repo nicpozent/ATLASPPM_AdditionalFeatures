@@ -75,8 +75,10 @@ public static class Capacity
 
     public static void MapCapacityEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/projects/{id}/capacity", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/capacity", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var names = await AssignedPeopleAsync(db, id);
             var util = await UtilByPersonAsync(db);

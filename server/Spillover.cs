@@ -61,8 +61,10 @@ public static class Spillover
     public static void MapSpilloverEndpoints(this RouteGroupBuilder api)
     {
         // Per-project spilled tasks — backs the Overview KPI.
-        api.MapGet("/projects/{id}/spillover", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/spillover", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var tasks = await Spilled(db.ProjectTasks.Where(t => t.ProjectId == id))
                 .OrderBy(t => t.Ord)

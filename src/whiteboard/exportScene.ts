@@ -18,15 +18,27 @@ const POLY: Partial<Record<NodeKind, [number, number][]>> = {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// Whitelist a colour to a known-safe CSS syntax (hex / rgb[a] / hsl[a] / a bare
+// named colour). A scene is importable JSON, so a node's colour is attacker-
+// controllable; interpolated raw into an SVG `fill="…"` a value like
+// `#000"><script>…` would break out of the attribute and run when the exported
+// .svg is opened. Anything not matching falls back to a safe default.
+const SAFE_COLOR = /^#[0-9a-f]{3,8}$|^rgba?\([\d.,\s%]+\)$|^hsla?\([\d.,\s%]+\)$|^[a-z]+$/i;
+const col = (c: string | undefined, fallback: string) =>
+  c && SAFE_COLOR.test(c.trim()) ? c.trim() : fallback;
+// Coerce a coordinate to a finite number so an imported point can't inject
+// markup through a path `d` attribute either.
+const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+
 function wrapText(x: number, y: number, w: number, text: string, ink: string, align: "start" | "middle"): string {
   const lines = text.split("\n").slice(0, 12);
   const anchorX = align === "middle" ? x + w / 2 : x + 6;
   return lines.map((ln, i) =>
-    `<text x="${anchorX}" y="${y + 16 + i * 15}" font-family="sans-serif" font-size="12" fill="${ink}" text-anchor="${align}">${esc(ln.slice(0, 80))}</text>`).join("");
+    `<text x="${anchorX}" y="${y + 16 + i * 15}" font-family="sans-serif" font-size="12" fill="${col(ink, "#141a3c")}" text-anchor="${align}">${esc(ln.slice(0, 80))}</text>`).join("");
 }
 
 function nodeSvg(n: WbNode): string {
-  const fill = n.color || "#ffffff";
+  const fill = col(n.color, "#ffffff");
   const stroke = "#c7ccd6";
   const box = { x: n.x, y: n.y, w: n.w, h: n.h };
   switch (n.kind) {
@@ -56,11 +68,11 @@ function nodeSvg(n: WbNode): string {
         + wrapText(box.x, box.y + box.h - 18, box.w, n.text || "Actor", "#2a3040", "middle");
     }
     case "icon":
-      return `<circle cx="${box.x + box.w / 2}" cy="${box.y + box.h / 2}" r="${Math.min(box.w, box.h) / 2 - 2}" fill="none" stroke="${n.color || "#5b7cfa"}" stroke-width="2"/>`;
+      return `<circle cx="${box.x + box.w / 2}" cy="${box.y + box.h / 2}" r="${Math.min(box.w, box.h) / 2 - 2}" fill="none" stroke="${col(n.color, "#5b7cfa")}" stroke-width="2"/>`;
     case "draw": {
       if (!n.points || n.points.length < 2) return "";
-      const d = n.points.reduce((acc, v, i) => acc + (i % 2 === 0 ? (i === 0 ? "M" : "L") + v : " " + v + " "), "");
-      return `<path d="${d}" fill="none" stroke="${n.color || "#5b7cfa"}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+      const d = n.points.reduce((acc, v, i) => acc + (i % 2 === 0 ? (i === 0 ? "M" : "L") + num(v) : " " + num(v) + " "), "");
+      return `<path d="${d}" fill="none" stroke="${col(n.color, "#5b7cfa")}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
     default:
       return "";
@@ -83,7 +95,7 @@ export function sceneToSvg(scene: Scene): string {
     const a = scene.nodes.find((n) => n.id === e.from), b = scene.nodes.find((n) => n.id === e.to);
     if (!a || !b) return "";
     const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2, x2 = b.x + b.w / 2, y2 = b.y + b.h / 2;
-    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${e.color || "#8a93a6"}" stroke-width="2" marker-end="url(#arw)"/>`;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col(e.color, "#8a93a6")}" stroke-width="2" marker-end="url(#arw)"/>`;
   }).join("");
   const nodes = scene.nodes.map(nodeSvg).join("");
 

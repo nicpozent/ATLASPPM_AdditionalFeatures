@@ -62,6 +62,24 @@ public class PiBoardAndSettingsTests : IClassFixture<AtlasApiFactory>
         Assert.DoesNotContain("super-secret", await (await Send(HttpMethod.Get, "/api/v1/settings")).Content.ReadAsStringAsync());
     }
 
+    // ---- Generic settings PATCH validates webhook URLs (SSRF guard) ---------
+    [Fact]
+    public async Task Settings_patch_rejects_a_non_https_webhook_url()
+    {
+        // A webhook-url key written through the generic /settings path must clear
+        // the same bar as the dedicated integration endpoint (absolute https), so
+        // it can't be pointed at a plaintext / internal target.
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Send(HttpMethod.Patch, "/api/v1/settings/slack.webhookUrl", new { value = "http://10.0.0.5/internal" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Send(HttpMethod.Patch, "/api/v1/settings/slack.webhookUrl", new { value = "not-a-url" })).StatusCode);
+        // A valid https webhook is accepted, and clearing it (blank) is allowed.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Send(HttpMethod.Patch, "/api/v1/settings/slack.webhookUrl", new { value = "https://hooks.example.com/abc" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Send(HttpMethod.Patch, "/api/v1/settings/slack.webhookUrl", new { value = "" })).StatusCode);
+    }
+
     // ---- PI board placement roundtrip --------------------------------------
     [Fact]
     public async Task Board_placement_roundtrips_and_unschedules()

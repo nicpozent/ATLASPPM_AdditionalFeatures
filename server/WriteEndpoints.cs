@@ -85,8 +85,11 @@ public static class WriteEndpoints
         });
 
         // Full demand incl. intake fields + attachment metadata.
-        api.MapGet("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
+        api.MapGet("/demands/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
+            // Internal roles, or a Stakeholder for a demand they raised (Mine).
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Demands.AnyAsync(x => x.Id == id && x.Mine)) is { } deny) return deny;
             var d = await db.Demands.Include(x => x.Attachments).FirstOrDefaultAsync(x => x.Id == id);
             if (d is null) return Results.NotFound();
             var authEnabled = cfg.GetValue("Auth:Enabled", false);
@@ -129,9 +132,11 @@ public static class WriteEndpoints
             return Results.Ok(saved);
         });
 
-        // Download an attachment's bytes.
-        api.MapGet("/attachments/{attId:int}", async (int attId, AtlasDbContext db) =>
+        // Download an attachment's bytes. Internal roles only (cap-dashboards) —
+        // guards the sequential attachment id against enumeration by outsiders.
+        api.MapGet("/attachments/{attId:int}", async (int attId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var a = await db.DemandAttachments.FindAsync(attId);
             return a is null ? Results.NotFound() : Results.File(a.Bytes, a.ContentType, a.FileName);
         });

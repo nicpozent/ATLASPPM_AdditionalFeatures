@@ -162,14 +162,94 @@ public class AuthorizationTests : IClassFixture<AtlasApiFactory>
         Assert.True((int)res.StatusCode < 500, $"unexpected {(int)res.StatusCode}");
     }
 
-    // ---- Reads stay open regardless of role ----------------------------------
+    // ---- Portfolio-wide reads are for internal roles only --------------------
+    // The whole-portfolio lists (projects, blockers, demands, programs,
+    // financials, resources) expose every entity in the org. They are gated at
+    // View on cap-dashboards, which every internal role holds but the external
+    // Stakeholder does not — Stakeholders reach only their own work through the
+    // "/my" endpoints. (cap-dashboards is the right gate here: it is the only
+    // capability where exactly the Stakeholder role is denied; cap-projects
+    // would also wrongly lock out the Executive.)
 
     [Theory]
-    [InlineData("stakeholder")]
     [InlineData("teammgr")]
-    public async Task Listing_projects_is_open(string role)
+    [InlineData("pm")]
+    [InlineData("Executive")]
+    public async Task Listing_projects_is_open_to_internal_roles(string role)
     {
         var res = await As(role, HttpMethod.Get, "/api/v1/projects");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/projects")]
+    [InlineData("/api/v1/blockers")]
+    [InlineData("/api/v1/demands")]
+    [InlineData("/api/v1/programs")]
+    [InlineData("/api/v1/financials")]
+    [InlineData("/api/v1/resources")]
+    [InlineData("/api/v1/resources/availability")]
+    [InlineData("/api/v1/resources/allocation-report.xlsx")]
+    [InlineData("/api/v1/dashboard")]
+    [InlineData("/api/v1/okrs")]
+    [InlineData("/api/v1/portfolio/gantt")]
+    [InlineData("/api/v1/capacity/insight")]
+    [InlineData("/api/v1/capacity/staffing")]
+    [InlineData("/api/v1/assignable/all")]
+    [InlineData("/api/v1/artifact-versions/1")]
+    public async Task Stakeholder_cannot_read_the_whole_portfolio(string path)
+    {
+        var res = await As("stakeholder", HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    // The same portfolio-wide reads stay available to internal roles.
+    [Theory]
+    [InlineData("/api/v1/dashboard")]
+    [InlineData("/api/v1/okrs")]
+    [InlineData("/api/v1/portfolio/gantt")]
+    [InlineData("/api/v1/capacity/insight")]
+    public async Task Portfolio_reads_stay_open_to_internal_roles(string path)
+    {
+        var res = await As("pm", HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    // ---- Per-object by-id reads: Stakeholder is scoped to what they own -------
+    // The project/demand detail endpoints let a Stakeholder open only their own
+    // visible items (a StakeholderVisible project, a demand they raised); an
+    // internal role reads any of them, and ops detail is internal-only.
+    [Fact]
+    public async Task Stakeholder_by_id_reads_are_scoped_to_owned_entities()
+    {
+        int opsId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();
+            static Project P(string id, string name, bool vis) => new()
+            {
+                Id = id, Name = name, StakeholderVisible = vis,
+                Dept = "", Due = "", Methodology = "", Owner = "", Phase = "", Target = "",
+            };
+            db.Projects.Add(P("OWN-VIS", "Visible", true));
+            db.Projects.Add(P("OWN-HID", "Hidden", false));
+            db.Demands.Add(new Demand { Id = "DM-MINE", Title = "Mine", Mine = true, Date = "", Dept = "", Requester = "" });
+            db.Demands.Add(new Demand { Id = "DM-NOT", Title = "Not mine", Mine = false, Date = "", Dept = "", Requester = "" });
+            var ops = new OpsItem { Title = "Op", Status = "Open" };
+            db.OpsItems.Add(ops);
+            await db.SaveChangesAsync();
+            opsId = ops.Id;
+        }
+
+        // Stakeholder: own items readable, others' are 403 (not 404 — no id oracle).
+        Assert.Equal(HttpStatusCode.OK, (await As("stakeholder", HttpMethod.Get, "/api/v1/projects/OWN-VIS")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, "/api/v1/projects/OWN-HID")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await As("stakeholder", HttpMethod.Get, "/api/v1/demands/DM-MINE")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, "/api/v1/demands/DM-NOT")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await As("stakeholder", HttpMethod.Get, $"/api/v1/ops/items/{opsId}")).StatusCode);
+
+        // Internal role reads any of them (even the stakeholder-hidden project).
+        Assert.Equal(HttpStatusCode.OK, (await As("pm", HttpMethod.Get, "/api/v1/projects/OWN-HID")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await As("pm", HttpMethod.Get, $"/api/v1/ops/items/{opsId}")).StatusCode);
     }
 }

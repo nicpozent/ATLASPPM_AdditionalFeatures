@@ -234,7 +234,7 @@ public static class Backups
             var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var restored = new Dictionary<string, int>();
 
-            async Task Merge<T>(string key, Func<T, string> keyOf) where T : class
+            async Task Merge<T>(string key, Func<T, string> keyOf, Func<T, bool>? skip = null) where T : class
             {
                 if (!data.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array) return;
                 var items = arr.Deserialize<List<T>>(opts) ?? new();
@@ -242,13 +242,18 @@ public static class Backups
                 int n = 0;
                 foreach (var inc in items)
                 {
+                    if (skip is not null && skip(inc)) continue;
                     var id = keyOf(inc);
                     if (string.IsNullOrEmpty(id)) continue;
                     var existing = await set.FindAsync(id);
-                    if (existing is null) { existing = (T)Activator.CreateInstance(typeof(T))!; set.Add(existing); }
+                    var isNew = existing is null;
+                    if (isNew) existing = (T)Activator.CreateInstance(typeof(T))!;
                     // SetValues copies scalar properties only — navigations are left
-                    // untouched, so no child rows are double-inserted.
-                    db.Entry(existing).CurrentValues.SetValues(inc);
+                    // untouched, so no child rows are double-inserted. Populate the
+                    // key/scalars BEFORE Add so a re-created row is tracked with its
+                    // (string) primary key already set, not a null key.
+                    db.Entry(existing!).CurrentValues.SetValues(inc);
+                    if (isNew) set.Add(existing!);
                     n++;
                 }
                 if (n > 0) restored[key] = n;
@@ -259,7 +264,14 @@ public static class Backups
             await Merge<Product>("products", p => p.Id);
             await Merge<Release>("releases", r => r.Id);
             await Merge<Objective>("objectives", o => o.Id);
-            await Merge<Setting>("settings", s => s.Key);
+            // Never let a restore silently overwrite security-sensitive config
+            // (webhook URLs, tokens/secrets, the personnel-data gate and other
+            // confidential per-scope blobs) from an uploaded — possibly tampered —
+            // snapshot. Those are reconfigured through their own validated,
+            // audited endpoints, not bulk-merged. (over-posting guard)
+            await Merge<Setting>("settings", s => s.Key,
+                skip: s => IsSecretSetting(s.Key)
+                    || s.Key.Equals(Teams.PersonnelFlagKey, StringComparison.OrdinalIgnoreCase));
 
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Backups", "Restored from snapshot (merge)",
                 string.Join(", ", restored.Select(kv => $"{kv.Value} {kv.Key}"))));
@@ -283,6 +295,14 @@ public static class Backups
         {
             // Integration/platform settings are Platform-Admin territory.
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            // A webhook URL written through this generic path must clear the same
+            // bar as the dedicated integration endpoints — absolute https — so it
+            // can't be used to point a webhook at a plaintext / internal (SSRF)
+            // target, bypassing the validation those endpoints enforce.
+            if (key.EndsWith("webhookurl", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(req.Value)
+                && !(Uri.TryCreate(req.Value.Trim(), UriKind.Absolute, out var wu) && wu.Scheme == Uri.UriSchemeHttps))
+                return Results.BadRequest(new { error = "A webhook URL must be an absolute https URL." });
             var s = await db.Settings.FindAsync(key);
             if (s is null) { s = new Setting { Key = key, Value = req.Value }; db.Settings.Add(s); }
             else s.Value = req.Value;

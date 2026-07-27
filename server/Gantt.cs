@@ -143,8 +143,9 @@ public static class GanttEndpoints
         // project dates, else derived from its sprints/tasks) and its sprint bars,
         // so the program timeline shows a real schedule built from projects, tasks
         // and sprints rather than an empty "No phases" grid (ADR-0029).
-        api.MapGet("/programs/{id}/gantt", async (string id, AtlasDbContext db) =>
+        api.MapGet("/programs/{id}/gantt", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var pg = await db.Programs.FindAsync(id);
             if (pg is null) return Results.NotFound();
             var projects = await db.Projects.Where(p => pg.Projects.Contains(p.Id) && !p.Archived)
@@ -185,8 +186,9 @@ public static class GanttEndpoints
         // One bar per project/program/product/release with dates, so the
         // roadmap can be filtered by category. Undated items are omitted (they
         // can't be placed). Reads are open.
-        api.MapGet("/portfolio/gantt", async (AtlasDbContext db) =>
+        api.MapGet("/portfolio/gantt", async (AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var items = new List<PortfolioGanttItemDto>();
 
             void Add(string type, string id, string name, string status, int? progress, string startRaw, string endRaw, string dept = "")

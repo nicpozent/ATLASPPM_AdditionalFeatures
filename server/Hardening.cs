@@ -4,9 +4,12 @@ namespace Atlas.Api;
 
 // ============================================================================
 //  HTTP hardening — response security headers, a generous per-client rate limit,
-//  and upload validation. Deliberately NO Content-Security-Policy here yet: the
-//  app is 100% inline-styled, so a CSP needs its own careful (report-only first)
-//  rollout — tracked separately.
+//  and upload validation. The Content-Security-Policy lives on the edge (nginx,
+//  deploy/nginx.conf) where the HTML app shell is served — that's the surface a
+//  CSP protects. It is intentionally NOT set here: these API responses are JSON
+//  and file downloads (the latter forced to attachment + nosniff, so they never
+//  render in-origin), and the optional Swagger UI at /swagger is inline-scripted,
+//  which a strict app CSP would break. See docs/security-hardening.md.
 // ============================================================================
 public static class Hardening
 {

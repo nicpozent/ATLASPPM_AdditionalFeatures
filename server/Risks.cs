@@ -193,8 +193,10 @@ public static class Risks
 
     public static void MapRiskEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/projects/{id}/risks", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/risks", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(p => p.Id == id && p.StakeholderVisible && !p.Archived)) is { } deny) return deny;
             if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
             var findings = await EvaluateAsync(db, id);
             return Results.Ok(new RiskReportDto(
@@ -202,8 +204,10 @@ public static class Risks
                 findings.Count(x => x.Severity == "Low"), findings));
         });
 
-        api.MapGet("/projects/{id}/status-report", async (string id, AtlasDbContext db) =>
+        api.MapGet("/projects/{id}/status-report", async (string id, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            if (await Permissions.DenyRead(http, db, cfg,
+                () => db.Projects.AnyAsync(x => x.Id == id && x.StakeholderVisible && !x.Archived)) is { } deny) return deny;
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
             var tasks = await db.ProjectTasks.Where(t => t.ProjectId == id).ToListAsync();

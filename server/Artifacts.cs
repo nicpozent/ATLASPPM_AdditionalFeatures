@@ -89,8 +89,10 @@ public static class Artifacts
             return Results.Ok(new ArtifactVersionDto(ver.Id, ver.Version, ver.FileName, ver.Size, ver.UploadedAt));
         });
 
-        api.MapGet("/artifact-versions/{verId:int}", async (int verId, AtlasDbContext db) =>
+        api.MapGet("/artifact-versions/{verId:int}", async (int verId, AtlasDbContext db, IConfiguration cfg, HttpContext http) =>
         {
+            // Internal roles only (cap-dashboards) — guards the sequential id.
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var v = await db.ArtifactVersions.FindAsync(verId);
             return v is null ? Results.NotFound() : Results.File(v.Bytes, v.ContentType, v.FileName);
         });

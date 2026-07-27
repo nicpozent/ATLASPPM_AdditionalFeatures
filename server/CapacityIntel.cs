@@ -14,8 +14,9 @@ public static class CapacityIntel
     public static void MapCapacityIntelEndpoints(this RouteGroupBuilder api)
     {
         // Portfolio capacity vs demand + over-/under-allocation lists.
-        api.MapGet("/capacity/insight", async (AtlasDbContext db, string? asOf) =>
+        api.MapGet("/capacity/insight", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, string? asOf) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d)
                 ? d : DateOnly.FromDateTime(DateTime.UtcNow);
             var roster = await ResourcesData.RosterAsync(db, on);
@@ -48,8 +49,9 @@ public static class CapacityIntel
 
         // Skills-based staffing: people who have the requested skill (rated ≥ the
         // given minimum level) AND have spare capacity, ranked by free % then skill.
-        api.MapGet("/capacity/staffing", async (AtlasDbContext db, string? skill, int? minLevel, int? minFree, string? asOf) =>
+        api.MapGet("/capacity/staffing", async (AtlasDbContext db, IConfiguration cfg, HttpContext http, string? skill, int? minLevel, int? minFree, string? asOf) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-dashboards", "V") is { } deny) return deny;
             var on = !string.IsNullOrWhiteSpace(asOf) && DateOnly.TryParse(asOf, out var d)
                 ? d : DateOnly.FromDateTime(DateTime.UtcNow);
             var skillName = (skill ?? "").Trim();
