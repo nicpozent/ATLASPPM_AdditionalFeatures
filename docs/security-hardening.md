@@ -197,13 +197,16 @@ Beyond the same-origin proxy and the existing headers (`X-Content-Type-Options`,
   the forward-secret AEAD-only Mozilla "intermediate" list for TLS 1.2 (TLS 1.3
   suites are fixed by the protocol), plus an SSL session cache.
 
-**Follow-up — pin GitHub Actions to commit SHAs.** The workflows in
-`.github/workflows/` reference actions by mutable tag (e.g. `actions/checkout@v7`,
-`zaproxy/action-baseline@v0.12.0`). Supply-chain best practice is to pin each —
-especially third-party actions — to a full-length commit SHA (with the tag in a
-trailing comment) so a re-tagged release can't silently change what runs in CI.
-This is a network-verified change (each tag must be resolved to its upstream SHA)
-and is tracked as a hardening follow-up rather than applied blind.
+**GitHub Actions pinned to commit SHAs.** Every action in `.github/workflows/`
+is pinned to a full-length commit SHA with the version in a trailing comment
+(e.g. `actions/checkout@3d3c42e…  # v7`), so a re-tagged release can't silently
+change what runs in CI — the supply-chain risk concentrates in third-party
+actions like `zaproxy/action-baseline`. Currency is not sacrificed: the
+`github-actions` entry in [`.github/dependabot.yml`](../.github/dependabot.yml)
+opens weekly PRs (7-day cooldown) that bump both the SHA and the comment, so the
+pins stay immutable **and** up to date. When re-pinning by hand, resolve each tag
+to its **commit** SHA (`git ls-remote <repo> 'refs/tags/<tag>^{}'`), not the
+annotated-tag object.
 
 ### Threat model
 
