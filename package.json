@@ -13,10 +13,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@azure/msal-browser": "^5.17.0",
-    "@azure/msal-react": "^5.5.2",
+    "@azure/msal-browser": "^5.17.1",
+    "@azure/msal-react": "^5.5.3",
     "@microsoft/signalr": "^10.0.0",
-    "@tanstack/react-query": "^5.28.0",
+    "@tanstack/react-query": "^5.101.3",
     "pptxgenjs": "^3.12.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -39,8 +39,8 @@
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.4.0",
-    "typescript-eslint": "^8.64.0",
-    "vite": "^8.1.4",
+    "typescript-eslint": "^8.65.0",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10",
     "vitest-axe": "^0.1.0"
   }
