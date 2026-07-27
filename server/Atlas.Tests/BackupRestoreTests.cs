@@ -49,6 +49,27 @@ public class BackupRestoreTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
+    public async Task Restore_skips_secret_and_gate_settings_over_posting_guard()
+    {
+        // A tampered snapshot must not be able to silently overwrite security-
+        // sensitive config (webhook URLs, tokens/secrets, the personnel-data gate)
+        // through the settings merge — only the benign key should be applied.
+        var c = As("admin");
+        var body = new StringContent(
+            "{\"data\":{\"settings\":[" +
+            "{\"key\":\"ui.density\",\"value\":\"compact\"}," +
+            "{\"key\":\"teams.webhookUrl\",\"value\":\"http://evil.internal/x\"}," +
+            "{\"key\":\"jira.apiToken\",\"value\":\"stolen\"}," +
+            "{\"key\":\"personnel.assessmentsEnabled\",\"value\":\"true\"}" +
+            "]}}", Encoding.UTF8, "application/json");
+        var res = await c.PostAsync("/api/v1/backups/restore", body);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        var restored = doc.RootElement.GetProperty("restored");
+        Assert.Equal(1, restored.GetProperty("settings").GetInt32());   // only ui.density
+    }
+
+    [Fact]
     public async Task Restore_rejects_junk_and_is_gated()
     {
         // Not a backup → 400.

@@ -172,6 +172,39 @@ penetration test / red-team is a separate external engagement it does not
 replace — scope, rules of engagement, and the remediation register live in
 [`docs/pentest-scope.md`](./pentest-scope.md).
 
+## 7. Edge / HTTP hardening (nginx)
+
+The nginx edge (`deploy/nginx.conf`) terminates TLS and serves the SPA shell.
+Beyond the same-origin proxy and the existing headers (`X-Content-Type-Options`,
+`X-Frame-Options`, `Referrer-Policy`, HSTS) it now sets:
+
+- **Content-Security-Policy (enforcing).** `default-src 'self'`; `script-src 'self'`
+  (the build emits no inline script — the entry is a single external module — so
+  this is the real XSS control); `style-src 'self' 'unsafe-inline'` because the app
+  is 100 % inline-styled by design (ADR-0003) and style injection cannot execute
+  JS; `img-src/font-src` allow `data:`/`blob:` for bundled fonts, avatars, chart
+  and whiteboard exports; `connect-src`/`frame-src` allow
+  `https://login.microsoftonline.com` **only** for the optional Entra SSO flow
+  (inert when auth is off); `object-src 'none'`, `base-uri 'self'`,
+  `frame-ancestors 'none'`, `form-action 'self'`. Repeated verbatim in the
+  `location = /index.html` block because a per-location `add_header` drops the
+  server-block headers. The API middleware (`Hardening.cs`) deliberately omits
+  CSP: its responses are JSON and file **downloads** (forced to
+  `Content-Disposition: attachment` + `nosniff`, so uploaded bytes never render
+  in-origin), and the optional inline-scripted Swagger UI would break under a
+  strict policy.
+- **Modern TLS cipher suites.** The broad `HIGH:!aNULL:!MD5` alias is replaced by
+  the forward-secret AEAD-only Mozilla "intermediate" list for TLS 1.2 (TLS 1.3
+  suites are fixed by the protocol), plus an SSL session cache.
+
+**Follow-up — pin GitHub Actions to commit SHAs.** The workflows in
+`.github/workflows/` reference actions by mutable tag (e.g. `actions/checkout@v7`,
+`zaproxy/action-baseline@v0.12.0`). Supply-chain best practice is to pin each —
+especially third-party actions — to a full-length commit SHA (with the tag in a
+trailing comment) so a re-tagged release can't silently change what runs in CI.
+This is a network-verified change (each tag must be resolved to its upstream SHA)
+and is tracked as a hardening follow-up rather than applied blind.
+
 ### Threat model
 
 The qualitative companion to these gates is the platform

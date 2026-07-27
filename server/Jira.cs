@@ -67,6 +67,22 @@ public static class Jira
         return http;
     }
 
+    // Attachment "content" URLs come straight from the Jira API response, and the
+    // client `c` carries the Jira Basic-auth credential on every request. A
+    // compromised/spoofed Jira instance — or a crafted issue — could point that
+    // URL at an internal service (SSRF) or a foreign host (credential forwarding).
+    // Only fetch when the (absolute or base-relative) URL resolves back to the
+    // configured Jira origin: same scheme, host and port. Returns null to skip.
+    static Uri? SafeAttachmentUri(HttpClient c, string url)
+    {
+        var baseAddr = c.BaseAddress;
+        if (baseAddr is null || !Uri.TryCreate(baseAddr, url, out var abs)) return null;
+        var ok = abs.Scheme == baseAddr.Scheme
+            && string.Equals(abs.Host, baseAddr.Host, StringComparison.OrdinalIgnoreCase)
+            && abs.Port == baseAddr.Port;
+        return ok ? abs : null;
+    }
+
     public static void MapJiraEndpoints(this RouteGroupBuilder api)
     {
         // Config status for the Integrations card — never calls Jira.
@@ -521,9 +537,10 @@ public static class Jira
                     var size = LongProp(att, "size");
                     if (aid.Length == 0 || url.Length == 0 || have.Contains(aid)) continue;
                     if (size > maxAttachmentBytes) continue;
+                    if (SafeAttachmentUri(c, url) is not { } fileUri) continue;   // SSRF / credential-forwarding guard
                     try
                     {
-                        using var fileRes = await c.GetAsync(url);
+                        using var fileRes = await c.GetAsync(fileUri);
                         if (!fileRes.IsSuccessStatusCode) continue;
                         var bytes = await fileRes.Content.ReadAsByteArrayAsync();
                         if (bytes.LongLength > maxAttachmentBytes) continue;
@@ -791,9 +808,10 @@ public static class Jira
                     var size = LongProp(att, "size");
                     if (aid.Length == 0 || url.Length == 0 || have.Contains(aid)) continue;
                     if (size > maxAttachmentBytes) continue;
+                    if (SafeAttachmentUri(c, url) is not { } fileUri) continue;   // SSRF / credential-forwarding guard
                     try
                     {
-                        using var fileRes = await c.GetAsync(url);
+                        using var fileRes = await c.GetAsync(fileUri);
                         if (!fileRes.IsSuccessStatusCode) continue;
                         var bytes = await fileRes.Content.ReadAsByteArrayAsync();
                         if (bytes.LongLength > maxAttachmentBytes) continue;
