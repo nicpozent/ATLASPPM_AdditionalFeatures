@@ -86,5 +86,6 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0077](./0077-per-theme-brand-typography.md) | Per-theme brand typography (IBM Plex on the Atlas brand themes) | Accepted |
 | [0078](./0078-self-hosted-fonts.md) | Self-hosted fonts (no external font CDN; air-gapped on-prem) | Accepted |
 | [0079](./0079-stakeholder-relationship-intelligence.md) | Stakeholder relationship intelligence (coverage · strength · next engagement) | Proposed |
+| [0080](./0080-jira-bidirectional-write-back.md) | Jira bidirectional write-back (bounded push actions; amends 0006) | Proposed |
 
 Template: Context · Decision · Consequences · Alternatives considered.
