@@ -89,3 +89,8 @@ ADRs are immutable once *Accepted*; to change a decision, add a new ADR that
 | [0080](./0080-jira-bidirectional-write-back.md) | Jira bidirectional write-back (bounded push actions; amends 0006) | Proposed |
 
 Template: Context · Decision · Consequences · Alternatives considered.
+
+**Single-document export:** [`ALL-ADRS.md`](./ALL-ADRS.md) concatenates every ADR
+(this index + each record in order) into one document for Confluence / a review
+board. It is generated — after adding or editing an ADR, run
+`./build-all.sh` to regenerate it (`./build-all.sh --check` verifies it's current).
