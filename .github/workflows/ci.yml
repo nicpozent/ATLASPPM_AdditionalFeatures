@@ -78,18 +78,26 @@ jobs:
       - run: dotnet build Atlas.sln -c Release --no-restore
       - name: Test with coverage
         run: dotnet test Atlas.sln -c Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory TestResults
-      # Surface line/branch coverage in the job summary. Non-gating (report only);
-      # add a floor here later if you want to prevent backsliding.
-      - name: Coverage summary
-        if: always()
+      # Surface line/branch coverage in the job summary and enforce a floor so
+      # coverage can't silently backslide. FLOOR is set a few points below the
+      # current line rate — raise it as coverage climbs.
+      - name: Coverage summary + floor
         run: |
+          FLOOR=65.0
           f=$(find TestResults -name coverage.cobertura.xml | head -1)
-          [ -z "$f" ] && { echo "no coverage file"; exit 0; }
+          [ -z "$f" ] && { echo "::error::no coverage file produced"; exit 1; }
           line=$(grep -oE 'line-rate="[0-9.]+"' "$f" | head -1 | grep -oE '[0-9.]+')
           branch=$(grep -oE 'branch-rate="[0-9.]+"' "$f" | head -1 | grep -oE '[0-9.]+')
           pct() { awk "BEGIN{printf \"%.1f\", $1*100}"; }
+          linePct=$(pct "$line"); branchPct=$(pct "$branch")
           {
             echo "### Backend coverage (migrations excluded)"
-            echo "- **Line:** $(pct "$line")%"
-            echo "- **Branch:** $(pct "$branch")%"
+            echo "- **Line:** ${linePct}%  (floor ${FLOOR}%)"
+            echo "- **Branch:** ${branchPct}%"
           } >> "$GITHUB_STEP_SUMMARY"
+          below=$(awk "BEGIN{print ($linePct < $FLOOR) ? 1 : 0}")
+          if [ "$below" = "1" ]; then
+            echo "::error::Line coverage ${linePct}% is below the ${FLOOR}% floor."
+            exit 1
+          fi
+          echo "Line coverage ${linePct}% meets the ${FLOOR}% floor."
