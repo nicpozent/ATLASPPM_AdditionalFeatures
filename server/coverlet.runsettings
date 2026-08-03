@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coverage settings for the `dotnet test` XPlat coverage collector.
+     Excludes EF Core's generated Migrations/ and model snapshot: those are
+     machine-generated (the snapshot alone is ~445k lines) and are never
+     executed by the in-memory test suite, so including them drags the headline
+     line-rate down to a meaningless ~3%. Excluded, the number reflects app code. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByFile>**/Migrations/*.cs</ExcludeByFile>
+          <Exclude>[Atlas.Api]Atlas.Api.Migrations.*</Exclude>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

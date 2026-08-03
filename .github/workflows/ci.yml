@@ -76,4 +76,20 @@ jobs:
             exit 1
           fi
       - run: dotnet build Atlas.sln -c Release --no-restore
-      - run: dotnet test Atlas.sln -c Release --no-build --verbosity normal
+      - name: Test with coverage
+        run: dotnet test Atlas.sln -c Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --settings coverlet.runsettings --results-directory TestResults
+      # Surface line/branch coverage in the job summary. Non-gating (report only);
+      # add a floor here later if you want to prevent backsliding.
+      - name: Coverage summary
+        if: always()
+        run: |
+          f=$(find TestResults -name coverage.cobertura.xml | head -1)
+          [ -z "$f" ] && { echo "no coverage file"; exit 0; }
+          line=$(grep -oE 'line-rate="[0-9.]+"' "$f" | head -1 | grep -oE '[0-9.]+')
+          branch=$(grep -oE 'branch-rate="[0-9.]+"' "$f" | head -1 | grep -oE '[0-9.]+')
+          pct() { awk "BEGIN{printf \"%.1f\", $1*100}"; }
+          {
+            echo "### Backend coverage (migrations excluded)"
+            echo "- **Line:** $(pct "$line")%"
+            echo "- **Branch:** $(pct "$branch")%"
+          } >> "$GITHUB_STEP_SUMMARY"
