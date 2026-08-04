@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
@@ -33,13 +33,36 @@ import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
 
 // ---- data (empty until API exists) -----------------------------------------
 
-const TABS = [
-  ["overview", "Overview"], ["tasks", "Tasks"], ["backlog", "Backlog"], ["sprints", "Sprints"], ["epics", "Epics"], ["requirements", "Requirements"],
-  ["quality", "Quality"], ["governance", "Governance"], ["architecture", "Architecture"],
-  ["security", "Security & Privacy"], ["dependencies", "Dependencies"], ["blockers", "Blockers"], ["vacations", "Vacations"],
-  ["artifacts", "Artifacts"], ["raid", "RAID Log"], ["comments", "Comments"], ["whiteboard", "Whiteboard"],
-] as const;
-type TabId = (typeof TABS)[number][0];
+// One registry per tab: its label, its body, and (optionally) when it's visible.
+// The tab bar, the body and the deep-link validation all derive from this, so a
+// rule like "sprints only for agile methodologies" is stated exactly once and
+// adding a tab is a single entry. Order here is the display order.
+interface ProjectTab {
+  id: string;
+  label: string;
+  render: (projectId: string | null) => ReactNode;
+  visible?: (methodology?: string) => boolean;
+}
+const TABS: ProjectTab[] = [
+  { id: "overview", label: "Overview", render: (id) => <Overview projectId={id} /> },
+  { id: "tasks", label: "Tasks", render: (id) => <Tasks projectId={id} /> },
+  { id: "backlog", label: "Backlog", render: (id) => <Backlog projectId={id} /> },
+  { id: "sprints", label: "Sprints", visible: (m) => isAgileWithSprints(m), render: (id) => <Sprints projectId={id} /> },
+  { id: "epics", label: "Epics", render: (id) => <Epics projectId={id} /> },
+  { id: "requirements", label: "Requirements", render: (id) => <Requirements projectId={id} /> },
+  { id: "quality", label: "Quality", render: (id) => <Quality projectId={id} /> },
+  { id: "governance", label: "Governance", render: (id) => <Governance projectId={id} /> },
+  { id: "architecture", label: "Architecture", render: (id) => <Architecture projectId={id} /> },
+  { id: "security", label: "Security & Privacy", render: (id) => <Security projectId={id} /> },
+  { id: "dependencies", label: "Dependencies", render: (id) => <Dependencies projectId={id} /> },
+  { id: "blockers", label: "Blockers", render: (id) => <ProjectBlockers projectId={id} /> },
+  { id: "vacations", label: "Vacations", render: (id) => <Vacations projectId={id} /> },
+  { id: "artifacts", label: "Artifacts", render: (id) => <Artifacts projectId={id} /> },
+  { id: "raid", label: "RAID Log", render: (id) => <Raid projectId={id} /> },
+  { id: "comments", label: "Comments", render: (id) => <Comments projectId={id} /> },
+  { id: "whiteboard", label: "Whiteboard", render: (id) => (id ? <WhiteboardPanel scope={{ kind: "project", id }} /> : null) },
+];
+type TabId = string;
 
 
 export default function Project() {
@@ -50,7 +73,7 @@ export default function Project() {
   // can open a project straight on its Tasks / RAID / Security tab.
   const [tab, setTab] = useState<TabId>(() => {
     const t = params.get("tab");
-    return (TABS.some(([tid]) => tid === t) ? t : "overview") as TabId;
+    return (t && TABS.some((x) => x.id === t) ? t : "overview") as TabId;
   });
   const [editing, setEditing] = useState(false);
   const { data: p } = useProject(id);
@@ -97,34 +120,20 @@ export default function Project() {
 
       {/* tab bar */}
       <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${color.border3}`, marginBottom: 20, overflowX: "auto" }}>
-        {TABS.filter(([tid]) => tid !== "sprints" || isAgileWithSprints(p?.methodology)).map(([tid, label]) => {
-          const active = tab === tid;
+        {TABS.filter((t) => t.visible?.(p?.methodology) ?? true).map((t) => {
+          const active = tab === t.id;
           return (
-            <button key={tid} onClick={() => setTab(tid)} style={{
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "10px 4px", margin: "0 14px 0 0", border: "none", borderBottom: active ? `2.5px solid ${color.primary}` : "2.5px solid transparent",
               background: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 700 : 500, color: active ? color.primary : color.subtle, fontFamily: "inherit", whiteSpace: "nowrap",
-            }}>{label}</button>
+            }}>{t.label}</button>
           );
         })}
       </div>
 
-      {tab === "overview" && <Overview projectId={id} />}
-      {tab === "tasks" && <Tasks projectId={id} />}
-      {tab === "backlog" && <Backlog projectId={id} />}
-      {tab === "sprints" && (isAgileWithSprints(p?.methodology) ? <Sprints projectId={id} /> : <Overview projectId={id} />)}
-      {tab === "governance" && <Governance projectId={id} />}
-      {tab === "raid" && <Raid projectId={id} />}
-      {tab === "security" && <Security projectId={id} />}
-      {tab === "epics" && <Epics projectId={id} />}
-      {tab === "artifacts" && <Artifacts projectId={id} />}
-      {tab === "requirements" && <Requirements projectId={id} />}
-      {tab === "architecture" && <Architecture projectId={id} />}
-      {tab === "quality" && <Quality projectId={id} />}
-      {tab === "dependencies" && <Dependencies projectId={id} />}
-      {tab === "blockers" && <ProjectBlockers projectId={id} />}
-      {tab === "vacations" && <Vacations projectId={id} />}
-      {tab === "comments" && <Comments projectId={id} />}
-      {tab === "whiteboard" && id && <WhiteboardPanel scope={{ kind: "project", id }} />}
+      {/* Body: the active tab, or Overview if the active id is hidden/unknown
+          (e.g. a ?tab=sprints deep-link on a non-agile project). */}
+      {(TABS.find((t) => t.id === tab && (t.visible?.(p?.methodology) ?? true)) ?? TABS[0]).render(id)}
 
       {editing && p && <EditProjectDetailModal project={p} onClose={() => setEditing(false)} />}
     </div>

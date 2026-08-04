@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { color, font } from "@/theme";
 import { Icon } from "@/components/Icon";
@@ -61,10 +61,13 @@ export default function Dashboard() {
         {isLoading && <div style={{ fontSize: 12, color: color.faint3 }}>Loading…</div>}
       </div>
 
-      {layout === "executive" && <Executive d={d} onProject={openProject} onPortfolio={() => navigate(SCREENS.portfolio.path)} />}
-      {layout === "operational" && <Operational d={d} onProject={openProject} />}
-      {layout === "compact" && <Compact d={d} onProject={openProject} />}
-      {layout === "custom" && <Custom d={d} />}
+      {/* Body: one panel per layout id (exhaustive map — TS enforces all ids). */}
+      {({
+        executive: <Executive d={d} onProject={openProject} onPortfolio={() => navigate(SCREENS.portfolio.path)} />,
+        operational: <Operational d={d} onProject={openProject} />,
+        compact: <Compact d={d} onProject={openProject} />,
+        custom: <Custom d={d} />,
+      } satisfies Record<LayoutId, ReactNode>)[layout]}
     </div>
   );
 }
