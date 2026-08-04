@@ -1,10 +1,10 @@
 // ============================================================================
-//  NOTE: the PALETTE/CLIP constants below carry literal #RRGGBB by design (persisted
+//  NOTE: the PALETTE/SHAPES constants below carry literal #RRGGBB by design (persisted
 //  scene data validated server-side). Allowlisted from the eslint colour ban.
 //  Whiteboard scene model (ADR-0064). A scene is a flat list of freeform nodes
 //  (sticky notes, shapes, text, icons, actors) plus connectors between them.
 //  Kept deliberately small and JSON-serialisable — it round-trips through the
-//  REST API and is sanitised server-side (see server/Whiteboards.cs).
+//  REST API and is sanitised server-side (see server/Platform/Whiteboards.cs).
 // ============================================================================
 import { color } from "@/theme";
 
@@ -22,14 +22,6 @@ export interface WbNode {
   points?: number[]; // freehand polyline [x0,y0,x1,y1,…] in absolute coords (kind === "draw")
 }
 
-// Shapes rendered via a CSS clip-path polygon (the value is the polygon()).
-export const CLIP: Partial<Record<NodeKind, string>> = {
-  diamond: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)",
-  triangle: "polygon(50% 2%, 100% 100%, 0 100%)",
-  hexagon: "polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)",
-  parallelogram: "polygon(22% 0, 100% 0, 78% 100%, 0 100%)",
-  star: "polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
-};
 export interface WbEdge { id: string; from: string; to: string; color?: string }
 export interface Scene { nodes: WbNode[]; edges: WbEdge[] }
 
@@ -48,21 +40,59 @@ export const PALETTE = [
   "#FFFFFF", // white
 ] as const;
 
-// Shape/tool set shown in the palette (order = toolbar order).
-export const SHAPE_TOOLS: { kind: NodeKind; label: string }[] = [
-  { kind: "note", label: "Sticky note" },
-  { kind: "rect", label: "Rectangle" },
-  { kind: "pill", label: "Rounded" },
-  { kind: "ellipse", label: "Ellipse" },
-  { kind: "diamond", label: "Diamond" },
-  { kind: "triangle", label: "Triangle" },
-  { kind: "hexagon", label: "Hexagon" },
-  { kind: "parallelogram", label: "Parallelogram" },
-  { kind: "star", label: "Star" },
-  { kind: "cylinder", label: "Cylinder / DB" },
-  { kind: "actor", label: "Actor" },
-  { kind: "text", label: "Text" },
-];
+// ----------------------------------------------------------------------------
+//  Single source of truth for every NodeKind (ADR-0064 shape registry).
+//  One row per kind — label, whether it appears in the toolbar, optional
+//  clip-path polygon, default drop geometry and default colour. Everything
+//  downstream (CLIP, SHAPE_TOOLS, defaultSize, defaultColor) is DERIVED from
+//  this map, and the `Record<NodeKind, …>` type forces every new kind to be
+//  described here (no silent misses). Kept in toolbar order so SHAPE_TOOLS
+//  reads straight off it. The server keeps a matching whitelist
+//  (server/Platform/Whiteboards.cs `Kinds`) — a test guards the two against drift.
+// ----------------------------------------------------------------------------
+export interface ShapeSpec {
+  /** Human label shown in the toolbar / a11y name. */
+  label: string;
+  /** True when the kind is offered as a drop tool in the palette toolbar. */
+  inTools: boolean;
+  /** CSS clip-path polygon() for non-rectangular shapes (absent = plain box/oval). */
+  clip?: string;
+  /** Geometry (px) applied when a tool drops a fresh node. */
+  size: { w: number; h: number };
+  /** Fill (shapes/notes) or ink (text/icon/draw) applied to a fresh node. */
+  color: string;
+}
+
+export const SHAPES: Record<NodeKind, ShapeSpec> = {
+  note:          { label: "Sticky note",   inTools: true,  size: { w: 160, h: 150 }, color: PALETTE[0] },
+  rect:          { label: "Rectangle",     inTools: true,  size: { w: 170, h: 110 }, color: "#FFFFFF" },
+  pill:          { label: "Rounded",       inTools: true,  size: { w: 170, h: 70 },  color: "#FFFFFF" },
+  ellipse:       { label: "Ellipse",       inTools: true,  size: { w: 150, h: 110 }, color: "#FFFFFF" },
+  diamond:       { label: "Diamond",       inTools: true,  size: { w: 140, h: 120 }, color: "#FFFFFF", clip: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)" },
+  triangle:      { label: "Triangle",      inTools: true,  size: { w: 140, h: 120 }, color: "#FFFFFF", clip: "polygon(50% 2%, 100% 100%, 0 100%)" },
+  hexagon:       { label: "Hexagon",       inTools: true,  size: { w: 140, h: 120 }, color: "#FFFFFF", clip: "polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)" },
+  parallelogram: { label: "Parallelogram", inTools: true,  size: { w: 170, h: 110 }, color: "#FFFFFF", clip: "polygon(22% 0, 100% 0, 78% 100%, 0 100%)" },
+  star:          { label: "Star",          inTools: true,  size: { w: 140, h: 120 }, color: "#FFFFFF", clip: "polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)" },
+  cylinder:      { label: "Cylinder / DB", inTools: true,  size: { w: 130, h: 130 }, color: "#FFFFFF" },
+  actor:         { label: "Actor",         inTools: true,  size: { w: 96,  h: 120 }, color: "#FFFFFF" },
+  text:          { label: "Text",          inTools: true,  size: { w: 180, h: 44 },  color: color.ink },
+  icon:          { label: "Icon",          inTools: false, size: { w: 64,  h: 64 },  color: color.primary },
+  draw:          { label: "Freehand",      inTools: false, size: { w: 2,   h: 2 },   color: color.primary },
+};
+
+// Shapes rendered via a CSS clip-path polygon (derived — the value is the polygon()).
+// sync target for exportScene.ts's SVG export (matches the on-screen rendering).
+export const CLIP: Partial<Record<NodeKind, string>> = Object.fromEntries(
+  (Object.entries(SHAPES) as [NodeKind, ShapeSpec][])
+    .filter(([, s]) => s.clip)
+    .map(([k, s]) => [k, s.clip!]),
+) as Partial<Record<NodeKind, string>>;
+
+// Shape/tool set shown in the palette (order = toolbar order = registry order).
+export const SHAPE_TOOLS: { kind: NodeKind; label: string }[] =
+  (Object.entries(SHAPES) as [NodeKind, ShapeSpec][])
+    .filter(([, s]) => s.inTools)
+    .map(([kind, s]) => ({ kind, label: s.label }));
 
 // Starter icon set — names must exist in components/Icon.tsx.
 export const ICONS = [
@@ -72,23 +102,9 @@ export const ICONS = [
 
 // Default geometry per kind (px), used when a tool drops a new node.
 export function defaultSize(kind: NodeKind): { w: number; h: number } {
-  switch (kind) {
-    case "note": return { w: 160, h: 150 };
-    case "text": return { w: 180, h: 44 };
-    case "icon": return { w: 64, h: 64 };
-    case "actor": return { w: 96, h: 120 };
-    case "ellipse": return { w: 150, h: 110 };
-    case "diamond": case "triangle": case "hexagon": case "star": return { w: 140, h: 120 };
-    case "cylinder": return { w: 130, h: 130 };
-    case "pill": return { w: 170, h: 70 };
-    case "draw": return { w: 2, h: 2 };
-    default: return { w: 170, h: 110 };
-  }
+  return { ...SHAPES[kind].size };
 }
 
 export function defaultColor(kind: NodeKind): string {
-  if (kind === "note") return PALETTE[0];
-  if (kind === "text") return color.ink;
-  if (kind === "icon" || kind === "draw") return color.primary;
-  return "#FFFFFF";
+  return SHAPES[kind].color;
 }

@@ -61,7 +61,9 @@ public static class Whiteboards
     };
 
     // Node kinds the editor understands; anything else is rejected on write.
-    static readonly HashSet<string> Kinds = new()
+    // Canonical whitelist — the frontend keeps a matching NodeKind union / SHAPES
+    // registry (src/whiteboard/types.ts); a test guards the two against drift.
+    internal static readonly HashSet<string> Kinds = new()
         { "note", "rect", "ellipse", "diamond", "actor", "text", "icon",
           "triangle", "hexagon", "parallelogram", "star", "cylinder", "pill", "draw" };
 
