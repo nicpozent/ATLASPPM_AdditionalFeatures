@@ -34,9 +34,12 @@ const qc: QueryClient = new QueryClient({
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["audit"] }); },
   }),
   queryCache: new QueryCache({
-    // Only surface unexpected server failures on reads; 4xx (and endpoints that
-    // catch their own errors into empty states) stay quiet to avoid noise.
-    onError: (err) => { if (err instanceof ApiError && err.status >= 500) toastError(err); },
+    // Surface unexpected server failures (5xx) and network failures (status 0,
+    // set by api.ts when fetch itself rejects) on reads — the latter would
+    // otherwise render as a healthy empty state. 4xx (and endpoints that catch
+    // their own errors into empty states) stay quiet to avoid noise; a 403 on a
+    // read is a legitimate empty state.
+    onError: (err) => { if (err instanceof ApiError && (err.status >= 500 || err.status === 0)) toastError(err); },
   }),
 });
 
