@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
+import { QueryState } from "@/components/ui";
 
 // ---- theme presets (from the prototype) ----------------------------------
 type ThemeKey = "aurora" | "sunrise" | "forest" | "slate";
@@ -213,16 +214,16 @@ interface NewsWall { canEdit: boolean; theme: string; layout: string; blocks: Ne
 function useNews() {
   return useQuery({
     queryKey: ["news"], retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<NewsWall> => {
-      try {
-        return (await api<NewsWall>("/news")) ?? { canEdit: false, theme: "aurora", layout: "masonry", blocks: [] };
-      } catch { return { canEdit: false, theme: "aurora", layout: "masonry", blocks: [] }; }
-    },
+    // No error-swallow — a failed read surfaces via QueryState (loading/error),
+    // not as an empty news wall indistinguishable from "no updates posted".
+    queryFn: async (): Promise<NewsWall> =>
+      (await api<NewsWall>("/news")) ?? { canEdit: false, theme: "aurora", layout: "masonry", blocks: [] },
   });
 }
 
 export default function News() {
-  const { data } = useNews();
+  const nq = useNews();
+  const data = nq.data;
   const qc = useQueryClient();
   const canEdit = data?.canEdit ?? false;
 
@@ -280,6 +281,16 @@ export default function News() {
     layout === "masonry" ? { columnCount: 3, columnGap: 16 }
       : layout === "grid" ? { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, alignItems: "start" }
         : { maxWidth: 680, margin: "0 auto" };
+
+  // Loading / error gate — a failed read shows an error + Retry, not an empty
+  // wall. On success the full editor below renders unchanged.
+  if (nq.isPending || nq.isError) {
+    return (
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <QueryState query={nq} minHeight={500} isEmpty={() => false}>{() => null}</QueryState>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>

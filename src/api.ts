@@ -50,9 +50,22 @@ async function errorFrom(res: Response): Promise<ApiError> {
   return new ApiError(message, res.status, errorId, category);
 }
 
+// A network-level failure — API down, DNS failure, offline, CORS — makes fetch
+// reject with a TypeError, which is NOT an ApiError, so the global query handler
+// (and the UI) can't tell it apart from a legitimate empty result and the app
+// renders as a healthy, empty portfolio. Translate it to an ApiError with status
+// 0 so it surfaces as a real error, not "no data".
+async function doFetch(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${BASE}${path}`, init);
+  } catch {
+    throw new ApiError("Can’t reach the Atlas API — check your connection and try again.", 0);
+  }
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T | null> {
   const token = await getToken();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await doFetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -69,7 +82,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T | 
 // the multipart boundary — so we don't force a JSON Content-Type here.
 export async function apiUpload<T>(path: string, form: FormData): Promise<T | null> {
   const token = await getToken();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await doFetch(path, {
     method: "POST",
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...roleHeader() },
     body: form,
@@ -82,7 +95,7 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<T | nu
 // wouldn't carry it) and triggers a browser download of the returned blob.
 export async function apiDownload(path: string, filename: string): Promise<void> {
   const token = await getToken();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await doFetch(path, {
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...roleHeader() },
   });
   if (!res.ok) throw await errorFrom(res);

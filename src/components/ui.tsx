@@ -6,6 +6,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { color, font, radius, chart } from "@/theme";
+import { ApiError } from "@/api";
 import { Icon } from "./Icon";
 
 export function Card({ children, style, padding = 20, onClick }: {
@@ -62,6 +63,36 @@ export function EmptyBlock({ message, minHeight = 96 }: { message: string; minHe
       textAlign: "center", color: color.faint3, fontSize: 13, padding: "18px 12px",
     }}>{message}</div>
   );
+}
+
+// Renders the four states of a data view from a React Query result — loading,
+// error (message + Retry), empty, or the loaded children — so a failed read is
+// visibly different from "no data" (a network failure used to render as a healthy
+// empty state). Keep the deliberate quiet on a 403-read: pass isEmpty so a scoped
+// empty result still shows the empty message, not an error.
+export function QueryState<T>({ query, empty = "Nothing here yet.", isEmpty, minHeight = 120, children }: {
+  query: { isPending?: boolean; isLoading?: boolean; isError: boolean; error?: unknown; refetch?: () => void; data?: T };
+  empty?: string;
+  isEmpty?: (data: T) => boolean;
+  minHeight?: number;
+  children: (data: T) => React.ReactNode;
+}) {
+  if (query.isPending ?? query.isLoading ?? false) return <EmptyBlock message="Loading…" minHeight={minHeight} />;
+  if (query.isError) {
+    const msg = query.error instanceof ApiError ? query.error.message : "Something went wrong loading this.";
+    return (
+      <div style={{
+        minHeight, display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 12, textAlign: "center", padding: "18px 12px",
+      }}>
+        <div style={{ color: color.dangerInk, fontSize: 13, maxWidth: 440 }}>{msg}</div>
+        {query.refetch && <Button variant="secondary" onClick={() => query.refetch!()}>Retry</Button>}
+      </div>
+    );
+  }
+  const data = query.data as T;
+  if (data == null || (isEmpty?.(data) ?? false)) return <EmptyBlock message={empty} minHeight={minHeight} />;
+  return <>{children(data)}</>;
 }
 
 const HEALTH_COLORS: Record<string, { ink: string; tint: string }> = {

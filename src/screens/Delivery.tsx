@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { color, font } from "@/theme";
 import { api } from "@/api";
-import { Card, EmptyBlock } from "@/components/ui";
+import { Card, EmptyBlock, QueryState } from "@/components/ui";
 
 // ---- data ----------------------------------------------------------------
 type Period = "weekly" | "monthly" | "quarterly" | "half" | "yearly";
@@ -19,10 +19,9 @@ type DeliveryStats = {
 function useDelivery() {
   return useQuery({
     queryKey: ["delivery"], retry: false, staleTime: 60000,
-    queryFn: async () => {
-      try { return (await api<Partial<Record<Period, DeliveryStats>>>("/delivery")) ?? {}; }
-      catch { return {}; }
-    },
+    // No error-swallow — a failed read surfaces via QueryState (loading/error),
+    // not as an all-dashes layout indistinguishable from a healthy empty period.
+    queryFn: async () => (await api<Partial<Record<Period, DeliveryStats>>>("/delivery")) ?? {},
   });
 }
 
@@ -91,7 +90,7 @@ function StatCard({ label, value, sub, valueColor = color.navy }: {
 export default function Delivery() {
   const [period, setPeriod] = useState<Period>("monthly");
   const [view, setView] = useState<"delivery" | "cfo">("delivery");
-  const { data = {} } = useDelivery();
+  const dq = useDelivery();
   const { data: spill } = useSpillover();
   const { data: ops = [] } = useOperational();
   const opsActiveItems = ops.filter((o) => opActive(o.status));
@@ -99,11 +98,6 @@ export default function Delivery() {
   const opsProjects = new Set(opsActiveItems.map((o) => o.projectId).filter(Boolean)).size;
 
   const meta = PERIODS.find((p) => p.key === period)!;
-  const dd = data[period];
-  const total = dd ? dd.completed + dd.inProgress + dd.planned : 0;
-  const completedPct = pct(dd?.completed, total);
-  const inProgressPct = pct(dd?.inProgress, total);
-  const plannedPct = pct(dd?.planned, total);
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -125,7 +119,14 @@ export default function Delivery() {
         )))}
       </div>
 
-      {view === "cfo" ? (
+      <QueryState query={dq} minHeight={320} isEmpty={() => false}>
+        {(data) => {
+          const dd = data[period];
+          const total = dd ? dd.completed + dd.inProgress + dd.planned : 0;
+          const completedPct = pct(dd?.completed, total);
+          const inProgressPct = pct(dd?.inProgress, total);
+          const plannedPct = pct(dd?.planned, total);
+          return view === "cfo" ? (
         <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 18, alignItems: "start", marginBottom: 18 }}>
           <Card>
             <div style={{ fontFamily: font.head, fontSize: 15, fontWeight: 600, color: color.navy, marginBottom: 2 }}>Deliverables vs spend over time</div>
@@ -280,7 +281,9 @@ export default function Delivery() {
             </div>
           </div>
         </>
-      )}
+          );
+        }}
+      </QueryState>
     </div>
   );
 }
