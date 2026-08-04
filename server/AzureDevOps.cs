@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api.Integrations;
 
@@ -56,6 +57,12 @@ public static class AzureDevOps
     }
 
     // An HttpClient pinned to the org with Basic auth (":PAT"). Callers dispose it.
+    // Operational logger — set once at startup so a partial sync (iterations,
+    // WIQL or a work-item batch failing) leaves evidence instead of silently
+    // reporting fewer rows. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.AzureDevOps");
+
     public static HttpClient Client(IConfiguration cfg)
     {
         var baseUrl = NormalizeOrgUrl(cfg["AzureDevOps:Organization"])
@@ -333,6 +340,8 @@ public static class AzureDevOps
         var sprintOrd = existingSprints.Select(s => s.Ord).DefaultIfEmpty(0).Max();
         var seenSprints = new HashSet<string>();
         var iterRes = await c.GetAsync($"{enc}/_apis/wit/classificationnodes/iterations?$depth=5&api-version={ApiVersion}");
+        if (!iterRes.IsSuccessStatusCode)
+            _log.LogWarning("ADO iterations fetch for project {Project} returned {Status} — no sprints imported this run.", project, (int)iterRes.StatusCode);
         if (iterRes.IsSuccessStatusCode)
         {
             using var iterDoc = JsonDocument.Parse(await iterRes.Content.ReadAsStringAsync());
@@ -359,6 +368,8 @@ public static class AzureDevOps
             JsonSerializer.Serialize(new { query = $"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{project.Replace("'", "''")}'{changedClause} ORDER BY [System.ChangedDate] ASC" }),
             Encoding.UTF8, "application/json");
         var wiqlRes = await c.PostAsync($"{enc}/_apis/wit/wiql?api-version={ApiVersion}", wiql);
+        if (!wiqlRes.IsSuccessStatusCode)
+            _log.LogWarning("ADO WIQL query for project {Project} returned {Status} — no work items imported this run.", project, (int)wiqlRes.StatusCode);
         if (wiqlRes.IsSuccessStatusCode)
         {
             using var wiqlDoc = JsonDocument.Parse(await wiqlRes.Content.ReadAsStringAsync());
@@ -377,7 +388,7 @@ public static class AzureDevOps
         {
             var batch = ids.Skip(i).Take(ApiPageBatch);
             var res = await c.GetAsync($"_apis/wit/workitems?ids={string.Join(',', batch)}&fields={Uri.EscapeDataString(fields)}&api-version={ApiVersion}");
-            if (!res.IsSuccessStatusCode) { truncated = true; continue; }
+            if (!res.IsSuccessStatusCode) { _log.LogWarning("ADO work-item batch for project {Project} returned {Status} — those items skipped.", project, (int)res.StatusCode); truncated = true; continue; }
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
             if (!doc.RootElement.TryGetProperty("value", out var arr) || arr.ValueKind != JsonValueKind.Array) continue;
             foreach (var wi in arr.EnumerateArray())

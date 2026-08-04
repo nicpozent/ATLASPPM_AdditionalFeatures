@@ -343,6 +343,9 @@ route guards). To hit a real API in dev, run the backend and set `VITE_API_PROXY
 - Add icons to `Icon.tsx` as needed (Lucide-style, match the prototype's choices).
 - Data-drive everything through `api.ts` + React Query; empty states by default.
 - Keep components typed, accessible, and split sensibly.
+- Log every silent failure: a `catch` may swallow only if the caller surfaces the
+  failure another way (an `errors[]` roll-up, a non-2xx result); otherwise it must
+  log (server: `ILogger`; degradations that report "success" hide the cause).
 
 **Don't**
 - Don't redesign, restyle, or add screens/sections not in the prototype —

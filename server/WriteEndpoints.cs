@@ -2,10 +2,17 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Atlas.Api;
 
 public static class WriteEndpoints
 {
+    // Operational logger — set once at startup so the best-effort auto-sync below
+    // leaves evidence. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.WriteEndpoints");
+
     // The Demand Pipeline funnel is one portfolio-wide collaborative surface, so
     // it shares a single real-time room. Mutations below ping it (presence &
     // cursors come from the hub; this is the "refetch, something moved" signal).
@@ -356,7 +363,7 @@ public static class WriteEndpoints
             if (!string.IsNullOrEmpty(p.JiraProjectKey) && !string.Equals(p.JiraProjectKey, oldJiraKey, StringComparison.OrdinalIgnoreCase) && Jira.JiraConfigured(cfg))
             {
                 try { using var jc = Jira.Client(cfg); await Jira.SyncProjectAsync(db, cfg, jc, p); }
-                catch { /* ignore — the manual Sync surfaces connector errors */ }
+                catch (Exception ex) { _log.LogWarning(ex, "Auto-sync after linking Jira key {Key} to project {Project} failed — the manual Sync surfaces connector errors.", p.JiraProjectKey, p.Id); }
             }
             return Results.Ok(new ProjectDto(p.Id, p.Name, p.Dept, p.Owner, p.Methodology, p.Status, p.Health,
                 p.Progress, p.Budget, p.Spent, p.Target, p.Blockers.Count, p.Archived, p.IsSystem, p.StartDate));

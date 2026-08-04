@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api.Integrations;
 
@@ -56,6 +57,12 @@ public static class Jira
     }
 
     // An HttpClient pinned to the Jira site with Basic auth. Callers dispose it.
+    // Operational logger — set once at startup so the best-effort degradation
+    // paths (unreadable boards, skipped attachments) leave evidence rather than
+    // silently reporting success. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.Jira");
+
     public static HttpClient Client(IConfiguration cfg)
     {
         var baseUrl = NormalizeBaseUrl(cfg["Jira:BaseUrl"])
@@ -556,7 +563,7 @@ public static class Jira
                         });
                         have.Add(aid);
                     }
-                    catch { /* skip this attachment, keep importing */ }
+                    catch (Exception ex) { _log.LogWarning(ex, "Skipping a Jira attachment ({File}) after a download error during ops import.", Str(att, "filename")); /* keep importing */ }
                 }
             }
             imported++;
@@ -661,14 +668,14 @@ public static class Jira
                     if (string.Equals(Str(jb, "type"), "scrum", StringComparison.OrdinalIgnoreCase) && IntProp(jb, "id") is int bid && bid > 0)
                         sprintBoards.Add(bid);
             }
-            catch { /* board listing unavailable (permission / non-agile project) — fall back to issue-derived sprint names */ }
+            catch (Exception ex) { _log.LogWarning(ex, "Jira board listing for project {Key} is unavailable (permission / non-agile project) — falling back to issue-derived sprint names.", projectKey); /* fall back to issue-derived sprint names */ }
         foreach (var sb in sprintBoards.Distinct())
             try
             {
                 foreach (var js in await FetchPagedAsync(c, $"rest/agile/1.0/board/{sb}/sprint", "values", () => truncated = true))
                     UpsertSprint(js, sb);
             }
-            catch { /* this board's sprints unavailable — skip it, keep syncing the rest */ }
+            catch (Exception ex) { _log.LogWarning(ex, "Sprints for Jira board {Board} (project {Key}) are unavailable — skipping that board, continuing the sync.", sb, projectKey); /* skip it, keep syncing the rest */ }
 
         // --- Epics: board endpoint if available, else derived from issues ----
         var existingEpics = await db.Epics.Where(e => e.ProjectId == p.Id).ToListAsync();
@@ -827,7 +834,7 @@ public static class Jira
                         });
                         have.Add(aid);
                     }
-                    catch { /* skip this attachment, keep syncing */ }
+                    catch (Exception ex) { _log.LogWarning(ex, "Skipping a Jira attachment on {Issue} ({File}) after a download error during project sync.", key, Str(att, "filename")); /* keep syncing */ }
                 }
             }
         }
