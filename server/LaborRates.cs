@@ -97,7 +97,7 @@ public static class LaborRates
     static HashSet<string> RateIdentities(HttpContext http, IConfiguration cfg)
     {
         HashSet<string> ids;
-        if (!cfg.GetValue("Auth:Enabled", false))
+        if (!Permissions.AuthEnabled(cfg))
         {
             ids = Resolve(http.Request.Headers["X-Atlas-Role"].ToString());
         }

@@ -9,7 +9,7 @@ public static class Endpoints
     public static void MapAtlasEndpoints(this WebApplication app)
     {
         var api = app.MapGroup("/api/v1");
-        if (app.Configuration.GetValue("Auth:Enabled", false))
+        if (Permissions.AuthEnabled(app.Configuration))
             api.RequireAuthorization();
 
         api.MapAtlasWriteEndpoints();

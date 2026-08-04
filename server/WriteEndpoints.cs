@@ -44,7 +44,7 @@ public static class WriteEndpoints
         {
             if (await Permissions.Deny(http, db, cfg, "cap-submit-demand", "E") is { } denied) return denied;
             if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(new { error = "Title is required." });
-            var authEnabled = cfg.GetValue("Auth:Enabled", false);
+            var authEnabled = Permissions.AuthEnabled(cfg);
             var criticality = req.Criticality is >= 1 and <= 5 ? req.Criticality.Value : 0;
             // Priority follows criticality when the intake form supplied it, else the explicit priority.
             var priority = criticality > 0
@@ -99,7 +99,7 @@ public static class WriteEndpoints
                 () => db.Demands.AnyAsync(x => x.Id == id && x.Mine)) is { } deny) return deny;
             var d = await db.Demands.Include(x => x.Attachments).FirstOrDefaultAsync(x => x.Id == id);
             if (d is null) return Results.NotFound();
-            var authEnabled = cfg.GetValue("Auth:Enabled", false);
+            var authEnabled = Permissions.AuthEnabled(cfg);
             return Results.Ok(new DemandDetailDto(
                 d.Id, d.Title, d.Stage, d.Priority, d.Value, d.Effort, d.Requester, d.Dept, d.Date,
                 d.Description, d.Source, d.GeoImpact, d.HasDeadline, d.Deadline, d.BusinessProblem,
@@ -180,7 +180,7 @@ public static class WriteEndpoints
             var d = await db.Demands.FindAsync(id);
             if (d is null) return Results.NotFound();
             // You can delete your own initiatives; Platform Admins can delete any.
-            if (!CanDelete(d, user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
+            if (!CanDelete(d, user, Permissions.AuthEnabled(cfg))) return Results.Forbid();
             db.Demands.Remove(d);
             db.AuditEvents.Add(Permissions.Audit(http, cfg, "Demands", "Deleted demand", id));
             await db.SaveChangesAsync();

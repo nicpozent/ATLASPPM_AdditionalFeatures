@@ -95,7 +95,7 @@ builder.Services.AddCors(o => o.AddPolicy(Hardening.CorsPolicy, p =>
 
 // Entra ID bearer validation — enabled only when Auth:Enabled=true (parity with
 // the frontend's VITE_AUTH_ENABLED). When off, the API is anonymous for local runs.
-var authEnabled = cfg.GetValue("Auth:Enabled", false);
+var authEnabled = Permissions.AuthEnabled(cfg);
 
 // ---- Production safety fuses -------------------------------------------------
 // The convenient local defaults (anonymous API, baked-in "atlas" DB password)

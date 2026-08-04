@@ -23,7 +23,7 @@ public static class Deletions
             if (await db.DeletionRequests.AnyAsync(r => r.ProjectId == id && r.Status == "Pending"))
                 return Results.BadRequest(new { error = "A deletion request is already pending for this project." });
 
-            var role = Permissions.ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false)) ?? "dev";
+            var role = Permissions.ResolveRoleId(http.User, http.Request, Permissions.AuthEnabled(cfg)) ?? "dev";
             var req = new DeletionRequest
             {
                 ProjectId = id, ProjectName = p.Name, RequestedBy = Permissions.ActorName(http, cfg),
