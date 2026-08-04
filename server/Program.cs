@@ -180,6 +180,16 @@ AtlasTelemetry.RegisterQueueGauges(
 AtlasTelemetry.RegisterBoardGauges(() => BoardHub.ActiveConnections, () => BoardHub.ActiveBoards);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 TeamsNotify.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
+// Give the connectors, personnel crypto and the other silent-degradation paths a
+// real logger so best-effort failures leave evidence rather than reporting success.
+var lf = app.Services.GetRequiredService<ILoggerFactory>();
+Jira.UseLogger(lf);
+AzureDevOps.UseLogger(lf);
+PersonnelCrypto.UseLogger(lf);
+Whiteboards.UseLogger(lf);
+Gdpr.UseLogger(lf);
+WriteEndpoints.UseLogger(lf);
+BoardHub.UseLogger(lf);
 
 // Apply migrations on startup. The web/all role owns the schema (a single
 // migrator avoids two containers racing Migrate()); the worker role skips this

@@ -310,7 +310,7 @@ public static class Teams
                 var raw = PersonnelCrypto.Unprotect(cfg, stored);   // decrypt at rest; legacy plaintext passes through
                 if (string.IsNullOrWhiteSpace(raw)) continue;       // undecryptable (key missing/rotated) → not shown
                 try { if (JsonSerializer.Deserialize<TeamSwot>(raw) is { } s) items[key] = s; }
-                catch { /* tolerate a hand-edited/corrupt value */ }
+                catch (Exception ex) { _log?.LogWarning(ex, "Skipping a corrupt team-SWOT value for slot {Slot}.", key); }
             }
             return Results.Ok(new { enabled = true, canEdit = scope.Count > 0, items });
         });
@@ -358,7 +358,7 @@ public static class Teams
                 var raw = PersonnelCrypto.Unprotect(cfg, stored);   // decrypt at rest; legacy plaintext passes through
                 if (string.IsNullOrWhiteSpace(raw)) continue;       // undecryptable (key missing/rotated) → not shown
                 try { if (JsonSerializer.Deserialize<DevPlan>(raw) is { } p) items[name] = p; }
-                catch { /* tolerate a hand-edited/corrupt value */ }
+                catch (Exception ex) { _log?.LogWarning(ex, "Skipping a corrupt development-plan value for {Person}.", name); }
             }
             return Results.Ok(new { enabled = true, canEdit = names.Count > 0, items });
         });

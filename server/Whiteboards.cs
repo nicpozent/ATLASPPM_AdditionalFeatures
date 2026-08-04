@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Atlas.Api.Platform;
 
 // ---- Wire model (a scene = free-form nodes + connectors) -------------------
@@ -114,11 +116,16 @@ public static class Whiteboards
         Scope = scope, EdgeId = e.Id, FromNode = e.From, ToNode = e.To, Color = e.Color,
     };
 
+    // Operational logger — set once at startup so dropped/corrupt scene data
+    // leaves evidence. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.Whiteboards");
+
     static double[]? PointsFromJson(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<double[]>(json); }
-        catch { return null; }
+        catch (Exception ex) { _log.LogWarning(ex, "Dropping a whiteboard stroke with an unparseable points array."); return null; }
     }
 
     static double Clamp(double v, double lo, double hi) =>
@@ -378,7 +385,7 @@ public static class Whiteboards
             if (!alreadyTyped && !string.IsNullOrWhiteSpace(s.Value))
             {
                 WbScene? parsed = null;
-                try { parsed = JsonSerializer.Deserialize<WbScene>(s.Value); } catch { /* corrupt blob → drop */ }
+                try { parsed = JsonSerializer.Deserialize<WbScene>(s.Value); } catch (Exception ex) { _log.LogWarning(ex, "Dropping a corrupt legacy whiteboard scene blob for scope {Scope} during backfill.", scope); }
                 if (parsed is not null)
                 {
                     var scene = Sanitize(parsed);   // re-apply current bounds

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api;
 
@@ -25,13 +26,25 @@ public static class PersonnelCrypto
 {
     const string Marker = "enc:v1:";
 
+    // Operational logger — set once at startup so the silent inert/undecryptable
+    // paths below leave evidence ("why are my personnel notes blank?"). Never logs
+    // key material or plaintext. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.PersonnelCrypto");
+
     // A configured 256-bit key (base64 of 32 bytes), or null when absent/invalid.
     static byte[]? Key(IConfiguration cfg, string name)
     {
         var raw = cfg[name];
         if (string.IsNullOrWhiteSpace(raw)) return null;
-        try { var k = Convert.FromBase64String(raw.Trim()); return k.Length == 32 ? k : null; }
-        catch { return null; }
+        try
+        {
+            var k = Convert.FromBase64String(raw.Trim());
+            if (k.Length == 32) return k;
+            _log.LogWarning("Personnel key {Name} is {Len} bytes, not the required 32 — ignoring it; personnel notes stay inert (plaintext pass-through).", name, k.Length);
+            return null;
+        }
+        catch (FormatException ex) { _log.LogWarning(ex, "Personnel key {Name} is not valid base64 — ignoring it; personnel notes stay inert.", name); return null; }
     }
 
     public static bool Enabled(IConfiguration cfg) => Key(cfg, "Personnel:EncryptionKey") is not null;
@@ -63,7 +76,7 @@ public static class PersonnelCrypto
         if (!stored.StartsWith(Marker, StringComparison.Ordinal)) return stored;   // legacy plaintext
         byte[] blob;
         try { blob = Convert.FromBase64String(stored[Marker.Length..]); }
-        catch { return null; }
+        catch (FormatException ex) { _log.LogWarning(ex, "A stored personnel note is marked encrypted but its payload is not valid base64 — returning no value."); return null; }
         var nonceLen = AesGcm.NonceByteSizes.MaxSize;
         var tagLen = AesGcm.TagByteSizes.MaxSize;
         if (blob.Length < nonceLen + tagLen) return null;
@@ -83,6 +96,10 @@ public static class PersonnelCrypto
             }
             catch (CryptographicException) { /* wrong key or tampered — try the next */ }
         }
-        return null;   // no configured key could decrypt it
+        // Distinct from legacy-plaintext (returned early) and from inert/no-key:
+        // a value IS encrypted but no configured key decrypts it (key missing or
+        // rotated away). Surfaces as "no data" to the caller — log so it's traceable.
+        _log.LogWarning("An encrypted personnel note could not be decrypted by any configured key (missing or rotated away) — presenting as no data.");
+        return null;
     }
 }

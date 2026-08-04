@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Atlas.Api.Platform;
 
@@ -44,6 +45,11 @@ public class BoardHub : Hub
     static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, Peer>> Rooms = new();
 
     // Observability accessors (atlas.board.* gauges — see AtlasTelemetry).
+    // Operational logger — set once at startup. Advisory hub failures log at Debug
+    // (the REST write already succeeded). No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.BoardHub");
+
     public static int ActiveConnections => Rooms.Values.Sum(b => b.Count);
     public static int ActiveBoards => Rooms.Count;
 
@@ -81,7 +87,7 @@ public class BoardHub : Hub
         if (room is null) return;
         AtlasTelemetry.RecordBoardBroadcast();
         try { await hub.Clients.Group(room).SendAsync("BoardChanged"); }
-        catch { /* the REST write already succeeded; the ping is advisory */ }
+        catch (Exception ex) { _log.LogDebug(ex, "Board room {Room} change-ping failed (advisory; the REST write already succeeded).", room); }
     }
 
     // Convenience for PI increments — the increment board's room key is "pi:{id}".
@@ -103,7 +109,7 @@ public class BoardHub : Hub
         if (room is null) return;
         AtlasTelemetry.RecordBoardBroadcast();
         try { await hub.Clients.Group(room).SendAsync("Op", op); }
-        catch { /* the REST write already succeeded; the op is advisory */ }
+        catch (Exception ex) { _log.LogDebug(ex, "Board room {Room} op broadcast failed (advisory; the REST write already succeeded).", room); }
     }
 
     // A stable, pleasant colour per connection (no identity leak — derived from

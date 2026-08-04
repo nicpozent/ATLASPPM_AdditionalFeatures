@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace Atlas.Api.Governance;
 
 // ============================================================================
@@ -17,6 +19,10 @@ namespace Atlas.Api.Governance;
 // ============================================================================
 public static class Gdpr
 {
+    // Operational logger — set once at startup. No-op until wired in Program.cs.
+    static ILogger _log = NullLogger.Instance;
+    public static void UseLogger(ILoggerFactory factory) => _log = factory.CreateLogger("Atlas.Gdpr");
+
     public static void MapGdprEndpoints(this RouteGroupBuilder api)
     {
         // The people Atlas actually holds data on — used to populate a picker.
@@ -89,7 +95,7 @@ public static class Gdpr
                     if (System.Text.Json.JsonSerializer.Deserialize<DevPlan>(devPlanRaw) is { } p)
                         developmentPlan.Add(new { p.Strengths, p.GrowthAreas, p.Goals, p.UpdatedAt, p.UpdatedBy });
                 }
-                catch { /* corrupt value — skip */ }
+                catch (Exception ex) { _log.LogWarning(ex, "Skipping a corrupt development-plan value in the GDPR export for subject {Subject}.", s); }
             }
 
             var categories = new Dictionary<string, object>
