@@ -29,7 +29,30 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
-      - run: npm test
+      - name: Test with coverage
+        run: npm run test:coverage
+      # Surface line/branch coverage in the job summary and enforce a floor so it
+      # can't backslide. FLOOR sits a few points below today's line rate — raise it
+      # as the god-object screens are split and gain tests (R13/R18). Mirrors the
+      # backend floor below.
+      - name: Coverage summary + floor
+        run: |
+          FLOOR=6.0
+          f=coverage/coverage-summary.json
+          [ -f "$f" ] || { echo "::error::no coverage summary produced"; exit 1; }
+          line=$(node -p "require('./coverage/coverage-summary.json').total.lines.pct")
+          branch=$(node -p "require('./coverage/coverage-summary.json').total.branches.pct")
+          {
+            echo "### Frontend coverage"
+            echo "- **Line:** ${line}%  (floor ${FLOOR}%)"
+            echo "- **Branch:** ${branch}%"
+          } >> "$GITHUB_STEP_SUMMARY"
+          below=$(awk "BEGIN{print ($line < $FLOOR) ? 1 : 0}")
+          if [ "$below" = "1" ]; then
+            echo "::error::Frontend line coverage ${line}% is below the ${FLOOR}% floor."
+            exit 1
+          fi
+          echo "Frontend line coverage ${line}% meets the ${FLOOR}% floor."
       - run: npm run build
 
   a11y:
