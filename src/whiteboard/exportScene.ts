@@ -1,4 +1,6 @@
 // ============================================================================
+//  NOTE: literal #RRGGBB hex is intentional here — the exported SVG/PNG leaves the
+//  app and cannot carry CSS variables. Allowlisted from the eslint colour ban.
 //  Whiteboard export / import (ADR-0064). Dependency-free: the scene is our own
 //  model, so we serialise it to JSON (perfect fidelity, re-importable) and to a
 //  standalone SVG, then rasterise that SVG to PNG via a canvas. No html-to-image

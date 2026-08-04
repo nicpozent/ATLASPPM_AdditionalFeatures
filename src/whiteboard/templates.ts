@@ -1,4 +1,7 @@
 // ============================================================================
+//  NOTE: literal #RRGGBB hex is intentional here — templates are persisted scene
+//  data and the server's colour validator requires literal #RRGGBB. Allowlisted
+//  from the eslint colour ban.
 //  Whiteboard templates (ADR-0064). Each template is a pure builder that returns
 //  a scene fragment (nodes + connectors) laid out around an origin, ready to drop
 //  onto the canvas. Covers brainstorming shapes (mindmap, fishbone) and a starter
