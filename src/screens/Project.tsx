@@ -28,7 +28,7 @@ import { Epics } from "./project/Epics";
 import { Governance } from "./project/Governance";
 import { useProject, type ProjectDetail } from "./project/useProject";
 import { isAgileWithSprints } from "./project/taskModel";
-import { type CommentItem, fmtCommentTime } from "./project/util";
+import { type CommentItem, fmtCommentTime, vacationWindow, clipToWindow } from "./project/util";
 import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
 
 // ---- data (empty until API exists) -----------------------------------------
@@ -996,15 +996,10 @@ function ProjectBlockerModal({ projectId, blocker, onClose }: { projectId: strin
 interface Absence { id: number; person: string; from: string; to: string; type: string; }
 const ABSENCE_TYPES: [string, string, string][] = [["vacation", "Vacation", "#0F6CBD"], ["sick", "Sick", "#D13438"], ["training", "Training", "#7A3FB0"]];
 const ABSENCE_COLOR: Record<string, string> = { vacation: "#0F6CBD", sick: "#D13438", training: "#7A3FB0" };
-const VAC_MONTHS = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const WIN_START = Date.UTC(2026, 6, 1), WIN_END = Date.UTC(2026, 11, 31);
-const WIN_DAYS = Math.round((WIN_END - WIN_START) / 864e5) + 1;
-const vpct = (iso: string) => {
-  const t = Date.parse(iso);
-  return Math.max(0, Math.min(100, (t - WIN_START) / 864e5 / WIN_DAYS * 100));
-};
-
 function Vacations({ projectId }: { projectId: string | null }) {
+  // Rolling six-month window from the first of the current month (never pinned to
+  // a fixed year). Recomputed each render; the maths lives in project/util.ts.
+  const win = vacationWindow(new Date());
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["vacations", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
@@ -1033,14 +1028,14 @@ function Vacations({ projectId }: { projectId: string | null }) {
   return (
     <Card>
       <div style={{ fontFamily: font.head, fontSize: 16, fontWeight: 600, color: color.ink, marginBottom: 4 }}>Team vacations</div>
-      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>Jul–Dec 2026 · absences for resources assigned to this project. Plan allocations around these.</div>
+      <div style={{ fontSize: 12.5, color: color.faint2, marginBottom: 18 }}>{win.label} · absences for resources assigned to this project. Plan allocations around these.</div>
 
       {/* calendar */}
       <div style={{ border: `1px solid ${color.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", borderBottom: `1px solid ${color.bg}` }}>
           <div style={{ padding: "8px 14px", fontSize: 10.5, color: color.faint3, textTransform: "uppercase", fontWeight: 600 }}>Resource</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)" }}>
-            {VAC_MONTHS.map((m) => <div key={m} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#7B849A", borderLeft: `1px solid ${color.surfaceAlt}` }}>{m}</div>)}
+            {win.months.map((m, i) => <div key={`${m}-${i}`} style={{ padding: "8px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: "#7B849A", borderLeft: `1px solid ${color.surfaceAlt}` }}>{m}</div>)}
           </div>
         </div>
         {people.length === 0 ? (
@@ -1050,8 +1045,9 @@ function Vacations({ projectId }: { projectId: string | null }) {
             <div style={{ padding: "7px 14px", fontSize: 12.5, fontWeight: 600, color: color.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
             <div style={{ position: "relative", height: 30, backgroundImage: `linear-gradient(90deg,${color.surfaceAlt} 1px,transparent 1px)`, backgroundSize: "16.666% 100%" }}>
               {absences.filter((a) => a.person === name).map((a) => {
-                const left = vpct(a.from), w = Math.max(1.5, vpct(a.to) - left);
-                return <div key={a.id} title={`${name} · ${a.type} · ${a.from}→${a.to}`} style={{ position: "absolute", left: `${left}%`, width: `${w}%`, top: 7, height: 16, borderRadius: 5, background: ABSENCE_COLOR[a.type] ?? "#0F6CBD", opacity: 0.9 }} />;
+                const bar = clipToWindow(a.from, a.to, win);   // null → outside the window, filtered out
+                if (!bar) return null;
+                return <div key={a.id} title={`${name} · ${a.type} · ${a.from}→${a.to}`} style={{ position: "absolute", left: `${bar.leftPct}%`, width: `${bar.widthPct}%`, top: 7, height: 16, borderRadius: 5, background: ABSENCE_COLOR[a.type] ?? "#0F6CBD", opacity: 0.9 }} />;
               })}
             </div>
           </div>
