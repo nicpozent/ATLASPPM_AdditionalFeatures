@@ -1,4 +1,6 @@
 // ============================================================================
+//  NOTE: the PALETTE/CLIP constants below carry literal #RRGGBB by design (persisted
+//  scene data validated server-side). Allowlisted from the eslint colour ban.
 //  Whiteboard scene model (ADR-0064). A scene is a flat list of freeform nodes
 //  (sticky notes, shapes, text, icons, actors) plus connectors between them.
 //  Kept deliberately small and JSON-serialisable — it round-trips through the

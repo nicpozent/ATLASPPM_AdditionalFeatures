@@ -1,5 +1,8 @@
 // ============================================================================
 //  Atlas PPM — design tokens (extracted verbatim from the prototype).
+//  NOTE: literal #RRGGBB hex is intentional here — this file DEFINES the tokens
+//  every other module must use. Allowlisted from the no-restricted-syntax colour
+//  ban in eslint.config.js; do not "fix" these into token references.
 //  The prototype (design/Atlas PPM.dc.html) is the single source of visual
 //  truth. These tokens must match it exactly; do not invent new colors.
 // ============================================================================
