@@ -3,8 +3,9 @@
 This is the entry point for reviewing the **Atlas PPM** solution — a Portfolio &
 Project Management platform for Birgma / Biltema Group. Atlas is a **modular
 monolith**: a React 18 + TypeScript SPA (`src/`, inline-styled, token-driven) in
-front of a **.NET 8 minimal API** (`server/`) backed by **PostgreSQL 16 / EF
-Core 9**, served same-origin behind nginx.
+front of a **.NET minimal API** (`server/`) backed by **PostgreSQL / EF Core**,
+served same-origin behind nginx. (Exact framework/library versions live in one
+place — [`docs/architecture/hld.md` §"Technology stack"](docs/architecture/hld.md).)
 
 Start with the **architecture set** (§1), then read by the concern you own (§2).
 Everything is docs-as-code (Markdown + Mermaid + ADRs) and lives in the repo, so
@@ -86,9 +87,9 @@ Plus the two cross-cutting references that everything traces back to:
 | Folder | Contents |
 |--------|----------|
 | `src/` | **React SPA (frontend).** `screens/` — one file per screen (32); `components/` — AppShell, Sidebar, Topbar, UI primitives, RoleContext; `api.ts` — typed fetch client (`/api/v1`); `auth.ts` — MSAL/Entra; `nav.ts` + `theme.ts` — screen catalogue + design tokens; `i18n/` — 6-locale catalogue; `realtime/` + `whiteboard/` — collaboration features; `data/` — in-app admin docs source |
-| `server/` | **.NET 8 minimal API.** One C# file per domain area (Tasks, Sprints, Jira, Financials, Gates, …); `Program.cs` host/middleware; `Endpoints.cs` route map; `Domain.cs`/`Dtos.cs` entities & DTOs; `AtlasDbContext.cs`; `Permissions.cs`/`Rbac.cs` authorization; `Migrations/`; `Atlas.Tests/` |
+| `server/` | **.NET minimal API** ([versions in `hld.md`](docs/architecture/hld.md)). One C# file per domain area (Tasks, Sprints, Jira, Financials, Gates, …); `Program.cs` host/middleware; `Endpoints.cs` route map; `Domain.*.cs`/`Dtos.cs` entities & DTOs; `AtlasDbContext.cs`; `Permissions.cs`/`Rbac.cs` authorization; `Migrations/`; `Atlas.Tests/` |
 | `design/` | **Visual source of truth** — `Atlas PPM.dc.html`, the approved prototype every screen is built to match 1:1 (reference only, not hand-edited) |
-| `docs/` | All documentation, including `docs/architecture/` (HLD, LLD, building blocks, 71 ADRs) |
+| `docs/` | All documentation, including `docs/architecture/` (HLD, LLD, building blocks, and [the ADR set](docs/architecture/adr/README.md)) |
 | `deploy/` | nginx config, cert generation, Postgres least-privilege SQL, and the `observability/` reference stack (Grafana dashboards, Prometheus, Loki, Tempo, OTel collector, alerts) |
 | `e2e/` · `perf/` | Playwright end-to-end tests and performance/load tests |
 | `.github/` | CI workflows (build, type-check, lint, AppSec scanning) |

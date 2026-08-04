@@ -7,13 +7,16 @@ Instructions for Claude Code. Read this fully before writing any code.
 ## 1. What you are building
 
 **Atlas** — a Portfolio & Project Management (PPM) web app for **Birgma / Biltema
-Group** (Nordic retail). This repository is the **frontend only** (React + TypeScript
-+ Vite). A separate .NET backend exists elsewhere; here you build the UI and wire it
-to a REST API at `/api/v1/*`.
+Group** (Nordic retail). This repository holds **both** the **frontend** (React +
+TypeScript + Vite, in `src/`) and the **.NET 10 minimal API backend** it talks to
+(`server/`, PostgreSQL 16 / EF Core 10, exposed at `/api/v1/*`) — one modular-monolith
+repo, served same-origin behind nginx.
 
-Your job: **implement every screen and all functionality, pixel-faithful to the
-approved prototype**, then wire each screen to the API. The scaffold (app shell,
-routing, theme, one stub per screen) is already done and runs.
+Your primary job here is the **frontend**: **implement every screen and all
+functionality, pixel-faithful to the approved prototype**, then wire each screen to
+the API. The scaffold (app shell, routing, theme, one stub per screen) is already
+done and runs. The backend already implements the `/api/v1/*` endpoints the screens
+consume; extend it when a screen needs an endpoint that isn't there yet.
 
 ---
 
