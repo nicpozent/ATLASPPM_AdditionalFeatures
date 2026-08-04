@@ -995,7 +995,8 @@ function ProjectBlockerModal({ projectId, blocker, onClose }: { projectId: strin
 // ---- Vacations (team absence calendar) -------------------------------------
 interface Absence { id: number; person: string; from: string; to: string; type: string; }
 const ABSENCE_TYPES: [string, string, string][] = [["vacation", "Vacation", "#0F6CBD"], ["sick", "Sick", "#D13438"], ["training", "Training", "#7A3FB0"]];
-const ABSENCE_COLOR: Record<string, string> = { vacation: "#0F6CBD", sick: "#D13438", training: "#7A3FB0" };
+// Derived from ABSENCE_TYPES — one source of truth for the three absence colours.
+const ABSENCE_COLOR: Record<string, string> = Object.fromEntries(ABSENCE_TYPES.map(([k, , c]) => [k, c]));
 function Vacations({ projectId }: { projectId: string | null }) {
   // Rolling six-month window from the first of the current month (never pinned to
   // a fixed year). Recomputed each render; the maths lives in project/util.ts.

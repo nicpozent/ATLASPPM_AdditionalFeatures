@@ -264,16 +264,23 @@ export const chartPalettes: Record<ThemeId, Record<ChartKey, string>> = {
   "atlas-carbon": carbonChart,
 };
 
-export const chart: Record<ChartKey, string> & { method: Record<string, string> } = {
-  ...(Object.fromEntries(
-    (Object.keys(lightChart) as ChartKey[]).map((k) => [k, `var(--atlas-chart-${k}, ${lightChart[k]})`]),
-  ) as Record<ChartKey, string>),
-  // methodology chips — literal brand hues (read on every ground; not themed)
-  method: {
-    SAFe: "#0F6CBD", Waterfall: "#7A3FB0", Scrum: "#15A34A", "V-Model": "#E0A100",
-    Kanban: "#0E7C7B", "Stage-Gate": "#C24A1F", Scrumban: "#5B8FCB",
-  },
-};
+export const chart: Record<ChartKey, string> = Object.fromEntries(
+  (Object.keys(lightChart) as ChartKey[]).map((k) => [k, `var(--atlas-chart-${k}, ${lightChart[k]})`]),
+) as Record<ChartKey, string>;
+
+// The 8-hue entity palette — cycled by row/index to give sprints, portfolio-timeline
+// rows, methodology chips and avatars distinct-but-harmonious colours. Literal brand
+// hues chosen to read on every theme ground (same rationale as the tokens above), so
+// deliberately NOT themed via var(); theme.ts is allowlisted from the R7 colour lint.
+// This is the single source: it replaces the two byte-identical hue arrays that
+// were duplicated in the Gantt screen and the dead, drifted methodology-chip token
+// that had zero consumers (R10).
+export const entityHues = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"] as const;
+
+// A hue by index (safe modulo for any integer), and its ~13% translucent tint.
+export const entityHue = (index: number): string =>
+  entityHues[((index % entityHues.length) + entityHues.length) % entityHues.length];
+export const hueTint = (hue: string, alpha = "22"): string => `${hue}${alpha}`;
 
 export const radius = { sm: 8, md: 9, lg: 11, xl: 14, xxl: 16 } as const;
 
