@@ -42,7 +42,7 @@ public static class Rbac
         // Full matrix: capability catalogue + every role's levels.
         api.MapGet("/roles", async (AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg) =>
         {
-            var authEnabled = cfg.GetValue("Auth:Enabled", false);
+            var authEnabled = Permissions.AuthEnabled(cfg);
             var caps = await db.Capabilities.OrderBy(c => c.Sort).ToListAsync();
             var roles = await db.RoleDefs.Include(r => r.Permissions).OrderBy(r => r.Sort).ToListAsync();
             return Results.Ok(new RolesMatrixDto(
@@ -53,7 +53,7 @@ public static class Rbac
 
         api.MapPost("/roles", async (CreateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
-            if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
+            if (!CanManage(user, Permissions.AuthEnabled(cfg))) return Results.Forbid();
             if (string.IsNullOrWhiteSpace(req.Name)) return Results.BadRequest(new { error = "Name is required." });
             var maxSort = await db.RoleDefs.Select(r => (int?)r.Sort).MaxAsync() ?? 0;
             var existing = await db.RoleDefs.Select(r => r.Id).ToListAsync();
@@ -83,7 +83,7 @@ public static class Rbac
 
         api.MapPatch("/roles/{id}", async (string id, UpdateRoleReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
-            if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
+            if (!CanManage(user, Permissions.AuthEnabled(cfg))) return Results.Forbid();
             var role = await db.RoleDefs.Include(r => r.Permissions).FirstOrDefaultAsync(r => r.Id == id);
             if (role is null) return Results.NotFound();
             if (!string.IsNullOrWhiteSpace(req.Name)) role.Name = req.Name!.Trim();
@@ -100,7 +100,7 @@ public static class Rbac
 
         api.MapDelete("/roles/{id}", async (string id, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
-            if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
+            if (!CanManage(user, Permissions.AuthEnabled(cfg))) return Results.Forbid();
             var role = await db.RoleDefs.FindAsync(id);
             if (role is null) return Results.NotFound();
             if (role.IsSystem) return Results.BadRequest(new { error = "Canonical roles cannot be deleted." });
@@ -113,7 +113,7 @@ public static class Rbac
         // Set a single matrix cell (role × capability) to F/E/V/N.
         api.MapPut("/roles/{id}/permissions", async (string id, SetPermissionReq req, AtlasDbContext db, ClaimsPrincipal user, IConfiguration cfg, HttpContext http) =>
         {
-            if (!CanManage(user, cfg.GetValue("Auth:Enabled", false))) return Results.Forbid();
+            if (!CanManage(user, Permissions.AuthEnabled(cfg))) return Results.Forbid();
             if (!Levels.Contains(req.Level)) return Results.BadRequest(new { error = "Level must be F, E, V or N." });
             var role = await db.RoleDefs.FindAsync(id);
             if (role is null) return Results.NotFound();

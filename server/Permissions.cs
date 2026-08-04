@@ -17,6 +17,12 @@ namespace Atlas.Api;
 // ============================================================================
 public static class Permissions
 {
+    // The ONE place the Auth:Enabled default lives. Fail-open (false) is safe only
+    // because Program.cs's production fuse refuses to boot with auth disabled in
+    // the Production environment (see Program.cs "Production safety fuses"). Route
+    // every reader through here so flipping the default is a one-line change.
+    internal static bool AuthEnabled(IConfiguration cfg) => cfg.GetValue("Auth:Enabled", false);
+
     // Level ranking: None < View < Edit < Full.
     internal static int Rank(string level) => level switch { "F" => 3, "E" => 2, "V" => 1, _ => 0 };
 
@@ -102,7 +108,7 @@ public static class Permissions
             if (ManagerMap.TryGetValue(v, out var m)) keys.Add(m);
             if (RoleMap.TryGetValue(v, out var r)) keys.Add(r);
         }
-        if (cfg.GetValue("Auth:Enabled", false))
+        if (Permissions.AuthEnabled(cfg))
             foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role))) add(c.Value);
         else
             add(http.Request.Headers["X-Atlas-Role"].ToString());
@@ -110,7 +116,7 @@ public static class Permissions
     }
     public static string? ManagerKey(HttpContext http, IConfiguration cfg)
     {
-        if (cfg.GetValue("Auth:Enabled", false))
+        if (Permissions.AuthEnabled(cfg))
         {
             foreach (var c in http.User.FindAll("roles").Concat(http.User.FindAll(ClaimTypes.Role)))
                 if (ManagerMap.TryGetValue(c.Value, out var k)) return k;
@@ -126,7 +132,7 @@ public static class Permissions
     // True when the caller's effective role has at least `min` on `cap`.
     public static async Task<bool> Allows(HttpContext http, AtlasDbContext db, IConfiguration cfg, string cap, string min)
     {
-        var roleId = ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false));
+        var roleId = ResolveRoleId(http.User, http.Request, Permissions.AuthEnabled(cfg));
         if (roleId is null) return true;                       // dev, no impersonation → allow
         return Rank(await LevelAsync(roleId, db, cap)) >= Rank(min);
     }
@@ -160,7 +166,7 @@ public static class Permissions
     // stays admin-only regardless of how the matrix is edited.
     public static bool IsPlatformAdmin(HttpContext http, IConfiguration cfg)
     {
-        var roleId = ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false));
+        var roleId = ResolveRoleId(http.User, http.Request, Permissions.AuthEnabled(cfg));
         return roleId is null || roleId == "admin";
     }
 
@@ -170,7 +176,7 @@ public static class Permissions
     // canonical app roles exist in the token, so it's necessarily coarser.
     public static string EffectiveUiRole(HttpContext http, IConfiguration cfg)
     {
-        var authEnabled = cfg.GetValue("Auth:Enabled", false);
+        var authEnabled = Permissions.AuthEnabled(cfg);
         return authEnabled
             ? (ResolveRoleId(http.User, http.Request, true) ?? "")
             : http.Request.Headers["X-Atlas-Role"].ToString();
@@ -181,7 +187,7 @@ public static class Permissions
     // identity from the header (so each switcher identity is its own "user").
     public static string CallerKey(HttpContext http, IConfiguration cfg)
     {
-        if (cfg.GetValue("Auth:Enabled", false)) return Rbac.CallerId(http.User);
+        if (Permissions.AuthEnabled(cfg)) return Rbac.CallerId(http.User);
         var header = http.Request.Headers["X-Atlas-Role"].ToString();
         return string.IsNullOrWhiteSpace(header) ? "dev" : header;
     }
@@ -190,7 +196,7 @@ public static class Permissions
     // auth off — email delivery is then skipped and only in-app is used).
     public static string CallerEmail(HttpContext http, IConfiguration cfg)
     {
-        if (!cfg.GetValue("Auth:Enabled", false)) return "";
+        if (!Permissions.AuthEnabled(cfg)) return "";
         return http.User.FindFirst("preferred_username")?.Value
             ?? http.User.FindFirst(ClaimTypes.Email)?.Value
             ?? http.User.FindFirst("upn")?.Value ?? "";
@@ -199,7 +205,7 @@ public static class Permissions
     // Display name for the current caller (real name/UPN under auth, else role).
     public static string ActorName(HttpContext http, IConfiguration cfg)
     {
-        var authEnabled = cfg.GetValue("Auth:Enabled", false);
+        var authEnabled = Permissions.AuthEnabled(cfg);
         var role = ResolveRoleId(http.User, http.Request, authEnabled) ?? "dev";
         return authEnabled
             ? (http.User.FindFirst("name")?.Value ?? http.User.FindFirst("preferred_username")?.Value ?? role)
@@ -210,7 +216,7 @@ public static class Permissions
     // before SaveChangesAsync so it commits in the same transaction as the change.
     public static AuditEvent Audit(HttpContext http, IConfiguration cfg, string category, string action, string target)
     {
-        var authEnabled = cfg.GetValue("Auth:Enabled", false);
+        var authEnabled = Permissions.AuthEnabled(cfg);
         var role = ResolveRoleId(http.User, http.Request, authEnabled) ?? "dev";
         AtlasTelemetry.RecordAudit(category, action);   // domain-write metric (no-op unless OTel is on)
         return new AuditEvent

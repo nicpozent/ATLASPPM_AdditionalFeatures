@@ -191,7 +191,7 @@ public static class Backups
             var run = new BackupRun
             {
                 At = DateTime.UtcNow, Actor = Permissions.ActorName(http, cfg),
-                Role = Permissions.ResolveRoleId(http.User, http.Request, cfg.GetValue("Auth:Enabled", false)) ?? "dev",
+                Role = Permissions.ResolveRoleId(http.User, http.Request, Permissions.AuthEnabled(cfg)) ?? "dev",
                 SizeBytes = bytes.LongLength, Records = records, Status = "Completed",
             };
             db.BackupRuns.Add(run);
