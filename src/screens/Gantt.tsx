@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { color, font } from "@/theme";
+import { color, font, entityHue, hueTint } from "@/theme";
 import { api } from "@/api";
 import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
@@ -406,11 +406,6 @@ const SPRINT_BAR: Record<string, { bg: string; border: string }> = {
 // distinct bands on the timeline even when they share a status. The hue carries
 // identity; status still shows as the label in the left rail (and undated stays
 // dashed). A light alpha wash of the same hue is the fill.
-const SPRINT_HUES = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"];
-function sprintHue(index: number): { bg: string; border: string } {
-  const h = SPRINT_HUES[((index % SPRINT_HUES.length) + SPRINT_HUES.length) % SPRINT_HUES.length];
-  return { bg: `${h}22`, border: h }; // ~13% tint fill + solid hue border
-}
 function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, projectStart, projectEnd, startDate, endDate, sprints = [], onAddPhase, onEditPhase, onRemovePhase, onAddMilestone, onRemoveMilestone }: {
   phases: Phase[]; milestones: Milestone[]; canEdit: boolean; hasProject: boolean; projectId: string;
   projectStart: number | null; projectEnd: number | null; startDate: string; endDate: string; sprints?: SprintBar[];
@@ -487,7 +482,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
             <div style={{ height: 30, display: "flex", alignItems: "center", padding: "0 22px", fontSize: 11, fontWeight: 700, color: color.faint, letterSpacing: "0.04em", textTransform: "uppercase", borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }}>Sprints</div>
             {sprints.map((s, i) => {
               const open = openSprints.has(s.id);
-              const hue = sprintHue(i).border;
+              const hue = entityHue(i);
               return (
                 <div key={s.id}>
                   <div onClick={() => toggleSprint(s.id)} title="Show tasks" style={{ height: 34, display: "flex", alignItems: "center", gap: 7, padding: "0 14px 0 18px", borderBottom: `1px solid ${color.surfaceAlt}`, cursor: "pointer" }}>
@@ -531,7 +526,7 @@ function ProjectSchedule({ phases, milestones, canEdit, hasProject, projectId, p
           <div>
             <div style={{ height: 30, borderTop: `1px solid ${color.bg}`, background: color.surfaceAlt }} />
             {sprints.map((s, i) => {
-              const c = sprintHue(i);
+              const h = entityHue(i), c = { bg: hueTint(h), border: h };
               const open = openSprints.has(s.id);
               return (
                 <div key={s.id}>
@@ -826,11 +821,6 @@ const PF_TYPE: Record<string, { ink: string; tint: string; bar: string; label: s
 // assigned by row order so adjacent bars are always maximally different and a
 // newly-added item reads as its own band rather than merging into a wall of one
 // colour (the type stays identified by the left-rail chip).
-const PF_HUES = ["#0F6CBD", "#7A3FB0", "#15A34A", "#C98A00", "#0E7C7B", "#C24A1F", "#5B8FCB", "#A1282B"];
-function pfHue(index: number): { bar: string; tint: string } {
-  const hue = PF_HUES[((index % PF_HUES.length) + PF_HUES.length) % PF_HUES.length];
-  return { bar: hue, tint: `${hue}22` };
-}
 function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: PortfolioCat }) {
   const win = useWin();
   const gb = gridBg(win);
@@ -873,7 +863,7 @@ function PortfolioSchedule({ items, cat }: { items: PortfolioItem[]; cat: Portfo
         <div style={{ position: "relative", height: rowsHeight, ...gb }}>
           <NowLine />
           {items.map((i, row) => {
-            const c = pfHue(row);
+            const h = entityHue(row), c = { bar: h, tint: hueTint(h) };
             return (
               <div key={`${i.type}-${i.id}`} style={{ position: "relative", height: 38, borderBottom: `1px solid ${color.surfaceAlt}` }}>
                 <div title={`${i.name} · ${i.startLabel || "?"} → ${i.endLabel || "?"}${i.progress !== null ? ` · ${i.progress}%` : ""}`}
