@@ -53,6 +53,34 @@ public class JiraTests : IClassFixture<AtlasApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/v1/integrations/jira/sync", null)).StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/v1/programs/PG-1/jira/sync")]
+    [InlineData("/api/v1/programs/PG-1/jira/sync?background=true")]
+    [InlineData("/api/v1/products/PRD-1/jira/sync")]
+    [InlineData("/api/v1/products/PRD-1/jira/sync?background=true")]
+    public async Task Program_and_product_sync_are_gated_including_the_background_path(string path)
+    {
+        // The program/product sync (unlike per-project) is gated on cap-integrations.
+        // The background path must honour the same gate — a queued job would otherwise
+        // run the sync without the Edit right the synchronous path requires (R2). The
+        // gate runs before FindAsync, so a denied caller gets 403 even for an unknown id.
+        var c = _factory.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync(path, null)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/v1/programs/PG-1/jira/sync?background=true")]
+    [InlineData("/api/v1/products/PRD-1/jira/sync?background=true")]
+    public async Task Background_sync_passes_the_gate_for_an_authorized_role(string path)
+    {
+        // An Integrations-capable caller is NOT forbidden. The seeded entity doesn't
+        // exist here, so the gate passes and the request proceeds to a 404 — the point
+        // is only that it is not a 403.
+        var res = await Admin().PostAsync(path, null);
+        Assert.NotEqual(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
     [Fact]
     public async Task Per_project_sync_is_open_to_every_role()
     {

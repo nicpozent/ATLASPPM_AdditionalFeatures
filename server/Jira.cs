@@ -188,6 +188,9 @@ public static class Jira
         // project (delta by default) and reports the roll-up.
         api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
+            // Gate first — before FindAsync and before the background enqueue — so
+            // the queued path can't skip cap-integrations (matches AzureDevOps.cs).
+            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             var pg = await db.Programs.FindAsync(id);
             if (pg is null) return Results.NotFound();
             if (background == true) return QueueSync(queue, http, cfg, "program", id, delta ?? true);
@@ -195,6 +198,7 @@ public static class Jira
         });
         api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             var pr = await db.Products.FindAsync(id);
             if (pr is null) return Results.NotFound();
             if (background == true) return QueueSync(queue, http, cfg, "product", id, delta ?? true);
@@ -319,11 +323,9 @@ public static class Jira
         });
     }
 
-    // Sync the mapped, non-archived projects linked to a program/product and
-    // return a roll-up. Skips unmapped links silently; requires Jira configured
-    // and Edit on Integrations (checked here so both callers share the gate).
     // Enqueue a background sync under the caller's identity and return 202 with a
-    // pollable job id (see /integrations/jira/sync/status/{jobId}).
+    // pollable job id (see /integrations/jira/sync/status/{jobId}). Callers gate on
+    // cap-integrations before enqueuing — the worker itself performs no check.
     static IResult QueueSync(JiraSyncQueue queue, HttpContext http, IConfiguration cfg, string kind, string targetId, bool delta)
     {
         // Borrow Audit() only to resolve the caller's actor/role for the eventual
