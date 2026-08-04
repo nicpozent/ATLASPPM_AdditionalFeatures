@@ -1,0 +1,17 @@
+# Server-project analyzer config. Scoped to IDE0130 only (the namespace/folder
+# ratchet from R8) — every other IDE* rule is left at its default so enabling
+# EnforceCodeStyleInBuild doesn't flood the build with unrelated style warnings.
+root = false
+
+[*.cs]
+# Namespace should match the folder — now that each domain module lives in its
+# own folder (server/<Module>/), a file whose namespace drifts from its folder
+# gets flagged. Warning-only, like the other ratchets.
+dotnet_diagnostic.IDE0130.severity = warning
+
+[Kernel/**.cs]
+# The Kernel module is the root Atlas.Api namespace by design (composition-root
+# types the domain modules resolve without a using — changing it would break
+# GlobalUsings and the ADR-0072 boundary tests). Its folder deliberately does not
+# extend the namespace, so exempt it from IDE0130.
+dotnet_diagnostic.IDE0130.severity = none

@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Atlas.Api</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Run IDE-style analyzers during build so the namespace/folder ratchet
+         (IDE0130, configured in .editorconfig) actually surfaces — without this
+         those analyzers only run in the IDE and the ratchet is a no-op. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Atlas.Tests" />
