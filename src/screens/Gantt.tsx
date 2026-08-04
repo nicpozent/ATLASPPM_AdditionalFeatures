@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { Button, Input, Select, RowMenu, MenuItem } from "@/components/ui";
 import { toast, toastError } from "@/components/Toast";
 import { Overlay } from "./Demands";
+import { useCapacity } from "./project/useProject";
 import {
   type Win, MONTHS, nowAbs, monthOfIso, absOfIso, ymToAbs, absToYm,
   monthAbbr, yearOf, anchored, makeWindow, fitWindowYM, segPct, barGeom, centerPct,
@@ -1035,15 +1036,9 @@ function ProgramSchedule({ rows, milestones }: { rows: ProgramRow[]; milestones:
   );
 }
 
-// ---- Resource allocation view (reuses /capacity) ---------------------------
-interface CapPerson { name: string; role: string; initials: string; color: string; opsPct: number; projectPct: number; productPct: number; util: number; over: boolean; highOps: boolean; }
-interface Capacity { assigned: number; overCount: number; highOps: number; people: CapPerson[]; unknown: string[]; }
-
+// ---- Resource allocation view (shares the /capacity query + types — #97) ----
 function ResourceView({ projectId }: { projectId: string }) {
-  const { data } = useQuery({
-    queryKey: ["capacity", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<Capacity | null> => (await api<Capacity>(`/projects/${projectId}/capacity`)) ?? null,
-  });
+  const { data } = useCapacity(projectId);
   const people = data?.people ?? [];
   if (!projectId) return <Note text="Select a project." />;
   if (people.length === 0) return <Note text="No resource allocation data yet — assign people in the project's People & roles." />;

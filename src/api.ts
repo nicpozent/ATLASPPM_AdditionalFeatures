@@ -4,6 +4,20 @@
 //  Add typed endpoint helpers here as each screen is wired to the API.
 // ============================================================================
 import { getToken } from "./auth";
+import type { components } from "./api/generated";
+
+// The generated API contract. `src/api/generated.ts` is produced from the
+// server's OpenAPI document by `npm run api:types` (openapi-typescript), and a
+// CI drift check regenerates it and fails on any diff — so these types can't
+// silently fall out of step with the backend DTOs. Import request/response
+// shapes from here instead of re-declaring them by hand:
+//   import type { Schemas } from "@/api";
+//   type Capacity = Schemas["CapacityDto"];
+// Caveat: only endpoints that DECLARE their response (`TypedResults` or
+// `.Produces<T>()`) publish a response schema; handlers returning `Results.Ok`
+// erase it. Adopt per screen by adding `.Produces<T>()` server-side as you go —
+// see ADR-0081 and CLAUDE.md §6.
+export type Schemas = components["schemas"];
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || "/api/v1";
 
@@ -109,7 +123,3 @@ export async function apiDownload(path: string, filename: string): Promise<void>
   a.remove();
   URL.revokeObjectURL(url);
 }
-
-// Example (extend per feature — see CLAUDE.md § Data & API):
-// export interface Project { id: string; code: string; name: string; /* ... */ }
-// export const getProjects = () => api<Project[]>("/projects");
