@@ -9,9 +9,9 @@ import { usePermissions } from "@/components/usePermissions";
 import { useRole } from "@/components/RoleContext";
 import { toast, toastError } from "@/components/Toast";
 
-interface CapPerson { name: string; title: string; dept: string; initials: string; color: string; ops: number; project: number; product: number; total: number; free: number; }
+interface StaffPerson { name: string; title: string; dept: string; initials: string; color: string; ops: number; project: number; product: number; total: number; free: number; }
 interface CapDept { dept: string; headcount: number; capacity: number; allocated: number; loadedPct: number; overCount: number; }
-interface CapInsight { headcount: number; totalCapacity: number; totalAllocated: number; loadedPct: number; overCount: number; freeCount: number; unallocatedCount: number; over: CapPerson[]; under: CapPerson[]; byDept: CapDept[]; }
+interface CapInsight { headcount: number; totalCapacity: number; totalAllocated: number; loadedPct: number; overCount: number; freeCount: number; unallocatedCount: number; over: StaffPerson[]; under: StaffPerson[]; byDept: CapDept[]; }
 interface StaffCandidate { name: string; title: string; dept: string; initials: string; color: string; level: number; total: number; free: number; }
 
 function Avatar({ initials, color, size = 26 }: { initials: string; color: string; size?: number }) {
@@ -39,7 +39,7 @@ export function InsightsTab() {
       <div style={{ fontSize: 11.5, color: color.faint2, marginTop: 2 }}>{label}</div>
     </div>
   );
-  const personRow = (p: CapPerson, right: React.ReactNode) => (
+  const personRow = (p: StaffPerson, right: React.ReactNode) => (
     <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 18px", borderBottom: `1px solid ${color.surfaceAlt}` }}>
       <Avatar initials={p.initials} color={p.color} />
       <div style={{ flex: 1, minWidth: 0 }}>

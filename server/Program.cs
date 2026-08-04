@@ -17,6 +17,13 @@ if (role is not ("web" or "worker" or "all"))
 var runWeb = role is "web" or "all";
 var runWorker = role is "worker" or "all";
 
+// Off-DB startup: skip the migrate/seed block so the app can be built purely to
+// emit its OpenAPI document (endpoints still map, so the doc is complete) without
+// a reachable database. Used by `dotnet swagger tofile` in the `api:types` /
+// contract-drift pipeline (ADR-0081 / #97). Off by default — never set in a real
+// deployment, where the schema must be migrated before serving traffic.
+var skipDbInit = cfg.GetValue("Atlas:SkipDbInit", false);
+
 // Layer in file-mounted (Docker/K8s) secrets and, when configured, Azure Key
 // Vault — before anything reads a connection string. Inert unless configured.
 builder.AddAtlasSecrets();
@@ -197,7 +204,7 @@ BoardHub.UseLogger(lf);
 // depends_on / a k8s migration job). Demo seed is OFF by default — production
 // starts empty and fills with real data; set Seed:Enabled=true (env
 // Seed__Enabled) to preload the demo portfolio for a walkthrough. Idempotent.
-if (runWeb)
+if (runWeb && !skipDbInit)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AtlasDbContext>();

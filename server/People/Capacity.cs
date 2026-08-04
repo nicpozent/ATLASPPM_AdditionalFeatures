@@ -93,6 +93,12 @@ public static class Capacity
             }).ToList();
             return Results.Ok(new CapacityDto(
                 names.Count, rows.Count(r => r.Over), rows.Count(r => r.HighOps), rows, new List<string>()));
-        });
+        })
+        // Publish the response schema so the frontend type contract (openapi-
+        // typescript → src/api/generated.ts, ADR-0081 / #97) can generate
+        // CapacityDto/CapacityRowDto. Handlers return Results.Ok (IResult), which
+        // erases the type, so the 200 shape must be declared explicitly. This is
+        // the pattern the per-screen adoption follows for other GET responses.
+        .Produces<CapacityDto>(StatusCodes.Status200OK);
     }
 }

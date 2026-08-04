@@ -26,7 +26,7 @@ import { Backlog } from "./project/Backlog";
 import { Sprints } from "./project/Sprints";
 import { Epics } from "./project/Epics";
 import { Governance } from "./project/Governance";
-import { useProject, type ProjectDetail } from "./project/useProject";
+import { useProject, useCapacity, type ProjectDetail } from "./project/useProject";
 import { isAgileWithSprints } from "./project/taskModel";
 import { type CommentItem, fmtCommentTime, vacationWindow, clipToWindow } from "./project/util";
 import { WhiteboardPanel } from "@/whiteboard/WhiteboardPanel";
@@ -449,15 +449,10 @@ function PeopleRoles({ projectId }: { projectId: string | null }) {
 
 // Team capacity — the people assigned to this project (People & roles) checked
 // against their allocation on Resources. Over-allocation is flagged and feeds
-// the risk engine as a resource risk.
-interface CapacityRow { name: string; role: string; initials: string; color: string; opsPct: number; projectPct: number; productPct: number; util: number; over: boolean; highOps: boolean; }
-interface Capacity { assigned: number; overCount: number; highOps: number; people: CapacityRow[]; unknown: string[]; }
-
+// the risk engine as a resource risk. Query + types live in the shared
+// useCapacity hook (same source as the Gantt resource view — #97).
 function TeamCapacity({ projectId }: { projectId: string | null }) {
-  const { data } = useQuery({
-    queryKey: ["capacity", projectId], enabled: !!projectId, retry: false, staleTime: 30_000,
-    queryFn: async (): Promise<Capacity | null> => (await api<Capacity>(`/projects/${projectId}/capacity`)) ?? null,
-  });
+  const { data } = useCapacity(projectId);
   const seg = (pct: number, bg: string) => pct > 0 ? <div style={{ width: `${Math.min(pct, 100)}%`, background: bg, height: "100%" }} /> : null;
   return (
     <Card padding="18px 22px">

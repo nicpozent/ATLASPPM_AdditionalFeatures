@@ -124,3 +124,32 @@ jobs:
             exit 1
           fi
           echo "Line coverage ${linePct}% meets the ${FLOOR}% floor."
+
+  contract:
+    name: API type contract (OpenAPI → TS drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1  # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # Regenerate the OpenAPI document from the server and the TS types from it,
+      # then fail if either differs from what's committed. Keeps src/api/generated.ts
+      # in lock-step with the backend DTOs so a contract change can't slip through
+      # untyped (ADR-0081 / #97). The generator boots the API with no database
+      # (Atlas__SkipDbInit) — see server/openapi/dump-openapi.sh.
+      - name: Regenerate API types
+        run: npm run api:types
+      - name: Fail on drift
+        run: |
+          if ! git diff --quiet -- server/openapi/atlas-v1.json src/api/generated.ts; then
+            echo "::error::API type contract is stale. Run 'npm run api:types' and commit the result."
+            git --no-pager diff --stat -- server/openapi/atlas-v1.json src/api/generated.ts
+            exit 1
+          fi
+          echo "API type contract is in sync with the server DTOs."

@@ -293,8 +293,18 @@ where the prototype places them.
   In dev, `vite.config.ts` proxies `/api` → `VITE_API_PROXY`. In prod the site is
   served same-origin behind nginx.
 - Use **TanStack Query** for every fetch (`useQuery` / `useMutation`), with
-  loading/empty/error states. Define typed models next to their usage or in
-  `api.ts`.
+  loading/empty/error states.
+- **API types are generated, not hand-written** (ADR-0081). `src/api/generated.ts`
+  is produced from the server's OpenAPI document by `npm run api:types`
+  (openapi-typescript), and a CI `contract` job fails on any drift. Import shapes
+  via `import type { Schemas } from "@/api"` → `Schemas["ProjectDto"]` instead of
+  re-declaring an `interface`. Caveat: a response shape only appears once its
+  endpoint **declares** it (`.Produces<T>()` / `TypedResults`) — handlers that
+  return `Results.Ok(dto)` erase the type, so most GET responses aren't in the
+  contract yet. When wiring a screen, add `.Produces<T>()` to the endpoints it
+  reads (naming the DTO first if the handler returns an anonymous object), then
+  regenerate. The per-screen adoption order is in ADR-0081; do **not** attempt a
+  wholesale migration in one change.
 - Endpoints follow REST under `/api/v1` (e.g. `GET /projects`, `GET /projects/my`,
   `GET /demands`, `POST /demands`, `GET /blockers`, `GET /reports/...`). Confirm
   exact shapes with the backend team; until an endpoint exists, the query returns
