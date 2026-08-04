@@ -29,7 +29,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <!-- OpenTelemetry — traces, metrics & logs over OTLP. The exporter endpoint
          is configuration only; with none set the whole stack stays off. -->
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
