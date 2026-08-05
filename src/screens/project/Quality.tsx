@@ -142,7 +142,6 @@ export function Quality({ projectId }: { projectId: string | null }) {
   );
 }
 
-// A short date like "12 Mar" from an ISO date, or "" — for the compact task row.
 function shortDate(iso: string) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -154,7 +153,6 @@ function PlanTasks({ projectId, plan, canEdit }: { projectId: string; plan: Test
   const [modal, setModal] = useState(false);
   const [openTask, setOpenTask] = useState<PlanTask | null>(null);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["quality", projectId] });
-  // Quick inline status change without opening the full window.
   const setStatus = useMutation({
     mutationFn: (v: { id: number; status: string }) => api(`/test-plan-tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
     onSuccess: invalidate, onError: (e) => toastError(e),

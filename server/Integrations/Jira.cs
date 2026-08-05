@@ -561,7 +561,6 @@ public static class Jira
         return imported;
     }
 
-    // Jira issue type → Ops work-item type.
     static string MapOpsType(string? t) => (t ?? "").ToLowerInvariant() switch
     {
         "bug" or "incident" or "fault" => "Incident",
@@ -569,7 +568,6 @@ public static class Jira
         "task" or "story" or "sub-task" or "subtask" => "Request",
         _ => "Other",
     };
-    // Jira status category → Ops work-item status.
     static string MapOpsStatus(string? cat) => (cat ?? "").ToLowerInvariant() switch
     {
         "done" => "Done",

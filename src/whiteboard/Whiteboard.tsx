@@ -307,8 +307,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     }
   };
 
-  // Start a drag-to-connect wire from a node's connector handle.
-  const startWire = (e: React.PointerEvent, nodeId: string) => {
+  const startWire =(e: React.PointerEvent, nodeId: string) => {
     e.stopPropagation();
     if (!canEdit) return;
     wire.current = { from: nodeId }; interacting.current = true;
@@ -378,8 +377,7 @@ export default function Whiteboard({ scope }: { scope: { kind: string; id: strin
     } else if (selEdge) { setScene((s) => removeEdge(s, selEdge)); pushDelEdge(selEdge); setSelEdge(null); }
   }, [selIds, selEdge, pushDelNode, pushDelEdge, clearSel]);
 
-  // Pick a shape/pen/connector tool (clears the others).
-  const armShape = (k: NodeKind) => { setPending({ kind: k }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
+  const armShape =(k: NodeKind) => { setPending({ kind: k }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
   const armIcon = (icon: string) => { setPending({ kind: "icon", icon }); setTool("select"); setLinkFrom(null); setIconMenu(false); };
   const armTool = (t: "select" | "connector" | "pen") => { setTool(t); setPending(null); setLinkFrom(null); setIconMenu(false); };
 
@@ -737,7 +735,6 @@ function NodeView({ node, selected, canEdit, editing, linkSource, onSelect, onDo
   );
 }
 
-// Flatten [x0,y0,x1,y1,…] into an SVG points attribute.
 function pointsAttr(pts: number[]): string {
   let s = "";
   for (let i = 0; i + 1 < pts.length; i += 2) s += `${pts[i]},${pts[i + 1]} `;
@@ -764,7 +761,6 @@ function ActorGlyph({ color: c }: { color: string }) {
   );
 }
 
-// Tiny glyph shown on each shape tool button.
 function ShapeGlyph({ kind }: { kind: NodeKind }) {
   const s = 16;
   const outline = `2px solid ${color.text}`;

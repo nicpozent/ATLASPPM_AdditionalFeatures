@@ -81,7 +81,6 @@ function nodeSvg(n: WbNode): string {
   }
 }
 
-// Build a standalone SVG string for the whole scene, tightly cropped with a margin.
 export function sceneToSvg(scene: Scene): string {
   const M = 40;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -116,7 +115,6 @@ export function jsonToScene(text: string): Scene {
   return { nodes: Array.isArray(raw.nodes) ? raw.nodes : [], edges: Array.isArray(raw.edges) ? raw.edges : [] };
 }
 
-// Trigger a browser download of a blob.
 function download(name: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

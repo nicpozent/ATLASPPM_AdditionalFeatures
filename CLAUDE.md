@@ -365,6 +365,14 @@ route guards). To hit a real API in dev, run the backend and set `VITE_API_PROXY
 - Log every silent failure: a `catch` may swallow only if the caller surfaces the
   failure another way (an `errors[]` roll-up, a non-2xx result); otherwise it must
   log (server: `ILogger`; degradations that report "success" hide the cause).
+- Comments explain **why**, never restate **what**. A comment may record a
+  decision, a constraint, a non-obvious consequence, a units/ordering/vocabulary
+  contract, or a domain fact not visible in the code. It must not paraphrase the
+  line below it — that's two statements of one fact with nothing keeping them in
+  sync (this concealed a real authorization bug here — a comment claimed a gate
+  the code didn't have). If a comment is needed just to say *what* the code does,
+  **rename the identifier** until it isn't. Treat a comment that contradicts its
+  code as a suspected bug (fix the code, not the comment), not a style nit.
 
 **Don't**
 - Don't redesign, restyle, or add screens/sections not in the prototype —

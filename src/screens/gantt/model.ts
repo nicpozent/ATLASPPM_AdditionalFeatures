@@ -16,7 +16,7 @@ export interface Win { start: number; span: number }
 // Current month as an absolute month (impure — reads the clock).
 export const nowAbs = (): number => { const d = new Date(); return d.getFullYear() * 12 + d.getMonth(); };
 
-// Month-of-year (0..11) of an ISO date, or null if empty/invalid.
+// 0-based (0..11); null if the date is empty/invalid.
 export const monthOfIso = (s: string): number | null => {
   if (!s) return null;
   const d = new Date(s);
@@ -43,7 +43,6 @@ export const absToYm = (abs: number): string =>
 // Short month name of an absolute month (wraps negatives correctly).
 export const monthAbbr = (abs: number): string => MONTHS[((abs % 12) + 12) % 12];
 
-// Calendar year of an absolute month.
 export const yearOf = (abs: number): number => Math.floor(abs / 12);
 
 // Anchor a bare month-of-year to a base absolute month (its context's start).

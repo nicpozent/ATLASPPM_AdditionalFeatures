@@ -15,7 +15,7 @@ import { ROLES, type RoleIdentity } from "@/nav";
 interface RoleRow { id: string; name: string; short?: string; who?: string; }
 interface RolesMatrix { roles: RoleRow[]; }
 
-// Two-letter initials from a display name (first + last word, else first two chars).
+// first + last word's initials, else the first two chars.
 function initialsOf(s: string): string {
   const parts = s.trim().split(/\s+/).filter(Boolean);
   const ini = parts.length > 1

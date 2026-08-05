@@ -47,7 +47,7 @@ export function createStroke(points: number[], color: string): WbNode {
   };
 }
 
-// Translate a node by (dx,dy); for freehand nodes the polyline points move too.
+// Freehand nodes also shift their polyline points, not just x/y.
 export function translateNode(node: WbNode, dx: number, dy: number): Partial<WbNode> {
   if (node.kind === "draw" && node.points) {
     return { x: node.x + dx, y: node.y + dy, points: node.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) };
