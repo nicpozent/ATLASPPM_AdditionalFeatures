@@ -60,10 +60,11 @@ public class JiraTests : IClassFixture<AtlasApiFactory>
     [InlineData("/api/v1/products/PRD-1/jira/sync?background=true")]
     public async Task Program_and_product_sync_are_gated_including_the_background_path(string path)
     {
-        // The program/product sync (unlike per-project) is gated on cap-integrations.
-        // The background path must honour the same gate — a queued job would otherwise
-        // run the sync without the Edit right the synchronous path requires (R2). The
-        // gate runs before FindAsync, so a denied caller gets 403 even for an unknown id.
+        // Per-entity sync (project/program/product) is gated on cap-projects Edit
+        // (ADR-0083). The background path must honour the same gate — a queued job
+        // would otherwise run the sync without the Edit right the synchronous path
+        // requires (R2). The gate runs before FindAsync, so a denied caller gets 403
+        // even for an unknown id.
         var c = _factory.CreateClient();
         c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
         Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync(path, null)).StatusCode);
@@ -82,15 +83,18 @@ public class JiraTests : IClassFixture<AtlasApiFactory>
     }
 
     [Fact]
-    public async Task Per_project_sync_is_open_to_every_role()
+    public async Task Per_project_sync_requires_project_edit()
     {
-        // A Jira sync / full re-sync is a pull-only refresh of shared project data,
-        // so the per-entity endpoint is open to any authenticated role — a
-        // stakeholder is NOT forbidden (it reports not-configured gracefully here
-        // rather than 403). Integration *configuration* stays gated (above).
-        var c = _factory.CreateClient();
-        c.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
-        var res = await c.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null);
+        // Per-entity sync = cap-projects Edit (refresh a project you can edit) —
+        // the shared rule with Azure DevOps (ADR-0083). A view-only stakeholder is
+        // forbidden; a project editor (admin) passes the gate and reaches the
+        // graceful not-configured response.
+        var stk = _factory.CreateClient();
+        stk.DefaultRequestHeaders.Add("X-Atlas-Role", "stakeholder");
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await stk.PostAsync("/api/v1/projects/PRJ-1/jira/sync", null)).StatusCode);
+
+        var res = await Admin().PostAsync("/api/v1/projects/PRJ-1/jira/sync", null);
         Assert.NotEqual(HttpStatusCode.Forbidden, res.StatusCode);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
