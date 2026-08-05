@@ -84,12 +84,17 @@ if (runWorker && cfg.GetValue("Capacity:Alerts", true))
 // browser (ADR-0030/0039). The queue is in-process, so the consuming worker
 // lives with the endpoints that enqueue into it (the web role). The singletons
 // register in every role so the enqueue endpoints and the depth gauge resolve.
-builder.Services.AddSingleton<JiraSyncQueue>();
-builder.Services.AddSingleton<AdoSyncQueue>();
+// The connectors are stateless adapters over the shared pipeline (ADR-0083);
+// one generic SyncQueue<T> + SyncWorker<T> replaces the former per-connector
+// queue/worker pairs.
+builder.Services.AddSingleton<JiraConnector>();
+builder.Services.AddSingleton<AdoConnector>();
+builder.Services.AddSingleton<SyncQueue<JiraConnector>>();
+builder.Services.AddSingleton<SyncQueue<AdoConnector>>();
 if (runWeb)
 {
-    builder.Services.AddHostedService<JiraSyncWorker>();
-    builder.Services.AddHostedService<AdoSyncWorker>();
+    builder.Services.AddHostedService<SyncWorker<JiraConnector>>();
+    builder.Services.AddHostedService<SyncWorker<AdoConnector>>();
 }
 
 // A generous per-client rate limit + a CORS policy (empty ⇒ same-origin only).
@@ -181,8 +186,8 @@ startupLog.LogInformation("Atlas {Role} starting — auth {AuthMode}",
 Notifications.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());
 // Expose background-sync queue depth as an observable gauge (per connector).
 AtlasTelemetry.RegisterQueueGauges(
-    () => app.Services.GetRequiredService<JiraSyncQueue>().Pending,
-    () => app.Services.GetRequiredService<AdoSyncQueue>().Pending);
+    () => app.Services.GetRequiredService<SyncQueue<JiraConnector>>().Pending,
+    () => app.Services.GetRequiredService<SyncQueue<AdoConnector>>().Pending);
 // Live PI board hub gauges (connections + active boards) — see BoardHub.
 AtlasTelemetry.RegisterBoardGauges(() => BoardHub.ActiveConnections, () => BoardHub.ActiveBoards);
 Teams.UseLogger(app.Services.GetRequiredService<ILoggerFactory>());

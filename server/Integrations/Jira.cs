@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -125,25 +126,27 @@ public static class Jira
             }
         });
 
-        // Sync one project from its mapped Jira board. Open to **any authenticated
-        // role** — a Jira sync is an idempotent, pull-only refresh of shared project
-        // data (it grants no data the caller couldn't already see), so every role
-        // may run a sync or a full re-sync from the entity's "Sync from Jira" /
-        // "Full re-sync" buttons. (Integration *configuration* — connection test,
-        // credentials, the portfolio-wide bulk sync — stays behind cap-integrations.)
-        api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
+        // Sync one project from its mapped Jira board — the entity's "Sync from
+        // Jira" / "Full re-sync" button. Per-ENTITY sync requires cap-projects E
+        // (you can refresh a project you can edit); portfolio-wide bulk sync and
+        // connector *configuration* stay behind cap-integrations. Both connectors
+        // now share this rule — resolves the Jira(none)/ADO(cap-integrations)
+        // divergence (ADR-0083). Gate first, before the background enqueue, so the
+        // queued path can't skip the check (the R2 class of bug).
+        api.MapPost("/projects/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, SyncQueue<JiraConnector> queue) =>
         {
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
             var p = await db.Projects.FirstOrDefaultAsync(x => x.Id == id);
             if (p is null) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(p.JiraProjectKey))
                 return Results.Ok(new { ok = false, error = "This project isn't mapped to Jira — set its Jira project key first (a board id is optional and adds sprints)." });
-            if (background == true) return QueueSync(queue, http, cfg, "project", id, delta ?? false);
+            if (background == true) return SyncEndpoints.Queue<JiraConnector>(queue, "jira", "Jira", http, cfg, "project", id, delta ?? false);
             try
             {
                 using var c = Client(cfg);
-                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var watermark = SyncWatermark.Now();
                 var r = await SyncProjectAsync(db, cfg, c, p, delta ?? false);
                 p.LastJiraSync = watermark;             // stamp AFTER a successful pull
                 db.AuditEvents.Add(Permissions.Audit(http, cfg, "Integrations", (delta ?? false) ? "Delta-synced project from Jira" : "Synced project from Jira",
@@ -158,12 +161,12 @@ public static class Jira
         });
 
         // Sync every mapped project in one pass — the Integrations "Sync now".
-        api.MapPost("/integrations/jira/sync", async (bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
+        api.MapPost("/integrations/jira/sync", async (bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, SyncQueue<JiraConnector> queue) =>
         {
             if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
             if (!JiraConfigured(cfg))
                 return Results.Ok(new { ok = false, error = "Jira isn't configured — set Jira:BaseUrl, Jira:Email and Jira:ApiToken (see docs/jira-setup.md)." });
-            if (background == true) return QueueSync(queue, http, cfg, "all", "", delta ?? false);
+            if (background == true) return SyncEndpoints.Queue<JiraConnector>(queue, "jira", "Jira", http, cfg, "all", "", delta ?? false);
             var mapped = await db.Projects
                 .Where(p => !p.Archived && p.JiraProjectKey != "")
                 .ToListAsync();
@@ -176,7 +179,7 @@ public static class Jira
             {
                 try
                 {
-                    var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                    var watermark = SyncWatermark.Now();
                     var r = await SyncProjectAsync(db, cfg, c, p, delta ?? false);
                     p.LastJiraSync = watermark;
                     sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
@@ -193,28 +196,28 @@ public static class Jira
         // Sync a program's / product's mapped projects in one pass — powers the
         // "Sync from Jira" button on those entities' Overview. Syncs each linked
         // project (delta by default) and reports the roll-up.
-        api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
+        api.MapPost("/programs/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, SyncQueue<JiraConnector> queue) =>
         {
-            // Gate first — before FindAsync and before the background enqueue — so
-            // the queued path can't skip cap-integrations (matches AzureDevOps.cs).
-            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            // Per-entity sync = cap-projects E (ADR-0083). Gate first — before
+            // FindAsync and the background enqueue — so the queued path can't skip it.
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var pg = await db.Programs.FindAsync(id);
             if (pg is null) return Results.NotFound();
-            if (background == true) return QueueSync(queue, http, cfg, "program", id, delta ?? true);
+            if (background == true) return SyncEndpoints.Queue<JiraConnector>(queue, "jira", "Jira", http, cfg, "program", id, delta ?? true);
             return await SyncLinkedProjectsAsync(db, cfg, http, "program", pg.Projects, delta ?? true);
         });
-        api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, JiraSyncQueue queue) =>
+        api.MapPost("/products/{id}/jira/sync", async (string id, bool? delta, bool? background, AtlasDbContext db, IConfiguration cfg, HttpContext http, SyncQueue<JiraConnector> queue) =>
         {
-            if (await Permissions.Deny(http, db, cfg, "cap-integrations", "E") is { } denied) return denied;
+            if (await Permissions.Deny(http, db, cfg, "cap-projects", "E") is { } denied) return denied;
             var pr = await db.Products.FindAsync(id);
             if (pr is null) return Results.NotFound();
-            if (background == true) return QueueSync(queue, http, cfg, "product", id, delta ?? true);
+            if (background == true) return SyncEndpoints.Queue<JiraConnector>(queue, "jira", "Jira", http, cfg, "product", id, delta ?? true);
             return await SyncLinkedProjectsAsync(db, cfg, http, "product", pr.Projects, delta ?? true);
         });
 
-        // Background sync job status (poll target for the 202 responses above).
-        api.MapGet("/integrations/jira/sync/status/{jobId}", (string jobId, JiraSyncQueue queue) =>
-            queue.TryGet(jobId, out var s) && s is not null ? Results.Ok(s) : Results.NotFound());
+        // Background sync job status (poll target for the 202 responses above) —
+        // registered via the shared helper (ADR-0083).
+        api.MapSyncStatus<JiraConnector>("jira");
 
         // Re-sync a Jira-mapped Ops service (pull its project's issues into items).
         // The one-time import (target=ops) creates the mapping; this keeps it fresh.
@@ -330,21 +333,8 @@ public static class Jira
         });
     }
 
-    // Enqueue a background sync under the caller's identity and return 202 with a
-    // pollable job id (see /integrations/jira/sync/status/{jobId}). Callers gate on
-    // cap-integrations before enqueuing — the worker itself performs no check.
-    static IResult QueueSync(JiraSyncQueue queue, HttpContext http, IConfiguration cfg, string kind, string targetId, bool delta)
-    {
-        // Borrow Audit() only to resolve the caller's actor/role for the eventual
-        // completion audit event (the worker has no HttpContext).
-        var who = Permissions.Audit(http, cfg, "Integrations", "Queued Jira sync", "");
-        var status = queue.Enqueue(kind, targetId, delta, who.Actor, who.Role);
-        return Results.Accepted($"/api/v1/integrations/jira/sync/status/{status.Id}",
-            new { ok = true, queued = true, jobId = status.Id, state = status.State });
-    }
-
-    // Roll-up counts for a multi-project sync pass.
-    public record BulkSyncResult(int Projects, int Sprints, int Epics, int Tasks, List<string> Errors);
+    // (Enqueue/202/poll now live in the shared SyncEndpoints/SyncQueue — ADR-0083.)
+    // BulkSyncResult moved to WorkItemConnector.cs (shared by both connectors).
 
     // Sync a concrete list of projects, best-effort (one failure doesn't stop the
     // pass). Shared by the synchronous endpoints and the background worker.
@@ -358,7 +348,7 @@ public static class Jira
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var watermark = SyncWatermark.Now();
                 var r = await SyncProjectAsync(db, cfg, c, p, delta);
                 p.LastJiraSync = watermark;
                 sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
@@ -406,7 +396,7 @@ public static class Jira
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                var watermark = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                var watermark = SyncWatermark.Now();
                 var r = await SyncProjectAsync(db, cfg, c, p, delta);
                 p.LastJiraSync = watermark;
                 sp += r.Sprints; ep += r.Epics; tk += r.Tasks; ok++;
@@ -867,8 +857,18 @@ public static class Jira
     // The JQL fragment appended to a project search for a delta pull — only when
     // delta is requested AND there's a watermark to filter from (first delta with
     // no watermark behaves as a full pull). Pure; unit-tested.
-    public static string DeltaClause(bool delta, string? lastSync) =>
-        delta && !string.IsNullOrEmpty(lastSync) ? $" AND updated >= \"{lastSync}\"" : "";
+    public static string DeltaClause(bool delta, string? lastSync)
+    {
+        if (!delta || string.IsNullOrEmpty(lastSync)) return "";
+        // Watermarks are stored as UTC ISO (ADR-0083); JQL's date-time literal is
+        // "yyyy-MM-dd HH:mm". Reformat when we can parse it; otherwise fall back to
+        // the raw value (already JQL-shaped — keeps the legacy format working).
+        var jql = DateTime.TryParse(lastSync, CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt)
+            ? dt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            : lastSync;
+        return $" AND updated >= \"{jql}\"";
+    }
 
     // ---- Jira → Atlas field mappings (pure; unit-tested) --------------------
 
