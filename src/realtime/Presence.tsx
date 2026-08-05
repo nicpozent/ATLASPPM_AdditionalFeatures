@@ -9,7 +9,6 @@ import { color } from "@/theme";
 import { Icon } from "@/components/Icon";
 import type { Peer, PeerCursor } from "./useRoomRealtime";
 
-// A small "Live"/"Offline" pill reflecting the hub connection.
 export function LiveDot({ connected }: { connected: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, color: connected ? color.successInk : color.faint }}>

@@ -241,7 +241,6 @@ public record OpsServiceDto(int Id, string Ref, string Name, string Category, st
     bool Archived = false, string JiraProjectKey = "", List<OpsLinkedTaskDto>? LinkedTasks = null);
 public record OpsSummaryDto(int Services, int OpenItems, int Blocked, int ImpactedProjects, int PeopleEngaged);
 public record OpsBoardDto(bool CanEdit, List<OpsServiceDto> Services, OpsSummaryDto Summary);
-// Ops load impacting a single project (shown on Project Detail).
 public record OpsImpactRowDto(int Id, string Title, string ServiceName, string Type, string Priority,
     string Status, string Assignee, int Alloc, string ImpactNote);
 public record OpsImpactDto(int Alloc, List<OpsImpactRowDto> Items);

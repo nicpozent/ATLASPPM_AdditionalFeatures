@@ -55,7 +55,6 @@ export function ProgressBar({ pct, fill = color.primary, height = 6, track = cha
   );
 }
 
-// Small empty-state block shown inside a card body when there's no data.
 export function EmptyBlock({ message, minHeight = 96 }: { message: string; minHeight?: number }) {
   return (
     <div style={{
