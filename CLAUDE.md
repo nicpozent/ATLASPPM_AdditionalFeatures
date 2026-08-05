@@ -198,6 +198,15 @@ updating — never hand-edit `design/` yourself.
   styles, `aria-*` where the prototype implies it.
 - Every data view needs **loading / empty / error** states (React Query makes
   this natural).
+- **i18n scope (ADR-0084): localised chrome, English content.** Where a new
+  string goes, by rule: (1) **user-entered data** → never translated; (2)
+  **chrome** — navigation, topbar, the language picker, or a global/common
+  control or state shared across screens → add a key to all six locales in
+  `src/i18n/messages.ts` and render with `t()` (the completeness test fails on a
+  missing locale); (3) otherwise it is **screen content** → write it inline in
+  **English**, do **not** route it through `t()`. (Full screen-body i18n is a
+  future product decision, not the current scope — don't half-extend `t()` into
+  screens.)
 
 ---
 
