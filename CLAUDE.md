@@ -365,6 +365,11 @@ route guards). To hit a real API in dev, run the backend and set `VITE_API_PROXY
 - Don't invent colors/fonts or hardcode demo/seed data.
 - Don't put authorization logic on the client as a security control.
 - Don't edit `design/` (it's the reference).
+- Don't add **display-string date columns**. Every new date field is `DateOnly`
+  (calendar date) or `DateTime` UTC (instant), stored as `date`/`timestamptz`,
+  serialised as ISO at the API, and formatted for display on the frontend — never
+  `ToString("…MMM…")` into a persisted column (ADR-0082; migration of the legacy
+  string columns is staged per module).
 
 ---
 
