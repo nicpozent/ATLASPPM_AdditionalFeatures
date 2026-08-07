@@ -248,3 +248,172 @@ _Effective date: [on last signature] · SoW version: 1.0 · Supersedes: [none / 
 `azure-devops-setup.md`, `teams-setup.md`, `email-graph-setup.md`) ·
 `SoW/flows.md` (functional flows). Companion SoWs: `SoW-Atlas-PPM-Product-Build.md`
 (detailed build) and `SoW-Atlas-PPM-Remediation.md` (Epic #106 remediation).
+
+---
+
+## Appendix A — Functional flows
+
+The complete flow library (39 diagrams); editable Mermaid in `flows/`, indexed in `flows.md`. The HTML edition embeds these inline.
+
+### A.1 System & data flows
+
+**Application map & navigation**
+
+![Application map & navigation](images/00-app-sitemap.png)
+
+**Authentication & RBAC gate**
+
+![Authentication & RBAC gate](images/01-auth-rbac.png)
+
+**Dashboard layouts & data**
+
+![Dashboard layouts & data](images/02-dashboard.png)
+
+**Demand funnel**
+
+![Demand funnel](images/03-demands.png)
+
+**Portfolio → Project**
+
+![Portfolio → Project](images/04-portfolio-project.png)
+
+**Stage gates G0–G5**
+
+![Stage gates G0–G5](images/05-project-gates.png)
+
+**Task board (realtime)**
+
+![Task board (realtime)](images/06-tasks-board.png)
+
+**Gantt & dependencies**
+
+![Gantt & dependencies](images/07-gantt.png)
+
+**Resource utilisation**
+
+![Resource utilisation](images/08-resources.png)
+
+**Financials roll-up**
+
+![Financials roll-up](images/09-financials.png)
+
+**Program detail**
+
+![Program detail](images/10-programs.png)
+
+**Products → Releases**
+
+![Products → Releases](images/11-products-releases.png)
+
+**OKRs linkage**
+
+![OKRs linkage](images/12-okrs.png)
+
+**Delivery status**
+
+![Delivery status](images/13-delivery.png)
+
+**News wall**
+
+![News wall](images/14-news.png)
+
+**Connector sync (Jira/ADO)**
+
+![Connector sync (Jira/ADO)](images/15-integrations-sync.png)
+
+**Whiteboard co-editing**
+
+![Whiteboard co-editing](images/16-whiteboard.png)
+
+**Reports & export**
+
+![Reports & export](images/17-reports.png)
+
+**Administration**
+
+![Administration](images/18-admin.png)
+
+**Governance & compliance**
+
+![Governance & compliance](images/19-governance-compliance.png)
+
+### A.2 User journeys (per role)
+
+**Executive — portfolio review**
+
+![Executive — portfolio review](images/user-01-executive-review.png)
+
+**PMO — approve a demand**
+
+![PMO — approve a demand](images/user-02-pmo-demand-approval.png)
+
+**PM — create a project (wizard)**
+
+![PM — create a project (wizard)](images/user-03-pm-create-project.png)
+
+**PM — manage tasks & Jira sync**
+
+![PM — manage tasks & Jira sync](images/user-04-pm-manage-tasks.png)
+
+**PM — stage-gate review**
+
+![PM — stage-gate review](images/user-05-pm-stage-gate.png)
+
+**Team member — update my work**
+
+![Team member — update my work](images/user-06-team-member-update.png)
+
+**Stakeholder — check my status**
+
+![Stakeholder — check my status](images/user-07-stakeholder-status.png)
+
+**Manager — My Team**
+
+![Manager — My Team](images/user-08-manager-team.png)
+
+**Platform Admin — administration**
+
+![Platform Admin — administration](images/user-09-platform-admin.png)
+
+**Chief Architect — governance**
+
+![Chief Architect — governance](images/user-10-architect-governance.png)
+
+### A.3 Software-development interaction flows
+
+**Change lifecycle**
+
+![Change lifecycle](images/dev-01-change-lifecycle.png)
+
+**CI pipeline**
+
+![CI pipeline](images/dev-02-ci-pipeline.png)
+
+**API type contract + drift**
+
+![API type contract + drift](images/dev-03-api-type-contract.png)
+
+**Module-boundary ratchet**
+
+![Module-boundary ratchet](images/dev-04-module-boundary.png)
+
+**Test strategy**
+
+![Test strategy](images/dev-05-test-strategy.png)
+
+**Local dev loop**
+
+![Local dev loop](images/dev-06-local-dev.png)
+
+**Build & air-gapped deploy**
+
+![Build & air-gapped deploy](images/dev-07-build-deploy.png)
+
+**Runtime topology**
+
+![Runtime topology](images/dev-08-runtime-topology.png)
+
+**Extending a connector**
+
+![Extending a connector](images/dev-09-connector-extension.png)
+
