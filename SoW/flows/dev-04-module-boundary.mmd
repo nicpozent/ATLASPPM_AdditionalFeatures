@@ -1,0 +1,7 @@
+graph LR
+  BUILD(["Build + test"]):::start --> ARCH["NetArchTest / Mono.Cecil ratchet (ADR-0072)"]
+  ARCH --> CHK{"Atlas.Api.&lt;Domain&gt; edges legal?"}
+  CHK -- "Integrations reaches a business module" --> FAIL["Build fails"]:::deny
+  CHK -- "leaf boundaries respected" --> OK(["Pass"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

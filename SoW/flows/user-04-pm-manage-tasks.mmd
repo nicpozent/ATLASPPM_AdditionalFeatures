@@ -1,0 +1,7 @@
+graph LR
+  U(["Project Manager"]):::start --> A["Project → Tasks (board)"]
+  A --> B["Drag a card between columns"]
+  B --> C["Status updates live for the team"]
+  A --> D["Sync from Jira (pull latest)"]
+  D --> E["Board reflects imported issues"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

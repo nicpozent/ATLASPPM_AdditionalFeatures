@@ -1,0 +1,6 @@
+graph TD
+  U["Unit — xUnit (server) · Vitest (frontend)"] --> I["Integration — WebApplicationFactory (in-memory DB)"]
+  I --> E["E2E — Playwright + axe (empty-state DOM)"]
+  E --> PF["Performance — k6 budget"]
+  PF --> COV(["Coverage floors gated in CI"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

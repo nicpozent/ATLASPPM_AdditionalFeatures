@@ -1,0 +1,6 @@
+graph LR
+  DEV(["Developer"]):::start --> A["npm install → npm run dev (:5173)"]
+  A --> B{"VITE_AUTH_ENABLED?"}
+  B -- false --> C["Browse every screen → empty states (no backend)"]
+  B -- true --> D["Entra SSO + VITE_API_PROXY → live API"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

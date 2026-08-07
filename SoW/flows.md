@@ -1,12 +1,9 @@
 # Atlas PPM — Functional Flows
 
-Flow diagrams for each Atlas PPM functional area. Each entry shows the live
-Mermaid source (renders in Confluence / GitHub) and links the static PNG in
-`images/`. Sources live in `flows/`; regenerate images with the command in
-`README.md`.
+Flow diagrams grouped in three views: **system & data flows**, **user journeys** (persona → goal), and **software-development interaction** (SDLC + how the pieces interact at build/run/deploy). Each entry shows the live Mermaid source and links the static PNG in `images/`. Sources are in `flows/`.
 
 
-## Index
+## System & data flows
 
 - [Application map & navigation](#00-app-sitemap)
 - [Authentication & RBAC gate](#01-auth-rbac)
@@ -28,6 +25,36 @@ Mermaid source (renders in Confluence / GitHub) and links the static PNG in
 - [Reports & export](#17-reports)
 - [Administration](#18-admin)
 - [Governance & compliance](#19-governance-compliance)
+
+
+## User journeys
+
+- [Executive — portfolio review](#user-01-executive-review)
+- [PMO — triage & approve a demand](#user-02-pmo-demand-approval)
+- [PM — create a project (wizard)](#user-03-pm-create-project)
+- [PM — manage tasks & Jira sync](#user-04-pm-manage-tasks)
+- [PM — request a stage-gate review](#user-05-pm-stage-gate)
+- [Team member — update my work](#user-06-team-member-update)
+- [Stakeholder — check my status](#user-07-stakeholder-status)
+- [Manager — My Team (skills · SWOT · dev plan)](#user-08-manager-team)
+
+
+## Software-development interaction
+
+- [Change lifecycle — issue → PR → merge](#dev-01-change-lifecycle)
+- [CI pipeline — the gating jobs](#dev-02-ci-pipeline)
+- [API type contract (OpenAPI → TS) + drift guard](#dev-03-api-type-contract)
+- [Module-boundary ratchet (ADR-0072)](#dev-04-module-boundary)
+- [Test strategy — unit → integration → e2e → perf](#dev-05-test-strategy)
+- [Local dev loop (auth on/off)](#dev-06-local-dev)
+- [Build & air-gapped deploy](#dev-07-build-deploy)
+- [Runtime topology (component interaction)](#dev-08-runtime-topology)
+- [Extending a connector (IWorkItemConnector)](#dev-09-connector-extension)
+
+
+---
+
+# System & data flows
 
 
 <a id="00-app-sitemap"></a>
@@ -402,5 +429,323 @@ graph TD
   GOV --> TG["TOGAF ADM phases · ARB · waivers"]
   GOV --> SEC["GDPR · PCI-DSS · EU AI Act · SOC 2 · NIS2"]
   SOA --> COV["Coverage roll-up"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+---
+
+# User journeys
+
+
+<a id="user-01-executive-review"></a>
+
+## Executive — portfolio review
+
+![Executive — portfolio review](images/user-01-executive-review.png)
+
+```mermaid
+graph LR
+  U(["Executive"]):::start --> A["Open Dashboard → Executive layout"]
+  A --> B["Scan portfolio-health donut + KPI cards"]
+  B --> C{"Anything needs attention?"}
+  C -- yes --> D["Open a 'needs attention' project"]
+  D --> E["Read status · budget burn · blockers"]
+  C -- no --> F["Review demand pipeline + recent activity"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-02-pmo-demand-approval"></a>
+
+## PMO — triage & approve a demand
+
+![PMO — triage & approve a demand](images/user-02-pmo-demand-approval.png)
+
+```mermaid
+graph LR
+  U(["PMO"]):::start --> A["Open Demands funnel"]
+  A --> B["Review a scored demand (value vs effort)"]
+  B --> C{"Approve?"}
+  C -- yes --> D["Drag card to Approved → confirm"]
+  D --> E["Demand becomes project intake"]
+  C -- no --> F["Move to Hold · add comment"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-03-pm-create-project"></a>
+
+## PM — create a project (wizard)
+
+![PM — create a project (wizard)](images/user-03-pm-create-project.png)
+
+```mermaid
+graph LR
+  U(["Project Manager"]):::start --> A["Methodologies → Create project"]
+  A --> B["Step 1 · pick methodology"]
+  B --> C["Step 2 · name · department · owner"]
+  C --> D["Step 3 · choose integration (Jira / ADO / none)"]
+  D --> E(["Project created → opens Project Detail"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-04-pm-manage-tasks"></a>
+
+## PM — manage tasks & Jira sync
+
+![PM — manage tasks & Jira sync](images/user-04-pm-manage-tasks.png)
+
+```mermaid
+graph LR
+  U(["Project Manager"]):::start --> A["Project → Tasks (board)"]
+  A --> B["Drag a card between columns"]
+  B --> C["Status updates live for the team"]
+  A --> D["Sync from Jira (pull latest)"]
+  D --> E["Board reflects imported issues"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-05-pm-stage-gate"></a>
+
+## PM — request a stage-gate review
+
+![PM — request a stage-gate review](images/user-05-pm-stage-gate.png)
+
+```mermaid
+graph LR
+  U(["Project Manager"]):::start --> A["Project → Gates (G0–G5)"]
+  A --> B["Prepare gate evidence / checklist"]
+  B --> C["Request gate review"]
+  C --> D{"Reviewer decision"}
+  D -- pass --> E["Advance to next gate"]
+  D -- fail --> F["Remediate and resubmit"]:::deny
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;
+```
+
+
+<a id="user-06-team-member-update"></a>
+
+## Team member — update my work
+
+![Team member — update my work](images/user-06-team-member-update.png)
+
+```mermaid
+graph LR
+  U(["Team member"]):::start --> A["Dashboard → Operational → My tasks"]
+  A --> B["Open a task"]
+  B --> C["Update status · progress · notes"]
+  C --> D["Saved → rolls up to project + delivery"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-07-stakeholder-status"></a>
+
+## Stakeholder — check my status
+
+![Stakeholder — check my status](images/user-07-stakeholder-status.png)
+
+```mermaid
+graph LR
+  U(["Stakeholder"]):::start --> A["My Projects (reduced nav)"]
+  A --> B["Open a project → read-only status"]
+  B --> C["Check Delivery status + Releases"]
+  C --> D["Read Weekly Updates (News)"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-08-manager-team"></a>
+
+## Manager — My Team (skills · SWOT · dev plan)
+
+![Manager — My Team (skills · SWOT · dev plan)](images/user-08-manager-team.png)
+
+```mermaid
+graph LR
+  U(["Manager"]):::start --> A["My Team"]
+  A --> B["Review members + skills matrix"]
+  B --> C["Update team SWOT"]
+  B --> D["Record individual development plan (manager-only)"]
+  C --> E["Saved · governance-gated · audited"]
+  D --> E
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+---
+
+# Software-development interaction
+
+
+<a id="dev-01-change-lifecycle"></a>
+
+## Change lifecycle — issue → PR → merge
+
+![Change lifecycle — issue → PR → merge](images/dev-01-change-lifecycle.png)
+
+```mermaid
+graph LR
+  I(["Issue / finding"]):::start --> B["Branch (claude/…)"]
+  B --> IMP["Implement · ADR if architectural"]
+  IMP --> PR["Open ONE PR (one issue → one PR)"]
+  PR --> CI{"CI green?"}
+  CI -- no --> FIX["Fix → push"]
+  FIX --> CI
+  CI -- yes --> RV["Review"]
+  RV --> M(["Squash-merge to main"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="dev-02-ci-pipeline"></a>
+
+## CI pipeline — the gating jobs
+
+![CI pipeline — the gating jobs](images/dev-02-ci-pipeline.png)
+
+```mermaid
+graph TD
+  P(["Push / Pull request"]):::start --> J{"CI jobs — parallel"}
+  J --> FE["Frontend: lint · test · build · coverage floor"]
+  J --> BE["API: build · test · coverage floor"]
+  J --> CT["API type-contract drift"]
+  J --> AX["Accessibility (Playwright + axe)"]
+  J --> SEC["SAST (Semgrep) · Trivy (deps/secrets/IaC)"]
+  FE --> G{"All required green?"}
+  BE --> G
+  CT --> G
+  AX --> G
+  SEC --> G
+  G -- yes --> MG(["Mergeable"]):::start
+  G -- no --> BL["Blocked"]:::deny
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;
+```
+
+
+<a id="dev-03-api-type-contract"></a>
+
+## API type contract (OpenAPI → TS) + drift guard
+
+![API type contract (OpenAPI → TS) + drift guard](images/dev-03-api-type-contract.png)
+
+```mermaid
+graph LR
+  DTO["Server DTOs · .Produces&lt;T&gt;"] --> DUMP["Boot API (Atlas:SkipDbInit, no DB)"]
+  DUMP --> DOC["openapi/atlas-v1.json"]
+  DOC --> GEN["openapi-typescript"]
+  GEN --> TS["src/api/generated.ts"]
+  TS --> DIFF{"CI: git diff --exit-code"}
+  DIFF -- drift --> FAIL["Fail — run npm run api:types"]:::deny
+  DIFF -- clean --> OK(["Contract in sync"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;
+```
+
+
+<a id="dev-04-module-boundary"></a>
+
+## Module-boundary ratchet (ADR-0072)
+
+![Module-boundary ratchet (ADR-0072)](images/dev-04-module-boundary.png)
+
+```mermaid
+graph LR
+  BUILD(["Build + test"]):::start --> ARCH["NetArchTest / Mono.Cecil ratchet (ADR-0072)"]
+  ARCH --> CHK{"Atlas.Api.&lt;Domain&gt; edges legal?"}
+  CHK -- "Integrations reaches a business module" --> FAIL["Build fails"]:::deny
+  CHK -- "leaf boundaries respected" --> OK(["Pass"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;
+```
+
+
+<a id="dev-05-test-strategy"></a>
+
+## Test strategy — unit → integration → e2e → perf
+
+![Test strategy — unit → integration → e2e → perf](images/dev-05-test-strategy.png)
+
+```mermaid
+graph TD
+  U["Unit — xUnit (server) · Vitest (frontend)"] --> I["Integration — WebApplicationFactory (in-memory DB)"]
+  I --> E["E2E — Playwright + axe (empty-state DOM)"]
+  E --> PF["Performance — k6 budget"]
+  PF --> COV(["Coverage floors gated in CI"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="dev-06-local-dev"></a>
+
+## Local dev loop (auth on/off)
+
+![Local dev loop (auth on/off)](images/dev-06-local-dev.png)
+
+```mermaid
+graph LR
+  DEV(["Developer"]):::start --> A["npm install → npm run dev (:5173)"]
+  A --> B{"VITE_AUTH_ENABLED?"}
+  B -- false --> C["Browse every screen → empty states (no backend)"]
+  B -- true --> D["Entra SSO + VITE_API_PROXY → live API"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="dev-07-build-deploy"></a>
+
+## Build & air-gapped deploy
+
+![Build & air-gapped deploy](images/dev-07-build-deploy.png)
+
+```mermaid
+graph LR
+  SRC(["Source"]):::start --> FE["npm run build (tsc + Vite)"]
+  SRC --> BE["dotnet publish"]
+  FE --> ART["Self-contained artefacts (assets bundled)"]
+  BE --> ART
+  ART --> DL["Download to Windows server (no git on target)"]
+  DL --> NG(["nginx same-origin: app · /api/v1 · /hubs"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="dev-08-runtime-topology"></a>
+
+## Runtime topology (component interaction)
+
+![Runtime topology (component interaction)](images/dev-08-runtime-topology.png)
+
+```mermaid
+graph LR
+  BR(["Browser · React SPA"]):::start --> NG["nginx (same-origin)"]
+  NG --> API["Atlas .NET API · /api/v1"]
+  NG --> HUB["SignalR · /hubs (realtime rooms)"]
+  API --> DB[("PostgreSQL 16")]
+  API --> EXT["Connectors: Jira · Azure DevOps · …"]
+  BR -. "MSAL bearer" .-> ENTRA["Entra ID (SSO)"]
+  API -. "validate token" .-> ENTRA
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="dev-09-connector-extension"></a>
+
+## Extending a connector (IWorkItemConnector)
+
+![Extending a connector (IWorkItemConnector)](images/dev-09-connector-extension.png)
+
+```mermaid
+graph LR
+  NEW(["New tracker (e.g. ServiceNow)"]):::start --> IMPL["implement IWorkItemConnector"]
+  IMPL --> REG["register in DI: SyncQueue&lt;T&gt; + SyncWorker&lt;T&gt;"]
+  REG --> EP["reuse shared enqueue · 202/poll · gate"]
+  EP --> PARSE["add ONLY connector-specific parsing"]
+  PARSE --> TST(["fixture tests + boundary stays a leaf"]):::start
   classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
 ```

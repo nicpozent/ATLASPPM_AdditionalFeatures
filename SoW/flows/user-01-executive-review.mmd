@@ -1,0 +1,8 @@
+graph LR
+  U(["Executive"]):::start --> A["Open Dashboard → Executive layout"]
+  A --> B["Scan portfolio-health donut + KPI cards"]
+  B --> C{"Anything needs attention?"}
+  C -- yes --> D["Open a 'needs attention' project"]
+  D --> E["Read status · budget burn · blockers"]
+  C -- no --> F["Review demand pipeline + recent activity"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

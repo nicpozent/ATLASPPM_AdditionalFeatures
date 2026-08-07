@@ -1,0 +1,16 @@
+graph TD
+  P(["Push / Pull request"]):::start --> J{"CI jobs — parallel"}
+  J --> FE["Frontend: lint · test · build · coverage floor"]
+  J --> BE["API: build · test · coverage floor"]
+  J --> CT["API type-contract drift"]
+  J --> AX["Accessibility (Playwright + axe)"]
+  J --> SEC["SAST (Semgrep) · Trivy (deps/secrets/IaC)"]
+  FE --> G{"All required green?"}
+  BE --> G
+  CT --> G
+  AX --> G
+  SEC --> G
+  G -- yes --> MG(["Mergeable"]):::start
+  G -- no --> BL["Blocked"]:::deny
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

@@ -1,0 +1,10 @@
+graph LR
+  DTO["Server DTOs · .Produces&lt;T&gt;"] --> DUMP["Boot API (Atlas:SkipDbInit, no DB)"]
+  DUMP --> DOC["openapi/atlas-v1.json"]
+  DOC --> GEN["openapi-typescript"]
+  GEN --> TS["src/api/generated.ts"]
+  TS --> DIFF{"CI: git diff --exit-code"}
+  DIFF -- drift --> FAIL["Fail — run npm run api:types"]:::deny
+  DIFF -- clean --> OK(["Contract in sync"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

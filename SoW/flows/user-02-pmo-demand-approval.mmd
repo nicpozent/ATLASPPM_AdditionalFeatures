@@ -1,0 +1,8 @@
+graph LR
+  U(["PMO"]):::start --> A["Open Demands funnel"]
+  A --> B["Review a scored demand (value vs effort)"]
+  B --> C{"Approve?"}
+  C -- yes --> D["Drag card to Approved → confirm"]
+  D --> E["Demand becomes project intake"]
+  C -- no --> F["Move to Hold · add comment"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
