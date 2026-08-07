@@ -1,0 +1,7 @@
+graph LR
+  P(["Portfolio"]):::start --> T{"Sub-tab"}
+  T --> PJ["Projects<br/>filter chips · cards/table"]
+  T --> BK["Blockers<br/>list + side panel"]
+  PJ -->|"click project"| PD(["Project Detail"]):::start
+  PD --> TABS["Overview · Tasks · Epics · RAID<br/>Artifacts · Costs · Gates · Security"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

@@ -1,0 +1,6 @@
+graph TD
+  U(["User edits node / edge"]):::start --> OP["Authorized op<br/>scope-gated by entity capability"]
+  OP --> SAN["Server sanitises + persists typed row"]
+  SAN --> HUB["Room hub broadcast"]
+  HUB --> PEERS["Live co-edit: presence · cursors<br/>field-merge · off-screen peers"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

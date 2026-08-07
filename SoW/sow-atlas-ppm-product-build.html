@@ -1,0 +1,326 @@
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --surface-alt:#fbfcfd;
+    --ink:#18202e; --body:#333c4d; --muted:#606b7e; --faint:#8994a6;
+    --accent:#2a4c8f; --accent-ink:#22407a; --accent-soft:#e9eef8; --accent-line:#c9d6ee;
+    --border:#e4e8ef; --border-strong:#d3d9e2;
+    --ok:#2e7d5b; --warn:#a9791a; --crit:#b23a3a;
+    --shadow:0 1px 2px rgba(24,32,46,.06),0 8px 28px rgba(24,32,46,.06);
+    --radius:14px;
+    --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-head:"Segoe UI Semibold","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    --font-mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d131d; --surface:#151e2c; --surface-alt:#111a27;
+      --ink:#eaeef6; --body:#c4ccd9; --muted:#93a0b5; --faint:#6c7a90;
+      --accent:#7ea6e8; --accent-ink:#a9c4f2; --accent-soft:#1a2740; --accent-line:#2c3e5e;
+      --border:#25324a; --border-strong:#324159;
+      --ok:#5cc296; --warn:#d9ab5a; --crit:#e28585;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d131d; --surface:#151e2c; --surface-alt:#111a27;
+    --ink:#eaeef6; --body:#c4ccd9; --muted:#93a0b5; --faint:#6c7a90;
+    --accent:#7ea6e8; --accent-ink:#a9c4f2; --accent-soft:#1a2740; --accent-line:#2c3e5e;
+    --border:#25324a; --border-strong:#324159;
+    --ok:#5cc296; --warn:#d9ab5a; --crit:#e28585;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--body);
+    font-family:var(--font-body); font-size:16px; line-height:1.62;
+    margin:0; padding:0; -webkit-font-smoothing:antialiased;
+  }
+  .doc{max-width:60rem; margin:0 auto; padding:clamp(1.25rem,4vw,3.25rem) clamp(1rem,4vw,2.75rem) 4rem;}
+
+  /* Masthead */
+  .masthead{border-bottom:2px solid var(--accent); padding-bottom:1.6rem; margin-bottom:2.4rem;}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--accent-ink); font-weight:600; margin:0 0 .7rem;
+  }
+  h1{
+    font-family:var(--font-head); font-weight:700; color:var(--ink);
+    font-size:clamp(1.85rem,4.5vw,2.7rem); line-height:1.12; letter-spacing:-.015em;
+    margin:0 0 .3rem; text-wrap:balance;
+  }
+  .subtitle{color:var(--muted); font-size:1.02rem; margin:.2rem 0 0;}
+
+  .meta{
+    display:grid; grid-template-columns:max-content 1fr; column-gap:1.6rem; margin-top:1.6rem;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:.35rem 1.35rem; box-shadow:var(--shadow); font-size:.92rem;
+  }
+  .meta > div{display:contents;}
+  .meta dt{
+    color:var(--faint); font-family:var(--font-mono); font-size:.72rem; letter-spacing:.06em;
+    text-transform:uppercase; padding:.62rem 0; align-self:center; white-space:nowrap;
+    border-bottom:1px solid var(--border);
+  }
+  .meta dd{margin:0; color:var(--ink); font-weight:500; padding:.62rem 0; align-self:center; border-bottom:1px solid var(--border);}
+  .meta > div:last-child dt, .meta > div:last-child dd{border-bottom:none;}
+
+  /* Sections */
+  section{margin-top:2.6rem;}
+  h2{
+    font-family:var(--font-head); font-weight:700; color:var(--ink);
+    font-size:1.34rem; letter-spacing:-.01em; margin:0 0 .9rem;
+    padding-bottom:.5rem; border-bottom:1px solid var(--border-strong);
+    display:flex; align-items:baseline; gap:.7rem; text-wrap:balance;
+  }
+  h2 .num{font-family:var(--font-mono); font-size:.9rem; color:var(--accent-ink); font-weight:600;}
+  h3{font-family:var(--font-head); font-weight:650; color:var(--ink); font-size:1.02rem; margin:1.6rem 0 .5rem;}
+  p{margin:.5rem 0 .9rem; max-width:62ch;}
+  strong{color:var(--ink); font-weight:650;}
+  a{color:var(--accent-ink);}
+  code,.mono{font-family:var(--font-mono); font-size:.86em; background:var(--accent-soft); color:var(--accent-ink); padding:.08em .38em; border-radius:5px;}
+
+  ul{margin:.4rem 0 1rem; padding-left:0; list-style:none; max-width:64ch;}
+  ul li{position:relative; padding-left:1.35rem; margin:.4rem 0;}
+  ul li::before{content:""; position:absolute; left:.25rem; top:.82em; width:.42rem; height:.42rem; border-radius:2px; background:var(--accent); transform:translateY(-50%);}
+
+  /* Tables */
+  .twrap{overflow-x:auto; margin:1rem 0 1.4rem; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); background:var(--surface);}
+  table{border-collapse:collapse; width:100%; font-size:.9rem; min-width:34rem;}
+  .tight table{min-width:24rem;}
+  th,td{text-align:left; padding:.62rem .95rem; vertical-align:top; border-bottom:1px solid var(--border);}
+  thead th{
+    background:var(--accent-soft); color:var(--accent-ink);
+    font-family:var(--font-head); font-weight:650; font-size:.76rem; letter-spacing:.05em; text-transform:uppercase;
+    border-bottom:1px solid var(--accent-line); position:sticky; top:0;
+  }
+  tbody tr:nth-child(even){background:var(--surface-alt);}
+  tbody tr:last-child td{border-bottom:none;}
+  td:first-child{font-weight:550; color:var(--ink);}
+  .col-num{white-space:nowrap; font-family:var(--font-mono); color:var(--accent-ink);}
+
+  .callout{
+    background:var(--accent-soft); border:1px solid var(--accent-line); border-left:4px solid var(--accent);
+    border-radius:10px; padding:.9rem 1.15rem; margin:1.2rem 0; font-size:.93rem; color:var(--body);
+  }
+  .footer-note{margin-top:3rem; padding-top:1.3rem; border-top:1px solid var(--border); color:var(--muted); font-size:.86rem;}
+
+  @media print{
+    body{background:#fff; font-size:11.5pt;}
+    .doc{max-width:none; padding:0;}
+    .twrap,.meta{box-shadow:none;}
+    section,h2{break-inside:avoid;}
+    thead th{position:static;}
+  }
+</style>
+
+<article class="doc">
+  <header class="masthead">
+    <p class="eyebrow">Statement of Work</p>
+    <h1>Atlas PPM — Product Build</h1>
+    <p class="subtitle">Portfolio &amp; Project Management platform for Birgma / Biltema Group</p>
+    <dl class="meta">
+      <div><dt>Project</dt><dd>Atlas PPM platform</dd></div>
+      <div><dt>Client</dt><dd>Birgma / Biltema Group</dd></div>
+      <div><dt>Repository</dt><dd class="mono">nicpozent/ATLASPPM_AdditionalFeatures</dd></div>
+      <div><dt>Prepared for</dt><dd>nicolas.pozza@birgma.com</dd></div>
+      <div><dt>Date</dt><dd>2026-08-07</dd></div>
+      <div><dt>Document type</dt><dd>Baseline SoW (living)</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <h2><span class="num">1</span> Background &amp; objectives</h2>
+    <p>Atlas is a Portfolio &amp; Project Management web application for Birgma / Biltema Group. This engagement delivers the <strong>full application</strong> — every screen and all functionality — <strong>pixel-faithful to the approved prototype</strong> (<code>design/Atlas PPM.dc.html</code>), wired to the <strong>.NET 10 minimal API</strong> backend, and hardened for an <strong>on-premise, air-gapped</strong> deployment.</p>
+    <ul>
+      <li>Reproduce every prototype screen 1:1 — layout, typography, colour, components, states, copy — with no redesign or additions beyond approved extensions.</li>
+      <li>Data-drive every screen from the <code>/api/v1/*</code> API via TanStack Query, with first-class <strong>loading / empty / error</strong> states (empty by default — no fabricated seed data).</li>
+      <li>Enforce <strong>server-authoritative</strong> role-based access control; the client is never a security boundary.</li>
+      <li>Meet the non-functional bar: accessibility (WCAG AA), localised chrome, security/compliance modules, and a continuously green automated build.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span> Scope of work</h2>
+
+    <h3>2.1 Workspace screens</h3>
+    <ul>
+      <li><strong>Dashboard</strong> — four layouts via a segmented control: Executive (portfolio-health donut, budget-burn, KPI cards w/ sparklines, active-projects table, needs-attention, demand pipeline, recent activity), Operational, Compact, and a drag-and-drop <strong>Custom</strong> builder.</li>
+      <li><strong>Portfolio</strong> — Projects (filter chips + cards/table) and Blockers (list + side panel); drill-through to Project Detail.</li>
+      <li><strong>Programs</strong> — list + detail (stakeholder power/interest matrix, linked projects, status); create-program modal.</li>
+      <li><strong>Products</strong> — product portfolio; Jira/ADO tasks mapped to releases.</li>
+      <li><strong>OKRs</strong> — objectives with key results linked to projects/programs/products.</li>
+      <li><strong>Demands</strong> — value-vs-effort scored intake <strong>funnel</strong>; drag across stages; create/approve modals.</li>
+      <li><strong>Timeline / Gantt</strong> — Project / Program scope; phases, bars, milestones, dependency arrows, month grid, export.</li>
+      <li><strong>Project Detail</strong> — tabs: Overview, Tasks (board + list, drag), Epics, RAID, Artifacts (+ versions), Costs (labor/license/PaaS/IaaS/SaaS), Gates (G0–G5), Security (ISO 27001 SoA), plus people, linked products, change requests.</li>
+      <li><strong>Resources</strong> — people synced from Entra ID; allocation vs availability; period-windowed utilisation with a date-range filter.</li>
+      <li><strong>Financials</strong> — budget vs actual, CapEx/OpEx, forecast-at-completion, savings/benefit, portfolio ROI, source toggle.</li>
+      <li><strong>Delivery Status</strong> — stakeholder report by period; velocity, on-time %, blockers, budget burn.</li>
+      <li><strong>Releases</strong> — release calendar &amp; deployment tracking.</li>
+      <li><strong>Weekly Updates (News)</strong> — editable news wall (masonry, themes, edit mode).</li>
+    </ul>
+
+    <h3>2.2 Configuration screens</h3>
+    <ul>
+      <li><strong>My Team</strong> — members &amp; skills, per-team SWOT, individual development plans (manager-scoped; governance-gated).</li>
+      <li><strong>Methodologies</strong> — methodology library + create-project wizard.</li>
+      <li><strong>Integrations</strong> — connectors (Jira, Azure DevOps, ServiceNow, ManageEngine SDP, GitHub, Confluence, Teams, Slack, Power BI), SSO, email, directory sync.</li>
+      <li><strong>Reports</strong> — branded portfolio/demand/blocker/audit reports; export formats.</li>
+      <li><strong>Administration</strong> — roles &amp; permissions matrix, backups/restore, audit log, AD sync, install/integration guides, deletion requests.</li>
+      <li><strong>Help</strong> — role-based guides, articles, contact.</li>
+    </ul>
+
+    <h3>2.3 Stakeholder experience</h3>
+    <ul><li>Reduced navigation: <strong>My Projects</strong>, <strong>My Demands</strong> + Delivery, Releases, News, Help.</li></ul>
+
+    <h3>2.4 Governance modules</h3>
+    <p>Stage gates G0–G5, gate reviews (architecture/security), decision log (ADR), TOGAF ADM phases, architecture domains/waivers/ARB, and a security/compliance module (GDPR, PCI-DSS, ISO 27001, EU AI Act, SOC 2, NIS2) with control mappings — reproduced where the prototype places them.</p>
+
+    <h3>2.5 Approved extensions (beyond the frozen prototype)</h3>
+    <p>Built in the existing design language and recorded per <code>CLAUDE.md §2</code> + an ADR: Microsoft Teams notifications; real-time collaboration (SignalR rooms — PI Program Board, demand funnel, task board, live presence/cursors/off-screen peers); Freeform Whiteboard (co-editing, templates, export); Team SWOT and individual development plans; ISO 27001 Statement of Applicability; cross-entity timeline dependencies; period-windowed resource utilisation; quality test tasks + Jira board ingest; project delivery roles (Tech Lead / Scrum Master); and the three Atlas brand themes (Command / Daylight / Carbon).</p>
+
+    <h3>2.6 Platform &amp; cross-cutting</h3>
+    <ul>
+      <li>Entra ID (MSAL) SSO with route guards; server-authoritative RBAC (6 canonical roles; 9 cosmetic header identities).</li>
+      <li>Generated API type contract (OpenAPI → TypeScript) with CI drift protection.</li>
+      <li>Self-hosted fonts/assets for air-gapped operation; nginx same-origin serving.</li>
+      <li>Observability (OpenTelemetry), backups/restore, audit trail, secret rotation.</li>
+    </ul>
+
+    <h3>2.7 Out of scope</h3>
+    <ul>
+      <li>Any redesign, restyling, or screens/sections not in the prototype (except the §2.5 approved extensions).</li>
+      <li>New CSS frameworks or global stylesheets (inline theme tokens only).</li>
+      <li>Client-side authorization as a security control.</li>
+      <li>Full screen-body internationalisation (chrome-only per ADR-0084 until a product decision widens it).</li>
+      <li>Jira bidirectional write-back (Proposed, ADR-0080 — pending sign-off).</li>
+      <li>Editing the design reference (<code>design/</code>) — regenerated by the design team.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span> Deliverables</h2>
+    <ul>
+      <li>The complete, prototype-faithful Atlas PPM <strong>frontend</strong> (React 18 + TS + Vite), one screen component per route, split into local sub-components.</li>
+      <li>The supporting <strong>.NET 10 minimal API</strong> endpoints each screen consumes (extended where needed), EF Core 10 / PostgreSQL 16.</li>
+      <li><strong>Entra SSO</strong> wiring (login/redirect, route guards) and the RBAC capability matrix.</li>
+      <li><strong>Generated API types</strong> + <code>api.ts</code> client; TanStack Query hooks with loading/empty/error states.</li>
+      <li><strong>Automated test suites</strong> — backend (xUnit, incl. fixtures + architecture boundary tests), frontend (Vitest), accessibility (Playwright + axe), performance (k6) — gated in CI with coverage floors.</li>
+      <li><strong>Architecture Decision Records</strong> for every architectural choice, plus a consolidated <code>ALL-ADRS.md</code>.</li>
+      <li><strong>Deployment artefacts</strong> for the air-gapped Windows on-prem target (self-contained build output, nginx config, setup/integration guides).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span> Approach &amp; methodology</h2>
+    <ul>
+      <li><strong>Prototype is the source of truth.</strong> Inline styles lifted from the prototype; <code>theme.ts</code> tokens and the three fonts only; computed visuals (charts, donuts, sparklines, gantt geometry) ported faithfully.</li>
+      <li><strong>Empty by default.</strong> Real layout with tasteful empty states until the API returns data; never fabricated seed data.</li>
+      <li><strong>Server-authoritative security.</strong> The API is the authority for authorization; UI role checks are cosmetic affordances only.</li>
+      <li><strong>Typed, tested, accessible.</strong> TypeScript strict; generated API types; ≥44px hit targets, real controls, focus styles, <code>aria-*</code>; every data view has loading/empty/error.</li>
+      <li><strong>Build one screen fully</strong> (visually faithful + data-wired + empty state) before the next; compare side-by-side with the prototype.</li>
+      <li><strong>ADR-driven + one-change-one-PR</strong>, each verified green in CI before merge.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span> Technical architecture</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+      <tbody>
+        <tr><td>Frontend</td><td>React 18, TypeScript (strict), Vite, react-router v6, TanStack Query, @azure/msal-browser, SignalR client</td></tr>
+        <tr><td>Styling</td><td>Inline styles + <code>theme.ts</code> tokens (CSS-variable themes; 5 palettes); self-hosted fonts</td></tr>
+        <tr><td>Backend</td><td>.NET 10 minimal API, modular monolith (per-domain <code>Atlas.Api.&lt;Domain&gt;</code>), EF Core 10</td></tr>
+        <tr><td>Data</td><td>PostgreSQL 16 (<code>date</code>/<code>timestamptz</code> typed dates per ADR-0082)</td></tr>
+        <tr><td>Realtime</td><td>SignalR "room" hub (presence, cursors, live sync)</td></tr>
+        <tr><td>Serving</td><td>nginx, same-origin, <code>/api/v1/*</code>; on-prem air-gapped</td></tr>
+        <tr><td>Quality gates</td><td>Module-boundary ratchet (NetArchTest), coverage floors, OpenAPI type-contract drift, axe a11y, Semgrep/Trivy</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span> Milestones (build order)</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>#</th><th>Phase</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">M1</td><td>Dashboard</td><td>Executive layout first (tokens, cards, charts, tables), then Operational/Compact/Custom</td></tr>
+        <tr><td class="col-num">M2</td><td>Core object</td><td>Portfolio (+ Blockers) and Project Detail drill-in</td></tr>
+        <tr><td class="col-num">M3</td><td>Flow &amp; time</td><td>Demands funnel, Gantt timeline</td></tr>
+        <tr><td class="col-num">M4</td><td>Portfolio breadth</td><td>Programs, Products, OKRs, Resources, Financials</td></tr>
+        <tr><td class="col-num">M5</td><td>Reporting</td><td>Delivery Status, Releases, News</td></tr>
+        <tr><td class="col-num">M6</td><td>Configuration</td><td>Methodologies (+ wizard), Integrations, Reports, Admin, Help</td></tr>
+        <tr><td class="col-num">M7</td><td>Stakeholder</td><td>My Projects / My Demands + role-based nav &amp; affordances</td></tr>
+        <tr><td class="col-num">M8</td><td>Governance</td><td>Gates, decisions, TOGAF ADM, security/compliance</td></tr>
+        <tr><td class="col-num">M9</td><td>Platform hardening</td><td>Entra SSO, real API wiring, loading/empty/error finalisation, air-gapped packaging</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout">Milestones are delivery groupings, not a fixed calendar; sequencing may be reprioritised with the product owner.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span> Acceptance criteria</h2>
+    <ul>
+      <li><strong>Visual fidelity</strong> — each screen matches the prototype 1:1 on side-by-side review (layout, spacing, type, colour, components, states, copy).</li>
+      <li><strong>Data-wired</strong> — every view reads real data via TanStack Query with loading/empty/error states; empty by default.</li>
+      <li><strong>Security</strong> — authorization enforced server-side; verified by backend tests.</li>
+      <li><strong>Accessibility</strong> — axe sweep passes (structural); WCAG AA colour contrast on all themes.</li>
+      <li><strong>Quality gates green</strong> — frontend + backend suites, coverage floors, OpenAPI contract-drift, module-boundary ratchet, SAST/Trivy.</li>
+      <li><strong>Deployable</strong> — a clean build runs on the air-gapped Windows target from the provided artefacts.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">8</span> Assumptions &amp; constraints</h2>
+    <ul>
+      <li><strong>On-prem, air-gapped</strong> — no runtime internet egress; all fonts/assets self-hosted (ADR-0078); dev-only tooling runs in CI, never ships.</li>
+      <li><strong>Deployment</strong> — client downloads built files to a Windows server; no git on target — artefacts must be self-contained.</li>
+      <li><strong>Identity</strong> — Entra ID (Azure AD) tenant available for SSO; directory sync for Resources.</li>
+      <li><strong>Prototype freeze</strong> — <code>design/Atlas PPM.dc.html</code> is authoritative and not edited; approved deviations recorded in <code>CLAUDE.md §2</code> + an ADR, and flagged for the design team to regenerate <code>design/</code>.</li>
+      <li><strong>Roles</strong> — six canonical backend roles enforce access; the nine-identity header switcher is cosmetic.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">9</span> Roles &amp; responsibilities</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Party</th><th>Responsibility</th></tr></thead>
+      <tbody>
+        <tr><td>Engineering (delivery)</td><td>Frontend + API implementation, tests, ADRs, CI, deployment artefacts</td></tr>
+        <tr><td>Product Owner (Birgma)</td><td>Prototype sign-off, approval of extensions &amp; Proposed ADRs, milestone prioritisation</td></tr>
+        <tr><td>Design team</td><td>Own <code>design/</code>; regenerate to reflect approved extensions</td></tr>
+        <tr><td>Platform / IT (Birgma)</td><td>Entra tenant, on-prem/nginx environment, DB provisioning, deploy windows</td></tr>
+        <tr><td>Security / Compliance</td><td>DPIA / MBL §11 sign-off for personnel-data features; governance module review</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">10</span> Non-functional requirements</h2>
+    <ul>
+      <li><strong>Accessibility</strong> — WCAG AA; keyboard + AT support; axe-gated in CI.</li>
+      <li><strong>Internationalisation</strong> — six-locale chrome catalogue (en/sv/fi/da/no/fr) + completeness test; English screen content (ADR-0084).</li>
+      <li><strong>Security &amp; compliance</strong> — RBAC capability matrix; GDPR/ISO 27001/PCI-DSS/EU AI Act/SOC 2/NIS2 modules; audit trail; secret rotation; CSP + TLS hardening.</li>
+      <li><strong>Performance</strong> — k6 performance budget; time-phased resource engine shared across roster/report/export to prevent drift.</li>
+      <li><strong>Observability</strong> — OpenTelemetry traces/metrics/logs (OTLP, opt-in).</li>
+      <li><strong>Data integrity</strong> — typed dates (<code>date</code>/<code>timestamptz</code>); no display-string date columns (ADR-0082).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">11</span> Risks &amp; dependencies</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Risk / dependency</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Prototype fidelity disputes</td><td>Side-by-side review as an explicit acceptance gate</td></tr>
+        <tr><td>Air-gapped runtime (no CDNs)</td><td>Self-host all assets; verify offline build</td></tr>
+        <tr><td>Entra tenant / directory access</td><td>Confirm tenant + app registration early (M9 depends on it)</td></tr>
+        <tr><td>Personnel-data features (SWOT / dev plans)</td><td>Gated off until DPIA + MBL §11 sign-off (ADR-0063)</td></tr>
+        <tr><td>External connector availability (Jira/ADO/etc.)</td><td>Empty/degraded states; connectors dormant until configured</td></tr>
+        <tr><td>Compliance-module accuracy</td><td>Review with Security/Compliance before acceptance</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <p class="footer-note">Companion document: a separate SoW covers the <strong>code-review remediation engagement</strong> (Epic #106) — security hardening, structural refactors, and ADRs 0080–0084 — with per-item delivery status.</p>
+</article>

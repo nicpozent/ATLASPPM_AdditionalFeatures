@@ -1,0 +1,9 @@
+graph LR
+  G0["G0<br/>Concept"] --> G1["G1<br/>Initiate"] --> G2["G2<br/>Plan"] --> G3["G3<br/>Build"] --> G4["G4<br/>Deploy"] --> G5["G5<br/>Close"]
+  R{"Gate review<br/>cap-approve"}:::gate
+  G1 -.-> R
+  G3 -.-> R
+  R -- pass --> ADV["Advance to next gate"]
+  R -- fail --> REM["Remediate / hold"]:::deny
+  classDef gate fill:#fff6e6,stroke:#a9791a,color:#5a3d00;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

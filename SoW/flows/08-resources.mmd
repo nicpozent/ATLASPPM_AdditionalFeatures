@@ -1,0 +1,10 @@
+graph TD
+  R(["Resources roster<br/>synced from Entra ID"]):::start --> W{"Period window"}
+  W --> WIN["day/week/month/quarter/half/year<br/>or custom date range"]
+  WIN --> ENG["Shared time-phased engine"]
+  ENG --> UT["Avg utilisation = Ops + Project + Product"]
+  UT --> OV{"over 100%?"}
+  OV -- yes --> FLAG["Over-allocation → resource risk"]:::deny
+  OV -- no --> OK["Within capacity"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

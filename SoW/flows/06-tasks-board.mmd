@@ -1,0 +1,8 @@
+graph TD
+  U(["Planner drags task card"]):::start --> CAP{"cap-schedule?<br/>Admin · PMO · PM · PM Lead"}
+  CAP -- no --> DENY["403 — status change denied"]:::deny
+  CAP -- yes --> MV["PATCH task status"]
+  MV --> HUB["SignalR room tasks:{projectId}"]
+  HUB --> PEERS["Card moves live for every viewer"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  actor U as PM · cap-projects E
+  participant API as Atlas API
+  participant Q as SyncQueue⟨T⟩
+  participant W as SyncWorker⟨T⟩
+  participant C as IWorkItemConnector
+  participant EX as Jira / Azure DevOps
+  U->>API: POST /projects/{id}/{conn}/sync?background=true
+  API->>API: gate cap-projects E
+  API->>Q: enqueue job
+  API-->>U: 202 Accepted + jobId
+  W->>C: SyncCoreAsync(targets, delta)
+  C->>EX: pull issues (delta watermark, ISO)
+  EX-->>C: work items
+  C->>API: upsert projects / sprints / epics / tasks
+  W->>API: write audit event
+  U->>API: GET .../sync/status/{jobId}
+  API-->>U: status = done (counts)
