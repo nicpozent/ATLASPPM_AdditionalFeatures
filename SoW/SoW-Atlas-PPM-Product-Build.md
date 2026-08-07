@@ -7,7 +7,7 @@
 | **Repository** | `nicpozent/ATLASPPM_AdditionalFeatures` |
 | **Prepared for** | nicolas.pozza@birgma.com |
 | **Date** | 2026-08-07 |
-| **Document type** | Baseline SoW (living — updated as scope is confirmed) |
+| **Document type** | Statement of Work — for signature (v1.0 draft) |
 
 ---
 
@@ -282,6 +282,59 @@ reprioritised with the product owner.*
 
 ---
 
+## 12. Commercials & timeline
+
+> **To be completed by the parties.** The Atlas engineering scope, milestones and
+> acceptance are fixed by this document; pricing, rates and calendar dates are
+> commercial terms to be agreed and filled in before signature.
+
+| Term | Value |
+|---|---|
+| Pricing model | ‹fixed-price / capped T&M / T&M — to be agreed› |
+| Total price / not-to-exceed | ‹to be agreed› |
+| Rate card (if T&M) | ‹to be agreed› |
+| Estimated effort | ‹to be agreed› |
+| Payment schedule | On acceptance of each milestone (M1–M9, §6) · ‹split % to be agreed› |
+| Expenses & travel | ‹to be agreed› |
+| Start date | ‹TBD› |
+| Target completion | ‹TBD› (milestone dates per §6) |
+| Warranty / support | ‹to be agreed› |
+| Governing agreement | This SoW is issued under ‹MSA / framework agreement ref — TBD› |
+
+Change control: any change to the fixed scope (§2) is handled by a written
+change request priced against the agreed model before work proceeds.
+
+## 13. Acceptance & sign-off
+
+Work is accepted milestone-by-milestone against the criteria in §7. This
+Statement of Work is agreed and authorised by the undersigned.
+
+**For Birgma / Biltema Group (Client)**
+
+| | |
+|---|---|
+| Name | ______________________________ |
+| Title | ______________________________ |
+| Signature | ______________________________ |
+| Date | ______________________________ |
+
+**For the Supplier** — ‹supplier legal name — TBD›
+
+| | |
+|---|---|
+| Name | ______________________________ |
+| Title | ______________________________ |
+| Signature | ______________________________ |
+| Date | ______________________________ |
+
+Effective date: ‹on last signature› · SoW version: v1.0 (draft) · Supersedes: ‹none / prior version›
+
+---
+
 *Companion document: a separate SoW covers the **code-review remediation
 engagement** (Epic #106) — security hardening, structural refactors, and the
 ADRs 0080–0084 — with per-item delivery status.*
+
+*The 39 flow diagrams (system · user journeys · development) are embedded in the
+HTML edition and indexed in `flows.md`; the HTML edition is the self-contained,
+signable version.*
