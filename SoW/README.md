@@ -6,7 +6,8 @@ Statement-of-Work deliverables for the Atlas PPM engagement.
 
 | File | What |
 |---|---|
-| `SoW-Atlas-PPM-Product-Build.md` | SoW for the full product build (Markdown, Confluence-ready) |
+| `STATEMENT-OF-WORK.md` / `.html` | **Canonical SoW** in the Birgma house format (17 sections; mirrors `GovernancePortal_Latest/docs/STATEMENT-OF-WORK.md`) |
+| `SoW-Atlas-PPM-Product-Build.md` | Detailed build SoW (Markdown, Confluence-ready) |
 | `SoW-Atlas-PPM-Remediation.md` | SoW for the code-review remediation engagement (Epic #106) |
 | `sow-atlas-ppm-product-build.html` | Product-build SoW as a styled, printable HTML page |
 | `flows.md` | Index of all flow diagrams (live Mermaid + image links) |

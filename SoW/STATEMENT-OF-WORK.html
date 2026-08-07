@@ -1,0 +1,339 @@
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --surface-alt:#fbfcfd;
+    --ink:#18202e; --body:#333c4d; --muted:#606b7e; --faint:#8994a6;
+    --accent:#2a4c8f; --accent-ink:#22407a; --accent-soft:#e9eef8; --accent-line:#c9d6ee;
+    --border:#e4e8ef; --border-strong:#d3d9e2;
+    --ok:#2e7d5b; --warn:#a9791a; --crit:#b23a3a;
+    --shadow:0 1px 2px rgba(24,32,46,.06),0 8px 28px rgba(24,32,46,.06);
+    --radius:14px;
+    --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-head:"Segoe UI Semibold","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    --font-mono:ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d131d; --surface:#151e2c; --surface-alt:#111a27;
+      --ink:#eaeef6; --body:#c4ccd9; --muted:#93a0b5; --faint:#6c7a90;
+      --accent:#7ea6e8; --accent-ink:#a9c4f2; --accent-soft:#1a2740; --accent-line:#2c3e5e;
+      --border:#25324a; --border-strong:#324159;
+      --ok:#5cc296; --warn:#d9ab5a; --crit:#e28585;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d131d; --surface:#151e2c; --surface-alt:#111a27;
+    --ink:#eaeef6; --body:#c4ccd9; --muted:#93a0b5; --faint:#6c7a90;
+    --accent:#7ea6e8; --accent-ink:#a9c4f2; --accent-soft:#1a2740; --accent-line:#2c3e5e;
+    --border:#25324a; --border-strong:#324159;
+    --ok:#5cc296; --warn:#d9ab5a; --crit:#e28585;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--body);
+    font-family:var(--font-body); font-size:16px; line-height:1.62;
+    margin:0; padding:0; -webkit-font-smoothing:antialiased;
+  }
+  .doc{max-width:60rem; margin:0 auto; padding:clamp(1.25rem,4vw,3.25rem) clamp(1rem,4vw,2.75rem) 4rem;}
+
+  /* Masthead */
+  .masthead{border-bottom:2px solid var(--accent); padding-bottom:1.6rem; margin-bottom:2.4rem;}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--accent-ink); font-weight:600; margin:0 0 .7rem;
+  }
+  h1{
+    font-family:var(--font-head); font-weight:700; color:var(--ink);
+    font-size:clamp(1.85rem,4.5vw,2.7rem); line-height:1.12; letter-spacing:-.015em;
+    margin:0 0 .3rem; text-wrap:balance;
+  }
+  .subtitle{color:var(--muted); font-size:1.02rem; margin:.2rem 0 0;}
+
+  .meta{
+    display:grid; grid-template-columns:max-content 1fr; column-gap:1.6rem; margin-top:1.6rem;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:.35rem 1.35rem; box-shadow:var(--shadow); font-size:.92rem;
+  }
+  .meta > div{display:contents;}
+  .meta dt{
+    color:var(--faint); font-family:var(--font-mono); font-size:.72rem; letter-spacing:.06em;
+    text-transform:uppercase; padding:.62rem 0; align-self:center; white-space:nowrap;
+    border-bottom:1px solid var(--border);
+  }
+  .meta dd{margin:0; color:var(--ink); font-weight:500; padding:.62rem 0; align-self:center; border-bottom:1px solid var(--border);}
+  .meta > div:last-child dt, .meta > div:last-child dd{border-bottom:none;}
+
+  /* Sections */
+  section{margin-top:2.6rem;}
+  h2{
+    font-family:var(--font-head); font-weight:700; color:var(--ink);
+    font-size:1.34rem; letter-spacing:-.01em; margin:0 0 .9rem;
+    padding-bottom:.5rem; border-bottom:1px solid var(--border-strong);
+    display:flex; align-items:baseline; gap:.7rem; text-wrap:balance;
+  }
+  h2 .num{font-family:var(--font-mono); font-size:.9rem; color:var(--accent-ink); font-weight:600;}
+  h3{font-family:var(--font-head); font-weight:650; color:var(--ink); font-size:1.02rem; margin:1.6rem 0 .5rem;}
+  p{margin:.5rem 0 .9rem; max-width:62ch;}
+  strong{color:var(--ink); font-weight:650;}
+  a{color:var(--accent-ink);}
+  code,.mono{font-family:var(--font-mono); font-size:.86em; background:var(--accent-soft); color:var(--accent-ink); padding:.08em .38em; border-radius:5px;}
+
+  ul{margin:.4rem 0 1rem; padding-left:0; list-style:none; max-width:64ch;}
+  ul li{position:relative; padding-left:1.35rem; margin:.4rem 0;}
+  ul li::before{content:""; position:absolute; left:.25rem; top:.82em; width:.42rem; height:.42rem; border-radius:2px; background:var(--accent); transform:translateY(-50%);}
+
+  /* Tables */
+  .twrap{overflow-x:auto; margin:1rem 0 1.4rem; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); background:var(--surface);}
+  table{border-collapse:collapse; width:100%; font-size:.9rem; min-width:34rem;}
+  .tight table{min-width:24rem;}
+  th,td{text-align:left; padding:.62rem .95rem; vertical-align:top; border-bottom:1px solid var(--border);}
+  thead th{
+    background:var(--accent-soft); color:var(--accent-ink);
+    font-family:var(--font-head); font-weight:650; font-size:.76rem; letter-spacing:.05em; text-transform:uppercase;
+    border-bottom:1px solid var(--accent-line); position:sticky; top:0;
+  }
+  tbody tr:nth-child(even){background:var(--surface-alt);}
+  tbody tr:last-child td{border-bottom:none;}
+  td:first-child{font-weight:550; color:var(--ink);}
+  .col-num{white-space:nowrap; font-family:var(--font-mono); color:var(--accent-ink);}
+
+  .callout{
+    background:var(--accent-soft); border:1px solid var(--accent-line); border-left:4px solid var(--accent);
+    border-radius:10px; padding:.9rem 1.15rem; margin:1.2rem 0; font-size:.93rem; color:var(--body);
+  }
+  .footer-note{margin-top:3rem; padding-top:1.3rem; border-top:1px solid var(--border); color:var(--muted); font-size:.86rem;}
+
+  @media print{
+    body{background:#fff; font-size:11.5pt;}
+    .doc{max-width:none; padding:0;}
+    .twrap,.meta{box-shadow:none;}
+    section,h2{break-inside:avoid;}
+    thead th{position:static;}
+  }
+
+  /* flow embeds + sign-off (everything build) */
+  .flowgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,21rem),1fr));gap:1rem;margin:1rem 0 1.4rem;}
+  .flowgrid figure{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;}
+  .flowgrid figcaption{padding:.5rem .75rem;font-size:.82rem;font-weight:650;color:var(--ink);border-bottom:1px solid var(--border);background:var(--accent-soft);}
+  .flowgrid .iw{padding:.6rem;overflow-x:auto;background:var(--surface);}
+  .flowgrid img{max-width:100%;height:auto;display:block;}
+  .sign{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-top:1rem;}
+  @media (max-width:640px){.sign{grid-template-columns:1fr;}}
+  .sign .box{border:1px solid var(--border-strong);border-radius:12px;padding:1.05rem 1.2rem;background:var(--surface);}
+  .sign .box h4{margin:0 0 .2rem;font-family:var(--font-head);font-size:.95rem;color:var(--ink);}
+  .sign .sub{font-size:.8rem;color:var(--muted);margin:0 0 1.4rem;}
+  .sign .line{margin-top:1.5rem;border-top:1px solid var(--border-strong);padding-top:.35rem;font-size:.76rem;color:var(--faint);font-family:var(--font-mono);letter-spacing:.04em;text-transform:uppercase;}
+  .tbd{color:var(--warn);font-weight:600;font-family:var(--font-mono);font-size:.9em;}
+</style>
+
+<article class="doc">
+  <header class="masthead">
+    <p class="eyebrow">Statement of Work</p>
+    <h1>Atlas PPM</h1>
+    <p class="subtitle">Portfolio &amp; Project Management platform — Birgma / Biltema Group</p>
+    <p class="callout"><strong>How to use this document.</strong> The scope, deliverables, acceptance criteria and security/compliance commitments below are grounded in the delivered system. Fields in <strong>[brackets]</strong> — parties, dates, effort and commercials — are for the contracting parties to complete; they are intentionally not pre-filled.</p>
+    <dl class="meta">
+      <div><dt>Project</dt><dd>Atlas — Portfolio &amp; Project Management (PPM) platform</dd></div>
+      <div><dt>Client / Sponsor</dt><dd>[Birgma / Biltema — sponsor name]</dd></div>
+      <div><dt>Supplier / Delivery</dt><dd>[Delivery team / vendor]</dd></div>
+      <div><dt>SoW version</dt><dd>1.0 · [date]</dd></div>
+      <div><dt>Effective period</dt><dd>[start] – [end]</dd></div>
+      <div><dt>Document owner</dt><dd>[name, role]</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <h2><span class="num">1</span> Purpose</h2>
+    <p>This Statement of Work defines the scope, deliverables, approach, acceptance criteria and responsibilities for the design, build and hand-over of <strong>Atlas</strong> — a Portfolio &amp; Project Management web application that runs the Biltema Group portfolio end to end: demand intake and scoring, projects with stage-gate governance, programs and products, OKRs, timeline/Gantt planning, resource and financial management, delivery reporting, and a security/compliance module — with identity federated to <strong>Microsoft Entra ID</strong> and authorization enforced server-side. The frontend is reproduced <strong>pixel-faithful to the approved prototype</strong> (<code>design/Atlas PPM.dc.html</code>) and wired to the <strong>.NET 10 minimal API</strong>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span> Background</h2>
+    <p>Portfolio governance today is spread across spreadsheets and disconnected trackers, so demand, delivery, resourcing and financials cannot be seen or governed in one place, and stage-gate/architecture decisions are not auditable. Atlas replaces that with a single, role-aware platform: a controlled object model (demands → projects → programs/products/OKRs), server-authoritative RBAC, real-time collaboration, connector-fed work-item sync, and an ISO 27001 / GDPR-aware governance module — deployable <strong>on-premise and air-gapped</strong>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span> Objectives</h2>
+    <ul>
+      <li>Federated single sign-on and least-privilege authorisation (Entra ID; 6 canonical roles enforced server-side via a capability matrix).</li>
+      <li>A faithful reproduction of every approved screen, <strong>data-driven</strong> with first-class loading / empty / error states (empty by default — no seed data).</li>
+      <li>A controlled <strong>demand → project → gate</strong> lifecycle with stage gates (G0–G5) and architecture/security gate reviews.</li>
+      <li><strong>Planning &amp; resourcing</strong>: timeline/Gantt with cross-entity dependencies; time-phased resource utilisation; financials (budget vs actual, FaC, ROI).</li>
+      <li><strong>Integration</strong>: idempotent work-item sync from Jira and Azure DevOps behind one connector abstraction; Teams notifications.</li>
+      <li><strong>Real-time collaboration</strong>: presence, cursors and live change-sync; PI board, task board, demand funnel and a freeform whiteboard.</li>
+      <li><strong>Governance &amp; compliance by design</strong>: decision log (ADR), TOGAF ADM, ISO 27001 Statement of Applicability, and GDPR handling of personnel data.</li>
+      <li><strong>Portability &amp; assurance</strong>: container-first, same-origin behind nginx, an air-gapped build, observability, backups and a continuously green CI gate.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span> Scope of work</h2>
+    <h3>4.1 In scope (work packages)</h3>
+    <div class="twrap"><table>
+      <thead><tr><th>WP</th><th>Work package</th><th>Summary</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">WP1</td><td>Identity &amp; access</td><td>Entra SSO (MSAL); RS256 token validation; server-authoritative RBAC capability matrix (6 canonical roles; 9 cosmetic identities); idle logout; anonymous-in-production boot fuses</td></tr>
+        <tr><td class="col-num">WP2</td><td>Portfolio &amp; demand intake</td><td>Portfolio (projects + blockers); Demand Pipeline value-vs-effort funnel; Programs (stakeholder matrix); Products; OKRs</td></tr>
+        <tr><td class="col-num">WP3</td><td>Project delivery</td><td>Project Detail — Overview · Tasks (board+list) · Epics · RAID · Artifacts(+versions) · Costs · Gates (G0–G5) · Security (ISO 27001 SoA); delivery roles</td></tr>
+        <tr><td class="col-num">WP4</td><td>Planning &amp; timeline</td><td>Timeline / Gantt (project &amp; program); phases, bars, milestones; cross-entity dependency arrows (manual / jira / project)</td></tr>
+        <tr><td class="col-num">WP5</td><td>Resources &amp; financials</td><td>Entra-synced roster; period-windowed utilisation (shared time-phased engine + date range); budget vs actual, CapEx/OpEx, forecast-at-completion, ROI</td></tr>
+        <tr><td class="col-num">WP6</td><td>Reporting &amp; assurance</td><td>Dashboard (Executive/Operational/Compact/Custom); Delivery status; Releases; Weekly Updates; branded Reports (PDF/Excel/PPTX); audit log</td></tr>
+        <tr><td class="col-num">WP7</td><td>Integrations</td><td>Jira &amp; Azure DevOps sync behind one <code>IWorkItemConnector</code> (shared queue/worker, 202+poll, delta watermark); Teams notifications; connector catalogue</td></tr>
+        <tr><td class="col-num">WP8</td><td>Real-time collaboration</td><td>Single SignalR room hub — presence, cursors, live sync, off-screen peers; PI board, demand funnel, task board; Freeform Whiteboard co-editing</td></tr>
+        <tr><td class="col-num">WP9</td><td>Governance &amp; compliance</td><td>Stage gates + gate reviews; ADR log; TOGAF ADM, domains/waivers/ARB; ISO 27001 SoA; compliance module (GDPR/PCI-DSS/ISO 27001/EU AI Act/SOC 2/NIS2)</td></tr>
+        <tr><td class="col-num">WP10</td><td>People, teams &amp; methodology</td><td>My Team — skills matrix, Team SWOT, individual development plans (manager-scoped, governance-gated); Methodologies + create-project wizard</td></tr>
+        <tr><td class="col-num">WP11</td><td>Platform quality &amp; CI</td><td>Generated API type contract (OpenAPI→TS) + drift check; module-boundary ratchet (ADR-0072); xUnit·Vitest·Playwright/axe·k6 with coverage floors; Semgrep + Trivy; SHA-pinned Actions</td></tr>
+        <tr><td class="col-num">WP12</td><td>Air-gapped operations &amp; docs</td><td>Self-hosted assets; nginx same-origin (<code>/api/v1</code>, <code>/hubs</code>); OpenTelemetry; backups/restore; audit trail; secret rotation; HLD/LLD/ADRs/ABB-SBB, guides</td></tr>
+      </tbody>
+    </table></div>
+    <h3>4.2 Out of scope</h3>
+    <ul>
+      <li>Hosting, network and identity-tenant administration beyond configuration guidance (Entra tenant, host, network, firewalls, TLS).</li>
+      <li>Organisation-side security controls (MFA / Conditional Access, at-rest encryption, SIEM ingestion) — supported by the app; enabling them is an operator action.</li>
+      <li>Data migration from legacy PPM tools (unless added by change request).</li>
+      <li>Editing the design reference (<code>design/</code>) — regenerated by the design team.</li>
+      <li><strong>Jira bidirectional write-back</strong> (Proposed, ADR-0080 — pending sign-off).</li>
+      <li><strong>Full screen-body internationalisation</strong> — English content with localised chrome (ADR-0084).</li>
+      <li>Personnel-data features (Team SWOT / development plans) remain <strong>gated off</strong> until DPIA + MBL §11 sign-off (ADR-0063).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span> Deliverables</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>#</th><th>Deliverable</th><th>Form</th><th>Acceptance evidence</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">D1</td><td>Web application (SPA + API + database)</td><td>Running same-origin stack</td><td>Serves behind nginx; <code>npm run build</code> green; <code>/health</code>·<code>/readyz</code> healthy</td></tr>
+        <tr><td class="col-num">D2</td><td>Source code + CI pipelines</td><td>Git repository</td><td>CI green: frontend, API, type-contract drift, axe, Semgrep + Trivy</td></tr>
+        <tr><td class="col-num">D3</td><td>Automated test suite</td><td>Code</td><td>xUnit + Vitest + Playwright/axe + k6; coverage floors (backend line ≥ 65 %, frontend ≥ 6 %)</td></tr>
+        <tr><td class="col-num">D4</td><td>Architecture &amp; design docs</td><td>Markdown</td><td><code>hld.md</code>, <code>lld.md</code>, <code>adr/</code> (+ <code>ALL-ADRS.md</code>), <code>building-blocks.md</code></td></tr>
+        <tr><td class="col-num">D5</td><td>Requirements &amp; user stories</td><td>Markdown</td><td><code>requirements.md</code> (FR/NFR/TR), <code>user-stories.md</code></td></tr>
+        <tr><td class="col-num">D6</td><td>Security &amp; compliance pack</td><td>Markdown + code</td><td><code>threat-model.md</code>, <code>security-hardening.md</code>, <code>pentest-scope.md</code>, per-project ISO 27001 SoA</td></tr>
+        <tr><td class="col-num">D7</td><td>GDPR / personnel-data pack</td><td>Markdown</td><td><code>dpia-personnel-data.md</code>, <code>compliance-sweden.md</code>, <code>retention.md</code></td></tr>
+        <tr><td class="col-num">D8</td><td>Operations runbooks</td><td>Markdown</td><td><code>SETUP.md</code>, <code>DOCKER.md</code>, <code>sso-setup.md</code>, <code>secrets.md</code>, <code>observability.md</code>, connector guides</td></tr>
+        <tr><td class="col-num">D9</td><td>User &amp; functional documentation</td><td>Markdown + HTML</td><td><code>user-stories.md</code>, <code>accessibility.md</code>, and the flow package (<code>SoW/flows.md</code> + gallery — 39 diagrams)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span> Approach &amp; delivery phases</h2>
+    <p>Iterative delivery; each phase is independently shippable and CI-gated. (Phases reflect the documented delivery state and forward plan; see the ADRs.)</p>
+    <div class="twrap"><table>
+      <thead><tr><th>Phase</th><th>Focus</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>P0 — Shell &amp; SSO</td><td>App shell, routing, theme, Entra SSO, RBAC capability matrix</td><td>Delivered</td></tr>
+        <tr><td>P1 — Core objects</td><td>Dashboard, Portfolio (+ Blockers), Project Detail, Demands funnel</td><td>Delivered</td></tr>
+        <tr><td>P2 — Planning &amp; breadth</td><td>Gantt, Programs, Products, OKRs, Resources, Financials</td><td>Delivered</td></tr>
+        <tr><td>P3 — Reporting</td><td>Delivery status, Releases, Weekly Updates, branded Reports</td><td>Delivered</td></tr>
+        <tr><td>P4 — Integrations &amp; real-time</td><td>Jira/ADO connector abstraction, Teams notifications, SignalR rooms</td><td>Delivered</td></tr>
+        <tr><td>P5 — Governance &amp; compliance</td><td>Stage gates, gate reviews, ADR log, TOGAF ADM, ISO 27001 SoA, compliance module</td><td>Delivered</td></tr>
+        <tr><td>P6 — Approved extensions</td><td>Whiteboard, Team SWOT &amp; dev plans, timeline dependencies, brand themes, quality/Jira ingest</td><td>Delivered (CLAUDE.md §2 + ADRs)</td></tr>
+        <tr><td>P7 — Engineering-quality remediation</td><td>Security hardening, generated API types, connector abstraction, cleanup (Epic #106; ADRs 0080–0084)</td><td>Delivered</td></tr>
+        <tr><td>P8 — Azure-native / production migration</td><td>Managed identity, Key Vault, managed Postgres (PITR), private networking, WAF</td><td>Planned (separate SoW)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span> Milestones &amp; acceptance criteria</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Milestone</th><th>Acceptance criteria</th></tr></thead>
+      <tbody>
+        <tr><td>M1 Functional acceptance</td><td>All in-scope screens demonstrable against <code>requirements.md</code> (FR-*) and <code>user-stories.md</code>; real data with loading/empty/error; integration tests green</td></tr>
+        <tr><td>M2 Security acceptance</td><td>Threat model reviewed; server-authoritative RBAC verified by tests; no High findings in <code>npm audit --omit=dev</code> / Trivy; Semgrep + secrets clean; nginx CSP/TLS hardening</td></tr>
+        <tr><td>M3 Operational acceptance</td><td>Same-origin deployment per <code>SETUP.md</code> / <code>DOCKER.md</code>; <code>/health</code>·<code>/readyz</code> pass; <strong>backup + restore rehearsed</strong>; air-gapped build verified</td></tr>
+        <tr><td>M4 Compliance acceptance</td><td>Per-project ISO 27001 SoA populated; GDPR / personnel-data pack reviewed by [DPO]; DPIA + MBL §11 sign-off; audit trail verified</td></tr>
+        <tr><td>M5 Documentation &amp; hand-over</td><td>D4–D9 delivered; knowledge-transfer session held</td></tr>
+        <tr><td>M6 Live sign-off</td><td>A real Entra interactive sign-in verified in [staging/production]; go-live approved by [sponsor]</td></tr>
+      </tbody>
+    </table></div>
+    <p class="callout"><strong>Definition of Done (per work package):</strong> code merged to <code>main</code> behind green CI (one issue → one PR); tests for the behaviour; docs/ADR updated; no High/Critical security findings; module-boundary ratchet and API type-contract drift both green.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">8</span> Roles &amp; responsibilities (RACI)</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Activity</th><th>Delivery team</th><th>Client / IT</th><th>Sponsor</th><th>DPO</th></tr></thead>
+      <tbody>
+        <tr><td>Build &amp; test the application</td><td>R/A</td><td>C</td><td>I</td><td>I</td></tr>
+        <tr><td>Entra tenant + app registrations, MFA/CA</td><td>C</td><td>R/A</td><td>I</td><td>I</td></tr>
+        <tr><td>Host / network / TLS certificates</td><td>C</td><td>R/A</td><td>I</td><td>—</td></tr>
+        <tr><td>Connector setup + consent (Jira/ADO/Teams/Graph)</td><td>C</td><td>R/A</td><td>I</td><td>—</td></tr>
+        <tr><td>Security &amp; compliance artefacts</td><td>R/A</td><td>C</td><td>I</td><td>C</td></tr>
+        <tr><td>Personnel-data sign-off (DPIA / MBL §11)</td><td>C</td><td>C</td><td>I</td><td>R/A</td></tr>
+        <tr><td>Acceptance &amp; go-live approval</td><td>C</td><td>C</td><td>R/A</td><td>C</td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:.86rem;color:var(--muted);">R = Responsible · A = Accountable · C = Consulted · I = Informed. Names: [to complete].</p>
+  </section>
+
+  <section>
+    <h2><span class="num">9</span> Assumptions &amp; dependencies</h2>
+    <ul>
+      <li>An <strong>Entra ID tenant</strong> is available with rights to create app registrations and grant admin consent; <strong>MFA / Conditional Access</strong> is enabled organisation-side.</li>
+      <li>A <strong>Windows / VMware host</strong> is provisioned with the runtime; <strong>TLS certificates</strong> supplied; served same-origin behind nginx.</li>
+      <li><strong>PostgreSQL 16</strong> is provisioned; off-host, access-controlled <strong>backup storage</strong> is available.</li>
+      <li>Directory data via <strong>Entra</strong>; the client nominates admins, approvers and connector credentials (Jira / Azure DevOps / Teams / Graph).</li>
+      <li>The environment is <strong>air-gapped</strong> at runtime — all assets self-hosted; build tooling runs in CI, not on the target.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">10</span> Constraints</h2>
+    <ul>
+      <li>Single-instance, same-origin on-premise deployment; the value is auditability and durability of portfolio evidence, not high availability.</li>
+      <li><strong>No runtime internet egress</strong> — no CDNs; fonts/assets bundled (ADR-0078).</li>
+      <li>Deployment is by <strong>downloading built artefacts to a Windows server</strong> (no git on target); artefacts must be self-contained.</li>
+      <li>Authorization is <strong>server-authoritative</strong>; the client is never a security boundary.</li>
+      <li>Stack: React 18 / TypeScript / Vite · .NET 10 minimal API / EF Core 10 · PostgreSQL 16 · modern evergreen browsers.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">11</span> Environment &amp; technical requirements</h2>
+    <p>Technical requirements are specified in <code>requirements.md</code> (TR-*): platform, frontend, identity, API/data, storage, messaging, security, observability, i18n, CI and compatibility. Setup steps are in <code>SETUP.md</code> / <code>DOCKER.md</code>; identity in <code>sso-setup.md</code>; connectors in <code>jira-setup.md</code>, <code>azure-devops-setup.md</code>, <code>teams-setup.md</code>, <code>email-graph-setup.md</code>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">12</span> Security &amp; compliance obligations</h2>
+    <p>The supplier will deliver and maintain: a <strong>threat model</strong> (<code>threat-model.md</code>) and hardening record (<code>security-hardening.md</code>); <strong>server-authoritative RBAC</strong> (capability matrix, ADR-0004); a per-project <strong>ISO 27001:2022 Statement of Applicability</strong> (ADR-0066); a compliance module mapping controls across GDPR / PCI-DSS / ISO 27001 / EU AI Act / SOC 2 / NIS2; and a <strong>GDPR / personnel-data pack</strong> (<code>dpia-personnel-data.md</code>, <code>compliance-sweden.md</code>, <code>retention.md</code>) — DSAR export, evidence-preserving erasure and retention purge. CI enforces SAST (Semgrep), Trivy, an axe sweep, coverage floors, an API type-contract drift check and the ADR-0072 module-boundary ratchet; GitHub Actions are pinned to commit SHAs. Personnel-data features stay gated off until DPIA + MBL §11 sign-off (ADR-0063).</p>
+  </section>
+
+  <section>
+    <h2><span class="num">13</span> Change control &amp; governance</h2>
+    <p>Changes to scope, deliverables or acceptance criteria are handled by written <strong>change request</strong>: description, rationale, impact on schedule/effort, and sign-off by [sponsor] and [delivery lead]. Day-to-day delivery is tracked on <code>main</code> with green-CI gating, <strong>one issue → one PR</strong>, and an ADR for every significant decision (<code>architecture/adr/</code>, <code>ALL-ADRS.md</code>). Product-owner-approved deviations from the frozen prototype are recorded in <code>CLAUDE.md §2</code> and an ADR.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">14</span> Risks</h2>
+    <p>Key delivery/operational risks and mitigations are catalogued in <code>threat-model.md</code> and the ADRs. Highest residual items are organisation-side: enabling MFA / Conditional Access, at-rest encryption and SIEM forwarding. Delivery-side watch items: prototype-fidelity acceptance (mitigated by side-by-side review), the air-gapped no-CDN constraint (self-hosted assets, offline build verified), and the staged migration of legacy display-string date columns (ADR-0082, per-module).</p>
+  </section>
+
+  <section>
+    <h2><span class="num">15</span> Commercials</h2>
+    <p class="callout">[To be completed by the parties — pricing model (fixed-price / capped T&amp;M / T&amp;M), total or not-to-exceed, rate card, effort estimate, payment schedule (tied to the milestones in §7), expenses, warranty and any support/maintenance terms. Not pre-filled.]</p>
+  </section>
+
+  <section>
+    <h2><span class="num">16</span> Acceptance &amp; sign-off</h2>
+    <p>Acceptance is granted per milestone (§7). Final acceptance follows M6 (live sign-off). This Statement of Work is agreed and authorised by:</p>
+    <div class="twrap"><table>
+      <thead><tr><th>Party</th><th>Name</th><th>Signature</th><th>Date</th></tr></thead>
+      <tbody>
+        <tr><td>Client / Sponsor</td><td>[ ]</td><td></td><td></td></tr>
+        <tr><td>Delivery lead</td><td>[ ]</td><td></td><td></td></tr>
+        <tr><td>DPO (compliance)</td><td>[ ]</td><td></td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:.86rem;color:var(--muted);">Effective date: [on last signature] · SoW version: 1.0 · Supersedes: [none / prior].</p>
+  </section>
+
+  <section>
+    <h2><span class="num">17</span> References</h2>
+    <p><code>requirements.md</code> · <code>user-stories.md</code> · <code>architecture/hld.md</code> · <code>architecture/lld.md</code> · <code>architecture/adr/</code> (+ <code>ALL-ADRS.md</code>) · <code>architecture/building-blocks.md</code> · <code>threat-model.md</code> · <code>security-hardening.md</code> · <code>pentest-scope.md</code> · <code>compliance-sweden.md</code> · <code>dpia-personnel-data.md</code> · <code>retention.md</code> · <code>accessibility.md</code> · <code>observability.md</code> · <code>SETUP.md</code> · <code>DOCKER.md</code> · <code>sso-setup.md</code> · <code>secrets.md</code> · connector guides · <code>SoW/flows.md</code> (functional flows).</p>
+    <p class="footer-note">Companion SoWs: <code>SoW-Atlas-PPM-Product-Build.md</code> (detailed build, self-contained with the 39 embedded flow diagrams) and <code>SoW-Atlas-PPM-Remediation.md</code> (Epic #106 remediation). Format follows the Birgma house Statement-of-Work template.</p>
+  </section>
+</article>
