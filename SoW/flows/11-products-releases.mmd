@@ -1,0 +1,6 @@
+graph LR
+  PRD(["Product"]):::start --> MAP["Jira / ADO tasks mapped"]
+  MAP --> REL["Releases"]
+  REL --> CAL["Release calendar"]
+  CAL --> DEP["Deployment tracking"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

@@ -1,0 +1,10 @@
+graph LR
+  I(["Issue / finding"]):::start --> B["Branch (claude/…)"]
+  B --> IMP["Implement · ADR if architectural"]
+  IMP --> PR["Open ONE PR (one issue → one PR)"]
+  PR --> CI{"CI green?"}
+  CI -- no --> FIX["Fix → push"]
+  FIX --> CI
+  CI -- yes --> RV["Review"]
+  RV --> M(["Squash-merge to main"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

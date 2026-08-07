@@ -1,0 +1,9 @@
+graph LR
+  PER{"Period<br/>weekly → yearly"} --> AGG["Completed · in-progress · planned"]
+  AGG --> VEL["Velocity + on-time %"]
+  AGG --> BLK["Blockers"]
+  AGG --> BURN["Budget burn"]
+  VEL --> RPT(["Stakeholder delivery report"]):::start
+  BLK --> RPT
+  BURN --> RPT
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

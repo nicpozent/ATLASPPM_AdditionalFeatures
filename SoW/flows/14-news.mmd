@@ -1,0 +1,6 @@
+graph TD
+  ED{"Edit mode?"} -- yes --> BLK["Add blocks: headline · metric · shout-out<br/>image · milestone · doc"]
+  BLK --> SAVE["Save news wall"]
+  ED -- no --> VIEW(["Masonry news wall (themed)"]):::start
+  SAVE --> VIEW
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

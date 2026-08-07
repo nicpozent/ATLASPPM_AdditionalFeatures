@@ -1,0 +1,12 @@
+graph TD
+  U(["User opens Atlas"]):::start --> A{"VITE_AUTH_ENABLED?"}
+  A -- "No (dev)" --> DEV["Anonymous mode<br/>X-Atlas-Role header"]
+  A -- "Yes" --> MSAL["MSAL redirect → Entra ID"]
+  MSAL --> TOK["Bearer token"]
+  DEV --> API["Call /api/v1/* "]
+  TOK --> API
+  API --> RBAC{"Server RBAC<br/>capability check"}
+  RBAC -- allow --> OK(["200 + data"]):::start
+  RBAC -- deny --> F["403 Forbidden"]:::deny
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+  classDef deny fill:#f7dede,stroke:#b23a3a,color:#7a1f1f;

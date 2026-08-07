@@ -1,0 +1,7 @@
+graph LR
+  NEW(["New tracker (e.g. ServiceNow)"]):::start --> IMPL["implement IWorkItemConnector"]
+  IMPL --> REG["register in DI: SyncQueue&lt;T&gt; + SyncWorker&lt;T&gt;"]
+  REG --> EP["reuse shared enqueue · 202/poll · gate"]
+  EP --> PARSE["add ONLY connector-specific parsing"]
+  PARSE --> TST(["fixture tests + boundary stays a leaf"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

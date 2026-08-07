@@ -1,0 +1,7 @@
+graph LR
+  U(["Project Manager"]):::start --> A["Methodologies → Create project"]
+  A --> B["Step 1 · pick methodology"]
+  B --> C["Step 2 · name · department · owner"]
+  C --> D["Step 3 · choose integration (Jira / ADO / none)"]
+  D --> E(["Project created → opens Project Detail"]):::start
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

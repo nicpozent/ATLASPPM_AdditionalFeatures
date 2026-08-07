@@ -1,0 +1,10 @@
+graph LR
+  SC{"Scope"} --> PJ["Project"]
+  SC --> PG["Program"]
+  PJ --> T["Timeline: phases · bars · milestones"]
+  PG --> T
+  T --> DEP["Finish→Start dependency arrows"]
+  DEP --> S{"source"}
+  S --> M["manual (hand-drawn, cap-projects)"]
+  S --> J["jira (issue-link ingest)"]
+  S --> PL["project links (auto)"]

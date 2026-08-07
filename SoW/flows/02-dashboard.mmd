@@ -1,0 +1,14 @@
+graph LR
+  N(["Open Dashboard"]):::start --> L{"Layout"}
+  L --> E["Executive"]
+  L --> O["Operational"]
+  L --> C["Compact"]
+  L --> CU["Custom builder<br/>drag/add/remove widgets"]
+  E --> Q["useDashboard() query"]
+  O --> Q
+  C --> Q
+  CU --> Q
+  Q --> D{"Data?"}
+  D -- yes --> R["KPIs · charts · tables · pipeline"]
+  D -- empty --> Z["Zeroed KPIs · empty panels"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;

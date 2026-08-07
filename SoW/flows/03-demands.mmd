@@ -1,0 +1,9 @@
+graph TD
+  C(["Create demand"]):::start --> SC["Score: value + effort (1–5)"]
+  SC --> DR["Draft"]
+  DR --> BK["Backlog"]
+  BK -->|"drag card (live funnel)"| AP{"Approve?<br/>governance-gated"}
+  AP -- approved --> PG["In progress"]
+  AP -- hold --> HD["Hold"]
+  PG --> CV["Converted to project"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
