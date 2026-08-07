@@ -1,6 +1,6 @@
 # Atlas PPM — Functional Flows
 
-Flow diagrams grouped in three views: **system & data flows**, **user journeys** (persona → goal), and **software-development interaction** (SDLC + how the pieces interact at build/run/deploy). Each entry shows the live Mermaid source and links the static PNG in `images/`. Sources are in `flows/`.
+Flow diagrams in three views: **system & data flows**, **user journeys** (persona → goal), and **software-development interaction**. Each entry shows live Mermaid + a static PNG in `images/`.
 
 
 ## System & data flows
@@ -37,6 +37,8 @@ Flow diagrams grouped in three views: **system & data flows**, **user journeys**
 - [Team member — update my work](#user-06-team-member-update)
 - [Stakeholder — check my status](#user-07-stakeholder-status)
 - [Manager — My Team (skills · SWOT · dev plan)](#user-08-manager-team)
+- [Platform Admin — administration](#user-09-platform-admin)
+- [Chief Architect — governance](#user-10-architect-governance)
 
 
 ## Software-development interaction
@@ -573,6 +575,40 @@ graph LR
   B --> D["Record individual development plan (manager-only)"]
   C --> E["Saved · governance-gated · audited"]
   D --> E
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-09-platform-admin"></a>
+
+## Platform Admin — administration
+
+![Platform Admin — administration](images/user-09-platform-admin.png)
+
+```mermaid
+graph LR
+  U(["Platform Admin"]):::start --> A["Administration"]
+  A --> B["Roles & permissions matrix"]
+  A --> C["Backups / restore · audit log"]
+  A --> D["AD directory sync · connector config"]
+  A --> E["Review & action deletion requests (GDPR)"]
+  classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
+```
+
+
+<a id="user-10-architect-governance"></a>
+
+## Chief Architect — governance
+
+![Chief Architect — governance](images/user-10-architect-governance.png)
+
+```mermaid
+graph LR
+  U(["Chief Architect"]):::start --> A["Governance"]
+  A --> B["Decision log — record an ADR"]
+  A --> C["Architecture gate reviews (G1 / G3)"]
+  A --> D["TOGAF ADM · domains · waivers · ARB"]
+  A --> E["Project → Security: ISO 27001 SoA"]
   classDef start fill:#2a4c8f,stroke:#22407a,color:#ffffff,font-weight:600;
 ```
 
